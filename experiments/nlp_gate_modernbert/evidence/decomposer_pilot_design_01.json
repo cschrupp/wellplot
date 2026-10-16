@@ -1,7 +1,12 @@
 {
-  "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-DESIGN-01-AUTH-001",
-  "slice": "DECOMPOSER-PILOT-DESIGN-01",
-  "starting_sha": "b819852653ca891f7d5575521212321f5d4d3877",
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-DESIGN-01-REWORK-AUTH-001",
+  "slice": "DECOMPOSER-PILOT-DESIGN-01R",
+  "starting_sha": "6602a2856b5641bab49423175da6e5fc1bd2f8b1",
+  "prior_candidate": "96cecfbb66249d3ace6933764a656ae77fe31410",
+  "rework": {
+    "R1": "composition attribution case-scoped to D5GAP-0096 + D5GAP-0101; uniform (case_id, failure_label) → mechanism encoding",
+    "R2": "Q1 role zero-shot only (removed zero/few-shot wording)"
+  },
   "code": "NONE",
   "model_calls": 0,
   "accepted_predecessors": {
@@ -12,7 +17,7 @@
     "nl_program_design_01r2": "c88545e20cd8e453cd8c40cf41a3b2f55813f9f0",
     "nl_program_eval_harness_01r2": "a2dce439a9bcaddeb91f02fc44b9ff77467b77c8"
   },
-  "epistemic_claim": "DECOMPOSER-PILOT-DESIGN-01 freezes an experimental hypothesis and its evaluation protocol. It provides no evidence of English\u2192ScopeNormalizedProgram model performance because no model inference has occurred.",
+  "epistemic_claim": "DECOMPOSER-PILOT-DESIGN-01R freezes an experimental hypothesis and its evaluation protocol. It provides no evidence of English→ScopeNormalizedProgram model performance because no model inference has occurred.",
   "not_authorized": {
     "preflight_code": false,
     "decomposer_pilot_preflight_01": false,
@@ -50,7 +55,7 @@
       "training": "NONE",
       "fallback_model": "NONE",
       "auto_download": false,
-      "role": "zero/few-shot constrained autoregressive decomposer",
+      "role": "zero-shot constrained autoregressive decomposer",
       "provenance_before_inference_mandatory": [
         "snapshot_path under experiments/nlp_slm_01/artifacts/modelscope_cache/",
         "snapshot_revision / directory id",
@@ -299,12 +304,19 @@
         }
       },
       "failure_label_attribution": {
-        "composition": [
-          "MISSING_TASK",
-          "WRONG_OPERATION",
-          "SEMANTIC_UNDERSPECIFICATION",
-          "SEMANTIC_OVERREACH"
-        ],
+        "function": "(case_id, failure_label) → zero or more frozen mechanism classes; attribution requires BOTH label membership AND case membership in only_on_cases",
+        "composition": {
+          "labels": [
+            "MISSING_TASK",
+            "WRONG_OPERATION",
+            "SEMANTIC_UNDERSPECIFICATION",
+            "SEMANTIC_OVERREACH"
+          ],
+          "only_on_cases": [
+            "D5GAP-0096",
+            "D5GAP-0101"
+          ]
+        },
         "local_binding": {
           "labels": [
             "WRONG_BINDING",
@@ -326,11 +338,15 @@
           ]
         },
         "independent_order_handling": {
-          "WRONG_DEPENDENCY_on_cases": [
+          "labels": [
+            "WRONG_DEPENDENCY",
+            "WRONG_ORDER"
+          ],
+          "only_on_cases": [
             "D5GAP-0096",
             "D5GAP-0117"
           ],
-          "WRONG_ORDER": "only if harness emits it for an impermissibly imposed order on D5GAP-0096 / D5GAP-0117"
+          "note": "WRONG_ORDER only when harness emits it for an impermissibly imposed order; never from oracle serialization comparison"
         },
         "reference_resolution": {
           "labels": [
@@ -489,6 +505,5 @@
     "decomposer_implemented": false,
     "english_to_program_accuracy_claimed": false,
     "next_authorized_only_after_independent_review": "DECOMPOSER-PILOT-PREFLIGHT-01 (separate AUTH; model calls = 0)"
-  },
-  "candidate_sha": "96cecfbb66249d3ace6933764a656ae77fe31410"
+  }
 }

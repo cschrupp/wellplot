@@ -1,14 +1,17 @@
-# DECOMPOSER-PILOT-DESIGN-01 — experimental hypothesis freeze
+# DECOMPOSER-PILOT-DESIGN-01R — Q5 attribution + Q1 wording rework
 
 ```
 SLICE:
-DECOMPOSER-PILOT-DESIGN-01
+DECOMPOSER-PILOT-DESIGN-01R
 
 AUTHORITY:
-WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-DESIGN-01-AUTH-001
+WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-DESIGN-01-REWORK-AUTH-001
 
 STARTING SHA:
-b819852653ca891f7d5575521212321f5d4d3877
+6602a2856b5641bab49423175da6e5fc1bd2f8b1
+
+PRIOR CANDIDATE (DESIGN-01):
+96cecfbb66249d3ace6933764a656ae77fe31410
 
 ACCEPTED PREDECESSORS:
 MB-02R                         c2f158b8222e3c1b4ae3ae737c2544fc3b25f994
@@ -19,7 +22,7 @@ NL-PROGRAM-DESIGN-01R2         c88545e20cd8e453cd8c40cf41a3b2f55813f9f0
 NL-PROGRAM-EVAL-HARNESS-01R2   a2dce439a9bcaddeb91f02fc44b9ff77467b77c8
 
 CANDIDATE SHA:
-96cecfbb66249d3ace6933764a656ae77fe31410
+<pending commit>
 
 CODE:
 NONE
@@ -34,25 +37,34 @@ PILOT-01:
 NOT AUTHORIZED
 
 STATUS:
-STOP FOR INDEPENDENT DECOMPOSER-PILOT-DESIGN-01 REVIEW
+STOP FOR INDEPENDENT DECOMPOSER-PILOT-DESIGN-01R REVIEW
 ```
 
 ## CLAIM
 
-DECOMPOSER-PILOT-DESIGN-01 freezes an experimental hypothesis and its evaluation
+DECOMPOSER-PILOT-DESIGN-01R freezes an experimental hypothesis and its evaluation
 protocol. It provides **no** evidence of English→ScopeNormalizedProgram model
 performance because **no model inference has occurred**.
+
+## Rework
+
+| id | Correction |
+|----|------------|
+| R1 | Composition attribution case-scoped to D5GAP-0096 + D5GAP-0101; all mechanisms use uniform `(case_id, failure_label) → mechanism` encoding (`labels` + `only_on_cases`) |
+| R2 | Q1 role = `zero-shot constrained autoregressive decomposer` (removed `zero/few-shot`) |
+
+Q1–Q6 otherwise preserved (Q2 already zero-shot operationally).
 
 ## Frozen hypothesis (Q1–Q6)
 
 | Q | Freeze |
 |---|--------|
-| Q1 | Untuned local `Qwen/Qwen3-1.7B` instruction; thinking off; no SLM-02/03 adapters; no fallback/auto-download; exact snapshot+hashes mandatory before inference |
-| Q2 | Zero-shot; one immutable contract prompt; zero exemplars; one attempt/case; no retry/repair/feedback; general contract semantics only; sealed-six hints forbidden |
-| Q3 | Hard structural constrained decode from `ClosedNormalizedProgram` (incl. XOR parity); semantic-neutral; `freeze_candidate()` authoritative; distinct decode vs schema failures |
-| Q4 | Layer 0: 6/6 reach freeze (else semantic INCONCLUSIVE); Layer 1: EQUIVALENT/6; Layer 2: critical-mechanism veto; 6/6 strong / ≥5 continue / ≤4 stop; harness sole judge |
-| Q5 | Immutable probe map + deterministic `(case_id, failure_label)→mechanism`; Veto A/B; no post-hoc classes |
-| Q6 | Preflight hard barrier; immutable run manifest; fixed six-case order; per-case rendered-input hashes; contamination attestation; mechanical decision |
+| Q1 | Untuned local `Qwen/Qwen3-1.7B` instruction; **zero-shot** role; thinking off; no SLM-02/03 adapters; no fallback/auto-download; exact snapshot+hashes mandatory before inference |
+| Q2 | Zero-shot; one immutable contract prompt; zero exemplars; one attempt/case; no retry/repair/feedback |
+| Q3 | Hard structural constrained decode from `ClosedNormalizedProgram`; `freeze_candidate()` authoritative |
+| Q4 | Layer 0/1/2 scoring; harness sole judge; 6/6 ≠ production claim |
+| Q5 | Immutable probe map + **pair-scoped** attribution (every mechanism has `only_on_cases`); Veto A/B |
+| Q6 | Preflight hard barrier; immutable run manifest; fixed six-case order; contamination attestation |
 
 Machine-readable detail: `decomposer_pilot_design_01.json`.
 
@@ -68,10 +80,7 @@ CONSTRAINT BACKEND IMPLEMENTATION:      NOT AUTHORIZED
 PROMPT IMPLEMENTATION:                  NOT AUTHORIZED
 INFERENCE IMPLEMENTATION:               NOT AUTHORIZED
 
-MB-03:                                  NOT AUTHORIZED
-T5:                                     NOT AUTHORIZED
-Luna/frontier:                          NOT AUTHORIZED
-LangGraph:                              NOT AUTHORIZED
+MB-03 / T5 / Luna / LangGraph:          NOT AUTHORIZED
 fine-tuning:                            NOT AUTHORIZED
 SLM-02/03 adapters:                     FORBIDDEN FOR PILOT
 production / runtime / evaluator /
@@ -83,22 +92,14 @@ old D5 corpus as development data:      NOT AUTHORIZED
 ## Governance after acceptance
 
 ```
-DECOMPOSER-PILOT-DESIGN-01
+DECOMPOSER-PILOT-DESIGN-01R
     ACCEPTED / CLOSED
             ↓
 separate new AUTH
             ↓
 DECOMPOSER-PILOT-PREFLIGHT-01
-    pins model/backend/prompt/schema/serializer/inference
-    proves decoder parity
+    pins + decoder parity
     model calls = 0
-            ↓
-independent review
-            ↓
-separate new AUTH
-            ↓
-DECOMPOSER-PILOT-01
-    exactly six inference calls
 ```
 
 ## Artifacts
