@@ -2,7 +2,7 @@
   "all_expected_fixture_outcomes_match": true,
   "authority": "WELLPLOT-NLP-RUNTIME-V2-NL-PROGRAM-EVAL-HARNESS-01-AUTH-001",
   "candidate_digest_collisions": 0,
-  "candidate_sha": null,
+  "candidate_sha": "848c1053c3c16ee3c32555a95dc01d7a9d49e290",
   "closeout_attestation": {
     "negative_tests": {
       "benign_non_identical_state_idempotent": "PASS",
