@@ -1,17 +1,17 @@
-# NL-PROGRAM-DESIGN-01R — Evaluation-spec consistency rework
+# NL-PROGRAM-DESIGN-01R2 — D5GAP-0117 ordering correction
 
 ```
 SLICE:
-NL-PROGRAM-DESIGN-01R
+NL-PROGRAM-DESIGN-01R2
 
 AUTHORITY:
-WELLPLOT-NLP-RUNTIME-V2-NL-PROGRAM-DESIGN-01-REWORK-AUTH-001
+WELLPLOT-NLP-RUNTIME-V2-NL-PROGRAM-DESIGN-01-REWORK2-AUTH-001
 
 STARTING SHA:
-c22fa4f0487ff7d612f2a8294923c246ab40fffd
+bcdba373e0dcb6c744e35a4d6edf6e7cc8f5e85f
 
-PRIOR NL-PROGRAM-DESIGN CANDIDATE:
-b696e974b9ea6a2c8cda5ec80441db0d7726adea
+PRIOR NL-PROGRAM-DESIGN-01R CANDIDATE:
+9e7e638b5525ece924ffd227d045823089ca264d
 
 ACCEPTED PREDECESSORS:
 MB-02R              c2f158b8222e3c1b4ae3ae737c2544fc3b25f994
@@ -20,13 +20,13 @@ SCOPE-DESIGN-01R    0c1e6c8420ced10da5aea691f6ceecc5ac7cd2e8
 SCOPE-RUNTIME-01R   1026c1356ee39c52e439544167d4a6f03e5e04e2
 
 CANDIDATE SHA:
-9e7e638b5525ece924ffd227d045823089ca264d
+PENDING
 
 CODE:
 NONE
 
 STATUS:
-STOP FOR INDEPENDENT NL-PROGRAM-DESIGN-01R REVIEW
+STOP FOR INDEPENDENT NL-PROGRAM-DESIGN-01R2 REVIEW
 ```
 
 ## CLAIM
@@ -37,31 +37,16 @@ into and evaluated as a ScopeNormalizedProgram.
 It does not implement or validate any decomposer.
 It establishes no English→NormalizedProgram accuracy claim.
 
-## Rework
+## Rework (R3 only)
 
-**R1 — Coverage atom classes**
+D5GAP-0117: removed configure-before-fill ordering from `REQUIRED_REPRESENTABLE`.
 
-- `REQUIRED_REPRESENTABLE` — gates semantic equivalence; must fit frozen `ScopeNormalizedProgram`
-- `OBSERVED_OUT_OF_SCOPE` — recorded from utterance; does **not** gate equivalence; do not expand schema/runtime here
+Utterance “Set RHOB … and split-fill it …” coordinates two semantics; “it” binds
+RHOB identity. It does not establish temporal order. Oracle serialization alone
+cannot impose that order as coverage.
 
-D5GAP-0085: fill styling `blue` → `OBSERVED_OUT_OF_SCOPE` (no fill-color operand).
-
-**R2 — Ordering atoms**
-
-Ordering is a coverage atom only if the utterance encodes it (temporal language, anaphora, or other stated semantic dependency). Oracle task serialization alone is insufficient.
-
-D5GAP-0096: removed GR-before-RT ordering atom.
-
-Q3 alignment preserves required causal/utterance order; it does not treat arbitrary independent-op serialization as accuracy.
-
-## Frozen contract (Q1–Q4)
-
-| Q | Freeze |
-|---|--------|
-| Q1 | utterance + ProjectedWorkspace only; case_id/fixture_id harness-only |
-| Q2 | schema-closed ScopeNormalizedProgram; unknown fields invalid |
-| Q3 | runtime gate + REQUIRED_REPRESENTABLE coverage + semantic spine; not JSON equality |
-| Q4 | EvaluationSpec with classified coverage atoms; candidate frozen before oracle lookup |
+Preserved from 01R: R1 atom classes; D5GAP-0085 blue → `OBSERVED_OUT_OF_SCOPE`;
+D5GAP-0096 no GR-before-RT order; Q1–Q4 rules; other EvaluationSpecs.
 
 ## EvaluationSpec inventory (6)
 
@@ -69,14 +54,14 @@ Q3 alignment preserves required causal/utterance order; it does not treat arbitr
 |---------|-----------------------:|----------------------:|
 | D5GAP-0085 | 3 | 1 (blue styling) |
 | D5GAP-0089 | 3 | 0 |
-| D5GAP-0117 | 5 | 0 |
+| D5GAP-0117 | 4 | 0 |
 | D5GAP-0096 | 6 | 0 |
 | D5GAP-0101 | 5 | 0 |
 | SEED-cm-9643c020e2e02463 | 8 | 0 |
 
 ## Explicit exclusions
 
-no decomposer code · no heuristic parser · no Luna/frontier · no T5 · no Qwen · no LangGraph · no MB-03 · no production · no runtime changes · no witness/gold mutation · no schema expansion for out-of-scope atoms
+no decomposer code · no parser/model · no runtime/witness/gold changes · no schema expansion
 
 ## Artifacts
 

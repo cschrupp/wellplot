@@ -1,7 +1,7 @@
 {
-  "authority": "WELLPLOT-NLP-RUNTIME-V2-NL-PROGRAM-DESIGN-01-REWORK-AUTH-001",
-  "slice": "NL-PROGRAM-DESIGN-01R",
-  "starting_sha": "c22fa4f0487ff7d612f2a8294923c246ab40fffd",
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-NL-PROGRAM-DESIGN-01-REWORK2-AUTH-001",
+  "slice": "NL-PROGRAM-DESIGN-01R2",
+  "starting_sha": "bcdba373e0dcb6c744e35a4d6edf6e7cc8f5e85f",
   "accepted_predecessors": {
     "mb02r": "c2f158b8222e3c1b4ae3ae737c2544fc3b25f994",
     "oracle01": "fd2f0443ad18a76542d3577928dde80c6928fa11",
@@ -356,8 +356,7 @@
           "RHOB is requested at 1.95–2.95",
           "RHOB is requested reversed",
           "a split-fill is requested on RHOB",
-          "the split-fill baseline is 2.45",
-          "ordering: the RHOB scale/reverse request precedes the split-fill request (coordinated 'and' composition with scale then fill semantics)"
+          "the split-fill baseline is 2.45"
         ],
         "OBSERVED_OUT_OF_SCOPE": []
       },
@@ -377,7 +376,8 @@
         "SEMANTIC_OVERREACH",
         "SEMANTIC_UNDERSPECIFICATION",
         "RUNTIME_TERMINAL_MISMATCH"
-      ]
+      ],
+      "notes": "No configure-before-fill ordering atom: utterance uses coordinated 'and' and anaphoric 'it' for RHOB identity, not temporal order. Oracle serialization alone is insufficient. Runtime may still require dependency for a particular candidate representation, but that is not user-intent coverage."
     },
     {
       "case_id": "D5GAP-0096",
@@ -534,7 +534,7 @@
   ],
   "summary": {
     "n_evaluation_specs": 6,
-    "rework": "R1 atom classes + R2 no oracle-only ordering",
+    "rework": "R1 atom classes + R2 no oracle-only ordering + R3 D5GAP-0117 drop scale-before-fill order",
     "decomposer_implemented": false,
     "english_to_program_accuracy_claimed": false,
     "historical_gold": "UNCHANGED",
@@ -543,7 +543,7 @@
   },
   "prior_nl_program_design_candidate": "b696e974b9ea6a2c8cda5ec80441db0d7726adea",
   "prior_defect": {
-    "R1": "D5GAP-0085 required blue fill styling but ScopeNormalizedProgram has no fill-color operand",
-    "R2": "D5GAP-0096 checklist smuggled oracle GR-before-RT order not present in utterance"
-  }
+    "R3": "D5GAP-0117 treated coordinated 'and' as temporal configure-before-fill order; utterance does not establish that ordering requirement"
+  },
+  "prior_nl_program_design_01r_candidate": "9e7e638b5525ece924ffd227d045823089ca264d"
 }
