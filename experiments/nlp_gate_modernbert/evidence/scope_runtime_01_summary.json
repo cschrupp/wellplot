@@ -1,0 +1,53 @@
+{
+  "accepted_scope_design_subject": "0c1e6c8420ced10da5aea691f6ceecc5ac7cd2e8",
+  "all_local_ref_adapters_resolved_from_binding_table": true,
+  "all_task_effects_post_ok_only": true,
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-SCOPE-RUNTIME-01-AUTH-001",
+  "candidate_sha": null,
+  "case_terminals": {
+    "D5GAP-0085": {
+      "authority": "OK",
+      "reason": null,
+      "status": "ok"
+    },
+    "D5GAP-0089": {
+      "authority": "OK",
+      "reason": null,
+      "status": "ok"
+    },
+    "D5GAP-0096": {
+      "authority": "OK",
+      "reason": null,
+      "status": "ok"
+    },
+    "D5GAP-0101": {
+      "authority": "OK",
+      "reason": null,
+      "status": "ok"
+    },
+    "D5GAP-0117": {
+      "authority": "OK",
+      "reason": null,
+      "status": "ok"
+    },
+    "SEED-cm-9643c020e2e02463": {
+      "authority": "OK",
+      "reason": null,
+      "status": "ok"
+    }
+  },
+  "frontier_calls": 0,
+  "gold_decision_inputs": 0,
+  "historical_gold_modified": false,
+  "mb02r_modified": false,
+  "n_program_non_ok": 0,
+  "n_program_ok": 6,
+  "n_witnesses": 6,
+  "negative_tests": {
+    "failed_task_no_effect": "PASS",
+    "illegal_local_ref_schema_domain": "PASS"
+  },
+  "slice": "SCOPE-RUNTIME-01",
+  "starting_sha": "0c1e6c8420ced10da5aea691f6ceecc5ac7cd2e8",
+  "tests_passed": 41
+}
