@@ -1,0 +1,48 @@
+{
+  "all_expected_fixture_outcomes_match": true,
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-NL-PROGRAM-EVAL-HARNESS-01-AUTH-001",
+  "candidate_digest_collisions": 0,
+  "candidate_sha": null,
+  "closeout_attestation": {
+    "negative_tests": {
+      "candidate_files_pure_payloads": "PASS",
+      "closed_schema_recursive_forbid": "PASS",
+      "decomposer_input_allowlist": "PASS",
+      "nan_infinity_rejected": "PASS",
+      "schema_invalid_no_digest": "PASS"
+    },
+    "provenance": "CLOSEOUT_ATTESTATION (pytest; not replay output)",
+    "tests_passed": 26
+  },
+  "epistemic_claim": "Harness proves frozen/hand-authored ScopeNormalizedPrograms evaluate reproducibly under Q3; does not demonstrate English\u2192Program generation performance.",
+  "failure_label_counts": {
+    "DECOMPOSITION_SCHEMA_INVALID": 1,
+    "MISSING_TASK": 3,
+    "RUNTIME_TERMINAL_MISMATCH": 1,
+    "SEMANTIC_OVERREACH": 1,
+    "WRONG_BINDING": 1,
+    "WRONG_DEPENDENCY": 1,
+    "WRONG_OPERAND": 1,
+    "WRONG_ORDER": 2
+  },
+  "n_benign_redundant": 1,
+  "n_equivalent": 10,
+  "n_fixtures": 18,
+  "n_non_equivalent": 8,
+  "n_schema_invalid": 1,
+  "n_schema_valid": 17,
+  "n_terminal_mismatch": 1,
+  "n_terminal_ok": 16,
+  "oracle_access_before_freeze": 0,
+  "oracle_candidate_generation_at_runtime": 0,
+  "provenance": {
+    "handoff_md": "closeout-authored (not written by replay.py)",
+    "negative_tests": "CLOSEOUT_ATTESTATION (pytest; not replay output)",
+    "results_jsonl": "replay.py",
+    "summary_replay_counters": "replay.py",
+    "tests_passed": "CLOSEOUT_ATTESTATION (pytest; not replay output)"
+  },
+  "real_decomposer_calls": 0,
+  "slice": "NL-PROGRAM-EVAL-HARNESS-01",
+  "starting_sha": "4aaf96ebd9275886608a3a9901f218206dca6551"
+}
