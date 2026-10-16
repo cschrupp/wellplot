@@ -2,8 +2,8 @@
   "accepted_scope_design_subject": "0c1e6c8420ced10da5aea691f6ceecc5ac7cd2e8",
   "all_local_ref_adapters_resolved_from_binding_table": true,
   "all_task_effects_post_ok_only": true,
-  "authority": "WELLPLOT-NLP-RUNTIME-V2-SCOPE-RUNTIME-01-AUTH-001",
-  "candidate_sha": null,
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-SCOPE-RUNTIME-01-REWORK-AUTH-001",
+  "candidate_sha": "1026c1356ee39c52e439544167d4a6f03e5e04e2",
   "case_terminals": {
     "D5GAP-0085": {
       "authority": "OK",
@@ -60,6 +60,6 @@
     "summary_replay_counters": "replay.py",
     "tests_passed": "CLOSEOUT_ATTESTATION (pytest; not replay output)"
   },
-  "slice": "SCOPE-RUNTIME-01",
+  "slice": "SCOPE-RUNTIME-01R",
   "starting_sha": "68289174ea8ac1a6063801aad8d69801fb6d378d"
 }
