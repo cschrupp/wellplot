@@ -121,9 +121,8 @@ def _resolve_query(
             projected,
             text,
         )
-    if q.text is not None and str(q.text).strip() != "":
-        return SemanticQuery(kind=q.kind, text=q.text), None, None, None
-    return SemanticQuery(kind=q.kind, text=None), None, None, None
+    # Q4 XOR already enforced on ScopeSemanticQuery: text path has non-empty text
+    return SemanticQuery(kind=q.kind, text=q.text), None, None, None
 
 
 def to_mb02_request(

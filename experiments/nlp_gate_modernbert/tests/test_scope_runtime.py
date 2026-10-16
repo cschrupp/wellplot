@@ -182,6 +182,19 @@ def test_local_ref_plus_text_schema_domain() -> None:
         ScopeSemanticQuery(kind="track", text="track 1", local_ref="$track1")
 
 
+def test_semantic_query_neither_text_nor_local_ref_invalid() -> None:
+    """Q4 XOR: neither text nor local_ref is schema-invalid."""
+    import pytest
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        ScopeSemanticQuery(kind="track")
+    with pytest.raises(ValidationError):
+        ScopeSemanticQuery(kind="track", text=None, local_ref=None)
+    with pytest.raises(ValidationError):
+        ScopeSemanticQuery(kind="curve", text="", local_ref="")
+
+
 def test_adapter_track_n_form() -> None:
     w = _witness_by_id("D5GAP-0101")
     program = parse_program_from_witness(w["normalized_program"])

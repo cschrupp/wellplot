@@ -24,10 +24,18 @@ class ScopeSemanticQuery(BaseModel):
 
     @model_validator(mode="after")
     def _xor_text_local_ref(self) -> ScopeSemanticQuery:
+        """Q4: exactly one of text | local_ref (both-set and neither-set are invalid)."""
         has_text = self.text is not None and str(self.text).strip() != ""
         has_ref = self.local_ref is not None and str(self.local_ref).strip() != ""
         if has_text and has_ref:
             raise ValueError("local_ref_and_text_both_set")
+        if not has_text and not has_ref:
+            raise ValueError("local_ref_and_text_both_absent")
+        # Normalize empty string counterpart to None for the unused side
+        if has_text:
+            object.__setattr__(self, "local_ref", None)
+        else:
+            object.__setattr__(self, "text", None)
         return self
 
 
