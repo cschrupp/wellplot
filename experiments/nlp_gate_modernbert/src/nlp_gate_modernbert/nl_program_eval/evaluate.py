@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from nlp_gate_modernbert.nl_program_eval.cases import CASE_REGISTRY, CaseRecord
+from nlp_gate_modernbert.nl_program_eval.cases import CASE_REGISTRY
 from nlp_gate_modernbert.nl_program_eval.compare import CompareResult, compare_programs
 from nlp_gate_modernbert.nl_program_eval.freeze import (
     FreezeFailure,
@@ -16,11 +16,7 @@ from nlp_gate_modernbert.nl_program_eval.freeze import (
     require_frozen,
 )
 from nlp_gate_modernbert.nl_program_eval.input import build_decomposer_input
-from nlp_gate_modernbert.paths import EVIDENCE_DIR
-from nlp_gate_modernbert.scope_runtime.execute import parse_program_from_witness
-from nlp_gate_modernbert.scope_runtime.replay import load_witnesses
-
-WITNESS_PATH = EVIDENCE_DIR / "scope_contract_design_01.json"
+from nlp_gate_modernbert.nl_program_eval.oracle import load_oracle_program
 
 
 @dataclass
@@ -44,38 +40,13 @@ class EvaluationResult:
         return asdict(self)
 
 
-def _load_oracle_program(case_id: str) -> Any:
-    witnesses = {w["case_id"]: w for w in load_witnesses(WITNESS_PATH)}
-    if case_id not in witnesses:
-        raise RuntimeError(f"unknown_oracle_witness:{case_id}")
-    raw = witnesses[case_id]["normalized_program"]
-    return parse_program_from_witness(raw)
-
-
 def evaluate_raw_candidate(
     case_id: str,
     raw_candidate: dict[str, Any] | str | bytes,
-    *,
-    oracle_access_before_freeze: bool = False,
 ) -> EvaluationResult:
-    """Freeze then evaluate. Passing oracle_access_before_freeze=True is an audit fail."""
-    case = CASE_REGISTRY[case_id]
+    """Freeze then evaluate. Oracle material is unreachable before FrozenCandidate."""
     d_in = build_decomposer_input(case_id)
     payload = d_in.to_payload()
-
-    if oracle_access_before_freeze:
-        return EvaluationResult(
-            case_id=case_id,
-            schema_valid=False,
-            freeze_status="ORACLE_ACCESS_BEFORE_FREEZE",
-            candidate_digest=None,
-            canonicalization_version=None,
-            oracle_access_before_freeze=True,
-            oracle_access_enabled_after_freeze=None,
-            failure_labels=["ORACLE_ACCESS_BEFORE_FREEZE"],
-            semantically_equivalent=False,
-            decomposer_input_keys=sorted(payload.keys()),
-        )
 
     frozen = freeze_candidate(raw_candidate)
     if isinstance(frozen, FreezeFailure):
@@ -105,7 +76,8 @@ def evaluate_frozen(
     require_frozen(frozen)
     case = CASE_REGISTRY[case_id]
     initial = build_decomposer_input(case_id).projected_workspace
-    oracle = _load_oracle_program(case.oracle_witness_id)
+    # Oracle load is capability-locked: FrozenCandidate is a required argument.
+    oracle = load_oracle_program(frozen, case.oracle_witness_id)
 
     cmp: CompareResult = compare_programs(frozen, oracle, initial, case)
 

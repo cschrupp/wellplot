@@ -1,4 +1,4 @@
-"""NL-PROGRAM-EVAL-HARNESS-01: freeze, Q3 compare, fixture matrix, schema negatives."""
+"""NL-PROGRAM-EVAL-HARNESS-01R: freeze immutability, oracle lock, Q3 benign, fixture matrix."""
 
 from __future__ import annotations
 
@@ -8,20 +8,20 @@ from copy import deepcopy
 import pytest
 from pydantic import ValidationError
 
-from nlp_gate_modernbert.nl_program_eval.closed_schema import (
-    ClosedNormalizedProgram,
-    ClosedNormalizedRequest,
-    ClosedNormalizedTask,
-    ClosedScaleBounds,
-    ClosedSemanticQuery,
-)
+from nlp_gate_modernbert.nl_program_eval.closed_schema import ClosedNormalizedProgram
 from nlp_gate_modernbert.nl_program_eval.evaluate import evaluate_raw_candidate
-from nlp_gate_modernbert.nl_program_eval.freeze import FreezeFailure, freeze_candidate
+from nlp_gate_modernbert.nl_program_eval.freeze import (
+    FreezeFailure,
+    FrozenCandidate,
+    freeze_candidate,
+    require_frozen,
+)
 from nlp_gate_modernbert.nl_program_eval.input import (
     FORBIDDEN_DECOMPOSER_KEYS,
     assert_decomposer_payload_clean,
     build_decomposer_input,
 )
+from nlp_gate_modernbert.nl_program_eval.oracle import load_oracle_program
 from nlp_gate_modernbert.nl_program_eval.replay import (
     CANDIDATES_DIR,
     load_manifest,
@@ -69,32 +69,111 @@ def test_freeze_digest_stable() -> None:
     raw = _oracle_clean("D5GAP-0101")
     a = freeze_candidate(raw)
     b = freeze_candidate(raw)
-    assert not isinstance(a, FreezeFailure)
+    assert isinstance(a, FrozenCandidate)
     assert a.sha256 == b.sha256
     assert a.oracle_access_enabled is True
 
 
+def test_canonicalization_key_order_invariant() -> None:
+    a = {"tasks": [{"task_id": "t1", "depends_on": [], "produces_binds": {},
+                    "request": {"requested_operation": "CREATE_TRACK", "track_title": "X"}}]}
+    b = {"produces_binds": {}, "task_id": "t1", "request": {"track_title": "X",
+         "requested_operation": "CREATE_TRACK"}, "depends_on": []}
+    # reorder top-level task keys inside tasks array element via alternate construction
+    raw_a = {"version": "v", "tasks": [a["tasks"][0]]}
+    raw_b = {"tasks": [{
+        "produces_binds": {},
+        "depends_on": [],
+        "request": {"track_title": "X", "requested_operation": "CREATE_TRACK"},
+        "task_id": "t1",
+    }], "version": "v"}
+    fa, fb = freeze_candidate(raw_a), freeze_candidate(raw_b)
+    assert isinstance(fa, FrozenCandidate) and isinstance(fb, FrozenCandidate)
+    assert fa.sha256 == fb.sha256
+    assert fa.canonical_json == fb.canonical_json
+
+
+def test_canonicalization_whitespace_invariant() -> None:
+    compact = json.dumps(_oracle_clean("D5GAP-0101"), separators=(",", ":"))
+    pretty = json.dumps(_oracle_clean("D5GAP-0101"), indent=4)
+    fa, fb = freeze_candidate(compact), freeze_candidate(pretty)
+    assert isinstance(fa, FrozenCandidate) and isinstance(fb, FrozenCandidate)
+    assert fa.sha256 == fb.sha256
+
+
+def test_canonicalization_explicit_null_vs_omitted() -> None:
+    base = {
+        "tasks": [{
+            "task_id": "t1",
+            "depends_on": [],
+            "produces_binds": {},
+            "request": {
+                "requested_operation": "CREATE_TRACK",
+                "track_title": "Caliper QC",
+                "track_width_mm": 24.0,
+            },
+        }]
+    }
+    with_null = deepcopy(base)
+    with_null["tasks"][0]["request"]["report_title"] = None
+    fa, fb = freeze_candidate(base), freeze_candidate(with_null)
+    assert isinstance(fa, FrozenCandidate) and isinstance(fb, FrozenCandidate)
+    assert fa.sha256 == fb.sha256
+
+
+def test_canonicalization_semantic_value_changes_digest() -> None:
+    raw = _oracle_clean("D5GAP-0101")
+    a = freeze_candidate(raw)
+    raw2 = deepcopy(raw)
+    for t in raw2["tasks"]:
+        if t["request"].get("requested_operation") == "CONFIGURE_CURVE_DISPLAY":
+            t["request"]["scale_bounds"]["minimum"] = 0.0
+    b = freeze_candidate(raw2)
+    assert isinstance(a, FrozenCandidate) and isinstance(b, FrozenCandidate)
+    assert a.sha256 != b.sha256
+
+
+def test_frozen_candidate_immutable_and_digest_coupled() -> None:
+    frozen = freeze_candidate(_oracle_clean("D5GAP-0101"))
+    assert isinstance(frozen, FrozenCandidate)
+    digest = frozen.sha256
+    # frozen dataclass: attribute reassignment must fail
+    with pytest.raises(Exception):
+        frozen._sha256 = "0" * 64  # type: ignore[misc]
+    with pytest.raises(Exception):
+        frozen._canonical_json = "{}"  # type: ignore[misc]
+    # mutating a re-parsed program must not change digest or canonical bytes
+    prog = frozen.to_runtime_program()
+    prog.tasks[0].task_id = "MUTATED"
+    assert frozen.sha256 == digest
+    assert frozen.verify_digest()
+    prog2 = frozen.to_runtime_program()
+    assert prog2.tasks[0].task_id != "MUTATED"
+    # .program property is also a fresh re-parse
+    assert frozen.program.tasks[0].task_id == prog2.tasks[0].task_id
+
+
 @pytest.mark.parametrize(
     "nest_path",
-    [
-        "top",
-        "task",
-        "request",
-        "query",
-        "scale",
-    ],
+    ["top", "task", "request", "query", "scale", "fill"],
 )
 def test_closed_schema_recursive_forbid(nest_path: str) -> None:
-    base = {
+    base: dict = {
         "tasks": [
             {
                 "task_id": "t1",
                 "depends_on": [],
                 "produces_binds": {},
                 "request": {
-                    "requested_operation": "CONFIGURE_CURVE_DISPLAY",
-                    "query": {"kind": "curve", "text": "GR"},
-                    "scale_bounds": {"kind": "linear", "minimum": 0.0, "maximum": 100.0},
+                    "requested_operation": "DEFINE_FILL",
+                    "fill": {
+                        "mode": "BETWEEN_INSTANCES",
+                        "primary_query": "first CBL",
+                        "predicate": {
+                            "kind": "BETWEEN_CURVES",
+                            "secondary_query": "second CBL",
+                        },
+                    },
                 },
             }
         ]
@@ -106,15 +185,25 @@ def test_closed_schema_recursive_forbid(nest_path: str) -> None:
     elif nest_path == "request":
         base["tasks"][0]["request"]["extra_req"] = 1
     elif nest_path == "query":
-        base["tasks"][0]["request"]["query"]["extra_q"] = 1
+        base["tasks"][0]["request"]["query"] = {"kind": "curve", "text": "GR", "extra_q": 1}
+        base["tasks"][0]["request"]["requested_operation"] = "CONFIGURE_CURVE_DISPLAY"
+        base["tasks"][0]["request"]["scale_bounds"] = {
+            "kind": "linear", "minimum": 0.0, "maximum": 100.0
+        }
+        del base["tasks"][0]["request"]["fill"]
     elif nest_path == "scale":
-        base["tasks"][0]["request"]["scale_bounds"]["extra_s"] = 1
+        base["tasks"][0]["request"] = {
+            "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+            "query": {"kind": "curve", "text": "GR"},
+            "scale_bounds": {"kind": "linear", "minimum": 0.0, "maximum": 100.0, "extra_s": 1},
+        }
+    elif nest_path == "fill":
+        base["tasks"][0]["request"]["fill"]["extra_fill"] = 1
     with pytest.raises(ValidationError):
         ClosedNormalizedProgram.model_validate(base)
 
 
 def test_closed_schema_rejects_nan_infinity() -> None:
-    # NaN sneaks in via Python float before JSON; freeze canonicalization must reject
     raw = {
         "tasks": [
             {
@@ -124,12 +213,15 @@ def test_closed_schema_rejects_nan_infinity() -> None:
                 "request": {
                     "requested_operation": "CONFIGURE_CURVE_DISPLAY",
                     "query": {"kind": "curve", "text": "GR"},
-                    "scale_bounds": {"kind": "linear", "minimum": float("nan"), "maximum": 100.0},
+                    "scale_bounds": {
+                        "kind": "linear",
+                        "minimum": float("nan"),
+                        "maximum": 100.0,
+                    },
                 },
             }
         ]
     }
-    # Pydantic may reject NaN on float fields depending on config; either path is schema-invalid
     try:
         r = freeze_candidate(raw)
         assert isinstance(r, FreezeFailure)
@@ -143,6 +235,42 @@ def test_closed_schema_rejects_nan_infinity() -> None:
         assert isinstance(r2, FreezeFailure)
     except ValidationError:
         pass
+
+
+def test_oracle_load_requires_frozen_candidate() -> None:
+    """R1: pre-freeze oracle retrieval must hard-fail at the loader boundary."""
+    with pytest.raises(RuntimeError, match="oracle_access_denied_before_FrozenCandidate"):
+        load_oracle_program("not_frozen", "D5GAP-0101")  # type: ignore[arg-type]
+    with pytest.raises(RuntimeError, match="oracle_access_denied_before_FrozenCandidate"):
+        require_frozen(None)
+    with pytest.raises(RuntimeError, match="oracle_access_denied_before_FrozenCandidate"):
+        require_frozen(_oracle_clean("D5GAP-0101"))
+
+
+def test_oracle_load_succeeds_only_with_frozen() -> None:
+    frozen = freeze_candidate(_oracle_clean("D5GAP-0101"))
+    assert isinstance(frozen, FrozenCandidate)
+    oracle = load_oracle_program(frozen, "D5GAP-0101")
+    assert len(oracle.tasks) == 3
+
+
+def test_benign_redundant_is_non_identical_state_idempotent() -> None:
+    """R3: fixture uses alias reconfigure, not an earlier-identical duplicate."""
+    entry = next(e for e in load_manifest()["fixtures"] if e["scenario"] == "benign_redundant")
+    raw = json.loads((CANDIDATES_DIR / entry["filename"]).read_text(encoding="utf-8"))
+    texts = []
+    for t in raw["tasks"]:
+        req = t["request"]
+        if req["requested_operation"] == "CONFIGURE_CURVE_DISPLAY" and req.get("query"):
+            texts.append(req["query"].get("text"))
+    # Must include two distinct query spellings for the wide CBL entity
+    assert "wide CBL" in texts
+    assert "CBL Amplitude wide" in texts
+    assert texts.count("wide CBL") == 1
+    rec = replay_one(entry)
+    assert rec["semantically_equivalent"] is True
+    assert "BENIGN_REDUNDANT_TASK" in rec["diagnostics"]
+    assert rec["q3_comparison"]["benign_redundant_task_ids"]
 
 
 def test_oracle_equivalent_six() -> None:

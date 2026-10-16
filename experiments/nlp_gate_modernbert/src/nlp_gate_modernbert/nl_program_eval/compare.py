@@ -270,17 +270,112 @@ def _program_without_task(program: ScopeNormalizedProgram, task_id: str) -> Scop
     return ScopeNormalizedProgram(version=program.version, tasks=tasks)
 
 
-def _introduces_new_utterance_semantics(
+def _coverage_lost_without_task(
     case: CaseRecord,
     task: ScopeNormalizedTask,
     program: ScopeNormalizedProgram,
     initial: ProjectedWorkspace,
 ) -> bool:
-    """If removing this task would drop a required atom, it is not benign."""
+    """True if removing this task drops a REQUIRED_REPRESENTABLE atom."""
     reduced = _program_without_task(program, task.task_id)
     reduced_result = execute_program(reduced, initial.model_copy(deep=True), case_id=case.case_id)
     _, missing = evaluate_coverage(case.case_id, case.required_atom_ids, reduced, reduced_result)
     return len(missing) > 0
+
+
+def _task_primary_entity(task: ScopeNormalizedTask, ws: ProjectedWorkspace) -> str | None:
+    req = task.request
+    for q in (req.query, req.secondary_query, req.target):
+        if q is None:
+            continue
+        if q.local_ref:
+            return f"bind:{q.local_ref}"
+        if q.text:
+            return _resolve_text_entity(ws, q.kind, q.text)
+    if req.fill and req.fill.primary_query:
+        return _resolve_text_entity(ws, "curve", req.fill.primary_query)
+    return None
+
+
+def _entity_addressed_elsewhere(
+    program: ScopeNormalizedProgram,
+    task_id: str,
+    entity: str,
+    initial: ProjectedWorkspace,
+) -> bool:
+    """Another remaining task must address the same entity (no new utterance referent)."""
+    for t in program.tasks:
+        if t.task_id == task_id:
+            continue
+        # Text/alias resolution is stable on the initial workspace for these six cases;
+        # bind refs compare by local_ref name.
+        other = _task_primary_entity(t, initial)
+        if other is not None and other == entity:
+            return True
+    return False
+
+
+def _needed_bind_or_dependency_change(
+    program: ScopeNormalizedProgram,
+    task: ScopeNormalizedTask,
+) -> bool:
+    """True if this task produces binds or is the sole depends_on link for a bind consumer."""
+    if task.produces_binds:
+        return True
+    # If some later task lists only this task as depends_on and uses a bind, removing
+    # it would change dependency structure for that consumer.
+    for t in program.tasks:
+        if t.task_id == task.task_id:
+            continue
+        if task.task_id in t.depends_on and len(t.depends_on) == 1:
+            uses_bind = any(
+                q and q.local_ref
+                for q in (t.request.query, t.request.secondary_query, t.request.target)
+            )
+            if uses_bind:
+                return True
+    return False
+
+
+def _preserves_later_consumed_facts(
+    program: ScopeNormalizedProgram,
+    task: ScopeNormalizedTask,
+    initial: ProjectedWorkspace,
+    case: CaseRecord,
+) -> bool:
+    """Removing task must preserve terminal and projected facts later tasks consume."""
+    reduced = _program_without_task(program, task.task_id)
+    full = execute_program(program, initial.model_copy(deep=True), case_id=case.case_id)
+    reduced_result = execute_program(reduced, initial.model_copy(deep=True), case_id=case.case_id)
+    if not _terminal_ok(reduced_result.program_terminal):
+        return False
+    if not _terminals_match(full.program_terminal, reduced_result.program_terminal):
+        return False
+    # Compare final workspace summaries for tracks/curves scale facts
+    if not full.task_trace or not reduced_result.task_trace:
+        return _terminal_ok(reduced_result.program_terminal)
+    full_after = _trace_rec(full.task_trace[-1])["workspace_after"]
+    red_after = _trace_rec(reduced_result.task_trace[-1])["workspace_after"]
+    return full_after == red_after
+
+
+def _program_keeping(
+    program: ScopeNormalizedProgram, keep_ids: set[str]
+) -> ScopeNormalizedProgram:
+    tasks = []
+    for t in program.tasks:
+        if t.task_id not in keep_ids:
+            continue
+        deps = [d for d in t.depends_on if d in keep_ids]
+        tasks.append(
+            ScopeNormalizedTask(
+                task_id=t.task_id,
+                request=t.request,
+                depends_on=deps,
+                produces_binds=dict(t.produces_binds),
+            )
+        )
+    return ScopeNormalizedProgram(version=program.version, tasks=tasks)
 
 
 def _find_benign_redundant(
@@ -289,57 +384,58 @@ def _find_benign_redundant(
     result: ProgramExecutionResult,
     initial: ProjectedWorkspace,
 ) -> list[str]:
-    """Apply frozen six-predicate BENIGN_REDUNDANT_TASK test."""
+    """Frozen BENIGN_REDUNDANT_TASK six-predicate test (no duplicate-only prerequisite).
+
+    1. individually valid and supported (OK in trace)
+    2. no new user-visible semantics (coverage preserved; entity addressed elsewhere)
+    3. removing preserves terminal
+    4. removing preserves later-consumed projected facts
+    5. does not create/remove/change a needed bind or dependency
+    6. semantic effect already true at that execution point
+
+    Extras are removed iteratively (later-first) so a covering task for each
+    required atom is retained when multiple candidates are individually redundant.
+    """
     if not _terminal_ok(result.program_terminal):
         return []
     pre_ws = _pre_task_workspaces(result, initial)
+    keep: set[str] = {t.task_id for t in program.tasks}
     benign: list[str] = []
-    for i, task in enumerate(program.tasks):
-        # individually supported: appeared in OK trace
+
+    for i in reversed(range(len(program.tasks))):
+        task = program.tasks[i]
+        if task.task_id not in keep:
+            continue
         if i >= len(result.task_trace):
             continue
         rec = _trace_rec(result.task_trace[i])
         if rec.get("mb02_authority") != "OK":
             continue
         ws = pre_ws[i] if i < len(pre_ws) else initial
-        # Harness requires a proven duplicate or already-true effect at this point;
-        # the duplicate clause is mandatory so required first occurrences are not dropped.
-        if not _duplicate_of_earlier_identical(program, i):
+
+        # (6) effect already true at original execution point
+        if not _effect_already_true(task, ws):
             continue
-        if not _effect_already_true(task, ws) and not _duplicate_of_earlier_identical(program, i):
+        # (5) against the current kept program
+        current = _program_keeping(program, keep)
+        if _needed_bind_or_dependency_change(current, task):
             continue
-        if task.produces_binds:
-            continue  # must not create/remove/change needed bind
-        if _introduces_new_utterance_semantics(case, task, program, initial):
+        # (2) coverage must survive removing this task from the kept set
+        if _coverage_lost_without_task(case, task, current, initial):
             continue
-        reduced = _program_without_task(program, task.task_id)
-        reduced_result = execute_program(reduced, initial.model_copy(deep=True), case_id=case.case_id)
-        if not _terminal_ok(reduced_result.program_terminal):
+        entity = _task_primary_entity(task, ws)
+        if entity is None or not _entity_addressed_elsewhere(
+            current, task.task_id, entity, initial
+        ):
             continue
-        # After duplicate apply, effect is already true because earlier twin applied it
-        if not _effect_already_true(task, ws) and i > 0:
-            # still OK for pure duplicates: earlier twin made it true
-            pass
+        # (3)+(4)
+        if not _preserves_later_consumed_facts(current, task, initial, case):
+            continue
         benign.append(task.task_id)
+        keep.remove(task.task_id)
+
+    benign.reverse()
     return benign
-
-
-def _duplicate_of_earlier_identical(program: ScopeNormalizedProgram, index: int) -> bool:
-    cur = program.tasks[index]
-    cur_fp = _scalar_fingerprint(cur.request)
-    cur_q = None
-    if cur.request.query:
-        cur_q = cur.request.query.text or cur.request.query.local_ref
-    for j in range(index):
-        prev = program.tasks[j]
-        if _scalar_fingerprint(prev.request) != cur_fp:
-            continue
-        pq = None
-        if prev.request.query:
-            pq = prev.request.query.text or prev.request.query.local_ref
-        if pq == cur_q and cur.request.requested_operation == prev.request.requested_operation:
-            return True
-    return False
 
 
 def _oracle_dep_constraints(oracle: ScopeNormalizedProgram) -> set[tuple[int, int]]:

@@ -2,17 +2,21 @@
   "all_expected_fixture_outcomes_match": true,
   "authority": "WELLPLOT-NLP-RUNTIME-V2-NL-PROGRAM-EVAL-HARNESS-01-AUTH-001",
   "candidate_digest_collisions": 0,
-  "candidate_sha": "84212ab70b9b910f449211a93f1a140374e0f584",
+  "candidate_sha": null,
   "closeout_attestation": {
     "negative_tests": {
-      "candidate_files_pure_payloads": "PASS",
+      "benign_non_identical_state_idempotent": "PASS",
+      "canonicalization_key_order": "PASS",
+      "canonicalization_null_omitted": "PASS",
+      "canonicalization_semantic_digest_change": "PASS",
+      "canonicalization_whitespace": "PASS",
       "closed_schema_recursive_forbid": "PASS",
-      "decomposer_input_allowlist": "PASS",
+      "frozen_immutable_digest_coupled": "PASS",
       "nan_infinity_rejected": "PASS",
-      "schema_invalid_no_digest": "PASS"
+      "oracle_load_requires_frozen": "PASS"
     },
     "provenance": "CLOSEOUT_ATTESTATION (pytest; not replay output)",
-    "tests_passed": 26
+    "tests_passed": 23
   },
   "epistemic_claim": "Harness proves frozen/hand-authored ScopeNormalizedPrograms evaluate reproducibly under Q3; does not demonstrate English\u2192Program generation performance.",
   "failure_label_counts": {
@@ -43,6 +47,7 @@
     "tests_passed": "CLOSEOUT_ATTESTATION (pytest; not replay output)"
   },
   "real_decomposer_calls": 0,
+  "rework": "HARNESS-01R R1-oracle-lock R2-immutable-freeze R3-benign-six-predicate R4-canonicalization-tests",
   "slice": "NL-PROGRAM-EVAL-HARNESS-01",
-  "starting_sha": "4aaf96ebd9275886608a3a9901f218206dca6551"
+  "starting_sha": "4cfa047a7cf548dcdc31f315f0ccd74c04884a63"
 }

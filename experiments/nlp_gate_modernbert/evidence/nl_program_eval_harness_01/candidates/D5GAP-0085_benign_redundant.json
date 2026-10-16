@@ -29,7 +29,7 @@
         "requested_operation": "CONFIGURE_CURVE_DISPLAY",
         "query": {
           "kind": "curve",
-          "text": "wide CBL",
+          "text": "CBL Amplitude wide",
           "local_ref": null
         },
         "scale_bounds": {

@@ -1,20 +1,20 @@
-# NL-PROGRAM-EVAL-HARNESS-01 — Q3 evaluator closeout
+# NL-PROGRAM-EVAL-HARNESS-01R — integrity rework closeout
 
 ```
 SLICE:
-NL-PROGRAM-EVAL-HARNESS-01
+NL-PROGRAM-EVAL-HARNESS-01R
 
 AUTHORITY:
-WELLPLOT-NLP-RUNTIME-V2-NL-PROGRAM-EVAL-HARNESS-01-AUTH-001
+WELLPLOT-NLP-RUNTIME-V2-NL-PROGRAM-EVAL-HARNESS-01-REWORK-AUTH-001
 
 STARTING SHA:
-4aaf96ebd9275886608a3a9901f218206dca6551
+4cfa047a7cf548dcdc31f315f0ccd74c04884a63
 
-PRIOR SUBJECT (NL-PROGRAM-DESIGN-01R2):
-4aaf96ebd9275886608a3a9901f218206dca6551
+PRIOR CANDIDATE (HARNESS-01):
+84212ab70b9b910f449211a93f1a140374e0f584
 
 CANDIDATE SHA:
-84212ab70b9b910f449211a93f1a140374e0f584
+<pending commit>
 
 HISTORICAL GOLD:
 UNCHANGED
@@ -23,7 +23,7 @@ MB-02R / SCOPE-RUNTIME / ORACLE-01:
 UNCHANGED
 
 STATUS:
-STOP FOR INDEPENDENT NL-PROGRAM-EVAL-HARNESS-01 REVIEW
+STOP FOR INDEPENDENT NL-PROGRAM-EVAL-HARNESS-01R REVIEW
 ```
 
 ## CLAIM
@@ -34,29 +34,20 @@ The slice proves that frozen or hand-authored candidate `ScopeNormalizedProgram`
 evaluated reproducibly under the frozen Q3 relation. It does **not** demonstrate
 English→Program generation performance.
 
+## Rework (R1–R4)
+
+| id | correction |
+|----|------------|
+| R1 | `load_oracle_program(frozen, case_id)` requires verified `FrozenCandidate`; no case_id-only oracle path |
+| R2 | `FrozenCandidate` is a frozen dataclass; canonical JSON is source of truth; `.program` / `to_runtime_program()` re-parse; post-freeze mutation cannot change the digest |
+| R3 | `BENIGN_REDUNDANT_TASK` uses the frozen six predicates only (no duplicate-only gate); fixture is non-identical alias reconfigure with effect already true |
+| R4 | Canonicalization tests: key-order, whitespace, null↔omitted, semantic digest change; plus pre-freeze oracle hard-fail |
+
 ## Acceptance matrix (18 fixtures)
 
-| class | n | required outcome |
-|-------|---|------------------|
-| `{case}_oracle_equivalent` | 6 | EQUIVALENT + terminal OK + all REQUIRED_REPRESENTABLE covered |
-| wrong_operand | 1 | WRONG_OPERAND |
-| missing_task | 1 | MISSING_TASK |
-| wrong_binding | 1 | WRONG_BINDING |
-| wrong_order | 1 | WRONG_ORDER |
-| wrong_dependency | 1 | WRONG_DEPENDENCY |
-| semantic_overreach | 1 | SEMANTIC_OVERREACH |
-| runtime_mismatch | 1 | RUNTIME_TERMINAL_MISMATCH |
-| benign_redundant | 1 | EQUIVALENT + BENIGN_REDUNDANT_TASK |
-| alpha_renamed_bind | 1 | EQUIVALENT |
-| independent_order_variant | 1 | EQUIVALENT |
-| alias_equivalent | 1 | EQUIVALENT |
-| schema_invalid | 1 | DECOMPOSITION_SCHEMA_INVALID; no digest; no oracle access |
+Preserved corpus. `all_expected_fixture_outcomes_match = true`.
 
-`all_expected_fixture_outcomes_match = true`  
-`oracle_access_before_freeze = 0`  
-`candidate_digest_collisions = 0`  
-`real_decomposer_calls = 0`  
-`oracle_candidate_generation_at_runtime = 0`
+`oracle_access_before_freeze = 0` · digest collisions = 0 · decomposer calls = 0
 
 ## Evidence layout
 
@@ -65,15 +56,13 @@ evidence/nl_program_eval_harness_01_results.jsonl   ← replay.py
 evidence/nl_program_eval_harness_01_summary.json    ← replay.py
 evidence/nl_program_eval_harness_01.md              ← closeout-authored
 evidence/nl_program_eval_harness_01/
-  manifest.json                                     ← expected_evaluation for replay assertion only
+  manifest.json
   candidates/*.json                                 ← pure ScopeNormalizedProgram payloads
 ```
-
-Manifest `expected_evaluation` is **not** passed to `freeze.py`, SCOPE-RUNTIME, or `compare.py`.
 
 ## Explicit exclusions
 
 - No real decomposer / model / T5 / Luna / LangGraph
 - No MB-03 / production path
 - No English→Program accuracy claim
-- Comparator complete only for the six frozen EvaluationSpec surfaces; unsupported constructs fail closed as `COMPARATOR_SCOPE_UNSUPPORTED`
+- Comparator scoped to the six frozen EvaluationSpec surfaces

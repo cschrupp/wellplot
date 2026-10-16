@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass
 from typing import Any
 
 from pydantic import ValidationError
@@ -16,34 +17,18 @@ CANONICALIZATION_VERSION = "nl-program-canonical-json-v1"
 DIGEST_ALGORITHM = "sha256"
 
 
+@dataclass(frozen=True, slots=True)
 class FrozenCandidate:
-    """Immutable frozen candidate; oracle access becomes legal only after construction."""
+    """Digest-coupled immutable candidate. Canonical JSON is the source of truth.
 
-    __slots__ = (
-        "_program",
-        "_canonical_json",
-        "_sha256",
-        "_canonicalization_version",
-        "_oracle_access_enabled",
-    )
+    Callers must use ``to_runtime_program()`` (defensive re-parse). The stored
+    digest is over ``canonical_json`` bytes only.
+    """
 
-    def __init__(
-        self,
-        program: ScopeNormalizedProgram,
-        canonical_json: str,
-        sha256: str,
-        *,
-        canonicalization_version: str = CANONICALIZATION_VERSION,
-    ) -> None:
-        self._program = program
-        self._canonical_json = canonical_json
-        self._sha256 = sha256
-        self._canonicalization_version = canonicalization_version
-        self._oracle_access_enabled = True
-
-    @property
-    def program(self) -> ScopeNormalizedProgram:
-        return self._program
+    _canonical_json: str
+    _sha256: str
+    _canonicalization_version: str = CANONICALIZATION_VERSION
+    _oracle_access_enabled: bool = True
 
     @property
     def canonical_json(self) -> str:
@@ -61,21 +46,31 @@ class FrozenCandidate:
     def oracle_access_enabled(self) -> bool:
         return self._oracle_access_enabled
 
+    @property
+    def program(self) -> ScopeNormalizedProgram:
+        """Defensive re-parse; mutations to the returned model cannot affect the digest."""
+        return self.to_runtime_program()
+
     def to_runtime_program(self) -> ScopeNormalizedProgram:
-        """Defensive re-parse into runtime model (no mutation of frozen payload)."""
+        """Re-parse canonical JSON into a fresh runtime model every call."""
         return parse_program_from_witness(json.loads(self._canonical_json))
 
+    def verify_digest(self) -> bool:
+        return (
+            hashlib.sha256(self._canonical_json.encode("utf-8")).hexdigest()
+            == self._sha256
+        )
 
+
+@dataclass(frozen=True, slots=True)
 class FreezeFailure:
-    __slots__ = ("schema_valid", "failure", "detail")
-
-    def __init__(self, failure: str, detail: str | None = None) -> None:
-        self.schema_valid = False
-        self.failure = failure
-        self.detail = detail
+    failure: str
+    detail: str | None = None
+    schema_valid: bool = False
 
 
-def _canonical_json(closed: ClosedNormalizedProgram) -> str:
+def canonical_json_bytes(closed: ClosedNormalizedProgram) -> str:
+    """Deterministic canonical form: sorted keys, compact separators, no nulls, no NaN."""
     payload = closed.model_dump(mode="json", exclude_none=True)
     return json.dumps(
         payload,
@@ -102,24 +97,27 @@ def freeze_candidate(raw: dict[str, Any] | str | bytes) -> FrozenCandidate | Fre
         return FreezeFailure("DECOMPOSITION_SCHEMA_INVALID", str(exc))
 
     try:
-        canonical = _canonical_json(closed)
+        canonical = canonical_json_bytes(closed)
     except (ValueError, TypeError) as exc:
-        # NaN/Infinity → allow_nan=False raises ValueError
         return FreezeFailure("DECOMPOSITION_SCHEMA_INVALID", f"canonicalization:{exc}")
 
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-    runtime = parse_program_from_witness(json.loads(canonical))
-    return FrozenCandidate(
-        program=runtime,
-        canonical_json=canonical,
-        sha256=digest,
-        canonicalization_version=CANONICALIZATION_VERSION,
+    frozen = FrozenCandidate(
+        _canonical_json=canonical,
+        _sha256=digest,
+        _canonicalization_version=CANONICALIZATION_VERSION,
+        _oracle_access_enabled=True,
     )
+    assert frozen.verify_digest()
+    return frozen
 
 
 def require_frozen(candidate: Any) -> FrozenCandidate:
+    """Gate for any API that may reach oracle-side material."""
     if not isinstance(candidate, FrozenCandidate):
         raise RuntimeError("oracle_access_denied_before_FrozenCandidate")
     if not candidate.oracle_access_enabled:
         raise RuntimeError("oracle_access_disabled")
+    if not candidate.verify_digest():
+        raise RuntimeError("frozen_candidate_digest_mismatch")
     return candidate
