@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -28,7 +29,7 @@ from wellplot.agent.providers.base import ProviderRequestError, StructuredGenera
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _props() -> dict[str, object]:
+def _props(*, chat_template: str = "qwen3") -> dict[str, object]:
     """Build a sanitized llama.cpp property double."""
     return {
         "model_path": "/srv/models/qwen3.6-35b-a3b.gguf",
@@ -39,7 +40,7 @@ def _props() -> dict[str, object]:
         },
         "build_info": "llama.cpp provider-free test build",
         "total_slots": 1,
-        "chat_template": "qwen3",
+        "chat_template": chat_template,
         "gguf_byte_identity": "NOT_AVAILABLE",
     }
 
@@ -77,7 +78,7 @@ def _authorization(
     )
 
 
-def _ready() -> d5.D5OperationalReadiness:
+def _ready(*, live: bool = False) -> d5.D5OperationalReadiness:
     """Build already-qualified readiness without endpoint activity."""
     projection = d5.D5ReadinessProjection(
         model_catalog=(d5.EXPECTED_MODEL,),
@@ -94,6 +95,7 @@ def _ready() -> d5.D5OperationalReadiness:
     return d5.D5OperationalReadiness(
         projection=projection,
         endpoint_calls=("/v1/models", "/props"),
+        live=live,
     )
 
 
@@ -250,6 +252,16 @@ def test_two_get_readiness_order_and_sanitized_projection() -> None:
     assert "chat_template" not in projection
     assert len(projection["chat_template_sha256"]) == 64
     assert result.provider_calls == result.model_calls == 0
+
+
+def test_chat_template_fingerprint_preserves_exact_utf8_bytes() -> None:
+    """Whitespace changes in the returned template produce different hashes."""
+    first = d5._project_props(_props(chat_template="qwen3\n"), "json_schema")
+    second = d5._project_props(_props(chat_template="qwen3 "), "json_schema")
+
+    assert first["chat_template_sha256"] == hashlib.sha256(b"qwen3\n").hexdigest()
+    assert second["chat_template_sha256"] == hashlib.sha256(b"qwen3 ").hexdigest()
+    assert first["chat_template_sha256"] != second["chat_template_sha256"]
 
 
 def test_readiness_rejects_thinking_on_without_generation_probe() -> None:
@@ -652,6 +664,7 @@ def _live_transport_response_model(name: str) -> type[BaseModel]:
 def _live_transport_factory(
     *,
     retry_count: int,
+    failure_mode: str = "success",
     clients: list[httpx.AsyncClient],
     requests: list[httpx.Request],
 ) -> Callable[[Callable[[object], Any]], object]:
@@ -667,10 +680,27 @@ def _live_transport_factory(
         nonlocal attempt_number
         requests.append(request)
         attempt_number += 1
-        if attempt_number <= retry_count:
+        if failure_mode == "transport" or attempt_number <= retry_count:
             return httpx.Response(
                 500,
                 json={"error": {"message": "provider-free retry fixture"}},
+                request=request,
+            )
+        if failure_mode == "provider_rejection":
+            return httpx.Response(
+                200,
+                json={
+                    "choices": [
+                        {
+                            "message": {
+                                "role": "assistant",
+                                "content": None,
+                                "refusal": "structured output is not supported",
+                            },
+                            "finish_reason": "stop",
+                        }
+                    ]
+                },
                 request=request,
             )
         payload = json.loads(request.content)
@@ -688,6 +718,7 @@ def _live_transport_factory(
             ),
             response_model=response_model,
         )
+        content = generated.value.model_dump_json()
         return httpx.Response(
             200,
             json={
@@ -695,7 +726,7 @@ def _live_transport_factory(
                     {
                         "message": {
                             "role": "assistant",
-                            "content": generated.value.model_dump_json(),
+                            "content": content,
                         },
                         "finish_reason": "stop",
                     }
@@ -832,3 +863,103 @@ def test_real_live_transport_physical_ceiling_fails_closed(
         assert observed[2:] == [1]
         assert ledger.physical_attempts == 2
         assert len(requests) == 2
+
+
+def test_real_live_provider_rejection_is_inconclusive_without_replay(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A real provider refusal becomes structured-output INCONCLUSIVE evidence."""
+    from openai import _base_client
+
+    monkeypatch.setattr(_base_client, "get_platform", lambda: "Linux")
+    with TemporaryDirectory(dir=REPO_ROOT) as temporary:
+        root = Path(temporary)
+        artifact_root = root / "live"
+        clients: list[httpx.AsyncClient] = []
+        requests: list[httpx.Request] = []
+        adapter = d5.create_live_adapter(
+            repo_root=REPO_ROOT,
+            artifact_root=artifact_root,
+            api_key="provider-free-test-token",
+            http_client_factory=_live_transport_factory(
+                retry_count=0,
+                failure_mode="provider_rejection",
+                clients=clients,
+                requests=requests,
+            ),
+        )
+        client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
+        client._platform = "Linux"
+        authorization = _authorization(
+            campaign_id="provider-rejection",
+            artifact_root=str(artifact_root),
+        )
+        runner = d5.D5CampaignRunner(
+            repo_root=REPO_ROOT,
+            authorization=authorization,
+            paths=d5.EvidencePaths(artifact_root, authorization.campaign_id),
+            readiness=_ready(live=True),
+            provenance=_provenance(),
+        )
+        try:
+            result = asyncio.run(runner.run(adapter))
+        finally:
+            asyncio.run(clients[0].aclose())
+
+        assert result["decision"] == "INCONCLUSIVE"
+        assert result["attribution"] == "PROVIDER_BOUNDARY / STRUCTURED_OUTPUT"
+        assert result["completed_turns"] == 1
+        assert result["rows"][0]["failure_category"] == "provider_rejected"
+        assert result["rows"][0]["grader_status"] == "INCONCLUSIVE"
+        assert len(requests) == 1
+        journal = next(artifact_root.glob("*.journal.jsonl"))
+        assert "replay" not in journal.read_text(encoding="utf-8").casefold()
+
+
+def test_real_live_transport_exhaustion_is_not_semantic_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Exhausted real transport retries become provider-runtime INCONCLUSIVE."""
+    from openai import _base_client
+
+    monkeypatch.setattr(_base_client, "get_platform", lambda: "Linux")
+    with TemporaryDirectory(dir=REPO_ROOT) as temporary:
+        root = Path(temporary)
+        artifact_root = root / "live"
+        clients: list[httpx.AsyncClient] = []
+        requests: list[httpx.Request] = []
+        adapter = d5.create_live_adapter(
+            repo_root=REPO_ROOT,
+            artifact_root=artifact_root,
+            api_key="provider-free-test-token",
+            http_client_factory=_live_transport_factory(
+                retry_count=0,
+                failure_mode="transport",
+                clients=clients,
+                requests=requests,
+            ),
+        )
+        client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
+        client._platform = "Linux"
+        authorization = _authorization(
+            campaign_id="transport-exhaustion",
+            artifact_root=str(artifact_root),
+        )
+        runner = d5.D5CampaignRunner(
+            repo_root=REPO_ROOT,
+            authorization=authorization,
+            paths=d5.EvidencePaths(artifact_root, authorization.campaign_id),
+            readiness=_ready(live=True),
+            provenance=_provenance(),
+        )
+        try:
+            result = asyncio.run(runner.run(adapter))
+        finally:
+            asyncio.run(clients[0].aclose())
+
+        assert result["decision"] == "INCONCLUSIVE"
+        assert result["attribution"] == "PROVIDER_OR_TRANSPORT_RUNTIME"
+        assert result["rows"][0]["failure_category"] == "transport"
+        assert result["rows"][0]["grader_status"] == "INCONCLUSIVE"
+        assert result["physical_generation_attempts"] == 3
+        assert len(requests) == 3

@@ -893,7 +893,7 @@ def _project_props(payload: object, expected_contract: str) -> dict[str, Any]:
         "context_size": generation["n_ctx"],
         "build_info": build_info.strip(),
         "total_slots": slots,
-        "chat_template_sha256": d4.sha256_text(chat_template.strip()),
+        "chat_template_sha256": hashlib.sha256(chat_template.encode("utf-8")).hexdigest(),
         "runtime_defaults_sha256": _sha256_json(runtime_defaults),
         "structured_output_contract": expected_contract,
         "gguf_byte_identity": str(payload.get("gguf_byte_identity", "NOT_AVAILABLE")),
@@ -1222,6 +1222,8 @@ def _bounded_turn_row(
 ) -> dict[str, Any]:
     """Project one D4 actual/grade pair into redacted D5 evidence."""
     verifier = grade.get("verifier_requirements", [])
+    status = str(grade.get("status"))
+    outcome = "PASS" if status == "PASS" else "INCONCLUSIVE" if status == "INCONCLUSIVE" else "FAIL"
     return {
         "experiment_version": D5_EXPERIMENT_VERSION,
         "case_id": case.get("case_id"),
@@ -1229,7 +1231,7 @@ def _bounded_turn_row(
         "execution_index": execution_index,
         "request_sha256": case.get("request_sha256"),
         "result_status": grade.get("status"),
-        "outcome": "PASS" if grade.get("status") == "PASS" else "FAIL",
+        "outcome": outcome,
         "grader_status": grade.get("status"),
         "diagnostics": list(grade.get("errors", [])),
         "verifier_requirements": verifier,
@@ -1271,6 +1273,32 @@ def classify_grade_failure(actual: Mapping[str, Any], grade: Mapping[str, Any]) 
     evidence = actual.get("execution_evidence")
     if isinstance(evidence, Mapping) and evidence.get("accepted") is True:
         return "PRODUCTION_OR_INFRASTRUCTURE"
+    return None
+
+
+_STRUCTURED_OUTPUT_FAILURE_CATEGORIES = frozenset({"configuration", "provider_rejected"})
+_PROVIDER_RUNTIME_FAILURE_CATEGORIES = frozenset(
+    {"transport", "timeout", "rate_limit", "authentication"}
+)
+
+
+def _classify_logical_call_failure(
+    calls: Sequence[Mapping[str, Any]],
+) -> tuple[str, str] | None:
+    """Classify stable provider custody categories before semantic grading."""
+    categories = [
+        str(call.get("failure_category"))
+        for call in calls
+        if call.get("failure_category") is not None
+    ]
+    if any(category in _STRUCTURED_OUTPUT_FAILURE_CATEGORIES for category in categories):
+        return "PROVIDER_BOUNDARY / STRUCTURED_OUTPUT", next(
+            category for category in categories if category in _STRUCTURED_OUTPUT_FAILURE_CATEGORIES
+        )
+    if any(category in _PROVIDER_RUNTIME_FAILURE_CATEGORIES for category in categories):
+        return "PROVIDER_OR_TRANSPORT_RUNTIME", next(
+            category for category in categories if category in _PROVIDER_RUNTIME_FAILURE_CATEGORIES
+        )
     return None
 
 
@@ -1353,7 +1381,12 @@ class D5CampaignRunner:
                 physical_cursor = custody.ledger.physical_attempts
                 started = time.perf_counter()
                 actual = await execute_turn(case, expected)
-                grade = d4.grade_turn(dict(actual), expected)
+                observed_failure = _classify_logical_call_failure(custody.ledger.calls[cursor:])
+                grade = (
+                    {"status": "INCONCLUSIVE", "errors": [], "verifier_requirements": []}
+                    if observed_failure is not None
+                    else d4.grade_turn(dict(actual), expected)
+                )
                 calls = int(getattr(adapter, "logical_call_count", 0)) - cursor
                 row = _bounded_turn_row(
                     case,
@@ -1366,13 +1399,26 @@ class D5CampaignRunner:
                 )
                 row["duration_seconds"] = round(time.perf_counter() - started, 6)
                 row["authorization_id"] = self.authorization.authorization_id
-                row["failure_category"] = classify_grade_failure(actual, grade)
-                row["infrastructure_failure"] = row["failure_category"] is not None
+                row["failure_category"] = (
+                    observed_failure[1]
+                    if observed_failure is not None
+                    else classify_grade_failure(actual, grade)
+                )
+                row["infrastructure_failure"] = (
+                    observed_failure is not None or row["failure_category"] is not None
+                )
+                if observed_failure is not None:
+                    row["attribution"] = observed_failure[0]
                 custody.append_turn(row)
                 rows.append(row)
                 if row["infrastructure_failure"]:
                     break
-            if any(row["infrastructure_failure"] for row in rows):
+            provider_attributions = [
+                str(row["attribution"]) for row in rows if row.get("attribution") is not None
+            ]
+            if provider_attributions:
+                decision, attribution = "INCONCLUSIVE", provider_attributions[0]
+            elif any(row["infrastructure_failure"] for row in rows):
                 decision, attribution = "INCONCLUSIVE", "PRODUCTION_OR_INFRASTRUCTURE"
             elif len(rows) != 9:
                 decision, attribution = "INCONCLUSIVE", "POPULATION_INCOMPLETE"
@@ -1381,7 +1427,11 @@ class D5CampaignRunner:
             else:
                 decision, attribution = "FAIL", "SEMANTIC_CONTRACT"
         except Exception as error:
-            decision, attribution = _classify_exception(error)
+            observed_failure = _classify_logical_call_failure(custody.ledger.calls)
+            if observed_failure is not None:
+                decision, attribution = "INCONCLUSIVE", observed_failure[0]
+            else:
+                decision, attribution = _classify_exception(error)
         terminal = custody.finish(decision, attribution=attribution, rows=rows)
         custody_digests = verify_custody_artifacts(self.paths)
         self._finished = True

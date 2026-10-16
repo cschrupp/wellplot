@@ -9,7 +9,7 @@ frozen_design: 1658c1593330620501baa4a551b965fa209cc95b
 accepted_d5_3_engine: 51fd23fe18ca77c067b0cdf702f88a57ba4c457d
 branch: implementation/d5-4-bounded-live-semantic-qualification
 phase: PROVIDER_FREE_HARNESS_IMPLEMENTATION
-status: COMPLETE / READY FOR INDEPENDENT REWORK 2 REVIEW
+status: COMPLETE / READY FOR INDEPENDENT REWORK 3 REVIEW
 live_qualification: NOT RUN / NOT AUTHORIZED
 production_promotion: NOT AUTHORIZED
 ```
@@ -84,7 +84,7 @@ Final focused harness validation:
 
 ```text
 tests/test_nlp_d5_live_semantic_qualification.py
-23 passed
+26 passed
 ```
 
 The deterministic rehearsal included in that suite proves:
@@ -115,6 +115,8 @@ truthful live/provider-free call accounting: PASS
 real transport retry qualification: PASS
 physical-attempt ceiling on real transport path: PASS
 chat-template fingerprint custody: PASS
+real provider-bound failure attribution: PASS
+semantic failure remains FAIL / SEMANTIC_CONTRACT: PASS
 ```
 
 Adjacent validation:
