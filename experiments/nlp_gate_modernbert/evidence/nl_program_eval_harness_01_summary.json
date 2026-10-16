@@ -2,21 +2,31 @@
   "all_expected_fixture_outcomes_match": true,
   "authority": "WELLPLOT-NLP-RUNTIME-V2-NL-PROGRAM-EVAL-HARNESS-01-AUTH-001",
   "candidate_digest_collisions": 0,
-  "candidate_sha": "848c1053c3c16ee3c32555a95dc01d7a9d49e290",
+  "candidate_sha": null,
   "closeout_attestation": {
-    "negative_tests": {
-      "benign_non_identical_state_idempotent": "PASS",
-      "canonicalization_key_order": "PASS",
-      "canonicalization_null_omitted": "PASS",
-      "canonicalization_semantic_digest_change": "PASS",
-      "canonicalization_whitespace": "PASS",
-      "closed_schema_recursive_forbid": "PASS",
-      "frozen_immutable_digest_coupled": "PASS",
-      "nan_infinity_rejected": "PASS",
-      "oracle_load_requires_frozen": "PASS"
+    "adjacent_scope_runtime_tests": {
+      "collected": 12,
+      "note": "Unchanged adjacent suite; not part of harness closeout claim",
+      "passed": 12,
+      "path": "tests/test_scope_runtime.py",
+      "provenance": "CLOSEOUT_ATTESTATION (pytest; labeled separately)"
     },
-    "provenance": "CLOSEOUT_ATTESTATION (pytest; not replay output)",
-    "tests_passed": 23
+    "combined_collected_if_run_together": 36,
+    "harness_tests": {
+      "collected": 24,
+      "passed": 24,
+      "path": "tests/test_nl_program_eval_harness.py",
+      "provenance": "CLOSEOUT_ATTESTATION (pytest harness suite only)"
+    },
+    "negative_tests": {
+      "benign_six_predicate_no_entity_elsewhere": "PASS",
+      "canonicalization_invariants": "PASS",
+      "frozen_constructor_bypass_rejected": "PASS",
+      "oracle_load_requires_frozen": "PASS",
+      "sealed_factory_schema_canonical_gates": "PASS"
+    },
+    "provenance": "CLOSEOUT_ATTESTATION (pytest; harness suite = tests_passed)",
+    "tests_passed": 24
   },
   "epistemic_claim": "Harness proves frozen/hand-authored ScopeNormalizedPrograms evaluate reproducibly under Q3; does not demonstrate English\u2192Program generation performance.",
   "failure_label_counts": {
@@ -47,7 +57,7 @@
     "tests_passed": "CLOSEOUT_ATTESTATION (pytest; not replay output)"
   },
   "real_decomposer_calls": 0,
-  "rework": "HARNESS-01R R1-oracle-lock R2-immutable-freeze R3-benign-six-predicate R4-canonicalization-tests",
+  "rework": "HARNESS-01R2 R5-sealed-freeze R6-benign-six-exact R7-test-attestation",
   "slice": "NL-PROGRAM-EVAL-HARNESS-01",
-  "starting_sha": "4cfa047a7cf548dcdc31f315f0ccd74c04884a63"
+  "starting_sha": "66ff818e4c11be74d3afb6851047b4b95a55e44d"
 }

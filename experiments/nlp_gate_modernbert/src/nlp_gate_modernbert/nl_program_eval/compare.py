@@ -283,57 +283,68 @@ def _coverage_lost_without_task(
     return len(missing) > 0
 
 
-def _task_primary_entity(task: ScopeNormalizedTask, ws: ProjectedWorkspace) -> str | None:
-    req = task.request
-    for q in (req.query, req.secondary_query, req.target):
-        if q is None:
-            continue
-        if q.local_ref:
-            return f"bind:{q.local_ref}"
-        if q.text:
-            return _resolve_text_entity(ws, q.kind, q.text)
-    if req.fill and req.fill.primary_query:
-        return _resolve_text_entity(ws, "curve", req.fill.primary_query)
-    return None
-
-
-def _entity_addressed_elsewhere(
-    program: ScopeNormalizedProgram,
-    task_id: str,
-    entity: str,
-    initial: ProjectedWorkspace,
+def _consumer_uses_bind_from(
+    producer: ScopeNormalizedTask, consumer: ScopeNormalizedTask
 ) -> bool:
-    """Another remaining task must address the same entity (no new utterance referent)."""
-    for t in program.tasks:
-        if t.task_id == task_id:
-            continue
-        # Text/alias resolution is stable on the initial workspace for these six cases;
-        # bind refs compare by local_ref name.
-        other = _task_primary_entity(t, initial)
-        if other is not None and other == entity:
+    binds = set(producer.produces_binds)
+    if not binds:
+        return False
+    for q in (consumer.request.query, consumer.request.secondary_query, consumer.request.target):
+        if q is not None and q.local_ref and q.local_ref in binds:
             return True
     return False
 
 
+def _ordering_atom_requires_precedence(
+    case: CaseRecord,
+    earlier: ScopeNormalizedTask,
+    later: ScopeNormalizedTask,
+) -> bool:
+    """True if a frozen ordering atom requires earlier before later."""
+    e_op = earlier.request.requested_operation
+    l_op = later.request.requested_operation
+    for atom_id in case.ordering_atom_ids:
+        if atom_id == "SCALE_BEFORE_FILL":
+            if e_op == "CONFIGURE_CURVE_DISPLAY" and l_op == "DEFINE_FILL":
+                return True
+        if atom_id == "GR_BEFORE_RT":
+            eq = (earlier.request.query.text or "").strip().lower() if earlier.request.query else ""
+            lq = (later.request.query.text or "").strip().lower() if later.request.query else ""
+            if e_op == "PLACE_CURVE" and l_op == "PLACE_CURVE":
+                if eq in {"gr", "gamma", "gamma ray"} and lq in {"rt", "resistivity", "res"}:
+                    return True
+    return False
+
+
+def _dependency_semantically_needed(
+    case: CaseRecord,
+    producer: ScopeNormalizedTask,
+    consumer: ScopeNormalizedTask,
+) -> bool:
+    """Prove whether consumer→producer depends_on is semantically required before stripping."""
+    if _consumer_uses_bind_from(producer, consumer):
+        return True
+    if _ordering_atom_requires_precedence(case, producer, consumer):
+        return True
+    return False
+
+
 def _needed_bind_or_dependency_change(
+    case: CaseRecord,
     program: ScopeNormalizedProgram,
     task: ScopeNormalizedTask,
 ) -> bool:
-    """True if this task produces binds or is the sole depends_on link for a bind consumer."""
+    """True if removing task would change a needed bind or semantically required dependency."""
     if task.produces_binds:
+        # Removing a bind producer always changes the bind graph.
         return True
-    # If some later task lists only this task as depends_on and uses a bind, removing
-    # it would change dependency structure for that consumer.
     for t in program.tasks:
         if t.task_id == task.task_id:
             continue
-        if task.task_id in t.depends_on and len(t.depends_on) == 1:
-            uses_bind = any(
-                q and q.local_ref
-                for q in (t.request.query, t.request.secondary_query, t.request.target)
-            )
-            if uses_bind:
-                return True
+        if task.task_id not in t.depends_on:
+            continue
+        if _dependency_semantically_needed(case, task, t):
+            return True
     return False
 
 
@@ -384,13 +395,15 @@ def _find_benign_redundant(
     result: ProgramExecutionResult,
     initial: ProjectedWorkspace,
 ) -> list[str]:
-    """Frozen BENIGN_REDUNDANT_TASK six-predicate test (no duplicate-only prerequisite).
+    """Frozen BENIGN_REDUNDANT_TASK — exactly the six Q3 predicates.
 
     1. individually valid and supported (OK in trace)
-    2. no new user-visible semantics (coverage preserved; entity addressed elsewhere)
+    2. no new user-visible semantics / utterance coverage still preserved
+       (REQUIRED_REPRESENTABLE coverage intact after removal)
     3. removing preserves terminal
     4. removing preserves later-consumed projected facts
     5. does not create/remove/change a needed bind or dependency
+       (dependency edges stripped only after semantic need is disproven)
     6. semantic effect already true at that execution point
 
     Extras are removed iteratively (later-first) so a covering task for each
@@ -416,21 +429,18 @@ def _find_benign_redundant(
         # (6) effect already true at original execution point
         if not _effect_already_true(task, ws):
             continue
-        # (5) against the current kept program
         current = _program_keeping(program, keep)
-        if _needed_bind_or_dependency_change(current, task):
+        # (5) needed bind/dependency — prove edges are not semantically required
+        if _needed_bind_or_dependency_change(case, current, task):
             continue
-        # (2) coverage must survive removing this task from the kept set
+        # (2) coverage / no new utterance-required semantics lost
         if _coverage_lost_without_task(case, task, current, initial):
             continue
-        entity = _task_primary_entity(task, ws)
-        if entity is None or not _entity_addressed_elsewhere(
-            current, task.task_id, entity, initial
-        ):
-            continue
-        # (3)+(4)
+        # (3)+(4) terminal + later-consumed projected facts
         if not _preserves_later_consumed_facts(current, task, initial, case):
             continue
+        # Dependency edges to this task are not semantically needed (5 passed),
+        # so _program_keeping / _program_without_task may strip them.
         benign.append(task.task_id)
         keep.remove(task.task_id)
 

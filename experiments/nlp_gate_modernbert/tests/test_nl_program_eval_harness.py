@@ -153,6 +153,47 @@ def test_frozen_candidate_immutable_and_digest_coupled() -> None:
     assert frozen.program.tasks[0].task_id == prog2.tasks[0].task_id
 
 
+def test_frozen_candidate_public_constructor_bypass_rejected() -> None:
+    """R5: cannot forge FrozenCandidate without freeze_candidate / closed-schema path."""
+    import hashlib
+
+    raw = _oracle_clean("D5GAP-0101")
+    legit = freeze_candidate(raw)
+    assert isinstance(legit, FrozenCandidate)
+
+    # Direct construction is hard-blocked
+    with pytest.raises(TypeError, match="freeze_candidate"):
+        FrozenCandidate(  # type: ignore[call-arg]
+            legit.canonical_json,
+            legit.sha256,
+        )
+
+    # Matching hash of arbitrary non-schema JSON is not acceptable via public API
+    bogus = '{"tasks":[],"unexpected_top_level":true}'
+    bogus_digest = hashlib.sha256(bogus.encode("utf-8")).hexdigest()
+    with pytest.raises(TypeError, match="freeze_candidate"):
+        FrozenCandidate(bogus, bogus_digest)  # type: ignore[call-arg]
+
+    # Private factory still enforces closed-schema + canonicalization
+    with pytest.raises(RuntimeError, match="frozen_candidate_"):
+        FrozenCandidate._create_sealed(bogus, bogus_digest)
+
+    # Non-canonical (valid schema, pretty-printed) rejected by seal factory
+    pretty = json.dumps({"tasks": []}, indent=2)
+    pretty_digest = hashlib.sha256(pretty.encode("utf-8")).hexdigest()
+    with pytest.raises(RuntimeError, match="frozen_candidate_"):
+        FrozenCandidate._create_sealed(pretty, pretty_digest)
+
+    # require_frozen / oracle load still deny non-instances
+    with pytest.raises(RuntimeError, match="oracle_access_denied_before_FrozenCandidate"):
+        require_frozen({"canonical_json": legit.canonical_json, "sha256": legit.sha256})
+    with pytest.raises(RuntimeError, match="oracle_access_denied_before_FrozenCandidate"):
+        load_oracle_program(  # type: ignore[arg-type]
+            {"_canonical_json": legit.canonical_json, "_sha256": legit.sha256},
+            "D5GAP-0101",
+        )
+
+
 @pytest.mark.parametrize(
     "nest_path",
     ["top", "task", "request", "query", "scale", "fill"],

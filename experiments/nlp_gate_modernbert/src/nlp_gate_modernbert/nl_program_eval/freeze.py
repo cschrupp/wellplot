@@ -17,18 +17,51 @@ CANONICALIZATION_VERSION = "nl-program-canonical-json-v1"
 DIGEST_ALGORITHM = "sha256"
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, init=False)
 class FrozenCandidate:
-    """Digest-coupled immutable candidate. Canonical JSON is the source of truth.
+    """Digest-coupled immutable candidate. Constructible only via ``freeze_candidate``.
 
-    Callers must use ``to_runtime_program()`` (defensive re-parse). The stored
-    digest is over ``canonical_json`` bytes only.
+    Canonical JSON is the source of truth. ``program`` / ``to_runtime_program()``
+    always re-parse; mutations to returned models cannot affect the digest.
     """
 
     _canonical_json: str
     _sha256: str
-    _canonicalization_version: str = CANONICALIZATION_VERSION
-    _oracle_access_enabled: bool = True
+    _canonicalization_version: str
+    _oracle_access_enabled: bool
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError(
+            "FrozenCandidate_requires_freeze_candidate: "
+            "construct only via freeze_candidate()"
+        )
+
+    @classmethod
+    def _create_sealed(
+        cls,
+        canonical_json: str,
+        sha256: str,
+        *,
+        canonicalization_version: str = CANONICALIZATION_VERSION,
+        oracle_access_enabled: bool = True,
+    ) -> FrozenCandidate:
+        """Internal factory: closed-schema validate + canonicalize + digest check."""
+        try:
+            closed = ClosedNormalizedProgram.model_validate(json.loads(canonical_json))
+            recanon = canonical_json_bytes(closed)
+        except (ValidationError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"frozen_candidate_schema_invalid:{exc}") from exc
+        if recanon != canonical_json:
+            raise RuntimeError("frozen_candidate_not_canonical")
+        digest = hashlib.sha256(canonical_json.encode("utf-8")).hexdigest()
+        if digest != sha256:
+            raise RuntimeError("frozen_candidate_digest_mismatch")
+        obj = object.__new__(cls)
+        object.__setattr__(obj, "_canonical_json", canonical_json)
+        object.__setattr__(obj, "_sha256", sha256)
+        object.__setattr__(obj, "_canonicalization_version", canonicalization_version)
+        object.__setattr__(obj, "_oracle_access_enabled", oracle_access_enabled)
+        return obj
 
     @property
     def canonical_json(self) -> str:
@@ -60,6 +93,14 @@ class FrozenCandidate:
             hashlib.sha256(self._canonical_json.encode("utf-8")).hexdigest()
             == self._sha256
         )
+
+    def revalidate_freeze_contract(self) -> None:
+        """Re-run closed-schema + canonicalization + digest (require_frozen gate)."""
+        closed = ClosedNormalizedProgram.model_validate(json.loads(self._canonical_json))
+        if canonical_json_bytes(closed) != self._canonical_json:
+            raise RuntimeError("frozen_candidate_not_canonical")
+        if not self.verify_digest():
+            raise RuntimeError("frozen_candidate_digest_mismatch")
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,14 +143,12 @@ def freeze_candidate(raw: dict[str, Any] | str | bytes) -> FrozenCandidate | Fre
         return FreezeFailure("DECOMPOSITION_SCHEMA_INVALID", f"canonicalization:{exc}")
 
     digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-    frozen = FrozenCandidate(
-        _canonical_json=canonical,
-        _sha256=digest,
-        _canonicalization_version=CANONICALIZATION_VERSION,
-        _oracle_access_enabled=True,
+    return FrozenCandidate._create_sealed(
+        canonical,
+        digest,
+        canonicalization_version=CANONICALIZATION_VERSION,
+        oracle_access_enabled=True,
     )
-    assert frozen.verify_digest()
-    return frozen
 
 
 def require_frozen(candidate: Any) -> FrozenCandidate:
@@ -118,6 +157,5 @@ def require_frozen(candidate: Any) -> FrozenCandidate:
         raise RuntimeError("oracle_access_denied_before_FrozenCandidate")
     if not candidate.oracle_access_enabled:
         raise RuntimeError("oracle_access_disabled")
-    if not candidate.verify_digest():
-        raise RuntimeError("frozen_candidate_digest_mismatch")
+    candidate.revalidate_freeze_contract()
     return candidate
