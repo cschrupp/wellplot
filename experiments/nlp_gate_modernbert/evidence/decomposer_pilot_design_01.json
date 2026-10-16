@@ -192,11 +192,11 @@
         "DECOMPOSITION_SCHEMA_INVALID": "object returned but freeze_candidate() rejects"
       },
       "no_silent_semantic_normalization": [
-        "no GR\u2192canonical ID rewrite",
+        "no GR→canonical ID rewrite",
         "no inferred depends_on",
         "no inserted missing tasks",
         "no repaired local_ref producers",
-        "no unsupported-op \u2192 nearest-valid rewrite"
+        "no unsupported-op → nearest-valid rewrite"
       ],
       "freeze_candidate_authoritative_even_if_decoder_buggy": true,
       "backend_library": "implementation-time choice (Outlines / XGrammar / HF logits processor acceptable if behavior matches)",
@@ -271,7 +271,7 @@
             "D5GAP-0096",
             "D5GAP-0101"
           ],
-          "meaning": "Must recover multi-operation create \u2192 place \u2192 configure structure rather than collapse or omit semantics."
+          "meaning": "Must recover multi-operation create → place → configure structure rather than collapse or omit semantics."
         },
         "local_binding": {
           "cases": [
@@ -378,9 +378,9 @@
     "Q6_execution_evidence": {
       "governance_sequence": [
         "DECOMPOSER-PILOT-DESIGN-01 CLOSED",
-        "DECOMPOSER-PILOT-PREFLIGHT-01 (pins + parity; model calls = 0) \u2014 separate AUTH",
+        "DECOMPOSER-PILOT-PREFLIGHT-01 (pins + parity; model calls = 0) — separate AUTH",
         "independent review",
-        "DECOMPOSER-PILOT-01 (exactly six inference calls) \u2014 separate AUTH"
+        "DECOMPOSER-PILOT-01 (exactly six inference calls) — separate AUTH"
       ],
       "preflight_hard_barrier": {
         "model_calls_during_preflight": 0,
@@ -505,5 +505,6 @@
     "decomposer_implemented": false,
     "english_to_program_accuracy_claimed": false,
     "next_authorized_only_after_independent_review": "DECOMPOSER-PILOT-PREFLIGHT-01 (separate AUTH; model calls = 0)"
-  }
+  },
+  "candidate_sha": "1ad45677418cccdde7f7e432d8defc2fe2d28b3c"
 }
