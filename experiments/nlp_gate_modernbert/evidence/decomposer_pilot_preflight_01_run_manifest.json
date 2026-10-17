@@ -205,5 +205,6 @@
   "result": "FAIL",
   "slice": "DECOMPOSER-PILOT-PREFLIGHT-01R",
   "starting_sha": "1d84071576704909c9dce7e24011eb813009201c",
-  "starting_tip": "1d84071576704909c9dce7e24011eb813009201c"
+  "starting_tip": "1d84071576704909c9dce7e24011eb813009201c",
+  "tip_sha": "6c4fc67c04e72c201778064f1afea39d235e9372"
 }
