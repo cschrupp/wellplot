@@ -1,0 +1,1351 @@
+{
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-SCOPE-CONTRACT-DESIGN-REWORK-AUTH-001",
+  "slice": "SCOPE-DESIGN-01R",
+  "starting_sha": "e1e3fa23bd7f0ce94c56682cecd94f7fecfed44b",
+  "accepted_mb02r_subject": "c2f158b8222e3c1b4ae3ae737c2544fc3b25f994",
+  "accepted_oracle01_subject": "fd2f0443ad18a76542d3577928dde80c6928fa11",
+  "prior_scope_design_candidate": "e1e3fa23bd7f0ce94c56682cecd94f7fecfed44b",
+  "prior_classification_correction": {
+    "prior_candidate": "e1e3fa23bd7f0ce94c56682cecd94f7fecfed44b",
+    "defect": "Three witnesses used track_title/track_width_mm without those fields being frozen in Q1–Q5. Strict pre-Q1A result would have been 3/6 REPRESENTABLE + 3/6 CONTRACT_INSUFFICIENT.",
+    "rework": "Q1A explicitly freezes CREATE_TRACK operands; classifications recomputed under Q1–Q5+Q1A."
+  },
+  "frozen_contract": {
+    "Q1_top_level_program_contract": {
+      "NormalizedProgram": "top-level composition unit",
+      "NormalizedTask": "task_id + request + depends_on + produces_binds",
+      "NormalizedRequest": "single-operation payload only; no clauses/dependencies inside request",
+      "invariant": "NormalizedProgram owns composition; NormalizedRequest owns one semantic operation; ProjectedWorkspace owns evolving state; MB-02R remains per-task adjudicator"
+    },
+    "Q1A_CREATE_TRACK_semantic_operands": {
+      "status": "FROZEN_AMENDMENT",
+      "basis": "WELL-IR CreateTrack already carries title and width_mm; MB-02R allowlist lacked them",
+      "when": "requested_operation == CREATE_TRACK",
+      "additional_fields": {
+        "track_title": "str | None",
+        "track_width_mm": "float | None"
+      },
+      "forbidden": [
+        "general metadata bag",
+        "arbitrary op-specific payload for other operations",
+        "composition fields inside NormalizedRequest"
+      ],
+      "track_kind_normal": {
+        "adjudication": "DEFAULT_SEMANTICS",
+        "operand_required": false,
+        "rationale": "CreateTrack.kind defaults to 'normal' in WELL-IR and WellPlot loaders"
+      },
+      "does_not_reopen": [
+        "Q2",
+        "Q3",
+        "Q4",
+        "Q5"
+      ]
+    },
+    "Q2_order_and_dependencies": {
+      "tasks_array_order": "authoritative execution order",
+      "depends_on": "explicit linear state/data edges; serialize resolved deps",
+      "out_of_scope": [
+        "parallel",
+        "fan-out",
+        "fan-in",
+        "concurrent",
+        "conditional",
+        "loops"
+      ],
+      "contradiction_rule": "array order and depends_on must never contradict → DETERMINISTIC_SCHEMA_DOMAIN",
+      "unchanged_from_scope_design_01": true
+    },
+    "Q3_projected_effect_surface": {
+      "authorized": {
+        "CREATE_TRACK": "append TrackFact (title/width from Q1A when present); program-local projected ref via produces_binds",
+        "PLACE_CURVE": "update track_ref / membership",
+        "CONFIGURE_CURVE_DISPLAY": "scale_kind, scale_min, scale_max, scale_reverse only",
+        "DEFINE_FILL": "deferred unless later task must observe fill",
+        "REMOVE_FILL": "deferred unless required"
+      },
+      "effect_only_after_OK": true,
+      "unchanged_from_scope_design_01": true
+    },
+    "Q4_local_bind_semantics": {
+      "SemanticQuery": "exactly one of text | local_ref",
+      "LocalBindingTable": "execution state; bind-contract failures → DETERMINISTIC_SCHEMA_DOMAIN",
+      "unchanged_from_scope_design_01": true
+    },
+    "Q5_program_terminal_semantics": {
+      "fail_fast": true,
+      "first_non_OK_is_terminal": true,
+      "all_OK": {
+        "status": "ok",
+        "reason": null,
+        "authority": "OK"
+      },
+      "unchanged_from_scope_design_01": true
+    }
+  },
+  "epistemic_claim": "This slice establishes only whether the six cases are representable under NormalizedProgram + deterministic projected-state semantics (Q1–Q5 + Q1A). It does not establish raw English → NormalizedProgram.",
+  "witnesses": [
+    {
+      "case_id": "D5GAP-0085",
+      "source_utterance": "Make both CBL views use 0–100, then fill between them in blue.",
+      "initial_workspace_facts": {
+        "fixture_id": "d5_duplicate_cbl",
+        "curves": [
+          {
+            "id": "curve-1",
+            "channel": "CBL",
+            "track_ref": 1,
+            "scale_kind": "linear",
+            "scale_min": 0.0,
+            "scale_max": 100.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "curve-2",
+            "channel": "CBL",
+            "track_ref": 1,
+            "scale_kind": "linear",
+            "scale_min": 0.0,
+            "scale_max": 10.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "curve-3",
+            "channel": "GR",
+            "track_ref": 2,
+            "scale_kind": "linear",
+            "scale_min": 0.0,
+            "scale_max": 150.0,
+            "scale_reverse": false
+          }
+        ],
+        "tracks": [
+          {
+            "ref": 1,
+            "id": "cbl",
+            "title": "CBL"
+          },
+          {
+            "ref": 2,
+            "id": "gr",
+            "title": "Gamma Ray"
+          }
+        ],
+        "fills": []
+      },
+      "design_note": "Initial: curve-1 (wide) already 0–100; curve-2 (narrow) 0–10 → scale incompatible on Workspace0. Color 'blue' is non-adjudicating style; omitted from OK envelope proof (Q3).",
+      "normalized_program": {
+        "version": "scope-design-01r",
+        "tasks": [
+          {
+            "task_id": "t1",
+            "depends_on": [],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+              "query": {
+                "kind": "curve",
+                "text": "wide CBL",
+                "local_ref": null
+              },
+              "scale_bounds": {
+                "kind": "linear",
+                "minimum": 0.0,
+                "maximum": 100.0
+              }
+            }
+          },
+          {
+            "task_id": "t2",
+            "depends_on": [
+              "t1"
+            ],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+              "query": {
+                "kind": "curve",
+                "text": "narrow CBL",
+                "local_ref": null
+              },
+              "scale_bounds": {
+                "kind": "linear",
+                "minimum": 0.0,
+                "maximum": 100.0
+              }
+            }
+          },
+          {
+            "task_id": "t3",
+            "depends_on": [
+              "t2"
+            ],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "DEFINE_FILL",
+              "fill": {
+                "mode": "BETWEEN_INSTANCES",
+                "primary_query": "first CBL",
+                "predicate": {
+                  "kind": "BETWEEN_CURVES",
+                  "secondary_query": "second CBL"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "task_trace_design": [
+        {
+          "task_id": "t1",
+          "against": "Workspace0",
+          "expected_authority": "OK"
+        },
+        {
+          "task_id": "t2",
+          "against": "Workspace1",
+          "expected_authority": "OK"
+        },
+        {
+          "task_id": "t3",
+          "against": "Workspace2",
+          "expected_authority": "OK"
+        }
+      ],
+      "required_projected_effects": [
+        "CONFIGURE_CURVE_DISPLAY"
+      ],
+      "expected_intermediate_facts": {
+        "after_t2": {
+          "curve-2.scale": {
+            "min": 0.0,
+            "max": 100.0
+          },
+          "fill_scale_compatible": true
+        }
+      },
+      "expected_terminal": {
+        "status": "ok",
+        "reason": null,
+        "authority": "OK"
+      },
+      "representability": "REPRESENTABLE_UNDER_CONTRACT",
+      "missing_concept": null,
+      "uses_q1a_create_track_operands": false,
+      "uses_q4_local_ref": false,
+      "provenance": {
+        "normalization_source": {
+          "utterance": true,
+          "fixture_context": true
+        },
+        "gold_ops_role": "STRUCTURAL_ORACLE_ONLY",
+        "gold_used_as_runtime_decision_input": false
+      }
+    },
+    {
+      "case_id": "D5GAP-0089",
+      "source_utterance": "First change the narrow CBL view to 0–100, then fill between the first and second CBL instances.",
+      "initial_workspace_facts": {
+        "fixture_id": "d5_duplicate_cbl",
+        "curves": [
+          {
+            "id": "curve-1",
+            "channel": "CBL",
+            "track_ref": 1,
+            "scale_kind": "linear",
+            "scale_min": 0.0,
+            "scale_max": 100.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "curve-2",
+            "channel": "CBL",
+            "track_ref": 1,
+            "scale_kind": "linear",
+            "scale_min": 0.0,
+            "scale_max": 10.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "curve-3",
+            "channel": "GR",
+            "track_ref": 2,
+            "scale_kind": "linear",
+            "scale_min": 0.0,
+            "scale_max": 150.0,
+            "scale_reverse": false
+          }
+        ],
+        "tracks": [
+          {
+            "ref": 1,
+            "id": "cbl",
+            "title": "CBL"
+          },
+          {
+            "ref": 2,
+            "id": "gr",
+            "title": "Gamma Ray"
+          }
+        ],
+        "fills": []
+      },
+      "design_note": "Scale mismatch on Workspace0; configure then BETWEEN_INSTANCES.",
+      "normalized_program": {
+        "version": "scope-design-01r",
+        "tasks": [
+          {
+            "task_id": "t1",
+            "depends_on": [],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+              "query": {
+                "kind": "curve",
+                "text": "narrow CBL",
+                "local_ref": null
+              },
+              "scale_bounds": {
+                "kind": "linear",
+                "minimum": 0.0,
+                "maximum": 100.0
+              }
+            }
+          },
+          {
+            "task_id": "t2",
+            "depends_on": [
+              "t1"
+            ],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "DEFINE_FILL",
+              "fill": {
+                "mode": "BETWEEN_INSTANCES",
+                "primary_query": "first CBL",
+                "predicate": {
+                  "kind": "BETWEEN_CURVES",
+                  "secondary_query": "second CBL"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "task_trace_design": [
+        {
+          "task_id": "t1",
+          "against": "Workspace0",
+          "expected_authority": "OK"
+        },
+        {
+          "task_id": "t2",
+          "against": "Workspace1",
+          "expected_authority": "OK"
+        }
+      ],
+      "required_projected_effects": [
+        "CONFIGURE_CURVE_DISPLAY"
+      ],
+      "expected_intermediate_facts": {
+        "after_t1": {
+          "curve-2.scale": {
+            "min": 0.0,
+            "max": 100.0
+          },
+          "fill_scale_compatible": true
+        }
+      },
+      "expected_terminal": {
+        "status": "ok",
+        "reason": null,
+        "authority": "OK"
+      },
+      "representability": "REPRESENTABLE_UNDER_CONTRACT",
+      "missing_concept": null,
+      "uses_q1a_create_track_operands": false,
+      "uses_q4_local_ref": false,
+      "provenance": {
+        "normalization_source": {
+          "utterance": true,
+          "fixture_context": true
+        },
+        "gold_ops_role": "STRUCTURAL_ORACLE_ONLY",
+        "gold_used_as_runtime_decision_input": false
+      }
+    },
+    {
+      "case_id": "D5GAP-0117",
+      "source_utterance": "Set RHOB to 1.95–2.95 reversed and split-fill it at 2.45.",
+      "initial_workspace_facts": {
+        "fixture_id": "d5_petrophysics",
+        "curves": [
+          {
+            "id": "curve-1",
+            "channel": "GR",
+            "track_ref": 1,
+            "scale_kind": "linear",
+            "scale_min": 0.0,
+            "scale_max": 150.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "curve-2",
+            "channel": "NPHI",
+            "track_ref": 2,
+            "scale_kind": "linear",
+            "scale_min": -0.15,
+            "scale_max": 0.45,
+            "scale_reverse": true
+          },
+          {
+            "id": "curve-3",
+            "channel": "RHOB",
+            "track_ref": 2,
+            "scale_kind": "linear",
+            "scale_min": 1.95,
+            "scale_max": 2.95,
+            "scale_reverse": true
+          },
+          {
+            "id": "curve-4",
+            "channel": "RT",
+            "track_ref": 3,
+            "scale_kind": "log",
+            "scale_min": 0.2,
+            "scale_max": 2000.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "curve-5",
+            "channel": "CALI",
+            "track_ref": 4,
+            "scale_kind": "linear",
+            "scale_min": 6.0,
+            "scale_max": 16.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "curve-6",
+            "channel": "DT",
+            "track_ref": 5,
+            "scale_kind": "linear",
+            "scale_min": 40.0,
+            "scale_max": 140.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "PEF",
+            "channel": "PEF",
+            "track_ref": null,
+            "scale_kind": null,
+            "scale_min": null,
+            "scale_max": null,
+            "scale_reverse": null
+          },
+          {
+            "id": "SP",
+            "channel": "SP",
+            "track_ref": null,
+            "scale_kind": null,
+            "scale_min": null,
+            "scale_max": null,
+            "scale_reverse": null
+          },
+          {
+            "id": "MSFL",
+            "channel": "MSFL",
+            "track_ref": null,
+            "scale_kind": null,
+            "scale_min": null,
+            "scale_max": null,
+            "scale_reverse": null
+          }
+        ],
+        "tracks": [
+          {
+            "ref": 1,
+            "id": "gr",
+            "title": "Gamma Ray"
+          },
+          {
+            "ref": 2,
+            "id": "porosity",
+            "title": "Density Neutron"
+          },
+          {
+            "ref": 3,
+            "id": "rt",
+            "title": "Resistivity"
+          },
+          {
+            "ref": 4,
+            "id": "cali",
+            "title": "Caliper"
+          },
+          {
+            "ref": 5,
+            "id": "sonic",
+            "title": "Sonic"
+          }
+        ],
+        "fills": []
+      },
+      "design_note": "Two clauses; t1 may be idempotent against initial RHOB scale. Composition still required.",
+      "normalized_program": {
+        "version": "scope-design-01r",
+        "tasks": [
+          {
+            "task_id": "t1",
+            "depends_on": [],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+              "query": {
+                "kind": "curve",
+                "text": "RHOB",
+                "local_ref": null
+              },
+              "scale_bounds": {
+                "kind": "linear",
+                "minimum": 1.95,
+                "maximum": 2.95
+              },
+              "scale_direction_claims": [
+                "decreasing"
+              ]
+            }
+          },
+          {
+            "task_id": "t2",
+            "depends_on": [
+              "t1"
+            ],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "DEFINE_FILL",
+              "query": {
+                "kind": "curve",
+                "text": "RHOB",
+                "local_ref": null
+              },
+              "fill": {
+                "mode": "BASELINE_SPLIT",
+                "primary_query": "RHOB",
+                "baseline_value": 2.45,
+                "predicate": {
+                  "kind": "BASELINE_SPLIT",
+                  "value": 2.45
+                }
+              }
+            }
+          }
+        ]
+      },
+      "task_trace_design": [
+        {
+          "task_id": "t1",
+          "against": "Workspace0",
+          "expected_authority": "OK"
+        },
+        {
+          "task_id": "t2",
+          "against": "Workspace1",
+          "expected_authority": "OK"
+        }
+      ],
+      "required_projected_effects": [
+        "CONFIGURE_CURVE_DISPLAY"
+      ],
+      "expected_intermediate_facts": {
+        "after_t1": {
+          "RHOB.scale": {
+            "kind": "linear",
+            "min": 1.95,
+            "max": 2.95,
+            "reverse": true
+          }
+        }
+      },
+      "expected_terminal": {
+        "status": "ok",
+        "reason": null,
+        "authority": "OK"
+      },
+      "representability": "REPRESENTABLE_UNDER_CONTRACT",
+      "missing_concept": null,
+      "uses_q1a_create_track_operands": false,
+      "uses_q4_local_ref": false,
+      "provenance": {
+        "normalization_source": {
+          "utterance": true,
+          "fixture_context": true
+        },
+        "gold_ops_role": "STRUCTURAL_ORACLE_ONLY",
+        "gold_used_as_runtime_decision_input": false
+      }
+    },
+    {
+      "case_id": "D5GAP-0096",
+      "source_utterance": "Add a Petrophysics track with GR 0–150 and RT logarithmic 0.2–2000.",
+      "initial_workspace_facts": {
+        "fixture_id": "d5_petrophysics",
+        "curves": [
+          {
+            "id": "curve-1",
+            "channel": "GR",
+            "track_ref": 1,
+            "scale_kind": "linear",
+            "scale_min": 0.0,
+            "scale_max": 150.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "curve-2",
+            "channel": "NPHI",
+            "track_ref": 2,
+            "scale_kind": "linear",
+            "scale_min": -0.15,
+            "scale_max": 0.45,
+            "scale_reverse": true
+          },
+          {
+            "id": "curve-3",
+            "channel": "RHOB",
+            "track_ref": 2,
+            "scale_kind": "linear",
+            "scale_min": 1.95,
+            "scale_max": 2.95,
+            "scale_reverse": true
+          },
+          {
+            "id": "curve-4",
+            "channel": "RT",
+            "track_ref": 3,
+            "scale_kind": "log",
+            "scale_min": 0.2,
+            "scale_max": 2000.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "curve-5",
+            "channel": "CALI",
+            "track_ref": 4,
+            "scale_kind": "linear",
+            "scale_min": 6.0,
+            "scale_max": 16.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "curve-6",
+            "channel": "DT",
+            "track_ref": 5,
+            "scale_kind": "linear",
+            "scale_min": 40.0,
+            "scale_max": 140.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "PEF",
+            "channel": "PEF",
+            "track_ref": null,
+            "scale_kind": null,
+            "scale_min": null,
+            "scale_max": null,
+            "scale_reverse": null
+          },
+          {
+            "id": "SP",
+            "channel": "SP",
+            "track_ref": null,
+            "scale_kind": null,
+            "scale_min": null,
+            "scale_max": null,
+            "scale_reverse": null
+          },
+          {
+            "id": "MSFL",
+            "channel": "MSFL",
+            "track_ref": null,
+            "scale_kind": null,
+            "scale_min": null,
+            "scale_max": null,
+            "scale_reverse": null
+          }
+        ],
+        "tracks": [
+          {
+            "ref": 1,
+            "id": "gr",
+            "title": "Gamma Ray"
+          },
+          {
+            "ref": 2,
+            "id": "porosity",
+            "title": "Density Neutron"
+          },
+          {
+            "ref": 3,
+            "id": "rt",
+            "title": "Resistivity"
+          },
+          {
+            "ref": 4,
+            "id": "cali",
+            "title": "Caliper"
+          },
+          {
+            "ref": 5,
+            "id": "sonic",
+            "title": "Sonic"
+          }
+        ],
+        "fills": []
+      },
+      "design_note": "Uses Q1A track_title + Q4 local_ref $track1.",
+      "normalized_program": {
+        "version": "scope-design-01r",
+        "tasks": [
+          {
+            "task_id": "t1",
+            "depends_on": [],
+            "produces_binds": {
+              "$track1": "track"
+            },
+            "request": {
+              "requested_operation": "CREATE_TRACK",
+              "track_title": "Petrophysics"
+            },
+            "track_kind_adjudication": null
+          },
+          {
+            "task_id": "t2",
+            "depends_on": [
+              "t1"
+            ],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "PLACE_CURVE",
+              "query": {
+                "kind": "curve",
+                "text": "GR",
+                "local_ref": null
+              },
+              "target": {
+                "kind": "track",
+                "text": null,
+                "local_ref": "$track1"
+              }
+            }
+          },
+          {
+            "task_id": "t3",
+            "depends_on": [
+              "t2"
+            ],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+              "query": {
+                "kind": "curve",
+                "text": "GR",
+                "local_ref": null
+              },
+              "scale_bounds": {
+                "kind": "linear",
+                "minimum": 0.0,
+                "maximum": 150.0
+              }
+            }
+          },
+          {
+            "task_id": "t4",
+            "depends_on": [
+              "t3"
+            ],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "PLACE_CURVE",
+              "query": {
+                "kind": "curve",
+                "text": "RT",
+                "local_ref": null
+              },
+              "target": {
+                "kind": "track",
+                "text": null,
+                "local_ref": "$track1"
+              }
+            }
+          },
+          {
+            "task_id": "t5",
+            "depends_on": [
+              "t4"
+            ],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+              "query": {
+                "kind": "curve",
+                "text": "RT",
+                "local_ref": null
+              },
+              "scale_bounds": {
+                "kind": "log",
+                "minimum": 0.2,
+                "maximum": 2000.0
+              }
+            }
+          }
+        ]
+      },
+      "task_trace_design": [
+        {
+          "task_id": "t1",
+          "against": "Workspace0",
+          "expected_authority": "OK",
+          "effect": "CREATE_TRACK + bind $track1"
+        },
+        {
+          "task_id": "t2",
+          "against": "Workspace1",
+          "expected_authority": "OK",
+          "effect": "PLACE GR → $track1"
+        },
+        {
+          "task_id": "t3",
+          "against": "Workspace2",
+          "expected_authority": "OK",
+          "effect": "CONFIGURE GR"
+        },
+        {
+          "task_id": "t4",
+          "against": "Workspace3",
+          "expected_authority": "OK",
+          "effect": "PLACE RT → $track1"
+        },
+        {
+          "task_id": "t5",
+          "against": "Workspace4",
+          "expected_authority": "OK",
+          "effect": "CONFIGURE RT"
+        }
+      ],
+      "required_projected_effects": [
+        "CREATE_TRACK",
+        "PLACE_CURVE",
+        "CONFIGURE_CURVE_DISPLAY"
+      ],
+      "expected_intermediate_facts": {
+        "after_t1": {
+          "LocalBindingTable": {
+            "$track1": "<projected_track_ref>"
+          },
+          "TrackFact.title": "Petrophysics"
+        },
+        "after_t5": {
+          "GR and RT on $track1 with configured scales": true
+        }
+      },
+      "expected_terminal": {
+        "status": "ok",
+        "reason": null,
+        "authority": "OK"
+      },
+      "representability": "REPRESENTABLE_UNDER_CONTRACT",
+      "missing_concept": null,
+      "uses_q1a_create_track_operands": [
+        "track_title"
+      ],
+      "uses_q4_local_ref": true,
+      "provenance": {
+        "normalization_source": {
+          "utterance": true,
+          "fixture_context": true
+        },
+        "gold_ops_role": "STRUCTURAL_ORACLE_ONLY",
+        "gold_used_as_runtime_decision_input": false
+      }
+    },
+    {
+      "case_id": "D5GAP-0101",
+      "source_utterance": "Append a 24 mm Caliper QC track and plot CALI on it at 6–12.",
+      "initial_workspace_facts": {
+        "fixture_id": "d5_main_las",
+        "curves": [
+          {
+            "id": "curve-1",
+            "channel": "CBL",
+            "track_ref": 2,
+            "scale_kind": "linear",
+            "scale_min": 0.0,
+            "scale_max": 100.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "curve-2",
+            "channel": "GR",
+            "track_ref": 4,
+            "scale_kind": "linear",
+            "scale_min": 0.0,
+            "scale_max": 100.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "curve-3",
+            "channel": "CALI",
+            "track_ref": 5,
+            "scale_kind": "linear",
+            "scale_min": 6.0,
+            "scale_max": 12.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "curve-4",
+            "channel": "RT",
+            "track_ref": 6,
+            "scale_kind": "log",
+            "scale_min": 0.2,
+            "scale_max": 2000.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "VDL",
+            "channel": "VDL",
+            "track_ref": null,
+            "scale_kind": null,
+            "scale_min": null,
+            "scale_max": null,
+            "scale_reverse": null
+          }
+        ],
+        "tracks": [
+          {
+            "ref": 1,
+            "id": "depth",
+            "title": "Depth"
+          },
+          {
+            "ref": 2,
+            "id": "cbl",
+            "title": "CBL"
+          },
+          {
+            "ref": 3,
+            "id": "vdl",
+            "title": "VDL"
+          },
+          {
+            "ref": 4,
+            "id": "gr",
+            "title": "Gamma Ray"
+          },
+          {
+            "ref": 5,
+            "id": "cali",
+            "title": "Caliper"
+          },
+          {
+            "ref": 6,
+            "id": "rt",
+            "title": "Resistivity"
+          }
+        ],
+        "fills": []
+      },
+      "design_note": "Uses Q1A track_title + track_width_mm; width carried as CREATE_TRACK operand (WELL-IR width_mm).",
+      "normalized_program": {
+        "version": "scope-design-01r",
+        "tasks": [
+          {
+            "task_id": "t1",
+            "depends_on": [],
+            "produces_binds": {
+              "$track1": "track"
+            },
+            "request": {
+              "requested_operation": "CREATE_TRACK",
+              "track_title": "Caliper QC",
+              "track_width_mm": 24.0
+            },
+            "track_kind_adjudication": null
+          },
+          {
+            "task_id": "t2",
+            "depends_on": [
+              "t1"
+            ],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "PLACE_CURVE",
+              "query": {
+                "kind": "curve",
+                "text": "CALI",
+                "local_ref": null
+              },
+              "target": {
+                "kind": "track",
+                "text": null,
+                "local_ref": "$track1"
+              }
+            }
+          },
+          {
+            "task_id": "t3",
+            "depends_on": [
+              "t2"
+            ],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+              "query": {
+                "kind": "curve",
+                "text": "CALI",
+                "local_ref": null
+              },
+              "scale_bounds": {
+                "kind": "linear",
+                "minimum": 6.0,
+                "maximum": 12.0
+              }
+            }
+          }
+        ]
+      },
+      "task_trace_design": [
+        {
+          "task_id": "t1",
+          "against": "Workspace0",
+          "expected_authority": "OK"
+        },
+        {
+          "task_id": "t2",
+          "against": "Workspace1",
+          "expected_authority": "OK"
+        },
+        {
+          "task_id": "t3",
+          "against": "Workspace2",
+          "expected_authority": "OK"
+        }
+      ],
+      "required_projected_effects": [
+        "CREATE_TRACK",
+        "PLACE_CURVE",
+        "CONFIGURE_CURVE_DISPLAY"
+      ],
+      "expected_intermediate_facts": {
+        "after_t1": {
+          "LocalBindingTable": {
+            "$track1": "<projected_track_ref>"
+          },
+          "TrackFact.title": "Caliper QC",
+          "TrackFact.width_mm_if_projected": 24.0
+        }
+      },
+      "expected_terminal": {
+        "status": "ok",
+        "reason": null,
+        "authority": "OK"
+      },
+      "representability": "REPRESENTABLE_UNDER_CONTRACT",
+      "missing_concept": null,
+      "uses_q1a_create_track_operands": [
+        "track_title",
+        "track_width_mm"
+      ],
+      "uses_q4_local_ref": true,
+      "provenance": {
+        "normalization_source": {
+          "utterance": true,
+          "fixture_context": true
+        },
+        "gold_ops_role": "STRUCTURAL_ORACLE_ONLY",
+        "gold_used_as_runtime_decision_input": false
+      }
+    },
+    {
+      "case_id": "SEED-cm-9643c020e2e02463",
+      "source_utterance": "Create one normal track named Petrophysics. First plot GR linearly from -10 to 140. Then plot RT logarithmically from 0.1 to 10000. Preserve that binding order.",
+      "initial_workspace_facts": {
+        "fixture_id": "d0_base",
+        "curves": [
+          {
+            "id": "GR",
+            "channel": "GR",
+            "track_ref": 2,
+            "scale_kind": null,
+            "scale_min": 0.0,
+            "scale_max": 150.0,
+            "scale_reverse": false
+          },
+          {
+            "id": "NPHI",
+            "channel": "NPHI",
+            "track_ref": 3,
+            "scale_kind": null,
+            "scale_min": 0.45,
+            "scale_max": -0.15,
+            "scale_reverse": true
+          },
+          {
+            "id": "RHOB",
+            "channel": "RHOB",
+            "track_ref": null,
+            "scale_kind": null,
+            "scale_min": null,
+            "scale_max": null,
+            "scale_reverse": null
+          },
+          {
+            "id": "CALI",
+            "channel": "CALI",
+            "track_ref": null,
+            "scale_kind": null,
+            "scale_min": null,
+            "scale_max": null,
+            "scale_reverse": null
+          },
+          {
+            "id": "RT",
+            "channel": "RT",
+            "track_ref": null,
+            "scale_kind": null,
+            "scale_min": null,
+            "scale_max": null,
+            "scale_reverse": null
+          }
+        ],
+        "tracks": [
+          {
+            "ref": 1,
+            "id": "track_1",
+            "title": null
+          },
+          {
+            "ref": 2,
+            "id": "track_2",
+            "title": null
+          },
+          {
+            "ref": 3,
+            "id": "track_3",
+            "title": null
+          },
+          {
+            "ref": 4,
+            "id": "track_4",
+            "title": null
+          }
+        ],
+        "fills": []
+      },
+      "design_note": "Utterance 'normal track' adjudicated as DEFAULT_SEMANTICS (no track_kind operand). Q1A track_title='Petrophysics'. Relative beside-track-2 layout not required for terminal OK under Q3.",
+      "normalized_program": {
+        "version": "scope-design-01r",
+        "tasks": [
+          {
+            "task_id": "t1",
+            "depends_on": [],
+            "produces_binds": {
+              "$track1": "track"
+            },
+            "request": {
+              "requested_operation": "CREATE_TRACK",
+              "track_title": "Petrophysics"
+            },
+            "track_kind_adjudication": {
+              "utterance_word": "normal",
+              "adjudication": "DEFAULT_SEMANTICS",
+              "operand_required": false,
+              "rationale": "WELL-IR CreateTrack.kind defaults to 'normal' (experiments/nlp_slm_01/well_ir/operations.py); logfile/template parsers also default kind to 'normal'. Utterance 'normal track' names the canonical default; no track_kind operand required.",
+              "authoritative_sources": [
+                "well_ir.operations.CreateTrack.kind Literal default 'normal'",
+                "wellplot.logfile track kind default 'normal'",
+                "wellplot.templates._parse_track_kind default 'normal'"
+              ]
+            }
+          },
+          {
+            "task_id": "t2",
+            "depends_on": [
+              "t1"
+            ],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "PLACE_CURVE",
+              "query": {
+                "kind": "curve",
+                "text": "GR",
+                "local_ref": null
+              },
+              "target": {
+                "kind": "track",
+                "text": null,
+                "local_ref": "$track1"
+              }
+            }
+          },
+          {
+            "task_id": "t3",
+            "depends_on": [
+              "t2"
+            ],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+              "query": {
+                "kind": "curve",
+                "text": "GR",
+                "local_ref": null
+              },
+              "scale_bounds": {
+                "kind": "linear",
+                "minimum": -10.0,
+                "maximum": 140.0
+              }
+            }
+          },
+          {
+            "task_id": "t4",
+            "depends_on": [
+              "t3"
+            ],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "PLACE_CURVE",
+              "query": {
+                "kind": "curve",
+                "text": "RT",
+                "local_ref": null
+              },
+              "target": {
+                "kind": "track",
+                "text": null,
+                "local_ref": "$track1"
+              }
+            }
+          },
+          {
+            "task_id": "t5",
+            "depends_on": [
+              "t4"
+            ],
+            "produces_binds": {},
+            "request": {
+              "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+              "query": {
+                "kind": "curve",
+                "text": "RT",
+                "local_ref": null
+              },
+              "scale_bounds": {
+                "kind": "log",
+                "minimum": 0.1,
+                "maximum": 10000.0
+              }
+            }
+          }
+        ]
+      },
+      "track_kind_adjudication": {
+        "utterance_word": "normal",
+        "adjudication": "DEFAULT_SEMANTICS",
+        "operand_required": false,
+        "rationale": "WELL-IR CreateTrack.kind defaults to 'normal' (experiments/nlp_slm_01/well_ir/operations.py); logfile/template parsers also default kind to 'normal'. Utterance 'normal track' names the canonical default; no track_kind operand required.",
+        "authoritative_sources": [
+          "well_ir.operations.CreateTrack.kind Literal default 'normal'",
+          "wellplot.logfile track kind default 'normal'",
+          "wellplot.templates._parse_track_kind default 'normal'"
+        ]
+      },
+      "task_trace_design": [
+        {
+          "task_id": "t1",
+          "against": "Workspace0",
+          "expected_authority": "OK",
+          "effect": "CREATE_TRACK default kind=normal + title + bind"
+        },
+        {
+          "task_id": "t2",
+          "against": "Workspace1",
+          "expected_authority": "OK"
+        },
+        {
+          "task_id": "t3",
+          "against": "Workspace2",
+          "expected_authority": "OK"
+        },
+        {
+          "task_id": "t4",
+          "against": "Workspace3",
+          "expected_authority": "OK"
+        },
+        {
+          "task_id": "t5",
+          "against": "Workspace4",
+          "expected_authority": "OK"
+        }
+      ],
+      "required_projected_effects": [
+        "CREATE_TRACK",
+        "PLACE_CURVE",
+        "CONFIGURE_CURVE_DISPLAY"
+      ],
+      "expected_intermediate_facts": {
+        "after_t1": {
+          "LocalBindingTable": {
+            "$track1": "<projected_track_ref>"
+          },
+          "kind": "normal (default)"
+        }
+      },
+      "expected_terminal": {
+        "status": "ok",
+        "reason": null,
+        "authority": "OK"
+      },
+      "representability": "REPRESENTABLE_UNDER_CONTRACT",
+      "missing_concept": null,
+      "uses_q1a_create_track_operands": [
+        "track_title"
+      ],
+      "uses_q4_local_ref": true,
+      "optional_future_operands_not_required_for_ok": [
+        "create_track_relative_placement"
+      ],
+      "provenance": {
+        "normalization_source": {
+          "utterance": true,
+          "fixture_context": true
+        },
+        "gold_ops_role": "STRUCTURAL_ORACLE_ONLY",
+        "gold_used_as_runtime_decision_input": false,
+        "utterance_word_normal": "recorded as DEFAULT_SEMANTICS; not silently dropped"
+      }
+    }
+  ],
+  "summary": {
+    "n_cases": 6,
+    "REPRESENTABLE_UNDER_CONTRACT": 6,
+    "CONTRACT_INSUFFICIENT": 0,
+    "strict_pre_Q1A_would_have_been": {
+      "REPRESENTABLE_UNDER_CONTRACT": 3,
+      "CONTRACT_INSUFFICIENT": 3,
+      "insufficient_cases": [
+        "D5GAP-0096",
+        "D5GAP-0101",
+        "SEED-cm-9643c020e2e02463"
+      ]
+    },
+    "q1a_frozen": true,
+    "track_kind_normal": "DEFAULT_SEMANTICS",
+    "define_fill_effects_required": false
+  },
+  "historical_gold": "UNCHANGED",
+  "mb02r": "UNCHANGED",
+  "oracle01": "UNCHANGED",
+  "code": "NONE",
+  "implementation": "NOT_AUTHORIZED"
+}

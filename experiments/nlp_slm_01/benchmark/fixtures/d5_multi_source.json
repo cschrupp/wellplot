@@ -1,0 +1,131 @@
+{
+  "d5_ref": "d5/single-engine-convergence",
+  "d5_sha": "560ec48d2b2809ed2feb55467da15195f527ec44",
+  "fixture_format": "d5_semantic_manifest_r1",
+  "manifest": {
+    "aliases": {},
+    "existing_curves": [
+      {
+        "aliases": [
+          "gamma",
+          "gamma ray",
+          "gamma-ray"
+        ],
+        "channel": "GR",
+        "handle": "curve-1",
+        "label": "GR",
+        "scale": {
+          "kind": "linear",
+          "maximum": 150,
+          "minimum": 0,
+          "reverse": false
+        },
+        "track_ref": 1,
+        "track_title": "Gamma Ray"
+      },
+      {
+        "aliases": [
+          "neutron",
+          "neutron porosity"
+        ],
+        "channel": "NPHI",
+        "handle": "curve-2",
+        "label": "NPHI",
+        "scale": {
+          "kind": "linear",
+          "maximum": 0.45,
+          "minimum": -0.15,
+          "reverse": true
+        },
+        "track_ref": 2,
+        "track_title": "Density Neutron"
+      },
+      {
+        "aliases": [
+          "density",
+          "bulk density"
+        ],
+        "channel": "RHOB",
+        "handle": "curve-3",
+        "label": "RHOB",
+        "scale": {
+          "kind": "linear",
+          "maximum": 2.95,
+          "minimum": 1.95,
+          "reverse": true
+        },
+        "track_ref": 2,
+        "track_title": "Density Neutron"
+      }
+    ],
+    "fills": [],
+    "fixture_id": "d5_multi_source",
+    "focus": null,
+    "note": "Two host-approved sources; v1 deliberately does not encode source selection.",
+    "section": {
+      "depth_unit": "m",
+      "id": "main",
+      "title": "Main Log"
+    },
+    "sources": [
+      {
+        "candidate_id": "source-1",
+        "channels": [
+          {
+            "aliases": [],
+            "kind": "scalar",
+            "mnemonic": "GR",
+            "unit": "API"
+          },
+          {
+            "aliases": [],
+            "kind": "scalar",
+            "mnemonic": "RHOB",
+            "unit": "g/cm3"
+          }
+        ],
+        "labels": [
+          "primary.las",
+          "primary"
+        ],
+        "source_format": "las"
+      },
+      {
+        "candidate_id": "source-2",
+        "channels": [
+          {
+            "aliases": [],
+            "kind": "scalar",
+            "mnemonic": "GR",
+            "unit": "API"
+          },
+          {
+            "aliases": [],
+            "kind": "scalar",
+            "mnemonic": "RT",
+            "unit": "ohm.m"
+          }
+        ],
+        "labels": [
+          "secondary.las",
+          "secondary"
+        ],
+        "source_format": "las"
+      }
+    ],
+    "tracks": [
+      {
+        "id": "gr",
+        "kind": "normal",
+        "ref": 1,
+        "title": "Gamma Ray"
+      },
+      {
+        "id": "porosity",
+        "kind": "normal",
+        "ref": 2,
+        "title": "Density Neutron"
+      }
+    ]
+  }
+}

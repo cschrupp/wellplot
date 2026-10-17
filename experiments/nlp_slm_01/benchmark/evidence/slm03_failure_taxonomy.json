@@ -1,0 +1,13 @@
+{
+  "confirmed_model_semantic_n": 9,
+  "counts": {
+    "envelope_misuse": 9,
+    "other": 6,
+    "syntax_or_schema": 2
+  },
+  "ir_limitation_share_of_all_failures": 0.0,
+  "learnable_share_of_confirmed": 1.0,
+  "model_semantic_labels_seen": [
+    "envelope_misuse"
+  ]
+}

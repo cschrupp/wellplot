@@ -1,0 +1,238 @@
+{
+  "counts": {
+    "added": 148,
+    "after": 300,
+    "before": 152
+  },
+  "d5_ref": "d5/single-engine-convergence",
+  "d5_sha": "560ec48d2b2809ed2feb55467da15195f527ec44",
+  "families": {
+    "added": {
+      "ambiguity_unsupported": 22,
+      "composition": 16,
+      "display_configuration": 27,
+      "fills": 30,
+      "intervals": 10,
+      "move_remove": 4,
+      "reference_resolution": 11,
+      "relational_targeting": 8,
+      "track_creation": 12,
+      "track_targeting": 8
+    },
+    "after": {
+      "ambiguity_unsupported": 64,
+      "composition": 48,
+      "curve_placement": 10,
+      "display_configuration": 48,
+      "fills": 51,
+      "intervals": 27,
+      "move_remove": 4,
+      "reference_resolution": 11,
+      "relational_targeting": 17,
+      "track_creation": 12,
+      "track_targeting": 8
+    },
+    "before": {
+      "ambiguity_unsupported": 42,
+      "composition": 32,
+      "curve_placement": 10,
+      "display_configuration": 21,
+      "fills": 21,
+      "intervals": 17,
+      "relational_targeting": 9
+    }
+  },
+  "family_assessment": {
+    "ambiguity_unsupported": {
+      "added_focus": [
+        "duplicate selectors",
+        "deictic focus",
+        "capability boundaries",
+        "invalid domain values"
+      ],
+      "before": 42,
+      "finding": "Boundary coverage existed, but D5 fail-closed behavior adds duplicate-instance ambiguity, focus/no-focus distinction, source/section boundaries, fill-axis incompatibility, and canonical invalid-value constraints."
+    },
+    "composition": {
+      "added_focus": [
+        "create→bind→configure",
+        "place→scale→fill",
+        "scale repair→between fill",
+        "remove/update sequencing"
+      ],
+      "before": 32,
+      "finding": "Composition existed, but additional cases were needed where later operations depend on state established earlier in the same program."
+    },
+    "curve_placement": {
+      "added_focus": [
+        "reference_resolution",
+        "track_targeting",
+        "duplicate-instance handles"
+      ],
+      "before": 10,
+      "finding": "Basic placement existed, but the old corpus did not isolate alias resolution, ordinal/title track targeting, repeated-channel identity, or exact grounded source-channel resolution."
+    },
+    "display_configuration": {
+      "added_focus": [
+        "scale kinds",
+        "partial scale patches",
+        "style fields",
+        "focus and instance selection"
+      ],
+      "before": 21,
+      "finding": "Scale bounds/direction existed; D5 requires explicit linear/log/tangential kind, reverse, optional unit, and canonical style patches. Duplicate-instance and focus-based revision were under-covered."
+    },
+    "fills": {
+      "added_focus": [
+        "all five fill kinds",
+        "same-track gate",
+        "matching-scale gate",
+        "precondition repair",
+        "color/alpha"
+      ],
+      "before": 21,
+      "finding": "Limit/baseline coverage existed but D5/canonical semantics also require between_instances, same-track identity, matching effective scales, and renderer-safe precondition handling."
+    },
+    "intervals": {
+      "added_focus": [
+        "cross-unit requests",
+        "decimal bounds",
+        "core unit registry boundary"
+      ],
+      "before": 17,
+      "finding": "Intervals existed but needed explicit top/base ordering and core-unit conversion coverage restricted to m/ft/in/cm/mm."
+    },
+    "move_remove": {
+      "added_focus": [
+        "exact handle removal",
+        "fill handle removal",
+        "move preservation"
+      ],
+      "before_move": 1,
+      "before_remove_curve": 1,
+      "before_remove_fill": 8,
+      "finding": "Existing corpus had very little exact-instance movement/removal. Canonical authoring supports removal; curve movement needs a deterministic preservation resolver."
+    },
+    "relational_targeting": {
+      "added_focus": [
+        "curve/track anchors",
+        "request-local handles",
+        "ambiguous relational reference"
+      ],
+      "before": 9,
+      "finding": "With/beside existed, but curve handles, track references, ambiguous anchors, and deterministic relation lowering were sparse."
+    },
+    "track_creation": {
+      "added_focus": [
+        "width_mm",
+        "append",
+        "before/after",
+        "multi-binding",
+        "reused source channels"
+      ],
+      "before": 21,
+      "finding": "Track creation was mostly buried inside composition. D2B/D5 establish title, width, repeated source-channel binding, ordered bindings, scale/style, and append positioning as real semantics."
+    }
+  },
+  "new_schema_gaps_closed": [
+    "request-local curve instance handles",
+    "request-local fill/track selector handles",
+    "between_instances fill",
+    "track width on create_track",
+    "append/before/after track creation placement"
+  ],
+  "operations": {
+    "added": {
+      "configure_curve_display": 53,
+      "create_track": 16,
+      "define_fill": 34,
+      "move_curve": 3,
+      "place_curve": 56,
+      "remove_curve": 2,
+      "remove_fill": 2,
+      "set_interval": 16
+    },
+    "after": {
+      "configure_curve_display": 105,
+      "create_track": 37,
+      "define_fill": 48,
+      "move_curve": 4,
+      "place_curve": 106,
+      "remove_curve": 3,
+      "remove_fill": 10,
+      "set_interval": 41
+    },
+    "before": {
+      "configure_curve_display": 52,
+      "create_track": 21,
+      "define_fill": 14,
+      "move_curve": 1,
+      "place_curve": 50,
+      "remove_curve": 1,
+      "remove_fill": 8,
+      "set_interval": 25
+    }
+  },
+  "real_project_boundaries_preserved": [
+    "conditional threshold fill unsupported",
+    "annotations deferred",
+    "array/VDL/waveform deferred",
+    "report/page authoring deferred",
+    "source selection deferred",
+    "multi-well deferred",
+    "unsupported length units fail closed",
+    "between-curve fills require same track and matching effective scales"
+  ],
+  "revision": "d5-grounded-300-r1",
+  "statuses": {
+    "added": {
+      "ambiguous": 8,
+      "invalid": 6,
+      "ok": 124,
+      "unsupported": 10
+    },
+    "after": {
+      "ambiguous": 10,
+      "invalid": 14,
+      "ok": 233,
+      "unsupported": 43
+    },
+    "before": {
+      "ambiguous": 2,
+      "invalid": 8,
+      "ok": 109,
+      "unsupported": 33
+    }
+  },
+  "support_levels": {
+    "added": {
+      "authoring_supported": 63,
+      "d5_context_lowerable": 7,
+      "d5_current": 42,
+      "envelope_only": 24,
+      "resolver_extension": 12
+    },
+    "after": {
+      "authoring_supported": 106,
+      "d5_context_lowerable": 20,
+      "d5_current": 77,
+      "envelope_only": 67,
+      "resolver_extension": 30
+    },
+    "before": {
+      "authoring_supported": 43,
+      "d5_context_lowerable": 13,
+      "d5_current": 35,
+      "envelope_only": 43,
+      "resolver_extension": 18
+    }
+  },
+  "validation": {
+    "added_context_contract_errors": 0,
+    "added_gap_count": 148,
+    "duplicate_fixture_gold_targets": 0,
+    "final_case_count": 300,
+    "json_schema_errors": 0
+  },
+  "well_ir_version": "1.2-candidate"
+}

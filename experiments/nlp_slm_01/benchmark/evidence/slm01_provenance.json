@@ -1,0 +1,15 @@
+{
+  "enable_thinking": false,
+  "git_sha": "225977d80e945923d7c883f0c829d90dd16aa75f",
+  "gold_corpus_sha256": "4a2c68ba839f7a8faf57fa4faf13680564d6e73f36bc4415238351ca57bd2d2c",
+  "historical_baseline_sha": "d77649765dee81ebd0b8f460ac28515b244f70da",
+  "notes": [
+    "Held-out model scores are recorded when runners execute; scaffolding may leave them null."
+  ],
+  "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "python": "3.13.11 (main, Dec 17 2025, 21:08:16) [Clang 21.1.4 ]",
+  "qwen_model_id": "Qwen/Qwen3-1.7B",
+  "split_sha256": "aa26a77566499ab63096b3917977a59f38dcd6efb57aa1d92b95806ae76a46f8",
+  "timestamp_utc": "2026-10-12T00:40:11.177922+00:00",
+  "well_ir_schema_sha256": "4a91a325d9dd38db154bb38f4b997be81ff3047f0c663ec65c4349e4c2e21c5b"
+}

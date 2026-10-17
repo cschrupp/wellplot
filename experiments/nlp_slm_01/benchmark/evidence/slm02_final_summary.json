@@ -1,0 +1,9 @@
+{
+  "adapter": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/adapters/slm02_qwenv17_qlora",
+  "best_prompt_arm": "Q1",
+  "best_semantic_correctness": 0.8245614035087719,
+  "experiment": "WELLPLOT-NLP-SLM-02",
+  "gate_decision": "IR-REWORK",
+  "n_held_out": 70,
+  "untuned_qwen_q2_reference": 0.42105263157894735
+}

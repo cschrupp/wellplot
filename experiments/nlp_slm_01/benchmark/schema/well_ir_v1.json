@@ -1,0 +1,6 @@
+{
+  "comment": "SLM-03 freeze: active schema is well_ir_1_2_candidate.schema.json",
+  "active_schema": "well_ir_1_2_candidate.schema.json",
+  "well_ir_version": "1.2-candidate",
+  "d5_sha": "560ec48d2b2809ed2feb55467da15195f527ec44"
+}

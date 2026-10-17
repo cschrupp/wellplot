@@ -1,0 +1,15 @@
+{
+  "confirmed_model_semantic_n": 21,
+  "counts": {
+    "composition": 8,
+    "envelope_misuse": 13,
+    "other": 1,
+    "syntax_or_schema": 1
+  },
+  "ir_limitation_share_of_all_failures": 0.0,
+  "learnable_share_of_confirmed": 1.0,
+  "model_semantic_labels_seen": [
+    "composition",
+    "envelope_misuse"
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-MB01-GATE-CORPUS-AUDIT-REWORK-AUTH-001",
+  "resolutions": [
+    {
+      "affected_cases": "all reference_not_found / missing-curve fixtures (24)",
+      "decision_authority": "DETERMINISTIC_NOT_FOUND",
+      "disposition": "RESOLVED_KEEP",
+      "id": "UQ-01",
+      "note": "decision authority ≠ public envelope status; MB-02 may terminate on zero matches without a new terminal status",
+      "public_gold": {
+        "reason": "reference_not_found",
+        "status": "unsupported"
+      }
+    },
+    {
+      "affected_cases": [
+        "GOLD-0155",
+        "GOLD-0156",
+        "D5GAP-0140"
+      ],
+      "disposition": "RESOLVED_RECLASSIFY_AUTHORITY",
+      "from_authority": "LEARNED_SEMANTIC_GATE",
+      "id": "UQ-02",
+      "note": "explicit mutual exclusions (scale direction / exclusive targets) are deterministic validation once parsed",
+      "public_gold_unchanged": true,
+      "to_authority": "DETERMINISTIC_SCHEMA_DOMAIN"
+    },
+    {
+      "affected_cases": [
+        "GOLD-0102 (utt>=17)",
+        "SEED-cm-* divergent multi-utt DETACHes"
+      ],
+      "current_DETACH_dispositions": "PRESERVED",
+      "disposition": "DEFER_OUT_OF_SCOPE",
+      "id": "UQ-03",
+      "note": "detached ≠ auto-author new training cases",
+      "replacement_case_authoring": "NOT AUTHORIZED"
+    },
+    {
+      "affected_cases": [
+        "GOLD-0001"
+      ],
+      "affected_utterance_index": 2,
+      "disposition": "RESOLVED_REWRITE",
+      "id": "UQ-04",
+      "mutate_slm03_cases_jsonl": false,
+      "preserve_leakage_contrast": "generic density + unique workspace → OK; generic density + multiple candidates → AMBIGUOUS",
+      "proposed_rewrite_text": "Add RHOB to track 4.",
+      "source_text": "Add density to track 4."
+    },
+    {
+      "disposition": "DEFER_OUT_OF_SCOPE",
+      "id": "UQ-05",
+      "note": "closing UQs does not authorize classifier-oriented split freeze; reassess after MB-02",
+      "sealed_split_frozen": false,
+      "split_creation": "NOT AUTHORIZED"
+    }
+  ],
+  "slice": "MB-01R"
+}

@@ -1,0 +1,187 @@
+{
+  "slice": "NL-PROGRAM-EVAL-HARNESS-01",
+  "candidate_fixture_role_default": "HARNESS_TEST_VECTOR",
+  "note": "expected_evaluation is replay assertion metadata only; never passed to freeze/SCOPE-RUNTIME/compare as candidate semantics.",
+  "fixtures": [
+    {
+      "filename": "D5GAP-0085_oracle_equivalent.json",
+      "case_id": "D5GAP-0085",
+      "scenario": "oracle_equivalent",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": true,
+        "required_labels": ["EQUIVALENT"]
+      }
+    },
+    {
+      "filename": "D5GAP-0089_oracle_equivalent.json",
+      "case_id": "D5GAP-0089",
+      "scenario": "oracle_equivalent",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": true,
+        "required_labels": ["EQUIVALENT"]
+      }
+    },
+    {
+      "filename": "D5GAP-0096_oracle_equivalent.json",
+      "case_id": "D5GAP-0096",
+      "scenario": "oracle_equivalent",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": true,
+        "required_labels": ["EQUIVALENT"]
+      }
+    },
+    {
+      "filename": "D5GAP-0101_oracle_equivalent.json",
+      "case_id": "D5GAP-0101",
+      "scenario": "oracle_equivalent",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": true,
+        "required_labels": ["EQUIVALENT"]
+      }
+    },
+    {
+      "filename": "D5GAP-0117_oracle_equivalent.json",
+      "case_id": "D5GAP-0117",
+      "scenario": "oracle_equivalent",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": true,
+        "required_labels": ["EQUIVALENT"]
+      }
+    },
+    {
+      "filename": "SEED-cm-9643c020e2e02463_oracle_equivalent.json",
+      "case_id": "SEED-cm-9643c020e2e02463",
+      "scenario": "oracle_equivalent",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": true,
+        "required_labels": ["EQUIVALENT"]
+      }
+    },
+    {
+      "filename": "D5GAP-0101_wrong_operand.json",
+      "case_id": "D5GAP-0101",
+      "scenario": "wrong_operand",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": false,
+        "required_labels": ["WRONG_OPERAND"]
+      }
+    },
+    {
+      "filename": "D5GAP-0089_missing_task.json",
+      "case_id": "D5GAP-0089",
+      "scenario": "missing_task",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": false,
+        "required_labels": ["MISSING_TASK"]
+      }
+    },
+    {
+      "filename": "D5GAP-0096_wrong_binding.json",
+      "case_id": "D5GAP-0096",
+      "scenario": "wrong_binding",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": false,
+        "required_labels": ["WRONG_BINDING"]
+      }
+    },
+    {
+      "filename": "SEED_wrong_order.json",
+      "case_id": "SEED-cm-9643c020e2e02463",
+      "scenario": "wrong_order",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": false,
+        "required_labels": ["WRONG_ORDER"]
+      }
+    },
+    {
+      "filename": "D5GAP-0085_benign_redundant.json",
+      "case_id": "D5GAP-0085",
+      "scenario": "benign_redundant",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": true,
+        "required_labels": ["EQUIVALENT", "BENIGN_REDUNDANT_TASK"]
+      }
+    },
+    {
+      "filename": "D5GAP-0117_runtime_mismatch.json",
+      "case_id": "D5GAP-0117",
+      "scenario": "runtime_mismatch",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": false,
+        "required_labels": ["RUNTIME_TERMINAL_MISMATCH"]
+      }
+    },
+    {
+      "filename": "schema_invalid_unknown_field.json",
+      "case_id": "D5GAP-0101",
+      "scenario": "schema_invalid",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": false,
+        "required_labels": ["DECOMPOSITION_SCHEMA_INVALID"]
+      }
+    },
+    {
+      "filename": "D5GAP-0096_alpha_renamed_bind.json",
+      "case_id": "D5GAP-0096",
+      "scenario": "alpha_renamed_bind",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": true,
+        "required_labels": ["EQUIVALENT"]
+      }
+    },
+    {
+      "filename": "D5GAP-0096_independent_order_variant.json",
+      "case_id": "D5GAP-0096",
+      "scenario": "independent_order_variant",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": true,
+        "required_labels": ["EQUIVALENT"]
+      }
+    },
+    {
+      "filename": "D5GAP-0101_wrong_dependency.json",
+      "case_id": "D5GAP-0101",
+      "scenario": "wrong_dependency",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": false,
+        "required_labels": ["WRONG_DEPENDENCY"]
+      }
+    },
+    {
+      "filename": "D5GAP-0101_semantic_overreach.json",
+      "case_id": "D5GAP-0101",
+      "scenario": "semantic_overreach",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": false,
+        "required_labels": ["SEMANTIC_OVERREACH"]
+      }
+    },
+    {
+      "filename": "D5GAP-0101_alias_equivalent.json",
+      "case_id": "D5GAP-0101",
+      "scenario": "alias_equivalent",
+      "candidate_fixture_role": "HARNESS_TEST_VECTOR",
+      "expected_evaluation": {
+        "semantically_equivalent": true,
+        "required_labels": ["EQUIVALENT"]
+      }
+    }
+  ]
+}

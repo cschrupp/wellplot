@@ -1,0 +1,57 @@
+{
+  "version": "scope-design-01r",
+  "tasks": [
+    {
+      "task_id": "t1",
+      "depends_on": [],
+      "produces_binds": {
+        "$track1": "track"
+      },
+      "request": {
+        "requested_operation": "CREATE_TRACK",
+        "track_title": "Caliper QC",
+        "track_width_mm": 24.0
+      }
+    },
+    {
+      "task_id": "t2",
+      "depends_on": [
+        "t1"
+      ],
+      "produces_binds": {},
+      "request": {
+        "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+        "query": {
+          "kind": "curve",
+          "text": "CALI",
+          "local_ref": null
+        },
+        "scale_bounds": {
+          "kind": "linear",
+          "minimum": 6.0,
+          "maximum": 12.0
+        }
+      }
+    },
+    {
+      "task_id": "t3",
+      "depends_on": [
+        "t2"
+      ],
+      "produces_binds": {},
+      "request": {
+        "requested_operation": "PLACE_CURVE",
+        "query": {
+          "kind": "curve",
+          "text": "CALI",
+          "local_ref": null
+        },
+        "target": {
+          "kind": "track",
+          "text": null,
+          "local_ref": "$track1"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,549 @@
+{
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-NL-PROGRAM-DESIGN-01-REWORK2-AUTH-001",
+  "slice": "NL-PROGRAM-DESIGN-01R2",
+  "starting_sha": "bcdba373e0dcb6c744e35a4d6edf6e7cc8f5e85f",
+  "accepted_predecessors": {
+    "mb02r": "c2f158b8222e3c1b4ae3ae737c2544fc3b25f994",
+    "oracle01": "fd2f0443ad18a76542d3577928dde80c6928fa11",
+    "scope_design_01r": "0c1e6c8420ced10da5aea691f6ceecc5ac7cd2e8",
+    "scope_runtime_01r": "1026c1356ee39c52e439544167d4a6f03e5e04e2"
+  },
+  "epistemic_claim": "This slice freezes how raw utterance + projected workspace may be transformed into and evaluated as a ScopeNormalizedProgram. It does not implement or validate any decomposer. It establishes no English→NormalizedProgram accuracy claim.",
+  "frozen_contract": {
+    "Q1_generation_input_boundary": {
+      "DecomposerInput": {
+        "utterance": "kept utterance text only",
+        "projected_workspace": "deterministic ProjectedWorkspace fact projection (same surface MB-02R adjudicates)"
+      },
+      "projected_workspace_allowlist": {
+        "tracks": [
+          "ref",
+          "id",
+          "title",
+          "curves/membership when projected"
+        ],
+        "curves": [
+          "id/handle",
+          "channel",
+          "aliases/label if part of existing projection",
+          "track_ref",
+          "scale_kind",
+          "scale_min",
+          "scale_max",
+          "scale_reverse"
+        ],
+        "fills": [
+          "ref",
+          "curve",
+          "mode"
+        ],
+        "focus": [
+          "focus_curve_handle",
+          "focus_track_ref"
+        ],
+        "workspace_context": [
+          "depth_unit",
+          "supported_depth_units"
+        ]
+      },
+      "EvaluationEnvelope_harness_only": [
+        "case_id",
+        "fixture_id",
+        "utterance",
+        "projected_workspace"
+      ],
+      "forbidden_generation_inputs": [
+        "case_id",
+        "fixture_id",
+        "semantic_family",
+        "gold ops",
+        "gold operation count",
+        "gold status/reason",
+        "accepted witness normalized_program",
+        "expected task count",
+        "expected operation sequence",
+        "expected dependencies",
+        "expected binds",
+        "expected terminal",
+        "expected intermediate workspace states",
+        "expected effects",
+        "representability classification",
+        "MB-01 authority/classification",
+        "MB-02R expected decision",
+        "ORACLE-01 successor truth",
+        "SCOPE-DESIGN oracle annotations",
+        "SCOPE-RUNTIME task traces",
+        "evaluation scores",
+        "failure labels",
+        "oracle equivalence annotations",
+        "raw fixture/document beyond ProjectedWorkspace"
+      ],
+      "invariant": "Generation inputs must be constructible before consulting the accepted utterance→program oracle."
+    },
+    "Q2_decomposer_output_contract": {
+      "DecomposerOutput": "exactly one ScopeNormalizedProgram",
+      "schema_closed": true,
+      "unknown_field": "DECOMPOSITION_SCHEMA_INVALID — candidate never enters SCOPE-RUNTIME",
+      "allowed": {
+        "version": "schema/version metadata only; no semantic outcome",
+        "tasks": [
+          "task_id",
+          "depends_on",
+          "produces_binds",
+          "request"
+        ],
+        "request": "ScopeNormalizedRequest = MB-02R operands + Q1A track_title/track_width_mm + Q4 ScopeSemanticQuery XOR"
+      },
+      "forbidden_in_output": [
+        "status",
+        "authority",
+        "confidence",
+        "expected_terminal",
+        "expected_effect",
+        "workspace_after",
+        "resolved_projected_ref",
+        "candidate_count",
+        "reason",
+        "representability",
+        "oracle_id",
+        "gold_alignment",
+        "task_score",
+        "arbitrary extra fields"
+      ],
+      "atomicity": "One NormalizedTask = one atomic ScopeNormalizedRequest; task count follows required semantic operations, not grammatical clause count or punctuation.",
+      "oracle_separation": "oracle_witness_id is harness-only; candidate must be fully materialized before oracle dereference"
+    },
+    "Q3_semantic_equivalence_policy": {
+      "prerequisite": "candidate frozen before oracle lookup",
+      "stage_1_runtime_gate": {
+        "executor": "SCOPE-RUNTIME-01R",
+        "same_initial_ProjectedWorkspace": true,
+        "required_for_these_six": {
+          "status": "ok",
+          "authority": "OK",
+          "reason": null
+        },
+        "terminal_mismatch_label": "RUNTIME_TERMINAL_MISMATCH"
+      },
+      "stage_2_semantic_compare": {
+        "not_json_equality": true,
+        "order_preserving_alignment": {
+          "preserves": "required causal/utterance order and semantic dependency order",
+          "does_not_require": "oracle serialization order of otherwise independent operations",
+          "invariant": "oracle task serialization alone cannot establish user-required order"
+        },
+        "operand_equivalence": "resolved semantic referent against corresponding pre-task workspace; aliases OK iff unique same entity",
+        "bind_equivalence": "α-renamable; bijection preserving kind, producer, consumers, local_ref role, dependency ancestry",
+        "scalar_operands": "same effective requested values (scale bounds/kind/reverse, title, width, baseline, etc.)",
+        "BENIGN_REDUNDANT_TASK": {
+          "non_failing_diagnostic": true,
+          "requires_all_of": [
+            "individually valid and supported",
+            "no new user-visible semantics",
+            "removing preserves terminal",
+            "removing preserves projected facts consumed by later aligned tasks",
+            "does not create/remove/change a needed bind or dependency",
+            "semantic effect already true at that execution point",
+            "utterance semantic coverage still preserved"
+          ],
+          "not_sufficient": "same final state alone"
+        },
+        "SEMANTICALLY_EQUIVALENT_iff": [
+          "candidate schema-valid",
+          "candidate frozen before oracle lookup",
+          "runtime terminal matches oracle terminal",
+          "all REQUIRED_REPRESENTABLE utterance semantic atoms covered",
+          "OBSERVED_OUT_OF_SCOPE atoms recorded but do not gate equivalence",
+          "after permitted benign-redundancy normalization, order-preserving alignment exists over required causal/utterance order",
+          "aligned operations identical",
+          "aligned operands denote same semantic values/entities",
+          "dependency and bind graphs isomorphic modulo renaming",
+          "no semantic overreach or underspecification on the representable surface"
+        ],
+        "not_required": [
+          "identical JSON",
+          "identical task_id strings",
+          "identical alias spelling",
+          "identical projected ref numbers"
+        ]
+      },
+      "failure_labels": [
+        "MISSING_TASK",
+        "EXTRA_UNSUPPORTED_TASK",
+        "WRONG_OPERATION",
+        "WRONG_OPERAND",
+        "WRONG_ORDER",
+        "WRONG_DEPENDENCY",
+        "WRONG_BINDING",
+        "SEMANTIC_OVERREACH",
+        "SEMANTIC_UNDERSPECIFICATION",
+        "RUNTIME_TERMINAL_MISMATCH"
+      ],
+      "non_failing_diagnostics": [
+        "BENIGN_REDUNDANT_TASK"
+      ],
+      "coverage_atom_classes": {
+        "REQUIRED_REPRESENTABLE": "gates semantic equivalence; must be expressible on frozen ScopeNormalizedProgram surface",
+        "OBSERVED_OUT_OF_SCOPE": "recorded from utterance but absent from frozen program surface; does not gate equivalence; do not expand schema/runtime in this slice"
+      }
+    },
+    "Q4_evaluation_spec_contract": {
+      "access_order": [
+        "harness constructs DecomposerInput",
+        "decomposer receives only utterance + ProjectedWorkspace",
+        "candidate ScopeNormalizedProgram materialized",
+        "candidate frozen",
+        "only then evaluator may access case_id, oracle_witness_id, coverage checklist, expected_terminal, Q3 materials",
+        "evaluate candidate"
+      ],
+      "coverage_checklist_rules": {
+        "utterance_level_only": true,
+        "must_not_encode_implementation": true,
+        "no_oracle_derived_aliases": true,
+        "atom_classes": [
+          "REQUIRED_REPRESENTABLE",
+          "OBSERVED_OUT_OF_SCOPE"
+        ],
+        "only_REQUIRED_REPRESENTABLE_gates_equivalence": true,
+        "ordering_atom_allowed_only_if": [
+          "explicit temporal language in utterance",
+          "anaphoric/data dependency in utterance",
+          "other semantic dependency stated in utterance"
+        ],
+        "ordering_atom_forbidden_if": "supported only by oracle task serialization",
+        "describes": "what the user said must be preserved, not how NormalizedProgram must represent it"
+      },
+      "required_omissions_from_EvaluationSpec": [
+        "normalized_program copy",
+        "gold ops",
+        "gold operation count",
+        "expected task count",
+        "expected operation sequence",
+        "expected depends_on graph",
+        "expected bind graph",
+        "intermediate workspace snapshots",
+        "projected effect trace",
+        "resolved ephemeral refs",
+        "SCOPE-RUNTIME trace",
+        "MB-02R expected per-task decisions"
+      ]
+    }
+  },
+  "evaluation_specs": [
+    {
+      "case_id": "D5GAP-0085",
+      "generation_input_construction": {
+        "utterance_source": "kept utterance text for case_id (harness resolves case→utterance)",
+        "projected_workspace_source": "project_workspace(fixture) via harness; fixture_id never placed in DecomposerInput",
+        "payload_allowlist": [
+          "utterance",
+          "projected_workspace"
+        ],
+        "payload_forbidden": [
+          "case_id",
+          "fixture_id",
+          "all oracle/evaluation fields listed in Q1 denylist"
+        ],
+        "decomposer_payload_shape": {
+          "utterance": "Make both CBL views use 0–100, then fill between them in blue.",
+          "projected_workspace": "<tracks/curves/fills/focus/depth facts only>"
+        }
+      },
+      "oracle_witness_id": "D5GAP-0085",
+      "comparison_policy": "frozen_contract.Q3_semantic_equivalence_policy",
+      "utterance_semantic_coverage_checklist": {
+        "REQUIRED_REPRESENTABLE": [
+          "both referenced CBL views are requested to use 0–100",
+          "ordering: the scale request precedes the fill request (utterance 'then')",
+          "a fill is requested between the referenced CBL views"
+        ],
+        "OBSERVED_OUT_OF_SCOPE": [
+          {
+            "atom": "fill styling = blue",
+            "reason": "absent from frozen ScopeNormalizedProgram surface (no fill-color operand); SCOPE-DESIGN witness omitted blue from OK envelope proof"
+          }
+        ]
+      },
+      "expected_terminal": {
+        "status": "ok",
+        "authority": "OK",
+        "reason": null
+      },
+      "allowed_failure_labels": [
+        "MISSING_TASK",
+        "EXTRA_UNSUPPORTED_TASK",
+        "WRONG_OPERATION",
+        "WRONG_OPERAND",
+        "WRONG_ORDER",
+        "WRONG_DEPENDENCY",
+        "WRONG_BINDING",
+        "SEMANTIC_OVERREACH",
+        "SEMANTIC_UNDERSPECIFICATION",
+        "RUNTIME_TERMINAL_MISMATCH"
+      ],
+      "notes": "Blue is OBSERVED_OUT_OF_SCOPE; REQUIRED_REPRESENTABLE coverage of both CBL views at 0–100 remains even if one view already has that scale."
+    },
+    {
+      "case_id": "D5GAP-0089",
+      "generation_input_construction": {
+        "utterance_source": "kept utterance text for case_id (harness resolves case→utterance)",
+        "projected_workspace_source": "project_workspace(fixture) via harness; fixture_id never placed in DecomposerInput",
+        "payload_allowlist": [
+          "utterance",
+          "projected_workspace"
+        ],
+        "payload_forbidden": [
+          "case_id",
+          "fixture_id",
+          "all oracle/evaluation fields listed in Q1 denylist"
+        ],
+        "decomposer_payload_shape": {
+          "utterance": "First change the narrow CBL view to 0–100, then fill between the first and second CBL instances.",
+          "projected_workspace": "<tracks/curves/fills/focus/depth facts only>"
+        }
+      },
+      "oracle_witness_id": "D5GAP-0089",
+      "comparison_policy": "frozen_contract.Q3_semantic_equivalence_policy",
+      "utterance_semantic_coverage_checklist": {
+        "REQUIRED_REPRESENTABLE": [
+          "the narrow CBL view is requested to change to 0–100",
+          "ordering: that scale change precedes the fill request (utterance 'First'/'then')",
+          "a fill is requested between the first and second CBL instances"
+        ],
+        "OBSERVED_OUT_OF_SCOPE": []
+      },
+      "expected_terminal": {
+        "status": "ok",
+        "authority": "OK",
+        "reason": null
+      },
+      "allowed_failure_labels": [
+        "MISSING_TASK",
+        "EXTRA_UNSUPPORTED_TASK",
+        "WRONG_OPERATION",
+        "WRONG_OPERAND",
+        "WRONG_ORDER",
+        "WRONG_DEPENDENCY",
+        "WRONG_BINDING",
+        "SEMANTIC_OVERREACH",
+        "SEMANTIC_UNDERSPECIFICATION",
+        "RUNTIME_TERMINAL_MISMATCH"
+      ]
+    },
+    {
+      "case_id": "D5GAP-0117",
+      "generation_input_construction": {
+        "utterance_source": "kept utterance text for case_id (harness resolves case→utterance)",
+        "projected_workspace_source": "project_workspace(fixture) via harness; fixture_id never placed in DecomposerInput",
+        "payload_allowlist": [
+          "utterance",
+          "projected_workspace"
+        ],
+        "payload_forbidden": [
+          "case_id",
+          "fixture_id",
+          "all oracle/evaluation fields listed in Q1 denylist"
+        ],
+        "decomposer_payload_shape": {
+          "utterance": "Set RHOB to 1.95–2.95 reversed and split-fill it at 2.45.",
+          "projected_workspace": "<tracks/curves/fills/focus/depth facts only>"
+        }
+      },
+      "oracle_witness_id": "D5GAP-0117",
+      "comparison_policy": "frozen_contract.Q3_semantic_equivalence_policy",
+      "utterance_semantic_coverage_checklist": {
+        "REQUIRED_REPRESENTABLE": [
+          "RHOB is requested at 1.95–2.95",
+          "RHOB is requested reversed",
+          "a split-fill is requested on RHOB",
+          "the split-fill baseline is 2.45"
+        ],
+        "OBSERVED_OUT_OF_SCOPE": []
+      },
+      "expected_terminal": {
+        "status": "ok",
+        "authority": "OK",
+        "reason": null
+      },
+      "allowed_failure_labels": [
+        "MISSING_TASK",
+        "EXTRA_UNSUPPORTED_TASK",
+        "WRONG_OPERATION",
+        "WRONG_OPERAND",
+        "WRONG_ORDER",
+        "WRONG_DEPENDENCY",
+        "WRONG_BINDING",
+        "SEMANTIC_OVERREACH",
+        "SEMANTIC_UNDERSPECIFICATION",
+        "RUNTIME_TERMINAL_MISMATCH"
+      ],
+      "notes": "No configure-before-fill ordering atom: utterance uses coordinated 'and' and anaphoric 'it' for RHOB identity, not temporal order. Oracle serialization alone is insufficient. Runtime may still require dependency for a particular candidate representation, but that is not user-intent coverage."
+    },
+    {
+      "case_id": "D5GAP-0096",
+      "generation_input_construction": {
+        "utterance_source": "kept utterance text for case_id (harness resolves case→utterance)",
+        "projected_workspace_source": "project_workspace(fixture) via harness; fixture_id never placed in DecomposerInput",
+        "payload_allowlist": [
+          "utterance",
+          "projected_workspace"
+        ],
+        "payload_forbidden": [
+          "case_id",
+          "fixture_id",
+          "all oracle/evaluation fields listed in Q1 denylist"
+        ],
+        "decomposer_payload_shape": {
+          "utterance": "Add a Petrophysics track with GR 0–150 and RT logarithmic 0.2–2000.",
+          "projected_workspace": "<tracks/curves/fills/focus/depth facts only>"
+        }
+      },
+      "oracle_witness_id": "D5GAP-0096",
+      "comparison_policy": "frozen_contract.Q3_semantic_equivalence_policy",
+      "utterance_semantic_coverage_checklist": {
+        "REQUIRED_REPRESENTABLE": [
+          "a new track is requested",
+          "the new track is titled Petrophysics",
+          "GR is requested on that new track",
+          "GR is requested with range semantics 0–150",
+          "RT is requested on that new track",
+          "RT is requested logarithmic 0.2–2000"
+        ],
+        "OBSERVED_OUT_OF_SCOPE": []
+      },
+      "expected_terminal": {
+        "status": "ok",
+        "authority": "OK",
+        "reason": null
+      },
+      "allowed_failure_labels": [
+        "MISSING_TASK",
+        "EXTRA_UNSUPPORTED_TASK",
+        "WRONG_OPERATION",
+        "WRONG_OPERAND",
+        "WRONG_ORDER",
+        "WRONG_DEPENDENCY",
+        "WRONG_BINDING",
+        "SEMANTIC_OVERREACH",
+        "SEMANTIC_UNDERSPECIFICATION",
+        "RUNTIME_TERMINAL_MISMATCH"
+      ],
+      "notes": "No GR-before-RT ordering atom: utterance does not encode temporal order; oracle serialization alone is insufficient."
+    },
+    {
+      "case_id": "D5GAP-0101",
+      "generation_input_construction": {
+        "utterance_source": "kept utterance text for case_id (harness resolves case→utterance)",
+        "projected_workspace_source": "project_workspace(fixture) via harness; fixture_id never placed in DecomposerInput",
+        "payload_allowlist": [
+          "utterance",
+          "projected_workspace"
+        ],
+        "payload_forbidden": [
+          "case_id",
+          "fixture_id",
+          "all oracle/evaluation fields listed in Q1 denylist"
+        ],
+        "decomposer_payload_shape": {
+          "utterance": "Append a 24 mm Caliper QC track and plot CALI on it at 6–12.",
+          "projected_workspace": "<tracks/curves/fills/focus/depth facts only>"
+        }
+      },
+      "oracle_witness_id": "D5GAP-0101",
+      "comparison_policy": "frozen_contract.Q3_semantic_equivalence_policy",
+      "utterance_semantic_coverage_checklist": {
+        "REQUIRED_REPRESENTABLE": [
+          "a new track is requested by append",
+          "the new track is titled Caliper QC",
+          "the new track width is 24 mm",
+          "CALI is requested on that new track",
+          "CALI is requested at 6–12"
+        ],
+        "OBSERVED_OUT_OF_SCOPE": []
+      },
+      "expected_terminal": {
+        "status": "ok",
+        "authority": "OK",
+        "reason": null
+      },
+      "allowed_failure_labels": [
+        "MISSING_TASK",
+        "EXTRA_UNSUPPORTED_TASK",
+        "WRONG_OPERATION",
+        "WRONG_OPERAND",
+        "WRONG_ORDER",
+        "WRONG_DEPENDENCY",
+        "WRONG_BINDING",
+        "SEMANTIC_OVERREACH",
+        "SEMANTIC_UNDERSPECIFICATION",
+        "RUNTIME_TERMINAL_MISMATCH"
+      ]
+    },
+    {
+      "case_id": "SEED-cm-9643c020e2e02463",
+      "generation_input_construction": {
+        "utterance_source": "kept utterance text for case_id (harness resolves case→utterance)",
+        "projected_workspace_source": "project_workspace(fixture) via harness; fixture_id never placed in DecomposerInput",
+        "payload_allowlist": [
+          "utterance",
+          "projected_workspace"
+        ],
+        "payload_forbidden": [
+          "case_id",
+          "fixture_id",
+          "all oracle/evaluation fields listed in Q1 denylist"
+        ],
+        "decomposer_payload_shape": {
+          "utterance": "Create one normal track named Petrophysics. First plot GR linearly from -10 to 140. Then plot RT logarithmically from 0.1 to 10000. Preserve that binding order.",
+          "projected_workspace": "<tracks/curves/fills/focus/depth facts only>"
+        }
+      },
+      "oracle_witness_id": "SEED-cm-9643c020e2e02463",
+      "comparison_policy": "frozen_contract.Q3_semantic_equivalence_policy",
+      "utterance_semantic_coverage_checklist": {
+        "REQUIRED_REPRESENTABLE": [
+          "one new track is requested",
+          "the track is described as normal (canonical default kind; no extra kind operand required if omitted)",
+          "the new track is named Petrophysics",
+          "GR is requested on that new track",
+          "GR is requested linearly from -10 to 140",
+          "RT is requested on that new track",
+          "RT is requested logarithmically from 0.1 to 10000",
+          "ordering: GR-then-RT binding order is explicitly required (utterance 'First'/'Then'/'Preserve that binding order')"
+        ],
+        "OBSERVED_OUT_OF_SCOPE": []
+      },
+      "expected_terminal": {
+        "status": "ok",
+        "authority": "OK",
+        "reason": null
+      },
+      "allowed_failure_labels": [
+        "MISSING_TASK",
+        "EXTRA_UNSUPPORTED_TASK",
+        "WRONG_OPERATION",
+        "WRONG_OPERAND",
+        "WRONG_ORDER",
+        "WRONG_DEPENDENCY",
+        "WRONG_BINDING",
+        "SEMANTIC_OVERREACH",
+        "SEMANTIC_UNDERSPECIFICATION",
+        "RUNTIME_TERMINAL_MISMATCH"
+      ]
+    }
+  ],
+  "summary": {
+    "n_evaluation_specs": 6,
+    "rework": "R1 atom classes + R2 no oracle-only ordering + R3 D5GAP-0117 drop scale-before-fill order",
+    "decomposer_implemented": false,
+    "english_to_program_accuracy_claimed": false,
+    "historical_gold": "UNCHANGED",
+    "scope_runtime": "UNCHANGED",
+    "code": "NONE"
+  },
+  "prior_nl_program_design_candidate": "b696e974b9ea6a2c8cda5ec80441db0d7726adea",
+  "prior_defect": {
+    "R3": "D5GAP-0117 treated coordinated 'and' as temporal configure-before-fill order; utterance does not establish that ordering requirement"
+  },
+  "prior_nl_program_design_01r_candidate": "9e7e638b5525ece924ffd227d045823089ca264d"
+}

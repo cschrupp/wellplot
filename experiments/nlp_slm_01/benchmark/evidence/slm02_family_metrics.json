@@ -1,0 +1,40 @@
+{
+  "best_arm": "Q1",
+  "families": {
+    "ambiguity_unsupported": {
+      "correct": 0,
+      "n": 13,
+      "rate": 0.0
+    },
+    "composition": {
+      "correct": 5,
+      "n": 13,
+      "rate": 0.38461538461538464
+    },
+    "curve_placement": {
+      "correct": 9,
+      "n": 9,
+      "rate": 1.0
+    },
+    "display_configuration": {
+      "correct": 3,
+      "n": 4,
+      "rate": 0.75
+    },
+    "fills": {
+      "correct": 10,
+      "n": 10,
+      "rate": 1.0
+    },
+    "intervals": {
+      "correct": 9,
+      "n": 9,
+      "rate": 1.0
+    },
+    "relational_targeting": {
+      "correct": 11,
+      "n": 12,
+      "rate": 0.9166666666666666
+    }
+  }
+}

@@ -1,0 +1,133 @@
+{
+  "d0": {
+    "tracks": [
+      {
+        "ref": 1,
+        "id": "track_1",
+        "kind": "reference",
+        "curves": []
+      },
+      {
+        "ref": 2,
+        "id": "track_2",
+        "kind": "normal",
+        "curves": [
+          "GR"
+        ]
+      },
+      {
+        "ref": 3,
+        "id": "track_3",
+        "kind": "normal",
+        "curves": [
+          "NPHI"
+        ]
+      },
+      {
+        "ref": 4,
+        "id": "track_4",
+        "kind": "normal",
+        "curves": []
+      }
+    ],
+    "curves": [
+      {
+        "ref": "GR",
+        "track": 2,
+        "min": 0.0,
+        "max": 150.0,
+        "direction": "increasing",
+        "line_style": "solid"
+      },
+      {
+        "ref": "NPHI",
+        "track": 3,
+        "min": 0.45,
+        "max": -0.15,
+        "direction": "decreasing",
+        "line_style": "solid"
+      }
+    ],
+    "fills": [],
+    "interval": {
+      "top": 2000.0,
+      "bottom": 3500.0,
+      "unit": "m"
+    }
+  },
+  "workspace": {
+    "available_curves": [
+      {
+        "id": "GR",
+        "family": "gamma_ray",
+        "aliases": [
+          "gamma",
+          "gamma ray",
+          "gamma-ray"
+        ]
+      },
+      {
+        "id": "NPHI",
+        "family": "neutron_porosity",
+        "aliases": [
+          "neutron",
+          "neutron porosity",
+          "nphi"
+        ]
+      },
+      {
+        "id": "RHOB",
+        "family": "bulk_density",
+        "aliases": [
+          "density",
+          "bulk density",
+          "rhob"
+        ]
+      },
+      {
+        "id": "RT",
+        "family": "resistivity",
+        "aliases": [
+          "resistivity",
+          "res"
+        ]
+      }
+    ],
+    "current_tracks": [
+      {
+        "ref": 1,
+        "id": "track_1",
+        "kind": "reference",
+        "curves": []
+      },
+      {
+        "ref": 2,
+        "id": "track_2",
+        "kind": "normal",
+        "curves": [
+          "GR"
+        ]
+      },
+      {
+        "ref": 3,
+        "id": "track_3",
+        "kind": "normal",
+        "curves": [
+          "NPHI"
+        ]
+      },
+      {
+        "ref": 4,
+        "id": "track_4",
+        "kind": "normal",
+        "curves": []
+      }
+    ],
+    "fills": [],
+    "focus": {
+      "curve": null,
+      "track": null
+    },
+    "depth_unit": "m"
+  }
+}

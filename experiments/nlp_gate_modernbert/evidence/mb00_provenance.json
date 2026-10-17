@@ -1,0 +1,90 @@
+{
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-MB00-BOOTSTRAP-AUTH-001",
+  "branch": "exp/wellplot-nlp-slm-01",
+  "corpus_revision": "d5-grounded-300-r1",
+  "created_at_utc": "2026-10-14T14:52:48.308648+00:00",
+  "d5_ref": "d5/single-engine-convergence",
+  "d5_sha": "560ec48d2b2809ed2feb55467da15195f527ec44",
+  "environment": {
+    "gpu": {
+      "name": "NVIDIA GeForce RTX 3060 Laptop GPU",
+      "uuid": "GPU-b9b43d06-a239-0da5-133f-3f7a47e5d4b8",
+      "vram_gib": 6.0
+    },
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python_version": "3.12.3",
+    "torch": "unavailable:No module named 'torch'",
+    "transformers": "unavailable_in_default_python",
+    "unsloth_studio_python": {
+      "path": "/home/user/.unsloth/studio/unsloth_studio/bin/python",
+      "python": "3.13.11",
+      "torch": "2.11.0+cu130",
+      "transformers": "5.5.0"
+    }
+  },
+  "frozen_compiler": {
+    "adapter_dir": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/adapters/slm03_qwenv17_qlora",
+    "base_model_id": "Qwen/Qwen3-1.7B",
+    "id": "SLM-03"
+  },
+  "invariants": [
+    "SLM-03 adapter and evidence are immutable comparison artifacts",
+    "No Qwen retraining in this experiment",
+    "No T5 dependency until Decision Gate B",
+    "No LangGraph dependency until Decision Gate C",
+    "No production imports from this experiment",
+    "Never train on sealed held-out"
+  ],
+  "not_implemented_in_mb00": [
+    "MB-01 gate corpus audit",
+    "MB-02 deterministic fact projector",
+    "MB-03 ModernBERT training",
+    "T5",
+    "LangGraph",
+    "SLM-04"
+  ],
+  "paths": {
+    "corpus_meta": "/home/user/projects/wellplot/experiments/nlp_slm_01/benchmark/gold/corpus_meta.json",
+    "d5_zip": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/exports/wellplot_slm01_d5_grounded_300_r1.zip",
+    "gold_cases_jsonl": "/home/user/projects/wellplot/experiments/nlp_slm_01/benchmark/gold/cases.jsonl",
+    "qwen_base_config": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/modelscope_cache/models/Qwen--Qwen3-1.7B/snapshots/master/config.json",
+    "qwen_base_tokenizer_config": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/modelscope_cache/models/Qwen--Qwen3-1.7B/snapshots/master/tokenizer_config.json",
+    "qwen_base_tokenizer_json": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/modelscope_cache/models/Qwen--Qwen3-1.7B/snapshots/master/tokenizer.json",
+    "slm03_adapter_config": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/adapters/slm03_qwenv17_qlora/adapter_config.json",
+    "slm03_adapter_model": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/adapters/slm03_qwenv17_qlora/adapter_model.safetensors",
+    "slm03_final_summary": "/home/user/projects/wellplot/experiments/nlp_slm_01/benchmark/evidence/slm03_final_summary.json",
+    "slm03_gate_decision": "/home/user/projects/wellplot/experiments/nlp_slm_01/benchmark/evidence/slm03_gate_decision.json",
+    "slm03_model_metrics": "/home/user/projects/wellplot/experiments/nlp_slm_01/benchmark/evidence/slm03_model_metrics.json",
+    "slm03_tokenizer_config": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/adapters/slm03_qwenv17_qlora/tokenizer_config.json",
+    "slm03_tokenizer_json": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/adapters/slm03_qwenv17_qlora/tokenizer.json",
+    "slm03_train_meta": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/adapters/slm03_qwenv17_qlora/slm03_train_meta.json",
+    "split_development": "/home/user/projects/wellplot/experiments/nlp_slm_01/benchmark/splits/development.json",
+    "split_held_out": "/home/user/projects/wellplot/experiments/nlp_slm_01/benchmark/splits/held_out.json",
+    "split_validation": "/home/user/projects/wellplot/experiments/nlp_slm_01/benchmark/splits/validation.json",
+    "well_ir_1_2_schema": "/home/user/projects/wellplot/experiments/nlp_slm_01/benchmark/schema/well_ir_1_2_candidate.schema.json"
+  },
+  "pinned_sha256": {
+    "corpus_meta": "4260e9d75389c6a0dd28990aeaadf208ee4794eae4e128801531388e4beaceb9",
+    "d5_zip": "7c446fd3fb9d78d0eefa35e75c507d1fa5a321b6e0136cc7f9322333944b38ec",
+    "gold_cases_jsonl": "172e70825d51bf3cb68ea3798ff87f20da21e7365d14ff0efd383b69d9013a11",
+    "qwen_base_config": "1ddb5b89ebc90dcb417a45c213d818577e65976454d29385c8f6140771d95197",
+    "qwen_base_tokenizer_config": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+    "qwen_base_tokenizer_json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+    "slm03_adapter_config": "38cda81d3db2d3a2dbac01b9cb315fea3df3da6d9aeb7e90b36b9d2cced620fd",
+    "slm03_adapter_model": "1f11590ff5bd74b4c837811b51cb410caa589184e877882a5e8e95efd8b18850",
+    "slm03_final_summary": "3f4535f7afe65c1fa136bad8b86b7c9cd2728fa58905a344eceb0f9597f14390",
+    "slm03_gate_decision": "d2b8121a8bbb91d3a262ed8b8670c4cca3d6e18023d5c27652dbad3841169346",
+    "slm03_model_metrics": "0c6d81668dea09327056817bf77b819e73a38f2da853110844e4dd41bb7ddc8e",
+    "slm03_tokenizer_config": "48a7a50805a5a47717431e5ba1323594d0c27c03dc0cac52afb3a49aa38520a3",
+    "slm03_tokenizer_json": "476870a1f2fb6f6a2759a6ede2383bf9d5d738f17844563b65c91965b722ae09",
+    "slm03_train_meta": "982ab9112fc6c41ca21c00fe428d54d7d6ff079254b134c64f6216d09c3bfbe3",
+    "split_development": "c31e16376266ee345223e23388fd35a351525fd92f8aab17046170d27dbb2fd7",
+    "split_held_out": "188b48fa1f0176e46527841c5c95d20fda6183ca16e9e95585f0f8b89f41851d",
+    "split_validation": "d0d7999f1458fce137d5e2e3e2238ba4003abc21a801715a958eb3d36f60ea80",
+    "well_ir_1_2_schema": "b88111facf2146ce524b34e4d0c1034a62907da8ae2c867b60c4f0bea20ed610"
+  },
+  "repository": "/home/user/projects/wellplot",
+  "slice": "MB-00",
+  "starting_sha": "225977d80e945923d7c883f0c829d90dd16aa75f",
+  "well_ir_version": "1.2-candidate"
+}

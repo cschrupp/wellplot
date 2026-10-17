@@ -1,0 +1,33 @@
+# Example QLoRA config for SLM-02 — DO NOT RUN during SLM-01.
+
+base_model: Qwen/Qwen3-1.7B
+enable_thinking: false
+
+method: qlora
+load_in_4bit: true
+bnb_4bit_compute_dtype: float16
+lora_r: 16
+lora_alpha: 32
+lora_dropout: 0.05
+target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+
+train_split: development
+eval_split: validation
+held_out_split: held_out  # evaluation only; never train
+
+max_seq_length: 1024
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+learning_rate: 2.0e-4
+num_train_epochs: 3
+seed: 20261011
+
+output_dir: artifacts/adapters/slm02_qwenv17_qlora
+report_to: none

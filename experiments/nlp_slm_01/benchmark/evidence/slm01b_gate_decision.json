@@ -1,0 +1,35 @@
+{
+  "best_model_arm": "A",
+  "best_prompt_arm": "Q2",
+  "best_semantic_correctness": 0.2807017543859649,
+  "best_spec": {
+    "backend": "hf",
+    "label": "smollm3_bf16_hf",
+    "model_id": "unsloth/SmolLM3-3B",
+    "model_path": "/home/user/.cache/huggingface/hub/models--unsloth--SmolLM3-3B/snapshots/ece25bbbd9b7e0a36ed15b4e26ee1ad37654b3dd",
+    "offload": {
+      "device_map": "auto",
+      "dtype": "bfloat16",
+      "max_memory": {
+        "0": 4294967296,
+        "cpu": 30064771072
+      }
+    },
+    "quant": "bf16_offload"
+  },
+  "checks": {
+    "baselines_complete": true,
+    "family_breadth": false,
+    "gold_frozen": true,
+    "ir_frozen": true,
+    "ir_limit_lt_15": true,
+    "learnable_ge_70": true,
+    "lowerer_100": true,
+    "no_leakage": true,
+    "non_goals": true,
+    "semantic_floor_50": false,
+    "split_frozen": true,
+    "taxonomy_complete": true
+  },
+  "decision": "MODEL-SIZE-FAIL"
+}

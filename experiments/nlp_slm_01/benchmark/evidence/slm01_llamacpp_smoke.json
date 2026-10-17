@@ -1,0 +1,15 @@
+{
+  "affects_slm02_gate": false,
+  "cpu_only_inference": true,
+  "loads_successfully": true,
+  "n_held_out": 70,
+  "note": "Full held-out interim numbers reused as smoke evidence; scientific gate still awaits HF BF16/FP32 baseline.",
+  "port": 8889,
+  "q1_semantic_executable": 0.21052631578947367,
+  "q2_overall": 0.3142857142857143,
+  "q2_schema_validity": 0.4857142857142857,
+  "q2_semantic_executable": 0.3508771929824561,
+  "role": "deployment_smoke_only",
+  "runtime": "llama-server + Qwen3-1.7B-Q4_K_M.gguf",
+  "schema_constrained_output": "NOT_USED_IN_THIS_SMOKE"
+}

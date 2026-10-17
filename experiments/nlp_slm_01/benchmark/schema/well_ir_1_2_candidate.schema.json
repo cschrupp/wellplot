@@ -1,0 +1,1470 @@
+{
+  "$id": "https://wellplot.local/schema/well-ir/1.2-candidate",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "SLM-01 semantic-op schema grounded to d5/single-engine-convergence@560ec48d2b2809ed2feb55467da15195f527ec44 and canonical authoring contracts.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "properties": {
+        "ops": {
+          "items": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "curve": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "curve"
+                          },
+                          "ref": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "ref"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "handle": {
+                            "pattern": "^curve-[1-9][0-9]*$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "curve"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "handle"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "op": {
+                    "const": "place_curve"
+                  },
+                  "target": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "mode": {
+                            "const": "track"
+                          },
+                          "reference": {
+                            "oneOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "track"
+                                  },
+                                  "ref": {
+                                    "oneOf": [
+                                      {
+                                        "minimum": 1,
+                                        "type": "integer"
+                                      },
+                                      {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "ref"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "handle": {
+                                    "pattern": "^track-[1-9][0-9]*$",
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "const": "track"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "handle"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "track"
+                                  },
+                                  "local_ref": {
+                                    "pattern": "^\\$[A-Za-z][A-Za-z0-9_]*$",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "local_ref"
+                                ],
+                                "type": "object"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "reference"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "mode": {
+                            "const": "relative"
+                          },
+                          "reference": {
+                            "oneOf": [
+                              {
+                                "oneOf": [
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "kind": {
+                                        "const": "curve"
+                                      },
+                                      "ref": {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "ref"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "handle": {
+                                        "pattern": "^curve-[1-9][0-9]*$",
+                                        "type": "string"
+                                      },
+                                      "kind": {
+                                        "const": "curve"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "handle"
+                                    ],
+                                    "type": "object"
+                                  }
+                                ]
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "track"
+                                  },
+                                  "ref": {
+                                    "oneOf": [
+                                      {
+                                        "minimum": 1,
+                                        "type": "integer"
+                                      },
+                                      {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "ref"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "handle": {
+                                    "pattern": "^track-[1-9][0-9]*$",
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "const": "track"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "handle"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "track"
+                                  },
+                                  "local_ref": {
+                                    "pattern": "^\\$[A-Za-z][A-Za-z0-9_]*$",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "local_ref"
+                                ],
+                                "type": "object"
+                              }
+                            ]
+                          },
+                          "relation": {
+                            "enum": [
+                              "with",
+                              "beside"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "relation",
+                          "reference"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "op",
+                  "curve",
+                  "target"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "curve": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "curve"
+                          },
+                          "ref": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "ref"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "handle": {
+                            "pattern": "^curve-[1-9][0-9]*$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "curve"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "handle"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "op": {
+                    "const": "move_curve"
+                  },
+                  "target": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "mode": {
+                            "const": "track"
+                          },
+                          "reference": {
+                            "oneOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "track"
+                                  },
+                                  "ref": {
+                                    "oneOf": [
+                                      {
+                                        "minimum": 1,
+                                        "type": "integer"
+                                      },
+                                      {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "ref"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "handle": {
+                                    "pattern": "^track-[1-9][0-9]*$",
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "const": "track"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "handle"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "track"
+                                  },
+                                  "local_ref": {
+                                    "pattern": "^\\$[A-Za-z][A-Za-z0-9_]*$",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "local_ref"
+                                ],
+                                "type": "object"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "reference"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "mode": {
+                            "const": "relative"
+                          },
+                          "reference": {
+                            "oneOf": [
+                              {
+                                "oneOf": [
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "kind": {
+                                        "const": "curve"
+                                      },
+                                      "ref": {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "ref"
+                                    ],
+                                    "type": "object"
+                                  },
+                                  {
+                                    "additionalProperties": false,
+                                    "properties": {
+                                      "handle": {
+                                        "pattern": "^curve-[1-9][0-9]*$",
+                                        "type": "string"
+                                      },
+                                      "kind": {
+                                        "const": "curve"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "handle"
+                                    ],
+                                    "type": "object"
+                                  }
+                                ]
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "track"
+                                  },
+                                  "ref": {
+                                    "oneOf": [
+                                      {
+                                        "minimum": 1,
+                                        "type": "integer"
+                                      },
+                                      {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "ref"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "handle": {
+                                    "pattern": "^track-[1-9][0-9]*$",
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "const": "track"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "handle"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "track"
+                                  },
+                                  "local_ref": {
+                                    "pattern": "^\\$[A-Za-z][A-Za-z0-9_]*$",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "local_ref"
+                                ],
+                                "type": "object"
+                              }
+                            ]
+                          },
+                          "relation": {
+                            "enum": [
+                              "with",
+                              "beside"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "relation",
+                          "reference"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "op",
+                  "curve",
+                  "target"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "curve": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "curve"
+                          },
+                          "ref": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "ref"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "handle": {
+                            "pattern": "^curve-[1-9][0-9]*$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "curve"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "handle"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "op": {
+                    "const": "remove_curve"
+                  }
+                },
+                "required": [
+                  "op",
+                  "curve"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "anyOf": [
+                  {
+                    "required": [
+                      "scale"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "style"
+                    ]
+                  }
+                ],
+                "properties": {
+                  "curve": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "curve"
+                          },
+                          "ref": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "ref"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "handle": {
+                            "pattern": "^curve-[1-9][0-9]*$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "curve"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "handle"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "op": {
+                    "const": "configure_curve_display"
+                  },
+                  "scale": {
+                    "additionalProperties": false,
+                    "minProperties": 1,
+                    "properties": {
+                      "kind": {
+                        "enum": [
+                          "linear",
+                          "log",
+                          "tangential"
+                        ]
+                      },
+                      "maximum": {
+                        "type": "number"
+                      },
+                      "minimum": {
+                        "type": "number"
+                      },
+                      "reverse": {
+                        "type": "boolean"
+                      },
+                      "unit": {
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "style": {
+                    "additionalProperties": false,
+                    "minProperties": 1,
+                    "properties": {
+                      "alpha": {
+                        "maximum": 1,
+                        "minimum": 0,
+                        "type": "number"
+                      },
+                      "color": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "line_style": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "line_width": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "op",
+                  "curve"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "base": {
+                    "type": "number"
+                  },
+                  "op": {
+                    "const": "set_interval"
+                  },
+                  "top": {
+                    "type": "number"
+                  },
+                  "unit": {
+                    "minLength": 1,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "op",
+                  "top",
+                  "base",
+                  "unit"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "bind": {
+                    "pattern": "^\\$[A-Za-z][A-Za-z0-9_]*$",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "normal"
+                  },
+                  "op": {
+                    "const": "create_track"
+                  },
+                  "target": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "mode": {
+                            "const": "append"
+                          }
+                        },
+                        "required": [
+                          "mode"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "mode": {
+                            "const": "relative"
+                          },
+                          "reference": {
+                            "oneOf": [
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "track"
+                                  },
+                                  "ref": {
+                                    "oneOf": [
+                                      {
+                                        "minimum": 1,
+                                        "type": "integer"
+                                      },
+                                      {
+                                        "minLength": 1,
+                                        "type": "string"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "ref"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "handle": {
+                                    "pattern": "^track-[1-9][0-9]*$",
+                                    "type": "string"
+                                  },
+                                  "kind": {
+                                    "const": "track"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "handle"
+                                ],
+                                "type": "object"
+                              },
+                              {
+                                "additionalProperties": false,
+                                "properties": {
+                                  "kind": {
+                                    "const": "track"
+                                  },
+                                  "local_ref": {
+                                    "pattern": "^\\$[A-Za-z][A-Za-z0-9_]*$",
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "local_ref"
+                                ],
+                                "type": "object"
+                              }
+                            ]
+                          },
+                          "relation": {
+                            "enum": [
+                              "before",
+                              "after",
+                              "beside"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "mode",
+                          "relation",
+                          "reference"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "title": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "width_mm": {
+                    "exclusiveMinimum": 0,
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "op",
+                  "bind",
+                  "kind"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "alpha": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "color": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "curve": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "curve"
+                          },
+                          "ref": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "ref"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "handle": {
+                            "pattern": "^curve-[1-9][0-9]*$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "curve"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "handle"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "const": "to_lower_limit"
+                  },
+                  "op": {
+                    "const": "define_fill"
+                  }
+                },
+                "required": [
+                  "op",
+                  "curve",
+                  "kind"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "alpha": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "color": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "curve": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "curve"
+                          },
+                          "ref": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "ref"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "handle": {
+                            "pattern": "^curve-[1-9][0-9]*$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "curve"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "handle"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "const": "to_upper_limit"
+                  },
+                  "op": {
+                    "const": "define_fill"
+                  }
+                },
+                "required": [
+                  "op",
+                  "curve",
+                  "kind"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "alpha": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "color": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "curve": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "curve"
+                          },
+                          "ref": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "ref"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "handle": {
+                            "pattern": "^curve-[1-9][0-9]*$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "curve"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "handle"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "const": "between_curves"
+                  },
+                  "op": {
+                    "const": "define_fill"
+                  },
+                  "other_curve": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "curve"
+                          },
+                          "ref": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "ref"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "handle": {
+                            "pattern": "^curve-[1-9][0-9]*$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "curve"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "handle"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "op",
+                  "curve",
+                  "kind",
+                  "other_curve"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "alpha": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "color": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "curve": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "curve"
+                          },
+                          "ref": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "ref"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "handle": {
+                            "pattern": "^curve-[1-9][0-9]*$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "curve"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "handle"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "const": "between_instances"
+                  },
+                  "op": {
+                    "const": "define_fill"
+                  },
+                  "other_curve": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "curve"
+                          },
+                          "ref": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "ref"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "handle": {
+                            "pattern": "^curve-[1-9][0-9]*$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "curve"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "handle"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "op",
+                  "curve",
+                  "kind",
+                  "other_curve"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "alpha": {
+                    "maximum": 1,
+                    "minimum": 0,
+                    "type": "number"
+                  },
+                  "baseline": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "line_color": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "line_style": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "line_width": {
+                        "exclusiveMinimum": 0,
+                        "type": "number"
+                      },
+                      "lower_color": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "upper_color": {
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "value"
+                    ],
+                    "type": "object"
+                  },
+                  "color": {
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "curve": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "curve"
+                          },
+                          "ref": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "ref"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "handle": {
+                            "pattern": "^curve-[1-9][0-9]*$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "curve"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "handle"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "const": "baseline_split"
+                  },
+                  "op": {
+                    "const": "define_fill"
+                  }
+                },
+                "required": [
+                  "op",
+                  "curve",
+                  "kind",
+                  "baseline"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "fill": {
+                    "oneOf": [
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "kind": {
+                            "const": "fill"
+                          },
+                          "ref": {
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "ref"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "handle": {
+                            "pattern": "^fill-[1-9][0-9]*$",
+                            "type": "string"
+                          },
+                          "kind": {
+                            "const": "fill"
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "handle"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "op": {
+                    "const": "remove_fill"
+                  }
+                },
+                "required": [
+                  "op",
+                  "fill"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "status": {
+          "const": "ok"
+        },
+        "well_ir_version": {
+          "const": "1.2-candidate"
+        }
+      },
+      "required": [
+        "well_ir_version",
+        "status",
+        "ops"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "ambiguities": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "candidates": {
+                "items": {
+                  "oneOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              "field": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "query": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "field",
+              "query",
+              "candidates"
+            ],
+            "type": "object"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "status": {
+          "const": "ambiguous"
+        },
+        "well_ir_version": {
+          "const": "1.2-candidate"
+        }
+      },
+      "required": [
+        "well_ir_version",
+        "status",
+        "ambiguities"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "operation_not_supported",
+            "reference_not_found",
+            "capability_not_available"
+          ]
+        },
+        "reference": {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "enum": [
+                "curve",
+                "track",
+                "fill",
+                "source",
+                "section"
+              ]
+            },
+            "query": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "query"
+          ],
+          "type": "object"
+        },
+        "status": {
+          "const": "unsupported"
+        },
+        "well_ir_version": {
+          "const": "1.2-candidate"
+        }
+      },
+      "required": [
+        "well_ir_version",
+        "status",
+        "reason"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "status": {
+          "const": "invalid"
+        },
+        "well_ir_version": {
+          "const": "1.2-candidate"
+        }
+      },
+      "required": [
+        "well_ir_version",
+        "status",
+        "reason",
+        "detail"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "WELL-IR 1.2 Candidate — D5-grounded"
+}

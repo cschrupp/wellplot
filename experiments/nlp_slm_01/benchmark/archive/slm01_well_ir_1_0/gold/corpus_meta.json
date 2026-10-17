@@ -1,0 +1,20 @@
+{
+  "n_cases": 360,
+  "n_utterances": 467,
+  "by_family": {
+    "curve_placement": 47,
+    "display_configuration": 19,
+    "intervals": 45,
+    "relational_targeting": 60,
+    "fills": 55,
+    "composition": 71,
+    "ambiguity_unsupported": 63
+  },
+  "splits": {
+    "development": 219,
+    "validation": 71,
+    "held_out": 70
+  },
+  "corpus_sha256": "4a2c68ba839f7a8faf57fa4faf13680564d6e73f36bc4415238351ca57bd2d2c",
+  "well_ir_version": "1.0"
+}
