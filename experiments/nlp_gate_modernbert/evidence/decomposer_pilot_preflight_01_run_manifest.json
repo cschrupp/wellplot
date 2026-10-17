@@ -188,6 +188,7 @@
     "version": "decomposer_pilot_preflight_01.workspace_serialize.v1"
   },
   "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-PREFLIGHT-01-REWORK-AUTH-001",
+  "candidate_sha": "f5a9f1d947212cd0b2ea0fe588dc1409df126e7f",
   "failures": [
     "parity_failed:['xor_both', 'xor_text_whitespace_tab', 'xor_local_ref_whitespace_tab']",
     "token_level_constraint:Failed to build DFA number of DFA states exceeds limit of 2147483647"

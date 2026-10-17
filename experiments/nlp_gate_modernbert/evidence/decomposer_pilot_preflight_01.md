@@ -18,7 +18,7 @@ STARTING TIP:
 1d84071576704909c9dce7e24011eb813009201c
 
 CANDIDATE SHA:
-(pending commit)
+f5a9f1d947212cd0b2ea0fe588dc1409df126e7f
 
 TIP:
 (pending SHA-record commit)
