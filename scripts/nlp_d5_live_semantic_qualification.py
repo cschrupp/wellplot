@@ -27,22 +27,20 @@ from pathlib import Path
 from typing import Any
 
 from scripts import nlp_d4_live_acceptance as d4
+from wellplot.project_config import ProjectConfig, load_project_config
 
 D5_EXPERIMENT_VERSION = "WELLPLOT-NLP-D5-4"
 D5_DESIGN_CHECKPOINT = "1658c1593330620501baa4a551b965fa209cc95b"
 D5_ENGINE_CHECKPOINT = "51fd23fe18ca77c067b0cdf702f88a57ba4c457d"
 EXPECTED_PROVIDER = "openai_compat"
 EXPECTED_MODEL = "qwen3.6-35b-a3b"
-SERVER_ORIGIN = "http://192.168.2.140:8888"
-OPENAI_COMPAT_BASE_URL = f"{SERVER_ORIGIN}/v1"
-MODEL_CATALOG_URL = f"{OPENAI_COMPAT_BASE_URL}/models"
-PROPS_URL = f"{SERVER_ORIGIN}/props"
 EXPECTED_OPENAI_VERSION = "2.34.0"
 EXPECTED_SDK_MAX_RETRIES = 2
+EXPECTED_TIMEOUT_SECONDS = 900.0
+EXPECTED_CONCURRENCY = 1
+EXPECTED_STRUCTURED_OUTPUT = "json_schema"
 MAX_LOGICAL_CALLS = 45
 MAX_PHYSICAL_ATTEMPTS = 135
-CONCURRENCY = 1
-GENERATION_TIMEOUT_SECONDS = 900.0
 MAX_ENDPOINT_RESPONSE_BYTES = 1_048_576
 FROZEN_TURN_IDS = (
     "D4-C01:C01",
@@ -158,6 +156,7 @@ class D5Authorization:
     implementation_checkpoint: str
     authorization_id: str = ""
     campaign_id: str = ""
+    project_config_fingerprint_sha256: str = ""
     accepted_d5_engine_checkpoint: str = D5_ENGINE_CHECKPOINT
     accepted_d5_design_checkpoint: str = D5_DESIGN_CHECKPOINT
     provider: str = EXPECTED_PROVIDER
@@ -181,7 +180,12 @@ class D5Authorization:
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> D5Authorization:
         """Parse required authorization facts without deriving them locally."""
-        required = {"implementation_checkpoint", "authorization_id", "campaign_id"}
+        required = {
+            "implementation_checkpoint",
+            "authorization_id",
+            "campaign_id",
+            "project_config_fingerprint_sha256",
+        }
         missing = required - set(value)
         if missing:
             raise D5StaticPreflightError(f"authorization is missing: {sorted(missing)!r}")
@@ -189,6 +193,7 @@ class D5Authorization:
             implementation_checkpoint=str(value["implementation_checkpoint"]),
             authorization_id=str(value["authorization_id"]),
             campaign_id=str(value["campaign_id"]),
+            project_config_fingerprint_sha256=str(value["project_config_fingerprint_sha256"]),
             accepted_d5_engine_checkpoint=str(
                 value.get("accepted_d5_engine_checkpoint", D5_ENGINE_CHECKPOINT)
             ),
@@ -281,6 +286,22 @@ def _assert_hash(path: Path, expected: str, label: str) -> None:
         raise D5StaticPreflightError(f"{label} custody drifted")
 
 
+def _validate_project_config(project_config: ProjectConfig) -> None:
+    """Require the checked-in config to match the frozen D5 runtime contract."""
+    if project_config.provider.name != EXPECTED_PROVIDER:
+        raise D5StaticPreflightError("project provider contract drifted")
+    if project_config.provider.model != EXPECTED_MODEL:
+        raise D5StaticPreflightError("project model contract drifted")
+    if project_config.provider.timeout_seconds != EXPECTED_TIMEOUT_SECONDS:
+        raise D5StaticPreflightError("project timeout contract drifted")
+    if project_config.provider.max_retries != EXPECTED_SDK_MAX_RETRIES:
+        raise D5StaticPreflightError("project retry contract drifted")
+    if project_config.runtime.concurrency != EXPECTED_CONCURRENCY:
+        raise D5StaticPreflightError("project concurrency contract drifted")
+    if project_config.runtime.structured_output != EXPECTED_STRUCTURED_OUTPUT:
+        raise D5StaticPreflightError("project structured-output contract drifted")
+
+
 def _run_static_attestation(repo_root: Path) -> dict[str, Any]:
     """Run the accepted D5 attestation and reachability checks without network."""
     environment = {**os.environ, "PYTHONPATH": str(repo_root / "src")}
@@ -324,6 +345,13 @@ def _default_static_checks(
         raise D5StaticPreflightError("implementation checkpoint mismatch")
     if _git(repo_root, "status", "--porcelain"):
         raise D5StaticPreflightError("working tree is not clean")
+    project_config = load_project_config(repo_root)
+    _validate_project_config(project_config)
+    if (
+        not authorization.project_config_fingerprint_sha256
+        or authorization.project_config_fingerprint_sha256 != project_config.fingerprint_sha256
+    ):
+        raise D5StaticPreflightError("project configuration fingerprint mismatch")
     if authorization.accepted_d5_engine_checkpoint != D5_ENGINE_CHECKPOINT:
         raise D5StaticPreflightError("accepted D5 engine checkpoint drifted")
     if authorization.accepted_d5_design_checkpoint != D5_DESIGN_CHECKPOINT:
@@ -398,8 +426,12 @@ def _default_static_checks(
         "sdk_max_retries": retries,
         "logical_call_ceiling": MAX_LOGICAL_CALLS,
         "physical_attempt_upper_bound": MAX_PHYSICAL_ATTEMPTS,
-        "concurrency": CONCURRENCY,
-        "generation_timeout_seconds": GENERATION_TIMEOUT_SECONDS,
+        "concurrency": project_config.runtime.concurrency,
+        "generation_timeout_seconds": project_config.provider.timeout_seconds,
+        "project_config_fingerprint_sha256": project_config.fingerprint_sha256,
+        "server_origin": project_config.server_origin,
+        "model_catalog_url": project_config.model_catalog_url,
+        "props_url": project_config.props_url,
         "fallback": "NONE",
         "model_substitution": "FORBIDDEN",
         "d5_attestation": static_attestation,
@@ -964,6 +996,7 @@ class D5OperationalReadiness:
 def prepare_readiness(
     *,
     authorization: D5Authorization,
+    project_config: ProjectConfig,
     api_key_loader: Callable[[], str],
     endpoint_get: Callable[[str, str], object],
     static_preflight: Mapping[str, Any],
@@ -972,6 +1005,7 @@ def prepare_readiness(
     """Perform exactly two injectable identity observations after static checks."""
     if static_preflight.get("status") != "PASS":
         raise D5ReadinessError("static_preflight_failed", 0)
+    _validate_project_config(project_config)
     token = api_key_loader()
     if not isinstance(token, str) or not token.strip():
         raise D5ReadinessError("credential_unavailable", 0)
@@ -982,15 +1016,17 @@ def prepare_readiness(
         return endpoint_get(url, token)
 
     try:
-        catalog = _project_model_catalog(get(MODEL_CATALOG_URL), authorization.model)
-        props = _project_props(get(PROPS_URL), authorization.structured_output_contract)
+        catalog = _project_model_catalog(get(project_config.model_catalog_url), authorization.model)
+        props = _project_props(
+            get(project_config.props_url), authorization.structured_output_contract
+        )
         observed = {"model_catalog": catalog, **props}
         projection = validate_readiness_projection(observed, authorization)
     except D5ReadinessError as error:
         raise D5ReadinessError(error.reason, len(calls)) from None
     except Exception:
         raise D5ReadinessError("endpoint_unreachable", len(calls)) from None
-    if tuple(calls) != (MODEL_CATALOG_URL, PROPS_URL):
+    if tuple(calls) != (project_config.model_catalog_url, project_config.props_url):
         raise D5ReadinessError("endpoint_order_mismatch", len(calls))
     adapter = None
     if provider_factory is not None:
@@ -1071,6 +1107,7 @@ def create_live_adapter(
     repo_root: Path,
     artifact_root: Path,
     api_key: str,
+    project_config: ProjectConfig,
     http_client_factory: Callable[[Callable[[object], Any]], object] | None = None,
 ) -> _ObservedLiveAdapter:
     """Build the accepted canonical adapter with retry-visible HTTP transport."""
@@ -1079,6 +1116,7 @@ def create_live_adapter(
 
     from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
 
+    _validate_project_config(project_config)
     observer = _PhysicalAttemptObserver()
     http_client = (
         http_client_factory(observer.on_request)
@@ -1087,32 +1125,32 @@ def create_live_adapter(
     )
     client = AsyncOpenAI(
         api_key=api_key,
-        base_url=OPENAI_COMPAT_BASE_URL,
-        timeout=GENERATION_TIMEOUT_SECONDS,
-        max_retries=EXPECTED_SDK_MAX_RETRIES,
+        base_url=project_config.openai_compat_base_url,
+        timeout=project_config.provider.timeout_seconds,
+        max_retries=project_config.provider.max_retries,
         http_client=http_client,
     )
     backend = OpenAICompatibleBackendV2(
-        model=EXPECTED_MODEL,
+        model=project_config.provider.model,
         client=client,
-        structured_output="json_schema",
+        structured_output=project_config.runtime.structured_output,
     )
     calls: list[Any] = []
     ledger = d4.LogicalCallLedger()
     counted = d4.CountingBackend(
         delegate=backend,
-        provider=EXPECTED_PROVIDER,
-        model=EXPECTED_MODEL,
+        provider=project_config.provider.name,
+        model=project_config.provider.model,
         calls=calls,
         ledger=ledger,
     )
     session = d4.build_notebook_session(
         backend=counted,
-        provider=EXPECTED_PROVIDER,
-        model=EXPECTED_MODEL,
+        provider=project_config.provider.name,
+        model=project_config.provider.model,
         server_root=repo_root,
         credential_source="configured",
-        timeout=GENERATION_TIMEOUT_SECONDS,
+        timeout=project_config.provider.timeout_seconds,
     )
     inner = d4.D4CampaignAdapter(
         repo_root=repo_root,
@@ -1161,6 +1199,10 @@ def execute_live_campaign(
     """Run the explicit live path after static/readiness interlocks."""
     if artifact_root.resolve() != _authorized_artifact_root(repo_root, authorization):
         raise D5StaticPreflightError("artifact root is not authorized")
+    project_config = load_project_config(repo_root)
+    _validate_project_config(project_config)
+    if authorization.project_config_fingerprint_sha256 != project_config.fingerprint_sha256:
+        raise D5StaticPreflightError("project configuration fingerprint mismatch")
     paths = EvidencePaths(artifact_root, authorization.campaign_id)
     static = provider_free_preflight(
         repo_root,
@@ -1174,10 +1216,12 @@ def execute_live_campaign(
             repo_root=key_root,
             artifact_root=key_artifact_root,
             api_key=token,
+            project_config=project_config,
         )
     )
     readiness = prepare_readiness(
         authorization=authorization,
+        project_config=project_config,
         api_key_loader=load_key,
         endpoint_get=endpoint_get,
         static_preflight=static,
@@ -1458,10 +1502,16 @@ def provider_free_preflight(
     static_checker: Callable[[Path, D5Authorization, EvidencePaths], dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Run static D5-4 checks without credentials, endpoints, or providers."""
+    project_config = load_project_config(repo_root)
+    _validate_project_config(project_config)
+    if authorization.project_config_fingerprint_sha256 != project_config.fingerprint_sha256:
+        raise D5StaticPreflightError("project configuration fingerprint mismatch")
     checker = static_checker or _default_static_checks
     facts = checker(repo_root, authorization, paths)
     if facts.get("status") != "PASS":
         raise D5StaticPreflightError("provider-free static preflight failed")
+    static_facts = dict(facts)
+    static_facts.setdefault("project_config_fingerprint_sha256", project_config.fingerprint_sha256)
     return {
         "experiment_version": D5_EXPERIMENT_VERSION,
         "status": "PASS",
@@ -1473,7 +1523,7 @@ def provider_free_preflight(
         "provider_calls": 0,
         "endpoint_calls": 0,
         "model_calls": 0,
-        "static": facts,
+        "static": static_facts,
     }
 
 

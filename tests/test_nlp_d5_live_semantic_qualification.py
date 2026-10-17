@@ -6,6 +6,7 @@ import asyncio
 import hashlib
 import json
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -27,6 +28,7 @@ from tests.test_nlp_d4_live_acceptance import (
 from wellplot.agent.providers.base import ProviderRequestError, StructuredGenerationRequest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_CONFIG = d5.load_project_config(REPO_ROOT)
 
 
 def _props(*, chat_template: str = "qwen3") -> dict[str, object]:
@@ -59,6 +61,7 @@ def _authorization(
         implementation_checkpoint="synthetic-checkpoint",
         authorization_id="auth-test-001",
         campaign_id=campaign_id,
+        project_config_fingerprint_sha256=PROJECT_CONFIG.fingerprint_sha256,
         endpoint_identity={
             "model_catalog": [d5.EXPECTED_MODEL],
             "model_path_basename": "qwen3.6-35b-a3b.gguf",
@@ -219,9 +222,67 @@ def test_provider_free_preflight_is_network_free_and_fail_closed() -> None:
     with pytest.raises(d5.D5ReadinessError, match="static_preflight_failed"):
         d5.prepare_readiness(
             authorization=_authorization(),
+            project_config=PROJECT_CONFIG,
             api_key_loader=lambda: "secret-token",
             endpoint_get=endpoint_get,
             static_preflight={"status": "FAIL"},
+        )
+    assert endpoint_calls == []
+
+
+def test_project_config_fingerprint_mismatch_fails_before_static_boundary() -> None:
+    """A stale authorization cannot reach endpoint or provider readiness."""
+    checker_called = False
+
+    def checker(
+        repo_root: Path,
+        authorization: d5.D5Authorization,
+        artifact_paths: d5.EvidencePaths,
+    ) -> dict[str, Any]:
+        nonlocal checker_called
+        del repo_root, authorization, artifact_paths
+        checker_called = True
+        return {"status": "PASS"}
+
+    authorization = _authorization()
+    authorization = replace(authorization, project_config_fingerprint_sha256="0" * 64)
+    with pytest.raises(d5.D5StaticPreflightError, match="configuration fingerprint"):
+        d5.provider_free_preflight(
+            REPO_ROOT,
+            authorization,
+            _paths(REPO_ROOT / "tmp", "fingerprint-mismatch"),
+            static_checker=checker,
+        )
+    assert checker_called is False
+
+
+@pytest.mark.parametrize(
+    ("section", "field", "value"),
+    [
+        ("provider", "name", "other_provider"),
+        ("provider", "model", "other-model"),
+        ("provider", "timeout_seconds", 901),
+        ("provider", "max_retries", 3),
+        ("runtime", "concurrency", 2),
+        ("runtime", "structured_output", "text"),
+    ],
+)
+def test_project_runtime_drift_fails_before_endpoint_access(
+    section: str, field: str, value: object
+) -> None:
+    """Every frozen runtime invariant fails before credential or endpoint activity."""
+    section_config = getattr(PROJECT_CONFIG, section)
+    drifted_section = section_config.model_copy(update={field: value})
+    drifted_config = PROJECT_CONFIG.model_copy(update={section: drifted_section})
+    endpoint_calls: list[str] = []
+
+    with pytest.raises(d5.D5StaticPreflightError):
+        d5.prepare_readiness(
+            authorization=_authorization(),
+            project_config=drifted_config,
+            api_key_loader=lambda: "secret-token",
+            endpoint_get=lambda url, token: endpoint_calls.append(url),
+            static_preflight={"status": "PASS"},
         )
     assert endpoint_calls == []
 
@@ -232,17 +293,18 @@ def test_two_get_readiness_order_and_sanitized_projection() -> None:
 
     def endpoint_get(url: str, token: str) -> object:
         calls.append((url, token))
-        if url == d5.MODEL_CATALOG_URL:
+        if url == PROJECT_CONFIG.model_catalog_url:
             return {"data": [{"id": d5.EXPECTED_MODEL}]}
         return _props()
 
     result = d5.prepare_readiness(
         authorization=_authorization(),
+        project_config=PROJECT_CONFIG,
         api_key_loader=lambda: "secret-token",
         endpoint_get=endpoint_get,
         static_preflight={"status": "PASS"},
     )
-    assert [url for url, _ in calls] == [d5.MODEL_CATALOG_URL, d5.PROPS_URL]
+    assert [url for url, _ in calls] == [PROJECT_CONFIG.model_catalog_url, PROJECT_CONFIG.props_url]
     assert all(token == "secret-token" for _, token in calls)
     assert result.endpoint_calls == ("/v1/models", "/props")
     sanitized = json.dumps(result.projection.as_dict(), sort_keys=True)
@@ -271,19 +333,20 @@ def test_readiness_rejects_thinking_on_without_generation_probe() -> None:
     def endpoint_get(url: str, token: str) -> object:
         del token
         calls.append(url)
-        if url == d5.MODEL_CATALOG_URL:
+        if url == PROJECT_CONFIG.model_catalog_url:
             return {"data": [{"id": d5.EXPECTED_MODEL}]}
         return _props()
 
     with pytest.raises(d5.D5ReadinessError, match="thinking_off_not_established") as raised:
         d5.prepare_readiness(
             authorization=_authorization(thinking_off=False),
+            project_config=PROJECT_CONFIG,
             api_key_loader=lambda: "secret-token",
             endpoint_get=endpoint_get,
             static_preflight={"status": "PASS"},
         )
     assert raised.value.endpoint_calls == 2
-    assert calls == [d5.MODEL_CATALOG_URL, d5.PROPS_URL]
+    assert calls == [PROJECT_CONFIG.model_catalog_url, PROJECT_CONFIG.props_url]
 
 
 def test_credential_failure_is_retryable_before_endpoint_observation() -> None:
@@ -293,6 +356,7 @@ def test_credential_failure_is_retryable_before_endpoint_observation() -> None:
     with pytest.raises(d5.D5ReadinessError, match="credential_unavailable"):
         d5.prepare_readiness(
             authorization=_authorization(),
+            project_config=PROJECT_CONFIG,
             api_key_loader=lambda: "",
             endpoint_get=lambda url, token: calls.append(url),
             static_preflight={"status": "PASS"},
@@ -307,19 +371,20 @@ def test_identity_mismatch_is_bounded_after_two_gets() -> None:
     def endpoint_get(url: str, token: str) -> object:
         del token
         calls.append(url)
-        if url == d5.MODEL_CATALOG_URL:
+        if url == PROJECT_CONFIG.model_catalog_url:
             return {"data": [{"id": "wrong-model"}]}
         return _props()
 
     with pytest.raises(d5.D5ReadinessError, match="endpoint_identity_mismatch") as raised:
         d5.prepare_readiness(
             authorization=_authorization(),
+            project_config=PROJECT_CONFIG,
             api_key_loader=lambda: "secret-token",
             endpoint_get=endpoint_get,
             static_preflight={"status": "PASS"},
         )
     assert raised.value.endpoint_calls == 1
-    assert calls == [d5.MODEL_CATALOG_URL]
+    assert calls == [PROJECT_CONFIG.model_catalog_url]
 
 
 def test_runtime_defaults_drift_is_not_ready() -> None:
@@ -330,7 +395,7 @@ def test_runtime_defaults_drift_is_not_ready() -> None:
     def endpoint_get(url: str, token: str) -> object:
         del token
         calls.append(url)
-        if url == d5.MODEL_CATALOG_URL:
+        if url == PROJECT_CONFIG.model_catalog_url:
             return {"data": [{"id": d5.EXPECTED_MODEL}]}
         payload = _props()
         generation = payload["default_generation_settings"]
@@ -341,6 +406,7 @@ def test_runtime_defaults_drift_is_not_ready() -> None:
     with pytest.raises(d5.D5ReadinessError, match="runtime_defaults_mismatch"):
         d5.prepare_readiness(
             authorization=authorization,
+            project_config=PROJECT_CONFIG,
             api_key_loader=lambda: "secret-token",
             endpoint_get=endpoint_get,
             static_preflight={"status": "PASS"},
@@ -584,7 +650,7 @@ def test_execute_live_wiring_is_provider_free_with_injected_doubles(tmp_path: Pa
     def endpoint_get(url: str, token: str) -> object:
         assert token == "secret-token"
         endpoint_calls.append(url)
-        if url == d5.MODEL_CATALOG_URL:
+        if url == PROJECT_CONFIG.model_catalog_url:
             return {"data": [{"id": d5.EXPECTED_MODEL}]}
         return _props()
 
@@ -600,7 +666,7 @@ def test_execute_live_wiring_is_provider_free_with_injected_doubles(tmp_path: Pa
             provider_calls.append(token) or _RetryingAdapter(retry_count=0)
         ),
     )
-    assert endpoint_calls == [d5.MODEL_CATALOG_URL, d5.PROPS_URL]
+    assert endpoint_calls == [PROJECT_CONFIG.model_catalog_url, PROJECT_CONFIG.props_url]
     assert provider_calls == ["secret-token"]
     assert result["completed_turns"] == 9
     assert result["terminal"]["authorization_id"] == "auth-test-001"
@@ -783,6 +849,7 @@ def test_real_live_adapter_transport_retries_keep_one_logical_id(
             repo_root=server_root,
             artifact_root=server_root / "live",
             api_key="provider-free-test-token",
+            project_config=PROJECT_CONFIG,
             http_client_factory=_live_transport_factory(
                 retry_count=retry_count,
                 clients=clients,
@@ -812,6 +879,7 @@ def test_real_live_adapter_transport_retries_keep_one_logical_id(
         assert completed[0]["index"] == 1
         assert physical[: retry_count + 1] == [1] * (retry_count + 1)
         assert len(requests) == retry_count + 1
+        assert str(requests[0].url).startswith(PROJECT_CONFIG.openai_compat_base_url)
 
 
 def test_real_live_transport_physical_ceiling_fails_closed(
@@ -830,6 +898,7 @@ def test_real_live_transport_physical_ceiling_fails_closed(
             repo_root=server_root,
             artifact_root=server_root / "live",
             api_key="provider-free-test-token",
+            project_config=PROJECT_CONFIG,
             http_client_factory=_live_transport_factory(
                 retry_count=2,
                 clients=clients,
@@ -881,6 +950,7 @@ def test_real_live_provider_rejection_is_inconclusive_without_replay(
             repo_root=REPO_ROOT,
             artifact_root=artifact_root,
             api_key="provider-free-test-token",
+            project_config=PROJECT_CONFIG,
             http_client_factory=_live_transport_factory(
                 retry_count=0,
                 failure_mode="provider_rejection",
@@ -932,6 +1002,7 @@ def test_real_live_transport_exhaustion_is_not_semantic_failure(
             repo_root=REPO_ROOT,
             artifact_root=artifact_root,
             api_key="provider-free-test-token",
+            project_config=PROJECT_CONFIG,
             http_client_factory=_live_transport_factory(
                 retry_count=0,
                 failure_mode="transport",

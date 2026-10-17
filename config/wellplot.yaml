@@ -1,0 +1,10 @@
+schema_version: 1
+provider:
+  name: openai_compat
+  model: qwen3.6-35b-a3b
+  server_origin: http://192.168.2.141:8888
+  timeout_seconds: 900
+  max_retries: 2
+runtime:
+  concurrency: 1
+  structured_output: json_schema

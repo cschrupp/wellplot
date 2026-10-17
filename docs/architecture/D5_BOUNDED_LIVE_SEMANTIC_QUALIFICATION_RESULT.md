@@ -4,12 +4,12 @@
 
 ```yaml
 slice: WELLPLOT-D5-4
-authority: WELLPLOT-D5-4-LIVE-QUAL-IMPL-AUTH-001
+authority: WELLPLOT-RUNTIME-CONFIG-YAML-IMPL-AUTH-001
 frozen_design: 1658c1593330620501baa4a551b965fa209cc95b
 accepted_d5_3_engine: 51fd23fe18ca77c067b0cdf702f88a57ba4c457d
-branch: implementation/d5-4-bounded-live-semantic-qualification
-phase: PROVIDER_FREE_HARNESS_IMPLEMENTATION
-status: COMPLETE / READY FOR INDEPENDENT REWORK 3 REVIEW
+branch: implementation/project-runtime-config-yaml
+phase: PROJECT_RUNTIME_CONFIGURATION_REPAIR
+status: COMPLETE / READY FOR INDEPENDENT REVIEW
 live_qualification: NOT RUN / NOT AUTHORIZED
 production_promotion: NOT AUTHORIZED
 ```
@@ -20,17 +20,29 @@ endpoint is ready, or that a real campaign was executed.
 
 ## 1. Authorized Footprint
 
-The implementation changes only the three authorized files:
+The implementation changes only the authorized runtime-configuration files:
 
 ```text
+config/wellplot.yaml
+src/wellplot/project_config.py
+tests/test_project_config.py
 scripts/nlp_d5_live_semantic_qualification.py
 tests/test_nlp_d5_live_semantic_qualification.py
+docs/runtime-configuration.md
 docs/architecture/D5_BOUNDED_LIVE_SEMANTIC_QUALIFICATION_RESULT.md
 ```
 
-No production source, D4 fixture/gold, source asset, dependency lockfile,
-production manifest, accepted design document, provider implementation, or
-MCP adapter changed.
+No D4 fixture/gold, source asset, dependency lockfile, production manifest,
+accepted design document, provider implementation, or MCP adapter changed.
+
+The new `config/wellplot.yaml` is non-secret infrastructure configuration.
+`src/wellplot/project_config.py` validates it with a strict frozen Pydantic
+model, derives `/v1`, `/v1/models`, and `/props`, and computes a deterministic
+semantic SHA-256 fingerprint. D5 static preflight requires the external live
+authorization to carry that exact fingerprint before credentials or endpoint
+activity. The D5 adapter and readiness path consume the loaded config for the
+server origin, model, timeout, retries, concurrency, and structured-output
+contract; historical D4 endpoint constants and artifacts are unchanged.
 
 ## 2. Harness Contract Implemented
 
@@ -80,11 +92,18 @@ or model activity:
 
 ## 3. Provider-Free Validation
 
-Final focused harness validation:
+Focused configuration validation:
+
+```text
+tests/test_project_config.py
+19 passed
+```
+
+Final focused D5 harness validation:
 
 ```text
 tests/test_nlp_d5_live_semantic_qualification.py
-26 passed
+33 passed
 ```
 
 The deterministic rehearsal included in that suite proves:
@@ -156,3 +175,14 @@ model comparison
 prompt or decoder tuning
 production promotion
 ```
+
+## 5. Runtime Configuration Repair
+
+The earlier Gate-B readiness attempt used the historical `.140` endpoint and
+returned `NOT_READY` before `STARTED` was created. The campaign was therefore
+not consumed and no scientific result was produced. This implementation moves
+the operational endpoint into the canonical non-secret project configuration
+at `http://192.168.2.141:8888`; the D5 source no longer owns an endpoint
+literal. The refreshed authorization
+must pin the semantic configuration fingerprint before any future readiness
+attempt.
