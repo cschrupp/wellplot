@@ -22,7 +22,7 @@ CANDIDATE SHA:
 bce546960284be712e0d3b8f4d80d1eaec14e60f
 
 TIP:
-(pending SHA-record commit)
+6428c62e1d2010c2b2e6ede57dffdc717e07f3e7
 
 PRIMARY BACKEND FAMILY:
 XGrammar

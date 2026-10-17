@@ -4,7 +4,7 @@
   "stage": "A_PAPER_DOCS_COMPATIBILITY",
   "starting_tip": "b16b338bcdd1605f96cf026ecafde80907e57aa5",
   "candidate_sha": "bce546960284be712e0d3b8f4d80d1eaec14e60f",
-  "tip_sha": null,
+  "tip_sha": "6428c62e1d2010c2b2e6ede57dffdc717e07f3e7",
   "parent": {
     "slice": "DECOMPOSER-PILOT-PREFLIGHT-01R",
     "result": "FAIL",
