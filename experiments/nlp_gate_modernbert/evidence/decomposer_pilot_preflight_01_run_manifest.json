@@ -158,6 +158,7 @@
     "version": "decomposer_pilot_preflight_01.workspace_serialize.v1"
   },
   "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-PREFLIGHT-01-AUTH-001",
+  "candidate_sha": "4d140dc1c0805ee77dbb906ea3f2866cf15f1152",
   "failures": [],
   "generate_guard": [
     "GenerationMixin.generate_blocked"
