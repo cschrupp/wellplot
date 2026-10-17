@@ -3,7 +3,7 @@
   "slice": "DECOMPOSER-PILOT-CONSTRAINT-REDESIGN-01",
   "stage": "A_PAPER_DOCS_COMPATIBILITY",
   "starting_tip": "b16b338bcdd1605f96cf026ecafde80907e57aa5",
-  "candidate_sha": null,
+  "candidate_sha": "bce546960284be712e0d3b8f4d80d1eaec14e60f",
   "tip_sha": null,
   "parent": {
     "slice": "DECOMPOSER-PILOT-PREFLIGHT-01R",
