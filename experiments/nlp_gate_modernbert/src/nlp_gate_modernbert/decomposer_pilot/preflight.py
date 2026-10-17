@@ -1,4 +1,4 @@
-"""DECOMPOSER-PILOT-PREFLIGHT-01 orchestrator: pins + parity; model_calls=0; no generate."""
+"""DECOMPOSER-PILOT-PREFLIGHT-01R orchestrator: pins + parity; model_calls=0; no generate."""
 
 from __future__ import annotations
 
@@ -18,15 +18,15 @@ from nlp_gate_modernbert.decomposer_pilot import prompt_contract
 from nlp_gate_modernbert.decomposer_pilot import workspace_serialize
 from nlp_gate_modernbert.paths import EVIDENCE_DIR, SLM01_ROOT
 
-AUTH = "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-PREFLIGHT-01-AUTH-001"
-SLICE = "DECOMPOSER-PILOT-PREFLIGHT-01"
+AUTH = "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-PREFLIGHT-01-REWORK-AUTH-001"
+SLICE = "DECOMPOSER-PILOT-PREFLIGHT-01R"
 DESIGN_TIP = "d180050eddee5bb8e4f1a9a370fe1a8c83ddd7bc"
+PRIOR_PREFLIGHT_01_CANDIDATE = "4d140dc1c0805ee77dbb906ea3f2866cf15f1152"
+STARTING_TIP = "1d84071576704909c9dce7e24011eb813009201c"
 
-# Hard pins from PREFLIGHT interview freeze.
 REQUIRED_OUTLINES = "1.3.3"
 REQUIRED_OUTLINES_CORE = "0.2.14"
 
-# Global counter — preflight must leave this at 0.
 MODEL_CALLS = 0
 
 
@@ -57,7 +57,7 @@ def _install_generate_guard() -> list[str]:
 
     def _blocked(self, *args, **kwargs):  # noqa: ANN001
         raise GenerateForbiddenError(
-            "model.generate is forbidden during DECOMPOSER-PILOT-PREFLIGHT-01"
+            "model.generate is forbidden during DECOMPOSER-PILOT-PREFLIGHT-01R"
         )
 
     GenerationMixin.generate = _blocked  # type: ignore[method-assign]
@@ -142,12 +142,13 @@ def _handoff_md(
     *,
     result: str,
     candidate_sha: str | None,
-    starting_sha: str,
+    starting_tip: str,
+    tip_sha: str | None,
     failures: list[str],
     model_calls: int,
 ) -> str:
     fail_block = "\n".join(f"- {f}" for f in failures) if failures else "- (none)"
-    return f"""# DECOMPOSER-PILOT-PREFLIGHT-01 — STOP handoff
+    return f"""# DECOMPOSER-PILOT-PREFLIGHT-01R — STOP handoff
 
 ```
 SLICE:
@@ -159,11 +160,18 @@ AUTHORITY:
 PARENT DESIGN:
 decomposer_pilot_design_01 @ {DESIGN_TIP}
 
-STARTING SHA:
-{starting_sha}
+PRIOR PREFLIGHT-01 CANDIDATE:
+{PRIOR_PREFLIGHT_01_CANDIDATE}
+RESULT: REVISE
+
+STARTING TIP:
+{starting_tip}
 
 CANDIDATE SHA:
 {candidate_sha or "(pending commit)"}
+
+TIP:
+{tip_sha or "(pending SHA-record commit)"}
 
 MODEL CALLS:
 {model_calls}
@@ -177,9 +185,12 @@ RESULT:
 
 ## Claim
 
-PREFLIGHT-01 pins local Qwen provenance, XOR-patched constraint compile, parity,
-serializer/prompt/inference hashes. **PASS does not authorize DECOMPOSER-PILOT-01.**
-No `model.generate` / forward / download occurred.
+PREFLIGHT-01R PASS proves only that the pinned experimental machinery is
+reproducible and structurally viable. It provides **zero** model-performance
+evidence and does **not** authorize DECOMPOSER-PILOT-01.
+
+Rework corrections: R1 non-whitespace XOR pattern; R2 outlines_core token-guide
+construction (tokenizer-only); R3 serializer wording + patch/canonicalization pins.
 
 ## Failures
 
@@ -199,11 +210,12 @@ DECOMPOSER-PILOT-01:     NOT AUTHORIZED
 model.generate:          NOT AUTHORIZED
 model download:          NOT AUTHORIZED
 CFG fallback:            NOT AUTHORIZED
+backend swap:            NOT AUTHORIZED
 prompt sealed-six tune:  NOT AUTHORIZED
 ```
 
 STATUS:
-STOP FOR INDEPENDENT DECOMPOSER-PILOT-PREFLIGHT-01 REVIEW
+STOP FOR INDEPENDENT DECOMPOSER-PILOT-PREFLIGHT-01R REVIEW
 """
 
 
@@ -213,6 +225,7 @@ def run_preflight(
     snapshot_path: Path | None = None,
     starting_sha: str | None = None,
     skip_template_smoke: bool = False,
+    skip_token_guide: bool = False,
 ) -> dict[str, Any]:
     """Run all preflight pins; write four evidence artifacts; return result dict.
 
@@ -239,20 +252,31 @@ def run_preflight(
     constraint_meta: dict[str, Any] | None = None
     patched_bytes: bytes | None = None
     patched_schema: dict[str, Any] | None = None
+    patched_sha: str | None = None
     try:
         patched_schema, patched_bytes, raw_sha, patched_sha = cs.build_constraint_artifact()
         out_path = evidence / cs.CONSTRAINT_ARTIFACT_NAME
         out_path.write_bytes(patched_bytes)
+        # Re-read persisted bytes and verify hash (exact-artifact contract).
+        persisted = out_path.read_bytes()
+        persisted_sha = hashlib.sha256(persisted).hexdigest()
+        if persisted_sha != patched_sha:
+            raise RuntimeError(
+                f"persisted constraint hash mismatch after write: "
+                f"{persisted_sha} != {patched_sha}"
+            )
+        patched_bytes = persisted
         constraint_meta = {
             "path": str(out_path),
             "raw_pydantic_schema_sha256": raw_sha,
             "patched_constraint_schema_sha256": patched_sha,
             "constraint_source": (
                 "ClosedNormalizedProgram.model_json_schema() + XOR oneOf patch "
-                "on $defs.ClosedSemanticQuery"
+                "with pattern .*\\S.* on text/local_ref"
             ),
             "bytes_written": len(patched_bytes),
             "same_artifact_for_all_six": True,
+            **cs.constraint_identity(),
         }
     except Exception as exc:  # noqa: BLE001
         failures.append(f"constraint_schema:{exc}")
@@ -269,6 +293,10 @@ def run_preflight(
     parity_result: dict[str, Any] | None = None
     if patched_schema is not None:
         try:
+            # Prefer schema loaded from persisted artifact for parity.
+            persisted_path = evidence / cs.CONSTRAINT_ARTIFACT_NAME
+            if persisted_path.is_file():
+                patched_schema = json.loads(persisted_path.read_text(encoding="utf-8"))
             parity_result = parity_mod.run_parity_suite(
                 patched_schema=patched_schema,
                 outlines_compiled=outlines_compiled,
@@ -280,6 +308,39 @@ def run_preflight(
                 failures.append(f"parity_failed:{failed_ids}")
         except Exception as exc:  # noqa: BLE001
             failures.append(f"parity:{exc}")
+
+    token_level: dict[str, Any] | None = None
+    if (
+        not skip_token_guide
+        and patched_bytes is not None
+        and patched_sha is not None
+        and model_pin is not None
+    ):
+        try:
+            token_level = outlines_compile.construct_token_level_constraint(
+                persisted_schema_bytes=patched_bytes,
+                expected_schema_sha256=patched_sha,
+                snapshot_path=Path(model_pin["snapshot_path"]),
+            )
+            if token_level.get("construction") != "PASS":
+                failures.append("token_level_constraint:construction_not_pass")
+        except Exception as exc:  # noqa: BLE001
+            token_level = {
+                "backend": "outlines_core",
+                "construction": "FAIL",
+                "constraint_schema_sha256": patched_sha,
+                "tokenizer_snapshot": model_pin.get("snapshot_path"),
+                "local_files_only": True,
+                "model_weights_loaded": False,
+                "model_forward_calls": 0,
+                "model_generate_calls": 0,
+                "process_logits_invoked": False,
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+            }
+            failures.append(f"token_level_constraint:{exc}")
+    elif not skip_token_guide and model_pin is None:
+        failures.append("token_level_constraint:missing_model_pin")
 
     serializer_spec = workspace_serialize.serializer_spec()
     inference = inference_pins.inference_config_dict()
@@ -302,8 +363,8 @@ def run_preflight(
         failures.append(f"model_calls_nonzero:{MODEL_CALLS}")
 
     result = "PASS" if not failures else "FAIL"
-    sha = starting_sha
-    if sha is None:
+    sha = starting_sha or STARTING_TIP
+    if starting_sha is None:
         try:
             import subprocess
 
@@ -315,12 +376,15 @@ def run_preflight(
                 ).strip()
             )
         except Exception:  # noqa: BLE001
-            sha = "UNKNOWN"
+            sha = STARTING_TIP
 
     run_manifest: dict[str, Any] = {
         "authority": AUTH,
         "slice": SLICE,
         "parent_design_tip": DESIGN_TIP,
+        "prior_candidate": PRIOR_PREFLIGHT_01_CANDIDATE,
+        "prior_preflight_01_result": "REVISE",
+        "starting_tip": STARTING_TIP,
         "starting_sha": sha,
         "result": result,
         "model_calls": MODEL_CALLS,
@@ -332,7 +396,7 @@ def run_preflight(
         "SOFTWARE": software,
         "CONSTRAINT": {
             **(constraint_meta or {}),
-            "backend": "Outlines JsonSchema via HF Transformers (compile-only in preflight)",
+            "backend": "Outlines outlines_core via HF Transformers tokenizer path",
             "backend_versions": {
                 "outlines": software.get("outlines"),
                 "outlines_core": software.get("outlines_core"),
@@ -340,6 +404,7 @@ def run_preflight(
             "outlines_compile": outlines_att,
             "parity_pass": (parity_result or {}).get("pass"),
         },
+        "TOKEN_LEVEL_CONSTRAINT": token_level,
         "PROMPT": prompt_manifest,
         "WORKSPACE_SERIALIZATION": serializer_spec,
         "INFERENCE": {
@@ -353,8 +418,10 @@ def run_preflight(
             "no_backend_swap": True,
             "no_cfg_fallback": True,
             "no_sealed_six_prompt_tuning": True,
+            "model_weights_loaded": False,
             "template_smoke": template_smoke,
             "slm01_root": str(SLM01_ROOT),
+            "rework": ["R1_nonempty_pattern", "R2_token_guide", "R3_provenance_pins"],
         },
     }
 
@@ -370,7 +437,8 @@ def run_preflight(
     md = _handoff_md(
         result=result,
         candidate_sha=None,
-        starting_sha=sha,
+        starting_tip=STARTING_TIP,
+        tip_sha=None,
         failures=failures,
         model_calls=MODEL_CALLS,
     )
@@ -383,6 +451,7 @@ def run_preflight(
         "evidence_dir": str(evidence),
         "run_manifest": run_manifest,
         "parity": parity_result,
+        "token_level": token_level,
     }
 
 
@@ -393,13 +462,24 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--evidence-dir", type=Path, default=None)
     parser.add_argument("--snapshot", type=Path, default=None)
     parser.add_argument("--skip-template-smoke", action="store_true")
+    parser.add_argument("--skip-token-guide", action="store_true")
     args = parser.parse_args(argv)
     out = run_preflight(
         evidence_dir=args.evidence_dir,
         snapshot_path=args.snapshot,
         skip_template_smoke=args.skip_template_smoke,
+        skip_token_guide=args.skip_token_guide,
     )
-    print(json.dumps({"result": out["result"], "failures": out["failures"], "model_calls": out["model_calls"]}, indent=2))
+    print(
+        json.dumps(
+            {
+                "result": out["result"],
+                "failures": out["failures"],
+                "model_calls": out["model_calls"],
+            },
+            indent=2,
+        )
+    )
     return 0 if out["result"] == "PASS" else 1
 
 

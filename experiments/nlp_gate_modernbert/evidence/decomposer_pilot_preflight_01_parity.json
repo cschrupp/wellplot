@@ -1,6 +1,6 @@
 {
-  "pass": true,
-  "probe_count": 9,
+  "pass": false,
+  "probe_count": 19,
   "probes": [
     {
       "diagnostic": {
@@ -34,13 +34,13 @@
       "diagnostic": {
         "jsonschema": "jsonschema_reject:{'kind': 'curve', 'text': 'GR', 'local_ref': '$t'} is not valid under any of the given schemas",
         "jsonschema_pass": true,
-        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
-        "outlines_pass": true
+        "outlines": "outlines_accept",
+        "outlines_pass": false
       },
       "expected": "REJECT",
       "observed": "REJECT",
-      "observed_outlines": "REJECT",
-      "pass": true,
+      "observed_outlines": "ACCEPT",
+      "pass": false,
       "probe_id": "xor_both",
       "stage": "xor"
     },
@@ -57,6 +57,146 @@
       "pass": true,
       "probe_id": "xor_neither",
       "stage": "xor"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:'' does not match '.*\\\\S.*'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "xor_text_empty",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:' ' does not match '.*\\\\S.*'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "xor_text_whitespace_space",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:'   ' does not match '.*\\\\S.*'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "xor_text_whitespace_spaces",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:'\\t' does not match '.*\\\\S.*'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_accept",
+        "outlines_pass": false
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "ACCEPT",
+      "pass": false,
+      "probe_id": "xor_text_whitespace_tab",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:'' does not match '.*\\\\S.*'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "xor_local_ref_empty",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:' ' does not match '.*\\\\S.*'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "xor_local_ref_whitespace_space",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:'   ' does not match '.*\\\\S.*'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "xor_local_ref_whitespace_spaces",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:'\\t' does not match '.*\\\\S.*'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_accept",
+        "outlines_pass": false
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "ACCEPT",
+      "pass": false,
+      "probe_id": "xor_local_ref_whitespace_tab",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_accept",
+        "jsonschema_pass": true,
+        "outlines": "outlines_accept",
+        "outlines_pass": true
+      },
+      "expected": "ACCEPT",
+      "observed": "ACCEPT",
+      "observed_outlines": "ACCEPT",
+      "pass": true,
+      "probe_id": "xor_text_surrounded_whitespace",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_accept",
+        "jsonschema_pass": true,
+        "outlines": "outlines_accept",
+        "outlines_pass": true
+      },
+      "expected": "ACCEPT",
+      "observed": "ACCEPT",
+      "observed_outlines": "ACCEPT",
+      "pass": true,
+      "probe_id": "xor_local_ref_surrounded_whitespace",
+      "stage": "xor_nonempty"
     },
     {
       "diagnostic": {

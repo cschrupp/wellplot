@@ -21,9 +21,10 @@ _TOP_LEVEL_KEYS = (
 
 
 def _curve_sort_key(c: Mapping[str, Any]) -> tuple[str, str]:
+    """Q5 freeze: (id, handle-or-empty). Missing id sorts as empty string."""
     cid = c.get("id")
     handle = c.get("handle")
-    primary = str(cid) if cid is not None else (str(handle) if handle is not None else "")
+    primary = str(cid) if cid is not None else ""
     secondary = str(handle) if handle is not None else ""
     return (primary, secondary)
 
@@ -33,7 +34,7 @@ def serialize_projected_workspace(workspace: Mapping[str, Any] | Any) -> str:
 
     - omit fixture_id (harness-only)
     - exclude_none
-    - tracks sorted by ref; curves by (id or handle); fills by ref
+    - tracks sorted by ref; curves by (id, handle-or-empty); fills by ref
     - preserve nested array order (aliases, track.curves, supported_depth_units)
     - sort_keys=True, separators=(",",":"), ensure_ascii=False
     """
@@ -85,7 +86,7 @@ def serializer_spec() -> dict[str, Any]:
         "omit_fields": ["fixture_id"],
         "exclude_none": True,
         "sort_tracks_by": "ref",
-        "sort_curves_by": "(id or handle)",
+        "sort_curves_by": "(id, handle-or-empty)",
         "sort_fills_by": "ref",
         "preserve_nested_array_order": [
             "aliases",

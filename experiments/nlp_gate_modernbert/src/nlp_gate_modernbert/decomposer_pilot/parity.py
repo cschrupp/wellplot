@@ -52,6 +52,7 @@ def _create_track_program() -> dict[str, Any]:
 def probe_instances() -> list[dict[str, Any]]:
     """Canonical probe payloads (dict form)."""
     return [
+        # Core XOR
         {
             "probe_id": "xor_text_only",
             "expected": "ACCEPT",
@@ -62,7 +63,9 @@ def probe_instances() -> list[dict[str, Any]]:
             "probe_id": "xor_local_ref_only",
             "expected": "ACCEPT",
             "stage": "xor",
-            "instance": _minimal_program(query={"kind": "track", "local_ref": "$petrophysics"}),
+            "instance": _minimal_program(
+                query={"kind": "track", "local_ref": "$petrophysics"}
+            ),
         },
         {
             "probe_id": "xor_both",
@@ -78,6 +81,70 @@ def probe_instances() -> list[dict[str, Any]]:
             "stage": "xor",
             "instance": _minimal_program(query={"kind": "curve"}),
         },
+        # Non-whitespace / presence (R1)
+        {
+            "probe_id": "xor_text_empty",
+            "expected": "REJECT",
+            "stage": "xor_nonempty",
+            "instance": _minimal_program(query={"kind": "curve", "text": ""}),
+        },
+        {
+            "probe_id": "xor_text_whitespace_space",
+            "expected": "REJECT",
+            "stage": "xor_nonempty",
+            "instance": _minimal_program(query={"kind": "curve", "text": " "}),
+        },
+        {
+            "probe_id": "xor_text_whitespace_spaces",
+            "expected": "REJECT",
+            "stage": "xor_nonempty",
+            "instance": _minimal_program(query={"kind": "curve", "text": "   "}),
+        },
+        {
+            "probe_id": "xor_text_whitespace_tab",
+            "expected": "REJECT",
+            "stage": "xor_nonempty",
+            "instance": _minimal_program(query={"kind": "curve", "text": "\t"}),
+        },
+        {
+            "probe_id": "xor_local_ref_empty",
+            "expected": "REJECT",
+            "stage": "xor_nonempty",
+            "instance": _minimal_program(query={"kind": "track", "local_ref": ""}),
+        },
+        {
+            "probe_id": "xor_local_ref_whitespace_space",
+            "expected": "REJECT",
+            "stage": "xor_nonempty",
+            "instance": _minimal_program(query={"kind": "track", "local_ref": " "}),
+        },
+        {
+            "probe_id": "xor_local_ref_whitespace_spaces",
+            "expected": "REJECT",
+            "stage": "xor_nonempty",
+            "instance": _minimal_program(query={"kind": "track", "local_ref": "   "}),
+        },
+        {
+            "probe_id": "xor_local_ref_whitespace_tab",
+            "expected": "REJECT",
+            "stage": "xor_nonempty",
+            "instance": _minimal_program(query={"kind": "track", "local_ref": "\t"}),
+        },
+        {
+            "probe_id": "xor_text_surrounded_whitespace",
+            "expected": "ACCEPT",
+            "stage": "xor_nonempty",
+            "instance": _minimal_program(query={"kind": "curve", "text": " GR "}),
+        },
+        {
+            "probe_id": "xor_local_ref_surrounded_whitespace",
+            "expected": "ACCEPT",
+            "stage": "xor_nonempty",
+            "instance": _minimal_program(
+                query={"kind": "track", "local_ref": " $track "}
+            ),
+        },
+        # Regression
         {
             "probe_id": "regression_unknown_field",
             "expected": "REJECT",
@@ -148,7 +215,6 @@ def _outlines_accepts(compiled: Any, instance: Any) -> tuple[bool, str]:
         compiled.validate(text)
         return True, "outlines_accept"
     except Exception as exc:  # noqa: BLE001
-        # Outlines dumps the full compiled regex into ValueError; keep evidence compact.
         msg = str(exc)
         if len(msg) > 240:
             msg = msg[:240] + "…[truncated]"
@@ -178,7 +244,6 @@ def run_parity_suite(
             observed_outlines = "ACCEPT" if ol_ok else "REJECT"
             outlines_pass = observed_outlines == expected
 
-        # Conjunctive: jsonschema must match expected; Outlines must match when compiled.
         probe_pass = js_pass and (outlines_pass if outlines_pass is not None else True)
         if not probe_pass:
             all_pass = False
