@@ -10,7 +10,9 @@ accepted_d5_3_engine: 51fd23fe18ca77c067b0cdf702f88a57ba4c457d
 branch: implementation/project-runtime-config-yaml
 phase: PROJECT_RUNTIME_CONFIGURATION_REPAIR
 status: COMPLETE / READY FOR INDEPENDENT REVIEW
-live_qualification: NOT RUN / NOT AUTHORIZED
+live_qualification: AUTHORIZED / NOT RUN / PAUSED FOR CONFIG REPAIR REVIEW
+campaign_started: NO
+campaign_consumed: NO
 production_promotion: NOT AUTHORIZED
 ```
 
@@ -163,13 +165,19 @@ or model generation was attempted.
 ## 4. Governance Boundary
 
 The harness is ready for independent implementation review at the exact
-candidate commit. The next separate authority may address live readiness and
-the single frozen scientific campaign. This implementation does not authorize:
+candidate commit. Human Gate B authorization already exists under
+`WELLPLOT-D5-4-LIVE-RUN-AUTH-001`. The earlier readiness attempt returned
+`NOT_READY` before `STARTED` was created, so the scientific campaign remains
+unconsumed. This configuration repair requires independent acceptance before
+the execution record is refreshed. After acceptance, the existing execution
+authority continues without a new human Gate-B confirmation; the refreshed
+machine record is custody, not a new decision. This implementation does not
+execute or consume that authority:
 
 ```text
 Qwen generation
-real /v1/models or /props calls
-live qualification
+real /v1/models or /props calls from this provider-free validation
+live qualification from this provider-free validation
 MCP live qualification
 model comparison
 prompt or decoder tuning
@@ -183,6 +191,5 @@ returned `NOT_READY` before `STARTED` was created. The campaign was therefore
 not consumed and no scientific result was produced. This implementation moves
 the operational endpoint into the canonical non-secret project configuration
 at `http://192.168.2.141:8888`; the D5 source no longer owns an endpoint
-literal. The refreshed authorization
-must pin the semantic configuration fingerprint before any future readiness
-attempt.
+literal. The refreshed execution record must pin the semantic configuration
+fingerprint before the already-authorized readiness attempt.

@@ -109,6 +109,42 @@ runtime:
         load_project_config(tmp_path, _write_config(tmp_path, payload))
 
 
+@pytest.mark.parametrize("port", ["abc", "-1", "65536"])
+def test_server_origin_rejects_invalid_ports(tmp_path: Path, port: str) -> None:
+    """Malformed and out-of-range ports fail closed."""
+    payload = f"""schema_version: 1
+provider:
+  name: openai_compat
+  model: qwen3.6-35b-a3b
+  server_origin: http://host:{port}
+  timeout_seconds: 900
+  max_retries: 2
+runtime:
+  concurrency: 1
+  structured_output: json_schema
+"""
+    with pytest.raises((ValidationError, ValueError)):
+        load_project_config(tmp_path, _write_config(tmp_path, payload))
+
+
+@pytest.mark.parametrize("port", ["1", "8888", "65535"])
+def test_server_origin_accepts_valid_ports(tmp_path: Path, port: str) -> None:
+    """Valid ports remain accepted at the boundaries and project default."""
+    payload = f"""schema_version: 1
+provider:
+  name: openai_compat
+  model: qwen3.6-35b-a3b
+  server_origin: http://host:{port}
+  timeout_seconds: 900
+  max_retries: 2
+runtime:
+  concurrency: 1
+  structured_output: json_schema
+"""
+    config = load_project_config(tmp_path, _write_config(tmp_path, payload))
+    assert config.server_origin == f"http://host:{port}"
+
+
 @pytest.mark.parametrize("missing", ["schema_version", "provider", "server_origin"])
 def test_required_configuration_values_are_rejected(tmp_path: Path, missing: str) -> None:
     """Required top-level and nested values cannot silently default."""

@@ -26,6 +26,10 @@ def _normalize_server_origin(value: str) -> str:
         raise ValueError("server_origin must not contain credentials, query, or fragment")
     if parsed.path not in {"", "/"}:
         raise ValueError("server_origin must not contain a path")
+    try:
+        _ = parsed.port
+    except ValueError as error:
+        raise ValueError("server_origin contains an invalid port") from error
     return value.rstrip("/")
 
 
