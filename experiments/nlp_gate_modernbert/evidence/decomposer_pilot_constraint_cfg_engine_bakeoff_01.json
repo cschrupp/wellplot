@@ -3,7 +3,7 @@
   "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01",
   "mode": "BOUNDED_ENGINE_BAKEOFF",
   "starting_tip": "928d77672afcbb00cc514940b5ce3935847496ee",
-  "candidate_sha": "(pending commit)",
+  "candidate_sha": "0fd552bc527aa56b68fa17220288530e02471316",
   "tip_sha": "(pending SHA-record commit)",
   "model_calls": 0,
   "model_weights_loaded": false,
