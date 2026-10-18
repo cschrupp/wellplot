@@ -3,7 +3,7 @@
   "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01",
   "mode": "DESIGN_INTERVIEW_ONLY",
   "starting_tip": "9d4318953b28de651429983b2d097ed0707fa545",
-  "candidate_sha": null,
+  "candidate_sha": "d441534e97954a2e5f74c047c9be64b550ac5f1e",
   "tip_sha": null,
   "parent": {
     "slice": "DECOMPOSER-PILOT-CONSTRAINT-REDESIGN-01R",
