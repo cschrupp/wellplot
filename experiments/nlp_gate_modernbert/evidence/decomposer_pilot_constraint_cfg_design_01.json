@@ -1,28 +1,31 @@
 {
   "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01-REWORK-AUTH-001",
-  "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01R",
-  "mode": "DESIGN_INTERVIEW_ONLY",
-  "starting_tip": "81c76ecfd58c440add469c57fe692a21acd8d9e4",
-  "prior_candidate": "d441534e97954a2e5f74c047c9be64b550ac5f1e",
+  "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01R2",
+  "mode": "DESIGN_EVIDENCE_ONLY_CORRECTION",
+  "starting_tip": "5a753e485491b9c32331122ef248a01aa0bf0cc3",
+  "prior_candidate": "9d785e55f29fb3d2809c445b422c0a5c5af6ee6d",
   "prior_result": "REVISE",
-  "candidate_sha": "9d785e55f29fb3d2809c445b422c0a5c5af6ee6d",
-  "tip_sha": "77908665c66a50b322421f959bf8cbeba84b2b01",
-  "parent": {
-    "slice": "DECOMPOSER-PILOT-CONSTRAINT-REDESIGN-01R",
-    "status": "ACCEPTED_CLOSED",
-    "xgrammar_json_schema_route": "REJECTED",
-    "candidate_sha": "b249b810908cbc0283e62f18e8780a4a4f7144d3"
-  },
-  "rework": {
-    "R1": "Fully specify WELL-EBNF-1 metasyntax (byte-level dialect)",
-    "R2": "Remove WELL-EBNF-1 specification from Human gates (SOL authority)",
-    "R3": "Resolve Q6/T15: grammar = strict JSON-number syntax (no NaN/Infinity); freeze = finite/value validity",
-    "R4": "State global grammar-language relation and permitted canonical lexical narrowing",
-    "R5": "Update md/json closeout consistently"
-  },
-  "findings_addressed": [
+  "prior_findings_closed": [
     "F001",
     "F002"
+  ],
+  "candidate_sha": "(pending commit)",
+  "tip_sha": "(pending SHA-record commit)",
+  "parent": {
+    "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01R",
+    "status": "REVISE",
+    "candidate_sha": "9d785e55f29fb3d2809c445b422c0a5c5af6ee6d",
+    "note": "F001/F002 closed; F003/F004 open"
+  },
+  "corrective_scope": {
+    "F003": "Make JSON well_ebnf_1 metasyntax exactly match Markdown (Primary / Suffix)",
+    "F004": "Freeze one canonical rule-order algorithm (no topological alternative)",
+    "CHARCLASS": "Raw '-' is range syntax only; literal U+002D MUST be emitted as \\u002D",
+    "R5": "MD and JSON express the same normative metasyntax"
+  },
+  "findings_addressed": [
+    "F003",
+    "F004"
   ],
   "model_calls": 0,
   "claims": {
@@ -32,7 +35,9 @@
     "tokenizer_compatibility_proven": false,
     "model_capability": false,
     "pilot_01_authorized": false,
-    "well_ebnf_1_metasyntax_specified": true
+    "well_ebnf_1_metasyntax_specified": true,
+    "md_json_metasyntax_congruent": true,
+    "canonical_rule_order_unique": true
   },
   "unauthorized": [
     "grammar_implementation",
@@ -71,9 +76,11 @@
       "grammar": "canonical structural + lexical generation surface as frozen",
       "json_parse": "materialize JSON values from admitted texts",
       "freeze_candidate": "authoritative closed-model validation, canonicalization, finite numeric rejection"
-    }
+    },
+    "pipeline": "schema → one canonical WELL-EBNF-1 → zero or more backend-specific deterministic lowerings"
   },
   "numeric_lexical_authority": {
+    "status": "ACCEPTED_UNCHANGED",
     "grammar_admits": "strict JSON-number lexical syntax as in ECMA-404 / RFC 8259 number production (optional minus; int; optional frac; optional exp)",
     "grammar_rejects": [
       "NaN",
@@ -87,7 +94,7 @@
     "freeze_admits_or_rejects": "finite representability and ClosedNormalizedProgram field validity after parse; overflow-to-inf lexemes such as 1e309 may be syntactically grammar-legal JSON numbers and are decided by freeze_candidate/json.dumps(allow_nan=False) path",
     "harness_note": "freeze.py uses json.dumps(..., allow_nan=False); harness rejects non-finite canonicalization",
     "q6_clarification": "Q6 'full numeric lexical fidelity' means full strict JSON-number spelling surface under the pinned path, NOT Python json.loads nonstandard NaN/Infinity aliases",
-    "t15_unchanged_except_clarity": "integer vs number still derived from schema + pinned authoritative acceptance; integer sites must not invent convenience regex that contradicts pinned path"
+    "t15_unchanged_except_clarity": "integer vs number still derived from schema + pinned authoritative acceptance; integer sites must not invent convenience regex that contradicts pinned path; current patched schema has no integer sites — future integer constructs fail closed until exact mapping is needed"
   },
   "well_ebnf_1": {
     "dialect_id": "WELL-EBNF-1",
@@ -101,26 +108,25 @@
     "host_code": "FORBIDDEN",
     "engine_directives": "FORBIDDEN",
     "byte_level_metasyntax": {
-      "grammar_file": "Rule (LF Rule)* LF",
-      "Rule": "Identifier SP '::=' SP Expression SP ';' ",
+      "GrammarFile": "Rule (LF Rule)* LF",
+      "Rule": "Identifier SP '::=' SP Expression SP ';'",
       "note_rule_line": "Each Rule occupies exactly one physical line. No line wrapping.",
       "Identifier": "[A-Za-z_][A-Za-z0-9_]*",
       "reserved_identifiers": [],
       "Expression": "Sequence (SP '|' SP Sequence)*",
       "Sequence": "Atom (SP Atom)*",
-      "Atom": "Identifier | Literal | CharClass | '(' Expression ')' | AtomSuffix",
-      "AtomSuffix_note": "Suffix operators bind to the immediately preceding Atom only (Identifier, Literal, CharClass, or Group). Written without space before the suffix.",
-      "optional": "Atom '?'",
-      "zero_or_more": "Atom '*'",
-      "one_or_more": "Atom '+'",
-      "bounded_repeat": "Atom '{' UnsignedInt ',' UnsignedInt '}'",
-      "bounded_repeat_semantics": "Atom{m,n} means between m and n inclusive repetitions of Atom; require 0 <= m <= n; n must be finite",
-      "UnsignedInt": "0 | [1-9][0-9]*",
+      "Atom": "Primary Suffix?",
+      "Primary": "Identifier | Literal | CharClass | '(' Expression ')'",
+      "Suffix": "'?' | '*' | '+' | '{' UnsignedInt ',' UnsignedInt '}'",
+      "suffix_binding": "Suffix operators bind to the immediately preceding Primary with no space before the suffix",
+      "bounded_repeat_semantics": "Primary{m,n} means between m and n inclusive repetitions of Primary; require 0 <= m <= n; n must be finite",
+      "UnsignedInt": "'0' | [1-9][0-9]*",
       "Literal": "'\"' LitChar* '\"'",
       "LitChar": "unescaped Unicode scalar except U+0000..U+001F, U+0022, U+005C | Escape",
       "CharClass": "'[' '^'? ClassItem+ ']'",
       "ClassItem": "ClassAtom | ClassAtom '-' ClassAtom",
       "ClassAtom": "unescaped Unicode scalar except U+0000..U+001F, U+005D, U+005C, U+002D | Escape",
+      "hyphen_in_charclass": "Raw '-' is range syntax only. Literal U+002D inside a class MUST be emitted as \\u002D. First/last placement of raw '-' as a literal is FORBIDDEN.",
       "Escape": "'\\\\' ( '\\\\' | '\"' | 'n' | 'r' | 't' | 'u' Hex4 | 'U' Hex8 )",
       "Hex4": "[0-9A-Fa-f]{4}",
       "Hex8": "[0-9A-Fa-f]{8}",
@@ -135,9 +141,9 @@
         "blank lines between rules"
       ]
     },
-    "rule_ordering": "Rules MUST appear in deterministic generator-defined order: (1) START first if present as Identifier START; (2) then productions sorted by Identifier lexicographic UTF-8 byte order; OR generator emits a pinned topological order documented in generator provenance. The chosen ordering algorithm MUST be recorded in T18 provenance as rule_order_spec and must be pure.",
-    "rule_order_spec_default": "START first; remaining Identifiers ascending by UTF-8 code unit sequence",
-    "start_symbol": "The grammar MUST contain exactly one production with Identifier START. START ::= ClosedNormalizedProgram ;  (or the root object nonterminal name if ClosedNormalizedProgram is inlined—but T16 requires sole entry START).",
+    "rule_ordering": "SOLE canonical algorithm for WELL-EBNF-1 v1 source bytes: (1) START first; (2) all remaining Identifiers ascending by UTF-8 byte sequence. No alternative topological ordering in the canonical WELL-EBNF-1 source artifact. Backend-specific reordering belongs only to a separately hashed deterministic engine-native lowering.",
+    "rule_order_spec": "START first; remaining Identifiers ascending by UTF-8 byte sequence",
+    "start_symbol": "The grammar MUST contain exactly one production with Identifier START. START ::= ClosedNormalizedProgram ;  (T16 requires sole entry START).",
     "equivalence": "Two WELL-EBNF-1 files define the same dialect text iff their UTF-8 bytes are identical after the formatting rules above."
   },
   "decisions": {
@@ -195,8 +201,9 @@
     "T11_metalanguage": {
       "status": "FROZEN",
       "choice": "WELL-EBNF-1",
-      "summary": "Complete byte-level metasyntax specified in well_ebnf_1 (R1); no longer deferred to Human",
-      "rework_R1": true
+      "summary": "Complete byte-level metasyntax; md/json congruent (F003); sole rule-order algorithm (F004)",
+      "rework_R1": true,
+      "corrective_01R2": true
     },
     "T12_bool_null": {
       "status": "FROZEN",
@@ -212,7 +219,7 @@
     },
     "T15_integer_vs_number": {
       "status": "FROZEN",
-      "summary": "Schema-driven; number uses R3-clarified Q6; integer uses pinned authoritative integer language; FAIL if unrepresentable",
+      "summary": "Schema-driven; number uses R3-clarified Q6; integer uses pinned authoritative integer language; FAIL if unrepresentable; no integer sites in current patched schema",
       "rework_R3": true
     },
     "T16_root": {
@@ -225,7 +232,7 @@
     },
     "T18_provenance": {
       "status": "FROZEN",
-      "summary": "Full provenance including well_ebnf_1.version and rule_order_spec"
+      "summary": "Full provenance including well_ebnf_1.version and rule_order_spec (sole algorithm: START first then UTF-8 ascending)"
     },
     "T19_generator_fail": {
       "status": "FROZEN",
@@ -237,7 +244,7 @@
     },
     "T21_closeout_artifacts": {
       "status": "FROZEN",
-      "summary": "Paired md+json; this rework updates both"
+      "summary": "Paired md+json; this corrective rework updates both"
     }
   },
   "json_number_production_normative_sketch": {
@@ -291,7 +298,8 @@
       "preserve Q2–Q10 and T15 (with R3 numeric clarification)",
       "fail closed on unsupported/compile/tokenizer/resource failure",
       "pin engine/tokenizer/grammar/lowering/config/compile/resource evidence in future probe",
-      "demonstrate practical constructibility under bounded documented resource envelope"
+      "demonstrate practical constructibility under bounded documented resource envelope",
+      "if backend reordering is needed, emit a separately hashed deterministic engine-native lowering; do not alter canonical WELL-EBNF-1 source bytes"
     ],
     "candidates_not_selected": [
       "XGrammar grammar mode",

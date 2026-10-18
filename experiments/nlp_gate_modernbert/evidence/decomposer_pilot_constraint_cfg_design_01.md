@@ -1,31 +1,31 @@
-# DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01R — Design closeout (rework)
+# DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01R2 — Design closeout (corrective rework)
 
 ```
 SLICE:
-DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01R
+DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01R2
 
 AUTHORITY:
 WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01-REWORK-AUTH-001
 
 MODE:
-DESIGN / INTERVIEW ONLY
+DESIGN / EVIDENCE-ONLY CORRECTION
 
 PRIOR CANDIDATE:
-d441534e97954a2e5f74c047c9be64b550ac5f1e
-RESULT: REVISE
+9d785e55f29fb3d2809c445b422c0a5c5af6ee6d
+RESULT: REVISE (F003, F004)
 
 STARTING TIP:
-81c76ecfd58c440add469c57fe692a21acd8d9e4
+5a753e485491b9c32331122ef248a01aa0bf0cc3
 
 CANDIDATE SHA:
-9d785e55f29fb3d2809c445b422c0a5c5af6ee6d
+(pending commit)
 
 TIP:
-77908665c66a50b322421f959bf8cbeba84b2b01
+(pending SHA-record commit)
 
 PARENT:
-DECOMPOSER-PILOT-CONSTRAINT-REDESIGN-01R
-ACCEPTED / CLOSED (XGrammar JSON-Schema route REJECTED)
+DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01R
+(REVISE — F001/F002 closed; F003/F004 open)
 
 MODEL CALLS:
 0
@@ -34,27 +34,30 @@ GENERATOR / ENGINE / PILOT-01:
 NOT AUTHORIZED
 ```
 
-## Rework (R1–R5)
+## Corrective scope (01R2)
 
 | ID | Correction |
 |----|------------|
-| R1 | Fully specify **WELL-EBNF-1** byte-level metasyntax |
-| R2 | Remove WELL-EBNF-1 specification from Human gates (SOL authority) |
-| R3 | Resolve Q6/T15: grammar = **strict JSON-number** (no NaN/Infinity); freeze = finite/value validity |
-| R4 | State grammar-language relation + permitted canonical lexical narrowing |
-| R5 | Synchronize md/json |
+| F003 | Make JSON `well_ebnf_1` metasyntax exactly match Markdown (`Primary` / `Suffix`) |
+| F004 | Freeze one canonical rule-order algorithm (no topological alternative) |
+| CHARCLASS | Raw `-` is range syntax only; literal U+002D MUST be `\u002D` |
+| R5 | MD and JSON express the same normative metasyntax |
 
-Findings addressed: **F001**, **F002**.
+Findings addressed this slice: **F003**, **F004**.  
+Prior findings **F001**, **F002** remain closed. R3 numeric authority unchanged.
+
+Everything else in Q1–Q10 / T11–T21 remains frozen. No implementation, install, construction probe, model call, or PILOT-01.
 
 ## Claim
 
-This rework completes the CFG design contract so a future generator can emit
-**hash-addressed WELL-EBNF-1** bytes without inventing dialect or numeric rules.
+This corrective rework makes the machine-readable WELL-EBNF-1 ledger a complete,
+non-inferential rendering of the normative Markdown metasyntax, and removes the
+last degree of freedom in canonical rule ordering for hash-addressed artifacts.
 
 It still does **not** claim generator implementation, constructibility, backend
 fit, model capability, or PILOT authorization.
 
-## Grammar language relation (R4)
+## Grammar language relation (R4 — unchanged)
 
 The WELL-EBNF-1 artifact is a **deliberately canonical generation surface** for
 `ClosedNormalizedProgram` JSON texts. It is **not** required to equal every
@@ -76,7 +79,7 @@ JSON parse     → materialize values
 freeze_candidate → closed-model validation, canonicalization, finite numeric rejection
 ```
 
-## Numeric lexical authority (R3 / Q6 / T15)
+## Numeric lexical authority (R3 / Q6 / T15 — unchanged / accepted)
 
 | Layer | Admits / rejects |
 |-------|------------------|
@@ -97,7 +100,11 @@ Frac          ::= "." [0-9]+
 Exp           ::= [eE] [+-]? [0-9]+
 ```
 
-## WELL-EBNF-1 metasyntax (R1 / T11)
+Residual T15 integer-path wording does not block this slice: the current patched
+schema contains no integer sites; a future integer construct fails closed until
+its exact mapping is needed.
+
+## WELL-EBNF-1 metasyntax (R1 / T11 / F003 / F004)
 
 Dialect id: `WELL-EBNF-1` version `1.0.0`.
 
@@ -136,7 +143,7 @@ ClassItem    ::= ClassAtom | ClassAtom "-" ClassAtom
 - `SP` = exactly one SPACE (`U+0020`).  
 - No leading/trailing SP on a rule line; no blank lines between rules.  
 - Suffix operators bind to the immediately preceding `Primary` with **no** space before the suffix.  
-- `Atom{m,n}` means `m..n` inclusive repetitions; require `0 <= m <= n`.
+- `Primary{m,n}` means `m..n` inclusive repetitions; require `0 <= m <= n`.
 
 ### Escapes (in literals and char-class atoms)
 
@@ -153,23 +160,40 @@ Hex8   ::= [0-9A-Fa-f]{8}
 ### LitChar / ClassAtom
 
 - Literal: any Unicode scalar except controls, `"` (`U+0022`), `\` (`U+005C`), or Escape.  
-- Class atom: any Unicode scalar except controls, `]` (`U+005D`), `\` , `-` (`U+002D`) as an unescaped singleton that would be ambiguous — use Escape or place `-` first/last in the class per generator canonicalization (generator MUST emit a deterministic placement; recommended: literal `-` only as first ClassItem).
+- Class atom: any Unicode scalar except controls, `]` (`U+005D`), `\` (`U+005C`), and raw `-` (`U+002D`).  
+- Raw `-` inside a character class is **range syntax only**.  
+- Literal U+002D inside a class **MUST** be emitted as `\u002D`. The first/last placement alternative is **FORBIDDEN**.
 
-### Start symbol and rule order
+### Start symbol and rule order (F004)
 
 - Exactly one production `START`.  
 - T16: `START ::= ClosedNormalizedProgram ;` (root object nonterminal).  
-- Default rule order for canonical bytes: **`START` first**, then remaining identifiers ascending by UTF-8 byte order. Alternative pure topological order is allowed only if recorded in provenance as `rule_order_spec`.
+- **Sole** canonical rule-order algorithm for WELL-EBNF-1 v1 source bytes:
+
+  1. `START` first  
+  2. all remaining rule identifiers ascending by UTF-8 byte sequence  
+
+- No alternative topological ordering in the canonical WELL-EBNF-1 source artifact.  
+- Backend-specific reordering, if ever needed, belongs only to a separately hashed
+  deterministic engine-native lowering.
+
+Pipeline:
+
+```
+schema
+  → one canonical WELL-EBNF-1
+  → zero or more backend-specific deterministic lowerings
+```
 
 ### Identity
 
 Two WELL-EBNF-1 artifacts are the same dialect text iff their **UTF-8 bytes are identical**.
 
-Machine-readable copy: `well_ebnf_1` object in the JSON ledger.
+Machine-readable copy: `well_ebnf_1` object in the JSON ledger (must match this section).
 
 ## Prior freezes preserved (Q1–Q5, Q7–Q10, T12–T14, T16–T21)
 
-Unchanged except Q6/T15/T11 clarifications above. See JSON `decisions` map for the full ledger.
+Unchanged except F003/F004/CHARCLASS clarifications above. See JSON `decisions` map for the full ledger.
 
 Summary table:
 
@@ -185,7 +209,7 @@ Summary table:
 | Q8 | Mechanical arrays; no invented caps |
 | Q9 | Full strings except Q5 sites |
 | Q10 | Zero insignificant whitespace |
-| T11 | WELL-EBNF-1 fully specified (R1) |
+| T11 | WELL-EBNF-1 fully specified; md/json congruent (F003) |
 | T12–T14 | bool/null; enum/const; closed unions |
 | T15 | integer/number from pinned path (R3 clarity) |
 | T16–T17 | START root; empty tasks legal |
@@ -220,4 +244,4 @@ DESIGN_TECHNICALLY_CLOSED_AWAITING_INDEPENDENT_REVIEW
 ```
 
 STATUS:
-STOP FOR INDEPENDENT DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01R REVIEW
+STOP FOR INDEPENDENT DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01R2 REVIEW
