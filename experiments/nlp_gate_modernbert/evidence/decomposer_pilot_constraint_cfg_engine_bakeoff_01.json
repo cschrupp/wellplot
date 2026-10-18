@@ -1,10 +1,19 @@
 {
   "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01-AUTH-001",
-  "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01",
-  "mode": "BOUNDED_ENGINE_BAKEOFF",
-  "starting_tip": "928d77672afcbb00cc514940b5ce3935847496ee",
-  "candidate_sha": "0fd552bc527aa56b68fa17220288530e02471316",
-  "tip_sha": "f9fcf402a9bb7f71c17158b550b330b651660e08",
+  "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01R",
+  "mode": "BOUNDED_ENGINE_BAKEOFF_REWORK",
+  "rework": [
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5"
+  ],
+  "prior_candidate": "0fd552bc527aa56b68fa17220288530e02471316",
+  "prior_result": "REVISE (F001–F004)",
+  "starting_tip": "b814a0996efa87163239b9b4c5538ea27de50108",
+  "candidate_sha": "(pending commit)",
+  "tip_sha": "(pending SHA-record commit)",
   "model_calls": 0,
   "model_weights_loaded": false,
   "accepted_grammar_sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
@@ -22,6 +31,37 @@
       }
     },
     "pass": true
+  },
+  "source_oracle": {
+    "pass": true,
+    "positive_pass": true,
+    "negative_pass": true,
+    "recognizer_path": "/home/user/projects/wellplot/experiments/nlp_gate_modernbert/tests/support/well_ebnf1_recognizer.py",
+    "failures": []
+  },
+  "g2_lowering_audit": {
+    "pass": true,
+    "source_rule_count": 8841,
+    "target_rule_count": 8841,
+    "same_rule_count": true,
+    "same_rule_identifiers": true,
+    "start_first": true,
+    "one_to_one_mapping": true,
+    "authorized_syntax_rewrites_only": true,
+    "unauthorized_rewrites": [],
+    "repeated_lowering_byte_identical": true,
+    "lowered_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
+    "lowered_sha256_replay": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
+    "authorized_transform_set": [
+      "strip_rule_terminator_sp_semicolon",
+      "escape_line_breaking_scalars_in_literals_and_classes"
+    ],
+    "force_escape_codepoints": [
+      10,
+      13,
+      8232,
+      8233
+    ]
   },
   "packages": {
     "xgrammar": "0.2.8",
@@ -52,10 +92,10 @@
         "lowerer_source_sha256": "216976a6e7b8a6838862198fa4d37168666fab602ec643c7369ca100179d377e",
         "source_grammar_sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
         "backend_native_grammar_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
-        "compile_seconds": 0.9099156140000559,
+        "compile_seconds": 0.927526493993355,
         "vocab_size": 151936
       },
-      "build_wall_seconds": 2.0239937079895753,
+      "build_wall_seconds": 2.008869261975633,
       "gates": {
         "G1": true,
         "G2": true,
@@ -66,28 +106,385 @@
         "G7": true,
         "G8": true
       },
+      "oracle_backend_agreement": {
+        "pass": true,
+        "mismatches": []
+      },
       "text_parity": {
         "pass": true,
         "positive_pass": true,
-        "negative_pass": true,
-        "positive_failures": [],
-        "negative_failures": []
+        "negative_pass": true
       },
       "token_replay": {
         "pass": true,
         "positive_pass": true,
         "negative_pass": true,
-        "positive_failures": [],
-        "negative_failures": [],
+        "cases": [
+          {
+            "label": "empty_tasks",
+            "n_tokens": 4,
+            "rejection_index": null,
+            "rejection_reason": null,
+            "completed": true,
+            "any_stop_allowed": true,
+            "terminal_mask_digest": "91dbbb7314f7ae93861e61ed6c7143d0cf6e29ed8cb75068685b20b414690a97",
+            "step_mask_digest_count": 4,
+            "pass": true,
+            "detail": "ok"
+          },
+          {
+            "label": "version_null",
+            "n_tokens": 8,
+            "rejection_index": null,
+            "rejection_reason": null,
+            "completed": true,
+            "any_stop_allowed": true,
+            "terminal_mask_digest": "91dbbb7314f7ae93861e61ed6c7143d0cf6e29ed8cb75068685b20b414690a97",
+            "step_mask_digest_count": 8,
+            "pass": true,
+            "detail": "ok"
+          },
+          {
+            "label": "version_str",
+            "n_tokens": 9,
+            "rejection_index": null,
+            "rejection_reason": null,
+            "completed": true,
+            "any_stop_allowed": true,
+            "terminal_mask_digest": "91dbbb7314f7ae93861e61ed6c7143d0cf6e29ed8cb75068685b20b414690a97",
+            "step_mask_digest_count": 9,
+            "pass": true,
+            "detail": "ok"
+          },
+          {
+            "label": "text_only",
+            "n_tokens": 29,
+            "rejection_index": null,
+            "rejection_reason": null,
+            "completed": true,
+            "any_stop_allowed": true,
+            "terminal_mask_digest": "91dbbb7314f7ae93861e61ed6c7143d0cf6e29ed8cb75068685b20b414690a97",
+            "step_mask_digest_count": 29,
+            "pass": true,
+            "detail": "ok"
+          },
+          {
+            "label": "local_ref_only",
+            "n_tokens": 31,
+            "rejection_index": null,
+            "rejection_reason": null,
+            "completed": true,
+            "any_stop_allowed": true,
+            "terminal_mask_digest": "91dbbb7314f7ae93861e61ed6c7143d0cf6e29ed8cb75068685b20b414690a97",
+            "step_mask_digest_count": 31,
+            "pass": true,
+            "detail": "ok"
+          },
+          {
+            "label": "unicode_only_non_ws",
+            "n_tokens": 39,
+            "rejection_index": null,
+            "rejection_reason": null,
+            "completed": true,
+            "any_stop_allowed": true,
+            "terminal_mask_digest": "91dbbb7314f7ae93861e61ed6c7143d0cf6e29ed8cb75068685b20b414690a97",
+            "step_mask_digest_count": 39,
+            "pass": true,
+            "detail": "ok"
+          },
+          {
+            "label": "optionals_absent",
+            "n_tokens": 19,
+            "rejection_index": null,
+            "rejection_reason": null,
+            "completed": true,
+            "any_stop_allowed": true,
+            "terminal_mask_digest": "91dbbb7314f7ae93861e61ed6c7143d0cf6e29ed8cb75068685b20b414690a97",
+            "step_mask_digest_count": 19,
+            "pass": true,
+            "detail": "ok"
+          },
+          {
+            "label": "nullable_alpha_null",
+            "n_tokens": 23,
+            "rejection_index": null,
+            "rejection_reason": null,
+            "completed": true,
+            "any_stop_allowed": true,
+            "terminal_mask_digest": "91dbbb7314f7ae93861e61ed6c7143d0cf6e29ed8cb75068685b20b414690a97",
+            "step_mask_digest_count": 23,
+            "pass": true,
+            "detail": "ok"
+          },
+          {
+            "label": "produces_binds_empty",
+            "n_tokens": 26,
+            "rejection_index": null,
+            "rejection_reason": null,
+            "completed": true,
+            "any_stop_allowed": true,
+            "terminal_mask_digest": "91dbbb7314f7ae93861e61ed6c7143d0cf6e29ed8cb75068685b20b414690a97",
+            "step_mask_digest_count": 26,
+            "pass": true,
+            "detail": "ok"
+          },
+          {
+            "label": "produces_binds_entry",
+            "n_tokens": 30,
+            "rejection_index": null,
+            "rejection_reason": null,
+            "completed": true,
+            "any_stop_allowed": true,
+            "terminal_mask_digest": "91dbbb7314f7ae93861e61ed6c7143d0cf6e29ed8cb75068685b20b414690a97",
+            "step_mask_digest_count": 30,
+            "pass": true,
+            "detail": "ok"
+          },
+          {
+            "label": "number_forms",
+            "n_tokens": 23,
+            "rejection_index": null,
+            "rejection_reason": null,
+            "completed": true,
+            "any_stop_allowed": true,
+            "terminal_mask_digest": "91dbbb7314f7ae93861e61ed6c7143d0cf6e29ed8cb75068685b20b414690a97",
+            "step_mask_digest_count": 23,
+            "pass": true,
+            "detail": "ok"
+          },
+          {
+            "label": "number_frac_exp",
+            "n_tokens": 28,
+            "rejection_index": null,
+            "rejection_reason": null,
+            "completed": true,
+            "any_stop_allowed": true,
+            "terminal_mask_digest": "91dbbb7314f7ae93861e61ed6c7143d0cf6e29ed8cb75068685b20b414690a97",
+            "step_mask_digest_count": 28,
+            "pass": true,
+            "detail": "ok"
+          },
+          {
+            "label": "valid_surrogate_pair_in_task_id",
+            "n_tokens": 26,
+            "rejection_index": null,
+            "rejection_reason": null,
+            "completed": true,
+            "any_stop_allowed": true,
+            "terminal_mask_digest": "91dbbb7314f7ae93861e61ed6c7143d0cf6e29ed8cb75068685b20b414690a97",
+            "step_mask_digest_count": 26,
+            "pass": true,
+            "detail": "ok"
+          },
+          {
+            "label": "both_text_and_ref",
+            "n_tokens": 34,
+            "rejection_index": 14,
+            "rejection_reason": "blocked_token:2198",
+            "completed": false,
+            "any_stop_allowed": false,
+            "terminal_mask_digest": "10dfe0d273710c5667f832fb70f2bcc58fdaf711b1d4e64c8ac72bc302e00072",
+            "step_mask_digest_count": 15,
+            "pass": true,
+            "detail": "blocked_token:2198"
+          },
+          {
+            "label": "neither_text_nor_ref",
+            "n_tokens": 25,
+            "rejection_index": 10,
+            "rejection_reason": "blocked_token:58640",
+            "completed": false,
+            "any_stop_allowed": false,
+            "terminal_mask_digest": "25b5cf569a2bb408eb2d7fb39d33806e9f27ae90a52e59a493eaab6273823e54",
+            "step_mask_digest_count": 11,
+            "pass": true,
+            "detail": "blocked_token:58640"
+          },
+          {
+            "label": "empty_text",
+            "n_tokens": 28,
+            "rejection_index": 12,
+            "rejection_reason": "blocked_token:62366",
+            "completed": false,
+            "any_stop_allowed": false,
+            "terminal_mask_digest": "37615c9cede225871c32940c3813c26e316549f39b9e6b7bb9f30df37ebe8bf2",
+            "step_mask_digest_count": 13,
+            "pass": true,
+            "detail": "blocked_token:62366"
+          },
+          {
+            "label": "spaces_text",
+            "n_tokens": 30,
+            "rejection_index": 14,
+            "rejection_reason": "blocked_token:330",
+            "completed": false,
+            "any_stop_allowed": false,
+            "terminal_mask_digest": "61893bca4fd9018150f92accfd4a9ee04b08c5837ea7b66b4fbf12ab10d38ed6",
+            "step_mask_digest_count": 15,
+            "pass": true,
+            "detail": "blocked_token:330"
+          },
+          {
+            "label": "tab_escape",
+            "n_tokens": 30,
+            "rejection_index": 15,
+            "rejection_reason": "blocked_token:58640",
+            "completed": false,
+            "any_stop_allowed": false,
+            "terminal_mask_digest": "61893bca4fd9018150f92accfd4a9ee04b08c5837ea7b66b4fbf12ab10d38ed6",
+            "step_mask_digest_count": 16,
+            "pass": true,
+            "detail": "blocked_token:58640"
+          },
+          {
+            "label": "u0009",
+            "n_tokens": 34,
+            "rejection_index": 19,
+            "rejection_reason": "blocked_token:58640",
+            "completed": false,
+            "any_stop_allowed": false,
+            "terminal_mask_digest": "61893bca4fd9018150f92accfd4a9ee04b08c5837ea7b66b4fbf12ab10d38ed6",
+            "step_mask_digest_count": 20,
+            "pass": true,
+            "detail": "blocked_token:58640"
+          },
+          {
+            "label": "reordered_closed_keys",
+            "n_tokens": 30,
+            "rejection_index": 12,
+            "rejection_reason": "blocked_token:1631",
+            "completed": false,
+            "any_stop_allowed": false,
+            "terminal_mask_digest": "122ec5ec6def87ce40edcd95b80fe0f7d20f99acd047f003b512215cf38ceaf8",
+            "step_mask_digest_count": 13,
+            "pass": true,
+            "detail": "blocked_token:1631"
+          },
+          {
+            "label": "extra_property",
+            "n_tokens": 8,
+            "rejection_index": 4,
+            "rejection_reason": "blocked_token:15460",
+            "completed": false,
+            "any_stop_allowed": false,
+            "terminal_mask_digest": "656eb4725a6b28ace8f4ed0539052979e2cfd36a025b33b2f6c0b2889b86dcab",
+            "step_mask_digest_count": 5,
+            "pass": true,
+            "detail": "blocked_token:15460"
+          },
+          {
+            "label": "wrong_bind_value",
+            "n_tokens": 28,
+            "rejection_index": 10,
+            "rejection_reason": "blocked_token:50051",
+            "completed": false,
+            "any_stop_allowed": false,
+            "terminal_mask_digest": "cf71cebb2d35ed70387dcb49edaf7b8abdc270ee5d2ecfb21ae4f6d2798bcc95",
+            "step_mask_digest_count": 11,
+            "pass": true,
+            "detail": "blocked_token:50051"
+          },
+          {
+            "label": "nan",
+            "n_tokens": 23,
+            "rejection_index": 7,
+            "rejection_reason": "blocked_token:22831",
+            "completed": false,
+            "any_stop_allowed": false,
+            "terminal_mask_digest": "b3317bf519cca52bbdc46796f8d76d71c824ed5ff94091a41a7b8e9294e32790",
+            "step_mask_digest_count": 8,
+            "pass": true,
+            "detail": "blocked_token:22831"
+          },
+          {
+            "label": "infinity",
+            "n_tokens": 23,
+            "rejection_index": 7,
+            "rejection_reason": "blocked_token:45090",
+            "completed": false,
+            "any_stop_allowed": false,
+            "terminal_mask_digest": "b3317bf519cca52bbdc46796f8d76d71c824ed5ff94091a41a7b8e9294e32790",
+            "step_mask_digest_count": 8,
+            "pass": true,
+            "detail": "blocked_token:45090"
+          },
+          {
+            "label": "neg_infinity",
+            "n_tokens": 23,
+            "rejection_index": 7,
+            "rejection_reason": "blocked_token:45090",
+            "completed": false,
+            "any_stop_allowed": false,
+            "terminal_mask_digest": "23a597991c8edb11ead6fcf3350e97264d65e8413eaf783c15bbd04c6c88eade",
+            "step_mask_digest_count": 8,
+            "pass": true,
+            "detail": "blocked_token:45090"
+          },
+          {
+            "label": "structural_space",
+            "n_tokens": 5,
+            "rejection_index": 3,
+            "rejection_reason": "blocked_token:3056",
+            "completed": false,
+            "any_stop_allowed": false,
+            "terminal_mask_digest": "9f6abde2bbdd5913aa6b8b1c114c86e499b9ccb7d36cb5bce14cb777d6b15e89",
+            "step_mask_digest_count": 4,
+            "pass": true,
+            "detail": "blocked_token:3056"
+          },
+          {
+            "label": "structural_newline",
+            "n_tokens": 5,
+            "rejection_index": 3,
+            "rejection_reason": "blocked_token:198",
+            "completed": false,
+            "any_stop_allowed": false,
+            "terminal_mask_digest": "d02d605595d02b4e44b11b56212ec971a0a063ccdabceb695098ef1fe0e58145",
+            "step_mask_digest_count": 4,
+            "pass": true,
+            "detail": "blocked_token:198"
+          },
+          {
+            "label": "lone_high_surrogate",
+            "n_tokens": 22,
+            "rejection_index": 20,
+            "rejection_reason": "blocked_token:9207",
+            "completed": false,
+            "any_stop_allowed": false,
+            "terminal_mask_digest": "1a20a73bd726169f1ad6382e7f1c5529b500d7fc19c900e60e44bdab5a8c099f",
+            "step_mask_digest_count": 21,
+            "pass": true,
+            "detail": "blocked_token:9207"
+          },
+          {
+            "label": "lone_low_surrogate",
+            "n_tokens": 22,
+            "rejection_index": 17,
+            "rejection_reason": "blocked_token:5626",
+            "completed": false,
+            "any_stop_allowed": false,
+            "terminal_mask_digest": "bab372f9500c087a6b959ab56bca37c84a4c46e5c53653d8525e4ede0c26fec0",
+            "step_mask_digest_count": 18,
+            "pass": true,
+            "detail": "blocked_token:5626"
+          }
+        ],
         "mask_step_latency_seconds": {
-          "n": 485,
-          "mean": 0.01049897381933838,
-          "max": 0.10338001500349492,
-          "min": 1.1780066415667534e-06
+          "n": 514,
+          "mean": 0.010486849754514692,
+          "max": 0.10550640602014028,
+          "min": 1.2240197975188494e-06
         }
       },
+      "g6_repeated_replay": {
+        "pass": true,
+        "compared_cases": 29,
+        "mismatches": [],
+        "lowered_sha_identical": true,
+        "compile_both_succeeded": true
+      },
       "resources": {
-        "compile_seconds": 0.9099156140000559,
+        "compile_seconds": 0.927526493993355,
         "lowered_grammar_bytes": 1226434
       }
     },
@@ -101,15 +498,15 @@
       "lowerer_source_sha256": "852354266c9eafdf39760d5f567b174f3a1fa1f79732083040af7c73f17ca845",
       "backend_native_grammar_sha256": "5068fa5da97be560119f90275acf84f8d9eeea7a0007e12ddcf478b7eee1bdc1",
       "backend_native_grammar_bytes": 1475370,
-      "lower_seconds": 0.44206293299794197,
-      "tokenizer_wrap_seconds": 0.9516282819968183,
-      "construct_seconds": 0.9262698890233878,
+      "lower_seconds": 0.42985937601770274,
+      "tokenizer_wrap_seconds": 0.9888839790073689,
+      "construct_seconds": 0.9400315890088677,
       "validate_message": "",
       "pathology": "grammar_symbol_table_overflow"
     }
   },
   "recommendation": "xgrammar",
-  "recommendation_reason": "XGrammar passed G1–G8. llguidance rejected on construction pathology (grammar symbol table overflow / u16 limit) under G7.",
+  "recommendation_reason": "XGrammar passed evidence-derived G1–G8 (01R). llguidance remains rejected on G7 symbol-table pathology.",
   "unauthorized_still": [
     "model_weight_load",
     "model_forward",

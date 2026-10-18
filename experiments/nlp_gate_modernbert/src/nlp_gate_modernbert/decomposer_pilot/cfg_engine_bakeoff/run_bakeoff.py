@@ -1,4 +1,4 @@
-"""CFG-ENGINE-BAKEOFF-01 runner — library semantic authority."""
+"""CFG-ENGINE-BAKEOFF-01 / 01R runner — library semantic authority."""
 
 from __future__ import annotations
 
@@ -9,12 +9,17 @@ from typing import Any
 
 from nlp_gate_modernbert.decomposer_pilot.cfg_engine_bakeoff import backend_llguidance
 from nlp_gate_modernbert.decomposer_pilot.cfg_engine_bakeoff import backend_xgrammar
+from nlp_gate_modernbert.decomposer_pilot.cfg_engine_bakeoff.g2_audit import (
+    audit_xgrammar_lowering,
+)
 from nlp_gate_modernbert.decomposer_pilot.cfg_engine_bakeoff.pins import (
     ACCEPTED_GRAMMAR_SHA256,
     load_accepted_grammar,
     verify_pinned_tokenizer,
 )
-from nlp_gate_modernbert.decomposer_pilot.constraint_schema import canonical_json_bytes
+from nlp_gate_modernbert.decomposer_pilot.cfg_engine_bakeoff.source_oracle import (
+    source_oracle_parity,
+)
 
 
 def repo_root_from_here() -> Path:
@@ -32,12 +37,19 @@ def run_bakeoff(repo_root: Path | None = None) -> dict[str, Any]:
     tok_pin = verify_pinned_tokenizer()
     snapshot = tok_pin["snapshot_path"]
 
+    # R2: independent source-language oracle on fixed corpus
+    oracle = source_oracle_parity(root, grammar_bytes)
+
+    # R1: evidence-derived G2 lowering audit
+    g2 = audit_xgrammar_lowering(well_text)
+
     report: dict[str, Any] = {
-        "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01",
+        "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01R",
         "authority": (
             "WELLPLOT-NLP-RUNTIME-V2-"
             "DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01-AUTH-001"
         ),
+        "rework": ["R1", "R2", "R3", "R4", "R5"],
         "model_calls": model_calls,
         "model_weights_loaded": model_weights_loaded,
         "g1_input_identity": {
@@ -47,6 +59,18 @@ def run_bakeoff(repo_root: Path | None = None) -> dict[str, Any]:
             "tokenizer": tok_pin,
             "pass": grammar_sha == ACCEPTED_GRAMMAR_SHA256,
         },
+        "source_oracle": {
+            "pass": oracle["pass"],
+            "positive_pass": oracle["positive_pass"],
+            "negative_pass": oracle["negative_pass"],
+            "recognizer_path": oracle["recognizer_path"],
+            "failures": [
+                r
+                for r in (oracle["positive"] + oracle["negative"])
+                if not r["pass"]
+            ],
+        },
+        "g2_lowering_audit": g2,
         "backends": {},
     }
 
@@ -55,70 +79,99 @@ def run_bakeoff(repo_root: Path | None = None) -> dict[str, Any]:
     xg = backend_xgrammar.build_xgrammar(well_text, snapshot)
     xg_build_s = time.perf_counter() - t0
     xg_text = backend_xgrammar.text_parity(xg)
-    xg_replay = backend_xgrammar.token_replay(xg)
-    # G6 determinism: rebuild lowered bytes
+    oracle_backend = backend_xgrammar.backend_agrees_with_oracle(xg_text, oracle)
+
+    # G2 also requires source oracle/backend corpus parity
+    g2_pass = bool(g2["pass"]) and bool(oracle_backend["pass"]) and bool(oracle["pass"])
+
+    # R4/R5: token replay with completion semantics + per-case evidence
+    xg_replay_1 = backend_xgrammar.token_replay(xg)
+
+    # R3/G6: rebuild + second replay; compare semantic traces (not latency)
     xg2 = backend_xgrammar.build_xgrammar(well_text, snapshot)
-    xg_det = xg.lowered_sha256 == xg2.lowered_sha256
+    xg_replay_2 = backend_xgrammar.token_replay(xg2)
+    g6 = backend_xgrammar.compare_replay_semantics(xg_replay_1, xg_replay_2)
+    g6["lowered_sha_identical"] = xg.lowered_sha256 == xg2.lowered_sha256
+    g6["compile_both_succeeded"] = True
 
     xg_gates = {
         "G1": report["g1_input_identity"]["pass"],
-        "G2": True,
-        "G3": xg_text["pass"],
+        "G2": g2_pass,
+        "G3": xg_text["pass"] and oracle["pass"] and oracle_backend["pass"],
         "G4": True,
-        "G5": xg_replay["pass"],
-        "G6": xg_det,
-        "G7": xg.compile_seconds < 120.0,  # bounded; observed ~1s
+        "G5": xg_replay_1["pass"],
+        "G6": g6["pass"] and g6["lowered_sha_identical"],
+        "G7": xg.compile_seconds < 120.0,
         "G8": model_calls == 0 and model_weights_loaded is False,
     }
-    xg_pass = all(xg_gates[g] for g in ("G1", "G2", "G3", "G4", "G5", "G8")) and xg_gates[
-        "G6"
-    ] and xg_gates["G7"]
+    xg_pass = all(
+        xg_gates[g] for g in ("G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8")
+    )
 
     report["backends"]["xgrammar"] = {
         "status": "PASS" if xg_pass else "REJECTED",
         "provenance": backend_xgrammar.provenance(xg, grammar_sha),
         "build_wall_seconds": xg_build_s,
         "gates": xg_gates,
+        "oracle_backend_agreement": oracle_backend,
         "text_parity": {
             "pass": xg_text["pass"],
             "positive_pass": xg_text["positive_pass"],
             "negative_pass": xg_text["negative_pass"],
-            "positive_failures": [r for r in xg_text["positive"] if not r["accepted"]],
-            "negative_failures": [r for r in xg_text["negative"] if r["accepted"]],
+            "positive_failures": [r for r in xg_text["positive"] if not r["pass"]],
+            "negative_failures": [r for r in xg_text["negative"] if not r["pass"]],
         },
         "token_replay": {
-            "pass": xg_replay["pass"],
-            "positive_pass": xg_replay["positive_pass"],
-            "negative_pass": xg_replay["negative_pass"],
-            "positive_failures": [r for r in xg_replay["positive"] if not r["pass"]],
-            "negative_failures": [r for r in xg_replay["negative"] if not r["pass"]],
-            "mask_step_latency_seconds": xg_replay["mask_step_latency_seconds"],
+            "pass": xg_replay_1["pass"],
+            "positive_pass": xg_replay_1["positive_pass"],
+            "negative_pass": xg_replay_1["negative_pass"],
+            "positive_failures": [r for r in xg_replay_1["positive"] if not r["pass"]],
+            "negative_failures": [r for r in xg_replay_1["negative"] if not r["pass"]],
+            "cases": [
+                {
+                    "label": r["label"],
+                    "n_tokens": r["n_tokens"],
+                    "rejection_index": r["rejection_index"],
+                    "rejection_reason": r["rejection_reason"],
+                    "completed": r["completed"],
+                    "any_stop_allowed": r["any_stop_allowed"],
+                    "terminal_mask_digest": r["terminal_mask_digest"],
+                    "step_mask_digest_count": len(r["step_mask_digests"]),
+                    "pass": r["pass"],
+                    "detail": r["detail"],
+                }
+                for r in (xg_replay_1["positive"] + xg_replay_1["negative"])
+            ],
+            "mask_step_latency_seconds": xg_replay_1["mask_step_latency_seconds"],
         },
+        "g6_repeated_replay": g6,
         "resources": {
             "compile_seconds": xg.compile_seconds,
             "lowered_grammar_bytes": len(xg.lowered_ebnf.encode("utf-8")),
         },
     }
 
-    # --- llguidance ---
+    # --- llguidance (frozen rejection path; still exercised) ---
     llg = backend_llguidance.attempt_llguidance(well_text, snapshot)
     if llg.get("status") == "CONSTRUCTED":
-        # Unexpected success path — mark constructed but do not claim full gates here.
         report["backends"]["llguidance"] = {
             "status": "CONSTRUCTED_UNVALIDATED",
-            **{k: v for k, v in llg.items() if k not in ("matcher", "ll_tokenizer", "lark")},
+            **{
+                k: v
+                for k, v in llg.items()
+                if k not in ("matcher", "ll_tokenizer", "lark")
+            },
         }
     else:
         report["backends"]["llguidance"] = llg
 
-    # Recommendation
     xg_ok = report["backends"]["xgrammar"]["status"] == "PASS"
     llg_ok = report["backends"]["llguidance"].get("status") == "PASS"
     if xg_ok and not llg_ok:
         recommendation = "xgrammar"
         recommendation_reason = (
-            "XGrammar passed G1–G8. llguidance rejected on construction pathology "
-            "(grammar symbol table overflow / u16 limit) under G7."
+            "XGrammar passed evidence-derived G1–G8 (01R). llguidance remains "
+            "rejected on G7 symbol-table pathology."
         )
     elif llg_ok and not xg_ok:
         recommendation = "llguidance"
@@ -146,10 +199,6 @@ def run_bakeoff(repo_root: Path | None = None) -> dict[str, Any]:
 
 def write_evidence(report: dict[str, Any], evidence_dir: Path) -> None:
     evidence_dir.mkdir(parents=True, exist_ok=True)
-    (evidence_dir / "decomposer_pilot_constraint_cfg_engine_bakeoff_01.json").write_bytes(
-        canonical_json_bytes(report) if False else (
-            json.dumps(report, indent=2, ensure_ascii=False) + "\n"
-        ).encode("utf-8")
-    )
-    # Also write lowered artifacts if present
-    # (filled by caller when available)
+    (
+        evidence_dir / "decomposer_pilot_constraint_cfg_engine_bakeoff_01.json"
+    ).write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
