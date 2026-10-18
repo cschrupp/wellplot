@@ -12,7 +12,7 @@
   "prior_candidate": "0fd552bc527aa56b68fa17220288530e02471316",
   "prior_result": "REVISE (F001–F004)",
   "starting_tip": "b814a0996efa87163239b9b4c5538ea27de50108",
-  "candidate_sha": "(pending commit)",
+  "candidate_sha": "3b58f28cfea7a84dd2e5e4cb3122df27e11ad16d",
   "tip_sha": "(pending SHA-record commit)",
   "model_calls": 0,
   "model_weights_loaded": false,
