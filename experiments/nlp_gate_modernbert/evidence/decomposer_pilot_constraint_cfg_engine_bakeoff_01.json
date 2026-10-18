@@ -13,7 +13,7 @@
   "prior_candidate": "3b58f28cfea7a84dd2e5e4cb3122df27e11ad16d",
   "prior_result": "REVISE (G2 independent rewrite proof)",
   "starting_tip": "43c05042c7a427c1b268e7357fb18165f6f5090e",
-  "candidate_sha": "(pending commit)",
+  "candidate_sha": "d680a315b5cf11ef7c89c70cf6222dd1d62b9a84",
   "tip_sha": "(pending SHA-record commit)",
   "model_calls": 0,
   "model_weights_loaded": false,
