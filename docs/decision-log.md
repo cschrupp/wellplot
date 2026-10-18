@@ -217,8 +217,11 @@ These decisions govern the experimental NLP runtime unless explicitly revised.
     `f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3`
 - The Outlines constrained JSON-Schema path and XGrammar JSON-Schema route were rejected for this
   experiment. That does not reject XGrammar grammar mode.
-- No hard-constraint engine is selected yet. The next technical step is an engine bakeoff against
-  the immutable accepted grammar.
+- The hard-constraint engine selected by the accepted bakeoff is **XGrammar 0.2.8 / native EBNF**.
+- llguidance 1.9.1 is rejected for this accepted grammar because matcher construction exceeds its
+  u16 grammar-symbol-table bound; the accepted grammar is not weakened to accommodate it.
+- The next technical step is a selected-backend constrained-decoding preflight using XGrammar,
+  the immutable accepted grammar, and the pinned Qwen tokenizer with model calls remaining zero.
 - Engine acceptance does not itself authorize model inference or `PILOT-01`.
 
 ## Agentic Development Operating Decisions (2026-10-18)
