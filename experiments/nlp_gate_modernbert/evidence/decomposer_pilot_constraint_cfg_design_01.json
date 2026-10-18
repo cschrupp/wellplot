@@ -5,7 +5,7 @@
   "starting_tip": "81c76ecfd58c440add469c57fe692a21acd8d9e4",
   "prior_candidate": "d441534e97954a2e5f74c047c9be64b550ac5f1e",
   "prior_result": "REVISE",
-  "candidate_sha": null,
+  "candidate_sha": "9d785e55f29fb3d2809c445b422c0a5c5af6ee6d",
   "tip_sha": null,
   "parent": {
     "slice": "DECOMPOSER-PILOT-CONSTRAINT-REDESIGN-01R",
@@ -20,7 +20,10 @@
     "R4": "State global grammar-language relation and permitted canonical lexical narrowing",
     "R5": "Update md/json closeout consistently"
   },
-  "findings_addressed": ["F001", "F002"],
+  "findings_addressed": [
+    "F001",
+    "F002"
+  ],
   "model_calls": 0,
   "claims": {
     "generator_implemented": false,
@@ -124,7 +127,13 @@
       "Escape_u_semantics": "\\\\uXXXX denotes Unicode scalar U+XXXX for XXXX in 0000..D7FF or E000..FFFF; surrogate code units alone are ILLEGAL in WELL-EBNF-1 terminals",
       "Escape_U_semantics": "\\\\UXXXXXXXX denotes Unicode scalar U+XXXXXXXX for valid scalar values 00000000..0010FFFF excluding surrogates",
       "SP": "exactly one U+0020 SPACE",
-      "forbidden_in_formatting": ["TAB", "CR", "multiple consecutive SP where only one SP is specified", "SP at start or end of a Rule line", "blank lines between rules"]
+      "forbidden_in_formatting": [
+        "TAB",
+        "CR",
+        "multiple consecutive SP where only one SP is specified",
+        "SP at start or end of a Rule line",
+        "blank lines between rules"
+      ]
     },
     "rule_ordering": "Rules MUST appear in deterministic generator-defined order: (1) START first if present as Identifier START; (2) then productions sorted by Identifier lexicographic UTF-8 byte order; OR generator emits a pinned topological order documented in generator provenance. The chosen ordering algorithm MUST be recorded in T18 provenance as rule_order_spec and must be pure.",
     "rule_order_spec_default": "START first; remaining Identifiers ascending by UTF-8 code unit sequence",
@@ -238,7 +247,12 @@
     "Int": "'0' | [1-9] [0-9]*",
     "Frac": "'.' [0-9]+",
     "Exp": "[eE] [+-]? [0-9]+",
-    "excluded_aliases": ["NaN", "Infinity", "-Infinity", "+Infinity"]
+    "excluded_aliases": [
+      "NaN",
+      "Infinity",
+      "-Infinity",
+      "+Infinity"
+    ]
   },
   "generator_fail_classes": [
     "patched_schema_hash_mismatch",
