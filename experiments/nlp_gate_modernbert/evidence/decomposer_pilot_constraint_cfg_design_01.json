@@ -1,0 +1,220 @@
+{
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01-AUTH-001",
+  "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01",
+  "mode": "DESIGN_INTERVIEW_ONLY",
+  "starting_tip": "9d4318953b28de651429983b2d097ed0707fa545",
+  "candidate_sha": null,
+  "tip_sha": null,
+  "parent": {
+    "slice": "DECOMPOSER-PILOT-CONSTRAINT-REDESIGN-01R",
+    "status": "ACCEPTED_CLOSED",
+    "xgrammar_json_schema_route": "REJECTED",
+    "candidate_sha": "b249b810908cbc0283e62f18e8780a4a4f7144d3"
+  },
+  "model_calls": 0,
+  "claims": {
+    "generator_implemented": false,
+    "grammar_constructibility_proven": false,
+    "backend_compatibility_proven": false,
+    "tokenizer_compatibility_proven": false,
+    "model_capability": false,
+    "pilot_01_authorized": false
+  },
+  "unauthorized": [
+    "grammar_implementation",
+    "generator_implementation",
+    "dependency_installation",
+    "engine_installation",
+    "engine_construction_probe",
+    "tokenizer_construction_probe",
+    "model_loading",
+    "model_forward",
+    "model_generate",
+    "schema_mutation",
+    "prompt_changes",
+    "repair_postprocessing",
+    "PILOT_01",
+    "hand_edits_to_grammar",
+    "hand_patch_layer"
+  ],
+  "input_schema": {
+    "path": "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_preflight_01_constraint.schema.json",
+    "role": "exact frozen patched ClosedNormalizedProgram structural language; hash-verify before generate"
+  },
+  "decisions": {
+    "Q1_provenance": {
+      "status": "FROZEN",
+      "choice": "A",
+      "summary": "Mechanically generated grammar from hash-verified patched schema; hand-patch forbidden; pure deterministic transform with grammar + generator hashes"
+    },
+    "Q2_object_ordering": {
+      "status": "FROZEN",
+      "choice": "C",
+      "summary": "Canonical fixed property order for schema-closed objects; any-order allowlist = ClosedNormalizedTask.produces_binds only; order derived from persisted schema property order"
+    },
+    "Q3_produces_binds": {
+      "status": "FROZEN",
+      "choice": "A",
+      "summary": "Map surface {} or {\"json-string\":\"track\"(, ...)*}; duplicate dynamic keys not CFG-guaranteed; JSON parse + freeze_candidate authoritative for dict materialization; exception narrowly scoped to map-key uniqueness"
+    },
+    "Q4_xor": {
+      "status": "FROZEN",
+      "choice": "A",
+      "summary": "ClosedSemanticQuery ::= TextQuery | LocalRefQuery exclusive productions; both/neither unreachable; no oneOf runtime; no post-parse XOR fallback"
+    },
+    "Q5_nonempty_json_string": {
+      "status": "FROZEN",
+      "choice": "B",
+      "summary": "Decode-faithful NONEMPTY_JSON_STRING matching str(value).strip()!=\"\"; classify by decoded atoms including escapes; raw-source .*\\\\S.* forbidden; Unicode-only narrowing forbidden; fail closed if unrepresentable"
+    },
+    "Q6_numbers": {
+      "status": "FROZEN",
+      "choice": "A",
+      "summary": "Full numeric lexical surface of pinned JSON/Pydantic parse path for schema number; no deliberate spelling subset; semantic numeric domain remains freeze_candidate"
+    },
+    "Q7_optionals_null_defaults": {
+      "status": "FROZEN",
+      "choice": "A",
+      "summary": "Sequential optional slots with NoPrior/HasPrior comma machine; required never skippable; defaults never grammar-materialized; absence/null/false/0/[] remain distinct where schema distinguishes"
+    },
+    "Q8_arrays_nesting": {
+      "status": "FROZEN",
+      "choice": "A",
+      "summary": "Mechanical arrays [] | [T(,T)*]; honor only schema min/maxItems; shared $ref nonterminals; uniqueItems unrepresentable → FAIL; no invented caps; no inferred min tasks"
+    },
+    "Q9_ordinary_strings": {
+      "status": "FROZEN",
+      "choice": "A",
+      "summary": "Full pinned JSON string language for plain type:string including empty; Q5 nonempty only for ClosedSemanticQuery text/local_ref"
+    },
+    "Q10_insignificant_whitespace": {
+      "status": "FROZEN",
+      "choice": "A",
+      "summary": "Zero insignificant JSON whitespace; separators ',' and ':'; compact only; string contents unaffected"
+    },
+    "T11_metalanguage": {
+      "status": "FROZEN",
+      "choice": "WELL-EBNF-1",
+      "summary": "Restricted WellPlot-owned engine-neutral EBNF dialect; exact textual syntax part of design before generator impl; optional deterministic engine lowering as second pure transform; engine syntax not source contract"
+    },
+    "T12_bool_null": {
+      "status": "FROZEN",
+      "summary": "Exact JSON literals true|false|null only"
+    },
+    "T13_enum_const": {
+      "status": "FROZEN",
+      "summary": "Finite mechanical alternation of exact JSON literals from schema; schema array order for enum; pinned canonical JSON literal serializer"
+    },
+    "T14_unions": {
+      "status": "FROZEN",
+      "summary": "Closed whitelist: nullable T|null; exact language-union anyOf when every branch compilable; Q4 XOR special transform; other oneOf/not/if/allOf/unknown → GENERATOR_FAIL; no best-effort widening"
+    },
+    "T15_integer_vs_number": {
+      "status": "FROZEN",
+      "summary": "integer → pinned authoritative integer acceptance language; number → Q6; no assumed regex from memory; FAIL if unrepresentable"
+    },
+    "T16_root": {
+      "status": "FROZEN",
+      "summary": "START ::= ClosedNormalizedProgram sole entry; Q2/Q7 root object; no wrapper/prefix/suffix/whitespace"
+    },
+    "T17_empty_tasks": {
+      "status": "FROZEN",
+      "summary": "tasks:[] grammar-legal; no invented minItems"
+    },
+    "T18_provenance": {
+      "status": "FROZEN",
+      "summary": "Canonical WELL-EBNF-1 bytes + full transform provenance including runtime/parser/Unicode identities for Q5/Q6/T15; input_schema_sha256 must equal preflight patched schema"
+    },
+    "T19_generator_fail": {
+      "status": "FROZEN",
+      "summary": "No weaken/fallback modes; hard-failure catalogue + UNSUPPORTED_SCHEMA_CONSTRUCT catch-all"
+    },
+    "T20_engine_requirements": {
+      "status": "FROZEN",
+      "summary": "Requirements only; consume WELL-EBNF-1 or language-preserving lowering; hard token mask; fidelity to Q2–Q10/T15; fail closed; provenance; practical constructibility; candidates deferred; install/probe/PILOT not authorized"
+    },
+    "T21_closeout_artifacts": {
+      "status": "FROZEN",
+      "summary": "Paired md+json evidence; this materialization"
+    }
+  },
+  "well_ebnf_1_requirements": [
+    "UTF-8 bytes",
+    "LF line endings only",
+    "deterministic rule ordering",
+    "deterministic whitespace/formatting",
+    "named productions",
+    "sequence",
+    "alternation",
+    "grouping",
+    "optionality",
+    "repetition",
+    "quoted literal terminals",
+    "mechanically generated Unicode scalar/range terminals sufficient for Q5/Q9",
+    "no semantic actions",
+    "no embedded host code",
+    "no engine-specific directives"
+  ],
+  "well_ebnf_1_note": "Exact textual syntax of WELL-EBNF-1 is part of the design contract and must be fully specified before generator implementation; this closeout freezes the dialect identity and requirements, not a complete metasyntax document.",
+  "provenance_chain": [
+    "frozen ClosedNormalizedProgram contract",
+    "documented XOR / non-whitespace patch semantics",
+    "persisted decomposer_pilot_preflight_01_constraint.schema.json (hash verify)",
+    "deterministic grammar generator",
+    "canonical WELL-EBNF-1 bytes",
+    "optional deterministic engine-native lowering",
+    "SHA-256 + generator identity"
+  ],
+  "generator_fail_classes": [
+    "patched_schema_hash_mismatch",
+    "unsupported_schema_keyword_with_semantic_effect",
+    "unrepresentable_xor",
+    "q5_nonwhitespace_unrepresentable",
+    "q6_or_t15_numeric_unrepresentable",
+    "unsupported_uniqueItems",
+    "ref_resolution_failure",
+    "recursive_cycle_not_exactly_representable",
+    "unsupported_pattern_or_string_constraint",
+    "unsupported_combinator",
+    "invalid_or_ambiguous_schema_construct",
+    "nondeterministic_grammar_generation",
+    "detected_modification_of_generated_grammar_bytes",
+    "attempted_hand_patch",
+    "engine_lowering_not_language_preserving",
+    "UNSUPPORTED_SCHEMA_CONSTRUCT"
+  ],
+  "forbidden_generator_modes": [
+    "WARN_AND_CONTINUE",
+    "APPROXIMATE",
+    "FALLBACK_TO_JSON_SCHEMA",
+    "POST_PARSE_REPAIR",
+    "CANONICALIZE_INVALID_OUTPUT"
+  ],
+  "engine_requirements": {
+    "selection_authorized": false,
+    "install_authorized": false,
+    "construction_probe_authorized": false,
+    "must": [
+      "consume WELL-EBNF-1 or deterministic language-preserving lowering",
+      "not use rejected JSON-Schema oneOf path as substitute",
+      "hard token-level enforcement with pinned Qwen tokenizer",
+      "preserve Q2–Q10 and T15 semantics",
+      "fail closed on unsupported/compile/tokenizer/resource failure",
+      "pin engine/tokenizer/grammar/lowering/config/compile/resource evidence in future probe",
+      "demonstrate practical constructibility under bounded documented resource envelope"
+    ],
+    "candidates_not_selected": [
+      "XGrammar grammar mode",
+      "llguidance",
+      "other hard grammar engine"
+    ]
+  },
+  "unresolved_human_gates": [
+    "authorize generator implementation (separate AUTH)",
+    "authorize WELL-EBNF-1 full metasyntax specification document if treated as separate deliverable",
+    "authorize engine construction probe (separate AUTH)",
+    "authorize PILOT-01 (separate AUTH)",
+    "Human escalation if preferred engine changes dependency/cost/latency envelope"
+  ],
+  "terminal_state": "DESIGN_TECHNICALLY_CLOSED_AWAITING_INDEPENDENT_REVIEW"
+}
