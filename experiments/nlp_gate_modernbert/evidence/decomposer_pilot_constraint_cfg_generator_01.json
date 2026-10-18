@@ -9,7 +9,7 @@
     "candidate_sha": "73d9c31852a394701320dd50fcc6c83944936df1"
   },
   "candidate_sha": "1b5ccbc49862c8184b1bad1acfd76024040b0aa0",
-  "tip_sha": "(pending SHA-record commit)",
+  "tip_sha": "0683167707088d4446ecc74ed2e0283740579135",
   "model_calls": 0,
   "engine_calls": 0,
   "generator_version": "decomposer_pilot_cfg_generator.v1",
