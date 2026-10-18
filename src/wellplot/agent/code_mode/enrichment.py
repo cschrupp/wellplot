@@ -81,6 +81,7 @@ class SourceContext(_EnrichmentModel):
     """One normalized, inspected source attached to a semantic task."""
 
     candidate_id: str = Field(min_length=1)
+    labels: tuple[str, ...] = ()
     canonical_path: str = Field(min_length=1)
     source_format: SourceFormat
     dataset_name: str = ""
@@ -117,6 +118,9 @@ class ReportContext(_EnrichmentModel):
     """Read-only report inventory exposed to a future worker."""
 
     header_slots: tuple[HeaderSlotInspectionSummary, ...] = ()
+    general_slot_ids: tuple[str, ...] = ()
+    service_title_slot_ids: tuple[str, ...] = ()
+    detail_slot_ids: tuple[str, ...] = ()
 
 
 class EnrichmentWarning(_EnrichmentModel):
@@ -261,7 +265,12 @@ class SemanticEnricher:
         return EnrichedSemanticContext(
             plan=plan,
             sections=sections,
-            report=ReportContext(header_slots=inspection.header_slots()),
+            report=ReportContext(
+                header_slots=_report_header_slots(document, inspection.header_slots()),
+                general_slot_ids=_general_slot_ids(document),
+                service_title_slot_ids=_service_title_slot_ids(document),
+                detail_slot_ids=_detail_slot_ids(document),
+            ),
             warnings=tuple(warnings),
         )
 
@@ -290,6 +299,7 @@ class SemanticEnricher:
         loaded = loaded_cache[cache_key]
         return SourceContext(
             candidate_id=candidate.candidate_id,
+            labels=candidate.labels,
             canonical_path=str(candidate.path),
             source_format=candidate.source_format,
             dataset_name=loaded.dataset_name,
@@ -644,6 +654,65 @@ def _channel_candidate(channel: ChannelContext, *, source_path: str) -> Authorin
         value_shape=list(channel.shape),
         source_path=source_path,
     )
+
+
+def _general_slot_ids(document: AuthoringDocumentSpec) -> tuple[str, ...]:
+    """Return the host-owned general header slot identities."""
+    if document.header is None:
+        return ()
+    return tuple(field.slot_id for field in document.header.general_fields)
+
+
+def _service_title_slot_ids(document: AuthoringDocumentSpec) -> tuple[str, ...]:
+    """Return the host-owned service-title slot identities."""
+    if document.header is None:
+        return ()
+    return tuple(title.slot_id for title in document.header.service_titles)
+
+
+def _detail_slot_ids(document: AuthoringDocumentSpec) -> tuple[str, ...]:
+    """Return detail-table slot identities in their canonical document order."""
+    if document.header is None or document.header.detail is None:
+        return ()
+    slot_ids: list[str] = []
+    for row in document.header.detail.rows:
+        slot_ids.extend(cell.slot_id for cell in row.values)
+        for column in row.columns:
+            slot_ids.extend(cell.slot_id for cell in column.cells)
+    return tuple(slot_ids)
+
+
+def _report_header_slots(
+    document: AuthoringDocumentSpec,
+    inspected_slots: tuple[HeaderSlotInspectionSummary, ...],
+) -> tuple[HeaderSlotInspectionSummary, ...]:
+    """Attach canonical detail-row ownership to detail value cells."""
+    slots = {slot.slot_id: slot for slot in inspected_slots}
+    detail = document.header.detail if document.header is not None else None
+    if detail is None:
+        return inspected_slots
+
+    for row in detail.rows:
+        if row.values:
+            for index, cell in enumerate(row.values):
+                slots[cell.slot_id] = HeaderSlotInspectionSummary(
+                    slot_id=cell.slot_id,
+                    key=row.key if index == 0 else None,
+                    label=row.label if index == 0 else None,
+                )
+            continue
+        for column_index, column in enumerate(row.columns):
+            row_key = row.keys[column_index] if column_index < len(row.keys) else row.key
+            row_label = (
+                row.label_cells[column_index] if column_index < len(row.label_cells) else row.label
+            )
+            for cell_index, cell in enumerate(column.cells):
+                slots[cell.slot_id] = HeaderSlotInspectionSummary(
+                    slot_id=cell.slot_id,
+                    key=row_key if cell_index == 0 else None,
+                    label=row_label if cell_index == 0 else None,
+                )
+    return tuple(slots[slot.slot_id] for slot in inspected_slots)
 
 
 __all__ = [

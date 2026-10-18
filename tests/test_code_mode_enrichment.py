@@ -435,6 +435,7 @@ def test_section_hint_resolution_is_exact_then_lexical_and_preserves_plan(tmp_pa
 
     assert result.plan == plan
     assert result.sections[0].section_id == "main"
+    assert result.sections[0].sources[0].labels == ("main",)
     assert {slot.slot_id for slot in result.report.header_slots} == {
         "well",
         "service",
@@ -442,6 +443,62 @@ def test_section_hint_resolution_is_exact_then_lexical_and_preserves_plan(tmp_pa
         "elevation-kb",
         "elevation-gl",
     }
+    assert result.report.general_slot_ids == ("well",)
+    assert result.report.service_title_slot_ids == ("service",)
+    assert result.report.detail_slot_ids == (
+        "location-value",
+        "elevation-kb",
+        "elevation-gl",
+    )
+
+
+def test_detail_column_slots_retain_row_ownership_for_report_workers(tmp_path: Path) -> None:
+    """Expose row keys on value cells without assigning ownership to unit cells."""
+    enricher, _ = _enricher(tmp_path)
+    (tmp_path / "main.las").write_text("source", encoding="utf-8")
+    document = AuthoringDocumentSpec(
+        name="cm-41",
+        header={
+            "general_fields": [{"slot_id": "well", "key": "well", "label": "Well"}],
+            "detail": {
+                "kind": "cased_hole",
+                "rows": [
+                    {
+                        "row_id": "depth",
+                        "key": "driller_depth",
+                        "label": "Driller Depth",
+                        "columns": [
+                            {
+                                "cells": [
+                                    {"slot_id": "depth-value"},
+                                    {"slot_id": "depth-unit"},
+                                ]
+                            }
+                        ],
+                    }
+                ],
+            },
+        },
+        sections=[
+            {
+                "id": "main",
+                "title": "Main Pass",
+                "tracks": [{"id": "combo", "title": "Combo", "kind": "normal", "width_mm": 20}],
+            }
+        ],
+    )
+
+    result = enricher.enrich(
+        plan=_plan(hint="Main Pass", source_hints=("main",)),
+        document=document,
+        source_candidates=(_candidate(tmp_path),),
+    )
+
+    slots = {slot.slot_id: slot for slot in result.report.header_slots}
+    assert slots["depth-value"].key == "driller_depth"
+    assert slots["depth-value"].label == "Driller Depth"
+    assert slots["depth-unit"].key is None
+    assert slots["depth-unit"].label is None
 
 
 def test_section_hint_containment_requires_one_match(tmp_path: Path) -> None:

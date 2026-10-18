@@ -179,11 +179,22 @@ def _compile_track(
             candidate
             for candidate in existing_tracks.values()
             if str(getattr(candidate, "id", "")) not in used_track_ids
-            if getattr(candidate, "kind", None) == track.kind
-            and str(getattr(candidate, "title", "")).casefold() == track.title.casefold()
+            if str(getattr(candidate, "id", "")) == track.semantic_id
+            and getattr(candidate, "kind", None) == track.kind
         ),
         None,
     )
+    if existing is None:
+        existing = next(
+            (
+                candidate
+                for candidate in existing_tracks.values()
+                if str(getattr(candidate, "id", "")) not in used_track_ids
+                if getattr(candidate, "kind", None) == track.kind
+                and str(getattr(candidate, "title", "")).casefold() == track.title.casefold()
+            ),
+            None,
+        )
     track_id = (
         str(existing.id)
         if existing is not None

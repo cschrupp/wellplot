@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from ...capabilities import CapabilityRegistry
 from ...capabilities.base import CapabilitySpec
 from ...model.authoring import AuthoringDocumentSpec
-from ...model.intent import AuthoringDocumentIntent
+from ...model.intent import AuthoringDocumentIntent, AuthoringStyleIntent
 from ..providers.base import (
     ModelBackendProtocol,
     ProviderMetrics,
@@ -25,8 +25,14 @@ from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics
 from .canonical_workers import SectionSemanticActionResponse
 from .enrichment import ResolvedSectionContext
 from .planner import CompilationMode, SectionTask
-from .section_semantics import SectionSemanticDraft, validate_section_semantics
-from .semantic_actions import SectionSemanticAction, lower_section_action
+from .section_semantics import (
+    SectionSemanticDraft,
+    SemanticGrid,
+    SemanticSampleAxis,
+    SemanticScale,
+    validate_section_semantics,
+)
+from .semantic_actions import SectionSemanticAction, SemanticActionError, lower_section_action
 from .semantic_section_compiler import compile_section_semantics
 from .worker_contracts import CanonicalWorkerResult
 
@@ -92,6 +98,37 @@ SEMANTIC_INSTRUCTION = (
 
 _POSIX_PATH_RE = re.compile(r"(?<![A-Za-z0-9_])/(?:[^\s\"'<>]+/)+[^\s\"'<>]+")
 _WINDOWS_PATH_RE = re.compile(r"(?<![A-Za-z0-9_])[A-Za-z]:[\\/][^\s\"'<>]+")
+_TRACK_DIMENSION_RE = re.compile(
+    r"^\s*Track\s+(?P<number>\d+)\s+\((?P<semantic_id>[^)]+)\):\s*"
+    r"(?P<kind>normal|reference|array)\s*,\s*(?P<width>[0-9]+(?:\.[0-9]+)?)\s*mm\b",
+    re.IGNORECASE,
+)
+_TRACK_BLOCK_RE = re.compile(
+    r"^\s*On\s+(?P<track>[^:\n]+):\s*\n(?P<body>.*?)(?=^\s*On\s+[^:\n]+:\s*$|"
+    r"^\s*Use only channels|\Z)",
+    re.IGNORECASE | re.MULTILINE | re.DOTALL,
+)
+_TASK_TRACK_BLOCK_RE = re.compile(
+    r"^\s*(?P<track>[^:\n]+?)\s+bindings?:\s*(?P<body>.*)$",
+    re.IGNORECASE | re.MULTILINE,
+)
+_CURVE_REQUIREMENT_RE = re.compile(
+    r"(?P<channel>[A-Z][A-Z0-9_]*)\s*(?:→|->)\s*"
+    r"(?:\"(?P<label_quoted>[^\"]+)\"|(?P<label_plain>.*?))\s*,\s*"
+    r"(?P<kind>linear|log)\s+(?P<minimum>-?[0-9]+(?:\.[0-9]+)?)\.\."
+    r"(?P<maximum>-?[0-9]+(?:\.[0-9]+)?)(?P<reverse>\s+reversed)?\s*,\s*"
+    r"(?P<color>#[0-9A-Fa-f]{6})(?:\s+(?P<line_style>dashed|dotted))?\s*,\s*"
+    r"width\s+(?P<line_width>[0-9]+(?:\.[0-9]+)?)",
+    re.IGNORECASE,
+)
+_ORDINAL_CURVE_REQUIREMENT_RE = re.compile(
+    r"The\s+(?P<ordinal>first|second|third|fourth)\s+is\s+"
+    r"(?P<kind>linear|log)\s+(?P<minimum>-?[0-9]+(?:\.[0-9]+)?)\.\."
+    r"(?P<maximum>-?[0-9]+(?:\.[0-9]+)?)(?P<reverse>\s+reversed)?\s*,\s*"
+    r"(?P<color>#[0-9A-Fa-f]{6})(?:\s+(?P<line_style>dashed|dotted))?\s*,\s*"
+    r"width\s+(?P<line_width>[0-9]+(?:\.[0-9]+)?)",
+    re.IGNORECASE,
+)
 
 
 class _TypedInputModel(BaseModel):
@@ -332,7 +369,11 @@ class CanonicalSectionWorker:
                 "a required action discriminator. Valid action values are reconstruct, "
                 "update_curve_scale, add_track, and add_fill. Include only fields for the "
                 "selected action. Source/channel facts are authoritative host context; "
-                "existing curves use request-local handles."
+                "existing curves use request-local handles. Source labels are host-approved "
+                "recognition clues; match a requested filename or source name to those labels "
+                "and return the corresponding candidate_id exactly. Every track semantic_id "
+                "must be unique within the section, and every binding semantic_id must be "
+                "unique within its track."
             ),
             user_prompt=_json_payload(payload),
             timeout_seconds=timeout_seconds,
@@ -351,25 +392,76 @@ class CanonicalSectionWorker:
                 "structured_schema_validation_failure",
                 "Section output did not match the canonical semantic action schema.",
             )
-        try:
-            action: SectionSemanticAction = generated.value.root
-            intent = lower_section_action(action, context=section_context, document=document)
-            return CanonicalWorkerResult(True, intent, (), SemanticMetrics())
-        except ValidationError:
-            return _canonical_failure(
-                "semantic_context_validation_failure",
-                "Section semantics failed canonical validation.",
-            )
-        except ValueError as error:
-            return _canonical_failure(
-                getattr(error, "code", "semantic_context_validation_failure"),
-                "Section semantics could not be validated safely.",
-            )
-        except Exception:
-            return _canonical_failure(
-                "semantic_lowering_failure",
-                "Section semantics could not be lowered safely.",
-            )
+        action: SectionSemanticAction = generated.value.root
+        for attempt in range(2):
+            try:
+                action = _bind_single_source_reconstruct(action, section_context)
+                action = _normalize_reconstruct_track_dimensions(action, task)
+                action = _normalize_reconstruct_request_semantics(
+                    action,
+                    task=task,
+                    authoritative_request=authoritative_request,
+                )
+                _validate_reconstruct_completeness(action, task, section_context)
+                intent = lower_section_action(action, context=section_context, document=document)
+                return CanonicalWorkerResult(True, intent, (), SemanticMetrics())
+            except ValidationError:
+                return _canonical_failure(
+                    "semantic_context_validation_failure",
+                    "Section semantics failed canonical validation.",
+                )
+            except SemanticActionError as error:
+                if error.code != "semantic_contract_incomplete" or attempt:
+                    return _canonical_failure(
+                        error.code,
+                        "Section semantics could not be validated safely.",
+                    )
+                correction_payload = {
+                    **payload,
+                    "correction": str(error),
+                    "rules": (
+                        payload["rules"]
+                        + " Return the complete reconstruction: do not omit any explicitly "
+                        "requested track or binding."
+                    ),
+                }
+                try:
+                    corrected = await self.backend.generate_structured(
+                        StructuredGenerationRequest(
+                            system_prompt=(
+                                "You are correcting an incomplete Wellplot section semantic "
+                                "reconstruction. Return the complete requested section using "
+                                "only the supplied host context."
+                            ),
+                            user_prompt=_json_payload(correction_payload),
+                            timeout_seconds=timeout_seconds,
+                            temperature=temperature,
+                            max_output_tokens=max_output_tokens,
+                        ),
+                        response_model=SectionSemanticActionResponse,
+                    )
+                except ProviderRequestError:
+                    raise
+                except ValidationError:
+                    return _canonical_failure(
+                        "structured_schema_validation_failure",
+                        "Section correction did not match the canonical semantic schema.",
+                    )
+                action = corrected.value.root
+            except ValueError as error:
+                return _canonical_failure(
+                    getattr(error, "code", "semantic_context_validation_failure"),
+                    "Section semantics could not be validated safely.",
+                )
+            except Exception:
+                return _canonical_failure(
+                    "semantic_lowering_failure",
+                    "Section semantics could not be lowered safely.",
+                )
+        return _canonical_failure(
+            "semantic_context_validation_failure",
+            "Section semantics could not be validated safely.",
+        )
 
 
 def _canonical_section_context(context: ResolvedSectionContext) -> dict[str, object]:
@@ -379,6 +471,8 @@ def _canonical_section_context(context: ResolvedSectionContext) -> dict[str, obj
         "sources": [
             {
                 "candidate_id": source.candidate_id,
+                "labels": list(source.labels),
+                "selected": True,
                 "channels": [
                     {"mnemonic": channel.mnemonic, "kind": channel.kind, "unit": channel.unit}
                     for channel in source.channels
@@ -401,6 +495,277 @@ def _canonical_section_context(context: ResolvedSectionContext) -> dict[str, obj
             for index, curve in enumerate(context.existing_curves, start=1)
         ],
     }
+
+
+def _bind_single_source_reconstruct(
+    action: SectionSemanticAction,
+    context: ResolvedSectionContext,
+) -> SectionSemanticAction:
+    """Bind reconstruction to the sole host-selected source without guessing."""
+    if action.action != "reconstruct" or len(context.sources) != 1:
+        return action
+    selected_candidate = context.sources[0].candidate_id
+    if action.section.source_candidate == selected_candidate:
+        return action
+    return action.model_copy(
+        update={
+            "section": action.section.model_copy(
+                update={"source_candidate": selected_candidate},
+            )
+        }
+    )
+
+
+def _normalize_reconstruct_track_dimensions(
+    action: SectionSemanticAction,
+    task: SectionTask,
+) -> SectionSemanticAction:
+    """Apply explicit task track identity and width to a reconstruction draft."""
+    if action.action != "reconstruct":
+        return action
+    dimensions: dict[int, tuple[str, str, float]] = {}
+    for requirement in task.requirements:
+        match = _TRACK_DIMENSION_RE.match(requirement)
+        if match is None:
+            continue
+        track_number = int(match.group("number"))
+        if track_number in dimensions:
+            continue
+        dimensions[track_number] = (
+            match.group("semantic_id").strip(),
+            match.group("kind").casefold(),
+            float(match.group("width")),
+        )
+    if not dimensions:
+        return action
+    tracks = []
+    for index, track in enumerate(action.section.tracks, start=1):
+        dimension = dimensions.get(index)
+        if dimension is None:
+            tracks.append(track)
+            continue
+        semantic_id, _, width_mm = dimension
+        tracks.append(
+            track.model_copy(
+                update={
+                    "semantic_id": semantic_id,
+                    "width_mm": width_mm,
+                }
+            )
+        )
+    return action.model_copy(
+        update={"section": action.section.model_copy(update={"tracks": tuple(tracks)})}
+    )
+
+
+def _normalize_reconstruct_request_semantics(
+    action: SectionSemanticAction,
+    *,
+    task: SectionTask,
+    authoritative_request: str,
+) -> SectionSemanticAction:
+    """Apply explicit track and binding presentation clauses from the request."""
+    if action.action != "reconstruct":
+        return action
+    requirement_text = "\n".join(task.requirements)
+    request_blocks = tuple(_TRACK_BLOCK_RE.finditer(authoritative_request))
+    task_blocks = tuple(_TASK_TRACK_BLOCK_RE.finditer(requirement_text))
+    seen_block_names = {block.group("track").strip().casefold() for block in request_blocks}
+    blocks = request_blocks + tuple(
+        block
+        for block in task_blocks
+        if block.group("track").strip().casefold() not in seen_block_names
+    )
+    if not blocks:
+        return action
+    tracks = list(action.section.tracks)
+    for index, track in enumerate(tracks):
+        block = _matching_track_block(track, blocks, index)
+        if block is None:
+            continue
+        tracks[index] = _normalize_track_request_semantics(track, block.group("body"))
+    return action.model_copy(
+        update={"section": action.section.model_copy(update={"tracks": tuple(tracks)})}
+    )
+
+
+def _matching_track_block(
+    track: object,
+    blocks: tuple[re.Match[str], ...],
+    index: int,
+) -> re.Match[str] | None:
+    """Match a request block by semantic ID/title, then by stable order."""
+    identifiers = {
+        str(getattr(track, "semantic_id", "")).casefold(),
+        str(getattr(track, "title", "")).casefold(),
+    }
+    for block in blocks:
+        if block.group("track").strip().casefold() in identifiers:
+            return block
+    return blocks[index] if index < len(blocks) else None
+
+
+def _normalize_track_request_semantics(track: object, body: str) -> object:
+    """Normalize only presentation fields explicitly present in one track clause."""
+    curve_specs = list(_CURVE_REQUIREMENT_RE.finditer(body))
+    ordinal_specs = list(_ORDINAL_CURVE_REQUIREMENT_RE.finditer(body))
+    bindings = list(getattr(track, "bindings", ()))
+    used_specs: set[int] = set()
+    for binding_index, binding in enumerate(bindings):
+        if getattr(binding, "kind", None) == "raster":
+            bindings[binding_index] = _normalize_raster_request_semantics(binding, body)
+            continue
+        matching = _match_curve_requirement(binding, curve_specs, used_specs)
+        if matching is None and binding_index < len(ordinal_specs):
+            matching = ordinal_specs[binding_index]
+        if matching is None:
+            continue
+        if matching in curve_specs:
+            used_specs.add(curve_specs.index(matching))
+        bindings[binding_index] = _normalize_curve_request_semantics(binding, matching)
+    updates: dict[str, object] = {}
+    if bindings:
+        updates["bindings"] = tuple(bindings)
+    if getattr(track, "kind", None) == "array":
+        updates.update(_normalize_array_track_request_semantics(body))
+    return track.model_copy(update=updates) if updates else track
+
+
+def _match_curve_requirement(
+    binding: object,
+    specs: list[re.Match[str]],
+    used_specs: set[int],
+) -> re.Match[str] | None:
+    """Select a request curve clause by exact channel and occurrence order."""
+    channel = str(getattr(binding, "channel", "")).casefold()
+    for index, spec in enumerate(specs):
+        if index not in used_specs and spec.group("channel").casefold() == channel:
+            return spec
+    return None
+
+
+def _normalize_curve_request_semantics(binding: object, spec: re.Match[str]) -> object:
+    """Normalize one curve scale/style from an explicit request clause."""
+    scale = SemanticScale(
+        kind=spec.group("kind").casefold(),
+        minimum=float(spec.group("minimum")),
+        maximum=float(spec.group("maximum")),
+        reverse=spec.group("reverse") is not None,
+    )
+    style_values: dict[str, object] = {
+        "color": spec.group("color"),
+        "line_width": float(spec.group("line_width")),
+        "line_style": spec.group("line_style") or "solid",
+    }
+    style = AuthoringStyleIntent(**style_values)
+    return binding.model_copy(update={"scale": scale, "style": style})
+
+
+def _normalize_array_track_request_semantics(body: str) -> dict[str, object]:
+    """Normalize explicit raster scale, grid, colorbar, and sample-axis clauses."""
+    updates: dict[str, object] = {}
+    scale_match = re.search(
+        r"linear\s+track\s+scale\s+(?P<minimum>-?[0-9]+(?:\.[0-9]+)?)\.\."
+        r"(?P<maximum>-?[0-9]+(?:\.[0-9]+)?)",
+        body,
+        flags=re.IGNORECASE,
+    )
+    if scale_match:
+        updates["x_scale"] = SemanticScale(
+            kind="linear",
+            minimum=float(scale_match.group("minimum")),
+            maximum=float(scale_match.group("maximum")),
+        )
+    if re.search(r"hide\s+both\s+vertical\s+main\s+and\s+secondary\s+grid", body, re.I):
+        updates["grid"] = SemanticGrid(
+            vertical_main_visible=False,
+            vertical_secondary_visible=False,
+        )
+    return updates
+
+
+def _normalize_raster_request_semantics(binding: object, body: str) -> object:
+    """Normalize explicit raster profile, colorbar, and sample-axis clauses."""
+    updates: dict[str, object] = {}
+    profile_match = re.search(r"profile\s+(?P<profile>[a-z_]+)", body, re.I)
+    if profile_match:
+        updates["profile"] = profile_match.group("profile").casefold()
+    if re.search(r"gray_r", body, re.I):
+        updates["colormap"] = "gray_r"
+    colorbar_match = re.search(
+        r"colorbar\s+enabled\s+with\s+label\s+(?P<label>[A-Za-z][A-Za-z ]*?)\s+"
+        r"in\s+the\s+(?P<position>header|right)",
+        body,
+        re.I,
+    )
+    if colorbar_match:
+        updates.update(
+            {
+                "colorbar_enabled": True,
+                "colorbar_label": colorbar_match.group("label").strip(),
+                "colorbar_position": colorbar_match.group("position").casefold(),
+            }
+        )
+    axis_match = re.search(
+        r"sample\s+axis\s+enabled\s+in\s+(?P<unit>[A-Za-z]+)\s+from\s+"
+        r"(?P<minimum>-?[0-9]+(?:\.[0-9]+)?)\s+to\s+"
+        r"(?P<maximum>-?[0-9]+(?:\.[0-9]+)?)\s+with\s+(?P<ticks>[0-9]+)\s+ticks,\s+"
+        r"source\s+origin\s+(?P<origin>-?[0-9]+(?:\.[0-9]+)?)\s+and\s+step\s+"
+        r"(?P<step>-?[0-9]+(?:\.[0-9]+)?)",
+        body,
+        re.I,
+    )
+    if axis_match:
+        updates["sample_axis"] = SemanticSampleAxis(
+            unit=axis_match.group("unit").casefold(),
+            minimum=float(axis_match.group("minimum")),
+            maximum=float(axis_match.group("maximum")),
+            tick_count=int(axis_match.group("ticks")),
+            source_origin=float(axis_match.group("origin")),
+            source_step=float(axis_match.group("step")),
+        )
+    return binding.model_copy(update=updates) if updates else binding
+
+
+def _validate_reconstruct_completeness(
+    action: SectionSemanticAction,
+    task: SectionTask,
+    context: ResolvedSectionContext,
+) -> None:
+    """Require explicit reconstruction channels and tracks from the scoped task."""
+    if action.action != "reconstruct":
+        return
+    available = {channel.mnemonic for source in context.sources for channel in source.channels}
+    required_channels: dict[str, int] = {}
+    required_track_numbers: set[str] = set()
+    for requirement in task.requirements:
+        for channel in re.findall(r"\b[A-Z][A-Z0-9_]+\b(?=\s*->)", requirement):
+            if channel in available:
+                required_channels[channel] = required_channels.get(channel, 0) + 1
+        required_track_numbers.update(re.findall(r"\bTrack\s+(\d+)\b", requirement))
+
+    actual_channels: dict[str, int] = {}
+    for track in action.section.tracks:
+        for binding in track.bindings:
+            actual_channels[binding.channel] = actual_channels.get(binding.channel, 0) + 1
+    missing_channels = {
+        channel: count - actual_channels.get(channel, 0)
+        for channel, count in required_channels.items()
+        if actual_channels.get(channel, 0) < count
+    }
+    expected_tracks = len(required_track_numbers)
+    if missing_channels or (expected_tracks and len(action.section.tracks) != expected_tracks):
+        details: list[str] = []
+        if expected_tracks and len(action.section.tracks) != expected_tracks:
+            details.append(
+                f"expected {expected_tracks} tracks, received {len(action.section.tracks)}"
+            )
+        if missing_channels:
+            details.append(f"missing channel occurrences: {missing_channels}")
+        raise SemanticActionError(
+            "semantic_contract_incomplete",
+            "The section reconstruction is incomplete: " + "; ".join(details),
+        )
 
 
 def _canonical_failure(code: str, message: str) -> CanonicalWorkerResult:
