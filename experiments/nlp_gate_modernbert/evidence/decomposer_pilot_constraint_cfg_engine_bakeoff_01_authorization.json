@@ -1,0 +1,114 @@
+{
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01-AUTH-001",
+  "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01",
+  "mode": "BOUNDED_ENGINE_BAKEOFF",
+  "starting_tip": "d34c904f82ad35ed30ed723661a87d95fc908acc",
+  "parent": {
+    "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-GENERATOR-01R",
+    "status": "HUMAN_ACCEPTED_CLOSED",
+    "candidate_sha": "f3607ff9d0733712ecd86742496620e4aa77d9a4",
+    "grammar_sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3"
+  },
+  "objective": "Compare hard-constraint engines against the same immutable accepted WELL-EBNF-1 grammar and pinned Qwen3-1.7B tokenizer without loading model weights or generating.",
+  "candidate_backends": [
+    {
+      "id": "xgrammar",
+      "route": "native EBNF / grammar mode only",
+      "json_schema_route": "FORBIDDEN_BY_PRIOR_REJECTION"
+    },
+    {
+      "id": "llguidance",
+      "route": "deterministic WELL-EBNF-1 -> Lark-style grammar lowering"
+    }
+  ],
+  "authoritative_inputs": {
+    "grammar_path": "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_constraint_cfg_generator_01.well_ebnf1",
+    "grammar_sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
+    "tokenizer_model_id": "Qwen/Qwen3-1.7B",
+    "tokenizer_source": "existing local ModelScope snapshot only",
+    "tokenizer_json_sha256": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+    "tokenizer_config_sha256": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+    "merges_sha256": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+    "vocab_sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+    "auto_download": false
+  },
+  "authorized": [
+    "isolated experimental installation of XGrammar and llguidance only",
+    "record exact resolved backend/package versions and source/provenance",
+    "deterministic language-preserving WELL-EBNF-1 -> backend-native lowering",
+    "hash backend-native lowered grammar bytes",
+    "load/construct tokenizer metadata from the pinned local tokenizer snapshot only",
+    "compile/construct backend grammar against the pinned tokenizer",
+    "construct and inspect hard token masks without model logits",
+    "replay fixed positive and negative tokenized strings through backend matcher/mask APIs",
+    "measure compile/construction time, peak memory where measurable, and mask-step latency",
+    "write bakeoff tests and machine-readable evidence",
+    "recommend a backend based on frozen gates and recorded evidence"
+  ],
+  "forbidden": [
+    "modify accepted WELL-EBNF-1 source grammar",
+    "semantic widening or narrowing in backend lowering",
+    "hand patch backend-native grammar",
+    "use XGrammar JSON-Schema route",
+    "use llguidance inline JSON-Schema as a substitute for the accepted grammar",
+    "network/autodownload of Qwen tokenizer or model artifacts",
+    "load Qwen model weights",
+    "model forward",
+    "model generate",
+    "prompt changes",
+    "schema changes",
+    "semantic repair",
+    "PILOT_01",
+    "production wellplot dependency changes"
+  ],
+  "lowerer_contract": {
+    "source": "immutable WELL-EBNF-1 bytes",
+    "requirement": "pure deterministic transform per backend",
+    "provenance": [
+      "source grammar sha256",
+      "lowerer source sha256",
+      "lowerer version/id",
+      "backend-native grammar sha256",
+      "backend version"
+    ],
+    "failure": "If exact language-preserving lowering cannot be demonstrated, reject that backend; do not patch semantics."
+  },
+  "parity_contract": {
+    "source_suite": "existing CFG generator positive/negative parity fixtures plus targeted backend-boundary cases",
+    "positive_requirement": "all positives accepted",
+    "negative_requirement": "all negatives rejected",
+    "token_replay_positive": "every token of every positive case must remain allowed to full completion",
+    "token_replay_negative": "each negative case must encounter an excluded token or otherwise become impossible before full invalid text completion",
+    "independent_reference": "existing test-only WELL-EBNF-1 recognizer remains reference for source grammar language"
+  },
+  "gates": {
+    "G1_input_identity": "accepted grammar hash and pinned tokenizer hashes match",
+    "G2_lowering": "deterministic backend lowering and hash replay pass",
+    "G3_text_parity": "100% fixed positive/negative text parity",
+    "G4_tokenizer_compile": "backend tokenizer/grammar construction succeeds",
+    "G5_mask_replay": "100% positive replay and negative rejection",
+    "G6_determinism": "repeat construction/replay produces identical semantic results/masks for fixed probes",
+    "G7_resources": "record bounded compile/construction resource evidence; pathological resource failure rejects backend",
+    "G8_boundary": "model_calls=0 and model_weights_loaded=false"
+  },
+  "selection_policy": [
+    "Any backend failing G1-G5 or G8 is rejected.",
+    "If exactly one backend passes all mandatory gates, recommend it.",
+    "If multiple pass, SOL ranks by semantic fidelity first, then construction/resource behavior, mask latency, dependency footprint, and operational simplicity.",
+    "No backend selection authorizes PILOT-01."
+  ],
+  "tokenizer_unavailable_policy": "If the pinned local tokenizer artifacts are unavailable or hashes mismatch, STOP with PINNED_TOKENIZER_UNAVAILABLE. Do not download replacements.",
+  "dependency_policy": "Engine packages may be installed only in the experiment environment. Do not add them to the public wellplot runtime dependencies.",
+  "model_calls": 0,
+  "pilot_01": "NOT_AUTHORIZED",
+  "expected_handoff": [
+    "candidate SHA and remote head",
+    "exact changed paths",
+    "backend/lowerer versions and hashes",
+    "parity results per backend",
+    "token-mask replay results per backend",
+    "resource/performance evidence",
+    "backend recommendation or no-qualified-backend result",
+    "explicit model_calls=0 / model_weights_loaded=false"
+  ]
+}
