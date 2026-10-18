@@ -5,7 +5,7 @@
   "starting_tip": "c6aba48be4c2f8b7e7cf0954f812b2838883ab12",
   "prior_stage_a_candidate": "bce546960284be712e0d3b8f4d80d1eaec14e60f",
   "prior_stage_a_result": "REVISE",
-  "candidate_sha": null,
+  "candidate_sha": "b249b810908cbc0283e62f18e8780a4a4f7144d3",
   "tip_sha": null,
   "parent": {
     "slice": "DECOMPOSER-PILOT-PREFLIGHT-01R",
@@ -45,13 +45,19 @@
   },
   "xor_shape_vs_disjointness_prover": {
     "branch_a": {
-      "required": ["kind", "text"],
+      "required": [
+        "kind",
+        "text"
+      ],
       "kind": "same enum as branch B",
       "text": "pattern .*\\S.*",
       "additionalProperties": false
     },
     "branch_b": {
-      "required": ["kind", "local_ref"],
+      "required": [
+        "kind",
+        "local_ref"
+      ],
       "kind": "same enum as branch A",
       "local_ref": "pattern .*\\S.*",
       "additionalProperties": false
