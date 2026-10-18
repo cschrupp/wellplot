@@ -214,12 +214,32 @@ def parse_well_ebnf1(text: str | bytes) -> WellEbnf1Grammar:
     return WellEbnf1Grammar(prods, start="START")
 
 
+def _is_ascii_ident_char_first(c: str) -> bool:
+    return ("A" <= c <= "Z") or ("a" <= c <= "z") or c == "_"
+
+
+def _is_ascii_ident_char(c: str) -> bool:
+    return _is_ascii_ident_char_first(c) or ("0" <= c <= "9")
+
+
 def _is_ident(s: str) -> bool:
+    """WELL-EBNF-1 Identifier ::= [A-Za-z_][A-Za-z0-9_]* (ASCII only)."""
     if not s:
         return False
-    if not (s[0].isalpha() or s[0] == "_"):
+    if not _is_ascii_ident_char_first(s[0]):
         return False
-    return all(c.isalnum() or c == "_" for c in s)
+    return all(_is_ascii_ident_char(c) for c in s[1:])
+
+
+def _parse_unsigned_int(s: str) -> int:
+    """UnsignedInt ::= \"0\" | [1-9][0-9]* — reject leading zeros."""
+    if s == "0":
+        return 0
+    if not s or s[0] == "0" or not s.isdigit():
+        raise WellEbnf1Error(f"bad UnsignedInt: {s!r}")
+    if not all("0" <= c <= "9" for c in s):
+        raise WellEbnf1Error(f"bad UnsignedInt: {s!r}")
+    return int(s)
 
 
 def _parse_expression(expr: str, line_no: int) -> list[list[_AtomAst]]:
@@ -260,10 +280,11 @@ def _parse_atom(s: str, i: int, line_no: int) -> tuple[_AtomAst, int]:
             body = s[i + 1 : j]
             try:
                 m_s, n_s = body.split(",", 1)
-                m, n = int(m_s), int(n_s)
-            except ValueError as exc:
-                raise WellEbnf1Error(f"line {line_no}: bad repeat body") from exc
-            if m < 0 or n < m:
+                m = _parse_unsigned_int(m_s)
+                n = _parse_unsigned_int(n_s)
+            except WellEbnf1Error as exc:
+                raise WellEbnf1Error(f"line {line_no}: bad repeat body: {exc}") from exc
+            if n < m:
                 raise WellEbnf1Error(f"line {line_no}: bad repeat bounds")
             suffix = "{}"
             repeat = (m, n)
@@ -305,9 +326,9 @@ def _parse_primary(s: str, i: int, line_no: int) -> tuple[_Primary, int]:
         inner = s[i + 1 : j - 1]
         alts = _parse_expression(inner, line_no)
         return _Primary("group", alts), j
-    # identifier
+    # identifier — ASCII [A-Za-z_][A-Za-z0-9_]* only
     j = i
-    while j < len(s) and (s[j].isalnum() or s[j] == "_"):
+    while j < len(s) and _is_ascii_ident_char(s[j]):
         j += 1
     name = s[i:j]
     if not _is_ident(name):

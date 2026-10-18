@@ -68,21 +68,25 @@ def install_json_lexicals(rules: dict[str, Alt], provenance: dict[str, Any]) -> 
     provenance["python_strip_whitespace_codepoints"] = list(ws)
     provenance["q5_nonempty_pattern"] = NONEMPTY_PATTERN
 
-    # Unconstrained BMP hex nibble grammar: [0-9A-Fa-f]{4}
-    hex_digit = CharClass(
-        False,
-        (
-            CharRange(0x30, 0x39),
-            CharRange(0x41, 0x46),
-            CharRange(0x61, 0x66),
+    # R4: lone surrogate \\uXXXX halves are illegal as standalone atoms.
+    # Valid high+low surrogate pairs remain legal via JsonSurrogatePair.
+    surrogates = set(range(0xD800, 0xE000))
+    provenance["r4_surrogate_lexical_narrowing"] = {
+        "statement": (
+            "Ordinary \\uXXXX surrogate halves are NOT legal standalone JSON string "
+            "atoms on the canonical generation surface. Valid high+low surrogate "
+            "pairs remain legal. Unpaired high/low surrogate escapes are grammar-rejected."
         ),
+        "permitted_canonical_lexical_narrowing": True,
+    }
+
+    # BMP \\uXXXX excluding surrogates (used by ordinary JsonUnicodeEscape).
+    bmp_non_sur_rules, bmp_non_sur = build_hex4_alt_excluding(
+        surrogates, "JsonBmpNonSurHex4"
     )
-    rules["JsonHex4"] = _rule(
-        seq(Atom(hex_digit), Atom(hex_digit), Atom(hex_digit), Atom(hex_digit))
-    )
+    rules.update(bmp_non_sur_rules)
 
     # Non-whitespace BMP \\uXXXX (exclude strip-whitespace and surrogates)
-    surrogates = set(range(0xD800, 0xE000))
     non_ws_hex_rules, non_ws_hex = build_hex4_alt_excluding(
         ws_bmp, "NonWsHex4", also_exclude=surrogates
     )
@@ -134,7 +138,8 @@ def install_json_lexicals(rules: dict[str, Alt], provenance: dict[str, Any]) -> 
 
     rules["NonWsUnicodeEscape"] = _rule(seq(Lit("\\u"), Ident(non_ws_hex)))
     rules["WsUnicodeEscape"] = _rule(seq(Lit("\\u"), Ident(ws_hex)))
-    rules["JsonUnicodeEscape"] = _rule(seq(Lit("\\u"), Ident("JsonHex4")))
+    # R4: no lone surrogate halves via ordinary \\uXXXX.
+    rules["JsonUnicodeEscape"] = _rule(seq(Lit("\\u"), Ident(bmp_non_sur)))
 
     rules["NonWsDecodeAtom"] = alt(
         Ident("NonWsUnescaped"),

@@ -1,27 +1,27 @@
-# DECOMPOSER-PILOT-CONSTRAINT-CFG-GENERATOR-01 — Implementation closeout
+# DECOMPOSER-PILOT-CONSTRAINT-CFG-GENERATOR-01R — Corrective rework closeout
 
 ```
 SLICE:
-DECOMPOSER-PILOT-CONSTRAINT-CFG-GENERATOR-01
+DECOMPOSER-PILOT-CONSTRAINT-CFG-GENERATOR-01R
 
 AUTHORITY:
 WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-CFG-GENERATOR-01-AUTH-001
 
 MODE:
-BOUNDED IMPLEMENTATION
+BOUNDED IMPLEMENTATION REWORK
 
-PARENT:
-DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01R2
-ACCEPTED (Human design acceptance recorded)
+PRIOR CANDIDATE:
+1b5ccbc49862c8184b1bad1acfd76024040b0aa0
+RESULT: REVISE (F001–F004)
 
 STARTING TIP:
-8e84a8f41650a221a4ef247bd7d78bceaa43687d
+f0ede93c9885915b7430fa391901cc561d72f811
 
 CANDIDATE SHA:
-1b5ccbc49862c8184b1bad1acfd76024040b0aa0
+(pending commit)
 
 TIP:
-0683167707088d4446ecc74ed2e0283740579135
+(pending SHA-record commit)
 
 MODEL CALLS:
 0
@@ -30,73 +30,52 @@ ENGINE CALLS:
 0
 ```
 
-## Purpose
+## Corrective scope (R1–R5)
 
-```
-pinned patched ClosedNormalizedProgram schema
-        ↓
-deterministic generator (library)
-        ↓
-canonical WELL-EBNF-1 bytes
-        ↓
-parity / determinism / containment evidence
-```
+| ID | Correction |
+|----|------------|
+| R1 | Ledger attribution by entry index; coverage/ledger congruence |
+| R2 | T14: only ClosedSemanticQuery oneOf; fail-closed tests |
+| R3 | T18 provenance: patcher SHA, Unicode DB, JSON, pydantic(+core) |
+| R4 | Explicit surrogate lexical narrowing (pairs OK; lone halves REJECT) |
+| R5 | Regenerated grammar / ledger / coverage / provenance / closeout |
 
-## Library authority
+Also: independent recognizer ASCII Identifier + UnsignedInt hardening.
 
-Semantic entrypoint:
-
-`nlp_gate_modernbert.decomposer_pilot.cfg_generator.generate.generate_from_schema_bytes`
-
-No CLI semantic authority. No engine-native lowering.
-
-Independent test oracle (production import forbidden):
-
-`tests/support/well_ebnf1_recognizer.py`
-
-## Acceptance checklist (mechanical)
+## Acceptance checklist
 
 | Gate | Result |
 |------|--------|
 | pinned schema hash matches | PASS |
-| all encountered schema constructs accounted for | PASS |
-| unrecognized semantic keywords = 0 | PASS |
-| silently ignored semantic keywords = 0 | PASS |
-| generator fail-closed (integer / unknown keyword) | PASS (fail paths encoded) |
-| WELL-EBNF-1 syntax self-validation | PASS |
-| deterministic replay / byte identity | PASS |
-| grammar hash identity | PASS |
-| positive lexical/structural probes | PASS |
-| negative lexical/structural probes | PASS |
-| grammar → freeze_candidate containment | PASS |
+| constructs accounted for | PASS |
+| unrecognized / silently ignored = 0 | PASS |
+| ledger ↔ coverage congruence | PASS |
+| fail-closed: hash / keyword / integer / oneOf | PASS |
+| WELL-EBNF-1 self-validation | PASS |
+| deterministic replay | PASS |
+| positive / negative probes (incl. surrogates) | PASS |
+| grammar → freeze containment (incl. valid pair) | PASS |
+| T18 provenance complete | PASS |
 | hand-edit detection | PASS |
-| model_calls | 0 |
-| engine_calls | 0 |
+| model_calls / engine_calls | 0 / 0 |
 
-pytest: `tests/test_cfg_generator_01.py` — 47 passed.
+pytest: `tests/test_cfg_generator_01.py` — 59 passed.
 
-## Artifacts
+## R4 lexical narrowing (explicit)
 
-| File | Role |
-|------|------|
-| `decomposer_pilot_constraint_cfg_generator_01.well_ebnf1` | canonical WELL-EBNF-1 bytes |
-| `decomposer_pilot_constraint_cfg_generator_01_ledger.json` | transform ledger |
-| `decomposer_pilot_constraint_cfg_generator_01_coverage.json` | coverage report |
-| `decomposer_pilot_constraint_cfg_generator_01_provenance.json` | provenance pins |
-| `decomposer_pilot_constraint_cfg_generator_01.json` | machine handoff |
-| `decomposer_pilot_constraint_cfg_generator_01.md` | this document |
+Ordinary `\uXXXX` surrogate halves are **not** legal standalone atoms on the
+canonical generation surface. Valid high+low surrogate pairs remain legal.
+Unpaired high/low surrogate escapes are grammar-rejected.
 
-## Explicit non-authorizations
+This is an explicit permitted canonical lexical narrowing (alongside Q2/Q10/R3).
+
+## Non-authorizations
 
 ```
-XGrammar / llguidance / other engine install:  NOT AUTHORIZED
-engine-native grammar lowering:               NOT AUTHORIZED
-engine grammar compilation:                   NOT AUTHORIZED
-tokenizer / token-mask construction:          NOT AUTHORIZED
-Qwen load / forward / generate:               NOT AUTHORIZED
-prompt / schema / semantic repair changes:    NOT AUTHORIZED
-PILOT-01:                                     NOT AUTHORIZED
-CFG-ENGINE-BAKEOFF-01:                        NOT AUTHORIZED
+engine install / lowering / compile: NOT AUTHORIZED
+tokenizer / token-mask:              NOT AUTHORIZED
+model load / forward / generate:     NOT AUTHORIZED
+PILOT-01 / ENGINE-BAKEOFF:           NOT AUTHORIZED
 ```
 
 ## Terminal state
@@ -106,4 +85,4 @@ IMPLEMENTATION_COMPLETE_AWAITING_INDEPENDENT_REVIEW
 ```
 
 STATUS:
-STOP FOR INDEPENDENT DECOMPOSER-PILOT-CONSTRAINT-CFG-GENERATOR-01 REVIEW
+STOP FOR INDEPENDENT DECOMPOSER-PILOT-CONSTRAINT-CFG-GENERATOR-01R REVIEW

@@ -5,9 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+import unicodedata
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+import pydantic
+import pydantic_core
 
 from nlp_gate_modernbert.decomposer_pilot.cfg_generator.compile_schema import SchemaCompiler
 from nlp_gate_modernbert.decomposer_pilot.cfg_generator.emit_ebnf import emit_grammar_file
@@ -20,10 +24,11 @@ from nlp_gate_modernbert.decomposer_pilot.constraint_schema import (
     CONSTRAINT_PATCH_VERSION,
     build_constraint_artifact,
     canonical_json_bytes,
+    constraint_identity,
     sha256_bytes,
 )
 
-GENERATOR_VERSION = "decomposer_pilot_cfg_generator.v1"
+GENERATOR_VERSION = "decomposer_pilot_cfg_generator.v1.1"
 WELL_EBNF_1_VERSION = "1.0.0"
 RULE_ORDER_SPEC = "START first; remaining Identifiers ascending by UTF-8 byte sequence"
 
@@ -86,15 +91,27 @@ def generate_from_schema_bytes(schema_bytes: bytes) -> GenerationResult:
     schema, schema_sha = load_and_verify_schema_bytes(schema_bytes)
 
     rules: dict[str, Any] = {}
+    patch_id = constraint_identity()
     provenance: dict[str, Any] = {
         "generator_version": GENERATOR_VERSION,
         "generator_source_sha256": _generator_source_sha256(),
         "well_ebnf_1_version": WELL_EBNF_1_VERSION,
         "rule_order_spec": RULE_ORDER_SPEC,
         "constraint_patch_version": CONSTRAINT_PATCH_VERSION,
+        "constraint_patcher_source_sha256": patch_id["constraint_patcher_source_sha256"],
         "canonical_json_version": CANONICAL_JSON_VERSION,
         "canonical_json_spec": dict(CANONICAL_JSON_SPEC),
         "python_version": sys.version.split()[0],
+        "python_full_version": sys.version,
+        "unicode_database_version": unicodedata.unidata_version,
+        "json_parser": {
+            "module": "json",
+            "loads": "stdlib json.loads",
+            "dumps_allow_nan": False,
+            "note": "freeze_candidate uses json.dumps(..., allow_nan=False)",
+        },
+        "pydantic_version": pydantic.__version__,
+        "pydantic_core_version": getattr(pydantic_core, "__version__", None),
         "schema_sha256": schema_sha,
         "model_calls": 0,
         "engine_calls": 0,

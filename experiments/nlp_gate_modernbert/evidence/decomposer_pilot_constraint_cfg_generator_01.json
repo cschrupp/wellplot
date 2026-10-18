@@ -1,53 +1,46 @@
 {
   "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-CFG-GENERATOR-01-AUTH-001",
-  "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-GENERATOR-01",
-  "mode": "BOUNDED_IMPLEMENTATION",
-  "starting_tip": "8e84a8f41650a221a4ef247bd7d78bceaa43687d",
-  "parent": {
-    "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01R2",
-    "status": "ACCEPTED",
-    "candidate_sha": "73d9c31852a394701320dd50fcc6c83944936df1"
-  },
-  "candidate_sha": "1b5ccbc49862c8184b1bad1acfd76024040b0aa0",
-  "tip_sha": "0683167707088d4446ecc74ed2e0283740579135",
+  "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-GENERATOR-01R",
+  "mode": "BOUNDED_IMPLEMENTATION_REWORK",
+  "starting_tip": "f0ede93c9885915b7430fa391901cc561d72f811",
+  "prior_candidate": "1b5ccbc49862c8184b1bad1acfd76024040b0aa0",
+  "prior_result": "REVISE",
+  "findings_addressed": [
+    "F001",
+    "F002",
+    "F003",
+    "F004"
+  ],
+  "candidate_sha": "(pending commit)",
+  "tip_sha": "(pending SHA-record commit)",
   "model_calls": 0,
   "engine_calls": 0,
-  "generator_version": "decomposer_pilot_cfg_generator.v1",
+  "generator_version": "decomposer_pilot_cfg_generator.v1.1",
   "schema_sha256": "7fd52c8209be91495137ee03cc2fa78133c0e6657bfc2f45aac12eb59dd14848",
-  "grammar_sha256": "a7aac75203acfc26806d50b6f2dc66b0e21b72d8007b1229b22dfc6924adc4a9",
-  "grammar_lines": 4609,
-  "grammar_bytes_len": 609854,
+  "grammar_sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
+  "grammar_lines": 8841,
+  "grammar_bytes_len": 1244110,
   "transform_ledger_entries": 89,
   "pytest": {
     "path": "experiments/nlp_gate_modernbert/tests/test_cfg_generator_01.py",
-    "passed": 47,
+    "passed": 59,
     "failed": 0
   },
   "acceptance": {
     "pinned_schema_hash_matches": "PASS",
-    "constructs_accounted_for": "PASS",
-    "unrecognized_semantic_keywords": 0,
-    "silently_ignored_semantic_keywords": 0,
-    "well_ebnf1_self_validation": "PASS",
-    "deterministic_replay": "PASS",
-    "grammar_hash_identity": "PASS",
-    "positive_probes": "PASS",
-    "negative_probes": "PASS",
+    "ledger_coverage_congruence": "PASS",
+    "fail_closed_tests": "PASS",
+    "t18_provenance": "PASS",
+    "r4_surrogate_narrowing": "PASS",
+    "positive_negative_probes": "PASS",
     "freeze_containment": "PASS",
-    "hand_edit_detection": "PASS",
     "model_calls": 0,
     "engine_calls": 0
   },
-  "artifacts": [
-    "decomposer_pilot_constraint_cfg_generator_01.well_ebnf1",
-    "decomposer_pilot_constraint_cfg_generator_01_ledger.json",
-    "decomposer_pilot_constraint_cfg_generator_01_coverage.json",
-    "decomposer_pilot_constraint_cfg_generator_01_provenance.json",
-    "decomposer_pilot_constraint_cfg_generator_01.md",
-    "decomposer_pilot_constraint_cfg_generator_01.json"
-  ],
-  "library_entrypoint": "nlp_gate_modernbert.decomposer_pilot.cfg_generator.generate.generate_from_schema_bytes",
-  "test_oracle": "experiments/nlp_gate_modernbert/tests/support/well_ebnf1_recognizer.py",
+  "r4_surrogate_lexical_narrowing": {
+    "statement": "Ordinary \\uXXXX surrogate halves are NOT legal standalone JSON string atoms on the canonical generation surface. Valid high+low surrogate pairs remain legal. Unpaired high/low surrogate escapes are grammar-rejected.",
+    "permitted_canonical_lexical_narrowing": true
+  },
   "unauthorized": [
     "engine_install",
     "engine_native_lowering",
@@ -57,18 +50,16 @@
     "model_loading",
     "model_forward",
     "model_generate",
-    "prompt_changes",
-    "schema_changes",
-    "semantic_repair",
     "PILOT_01",
     "CFG_ENGINE_BAKEOFF_01"
   ],
   "provenance": {
-    "generator_version": "decomposer_pilot_cfg_generator.v1",
-    "generator_source_sha256": "766ba0ddeb5b82c9a5de86138798499ac0320377c8a44ae7b8c4ef44a7f07c77",
+    "generator_version": "decomposer_pilot_cfg_generator.v1.1",
+    "generator_source_sha256": "24a28d8f962f7a120654bca2a85223c7ccca0e98901f31110627a8e64c3a3833",
     "well_ebnf_1_version": "1.0.0",
     "rule_order_spec": "START first; remaining Identifiers ascending by UTF-8 byte sequence",
     "constraint_patch_version": "decomposer_pilot_preflight_01.constraint_patch.v1",
+    "constraint_patcher_source_sha256": "efd9c7de143053c2e109d38a509a0ac48050a307c0e1f41220068074dbead727",
     "canonical_json_version": "decomposer_pilot_preflight_01.canonical_json.v1",
     "canonical_json_spec": {
       "sort_keys": true,
@@ -79,6 +70,16 @@
       "ensure_ascii": false
     },
     "python_version": "3.13.11",
+    "python_full_version": "3.13.11 (main, Dec 17 2025, 21:08:16) [Clang 21.1.4 ]",
+    "unicode_database_version": "15.1.0",
+    "json_parser": {
+      "module": "json",
+      "loads": "stdlib json.loads",
+      "dumps_allow_nan": false,
+      "note": "freeze_candidate uses json.dumps(..., allow_nan=False)"
+    },
+    "pydantic_version": "2.14.1",
+    "pydantic_core_version": "2.50.1",
     "schema_sha256": "7fd52c8209be91495137ee03cc2fa78133c0e6657bfc2f45aac12eb59dd14848",
     "model_calls": 0,
     "engine_calls": 0,
@@ -114,8 +115,12 @@
       12288
     ],
     "q5_nonempty_pattern": ".*\\S.*",
-    "grammar_sha256": "a7aac75203acfc26806d50b6f2dc66b0e21b72d8007b1229b22dfc6924adc4a9",
-    "transform_ledger_sha256": "fbc399273d4b346c7954dc37523836dcbe191099510cdd8feb9e1cabc674fcba"
+    "r4_surrogate_lexical_narrowing": {
+      "statement": "Ordinary \\uXXXX surrogate halves are NOT legal standalone JSON string atoms on the canonical generation surface. Valid high+low surrogate pairs remain legal. Unpaired high/low surrogate escapes are grammar-rejected.",
+      "permitted_canonical_lexical_narrowing": true
+    },
+    "grammar_sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
+    "transform_ledger_sha256": "6bc8a41d1963491d45a291bc7d0f35a1ff5c66e1e53226cde5bbaba25b05e073"
   },
   "terminal_state": "IMPLEMENTATION_COMPLETE_AWAITING_INDEPENDENT_REVIEW"
 }

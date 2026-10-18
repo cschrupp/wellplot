@@ -1,20 +1,25 @@
-"""DECOMPOSER-PILOT-CONSTRAINT-CFG-GENERATOR-01 acceptance tests."""
+"""DECOMPOSER-PILOT-CONSTRAINT-CFG-GENERATOR-01 / 01R acceptance tests."""
 
 from __future__ import annotations
 
-import hashlib
-import json
-from pathlib import Path
-
 import pytest
 
+from nlp_gate_modernbert.decomposer_pilot.cfg_generator.ast_nodes import Alt
+from nlp_gate_modernbert.decomposer_pilot.cfg_generator.compile_schema import SchemaCompiler
+from nlp_gate_modernbert.decomposer_pilot.cfg_generator.errors import GeneratorFail
 from nlp_gate_modernbert.decomposer_pilot.cfg_generator.generate import (
-    generate_from_schema_bytes,
     default_pinned_schema_path,
+    generate_from_schema_bytes,
 )
+from nlp_gate_modernbert.decomposer_pilot.cfg_generator.json_lex import install_json_lexicals
 from nlp_gate_modernbert.decomposer_pilot.constraint_schema import sha256_bytes
 from nlp_gate_modernbert.nl_program_eval.freeze import FrozenCandidate, freeze_candidate
-from support.well_ebnf1_recognizer import accepts, parse_well_ebnf1, recognize
+from support.well_ebnf1_recognizer import (
+    WellEbnf1Error,
+    accepts,
+    parse_well_ebnf1,
+    recognize,
+)
 
 
 def _schema_bytes() -> bytes:
@@ -40,6 +45,31 @@ def test_coverage_no_unrecognized_or_silent(generation):
     assert generation.coverage["silently_ignored_semantic_keywords"] == []
     assert generation.coverage["schema_constructs_transformed"]
     assert generation.transform_ledger
+
+
+def test_ledger_coverage_path_transform_congruence(generation):
+    """R1: ledger and coverage transformed stream must agree path+transform."""
+    transformed = generation.coverage["schema_constructs_transformed"]
+    ledger = generation.transform_ledger
+    assert len(transformed) == len(ledger)
+    for cov, led in zip(transformed, ledger, strict=True):
+        assert cov["path"] == led["path"]
+        assert cov["transform"] == led["transform"]
+    # Spot-check known paths are not overwritten by child ARRAY/MAP/NULLABLE.
+    by_path = {e["path"]: e["transform"] for e in ledger}
+    assert by_path["#/$defs/ClosedNormalizedTask/properties/task_id"] == "JSON_STRING"
+    assert by_path[
+        "#/$defs/ClosedNormalizedRequest/properties/alpha"
+    ].startswith("NULLABLE(")
+    assert by_path[
+        "#/$defs/ClosedNormalizedRequest/properties/alpha/anyOf/non_null"
+    ] == "JSON_NUMBER"
+    assert by_path[
+        "#/$defs/ClosedNormalizedTask/properties/produces_binds"
+    ].startswith("MAP(")
+    assert by_path[
+        "#/$defs/ClosedNormalizedTask/properties/produces_binds/additionalProperties"
+    ] == "CONST_LITERAL"
 
 
 def test_well_ebnf1_syntax_self_validation(generation):
@@ -131,6 +161,11 @@ POSITIVE = [
         "number_frac_exp",
         _task(_req('"alpha":-0.5e+2', '"requested_operation":"PLACE_CURVE"')),
     ),
+    (
+        "valid_surrogate_pair_in_task_id",
+        '{"tasks":[{"request":{"requested_operation":"PLACE_CURVE"},'
+        '"task_id":"\\uD83D\\uDE00"}]}',
+    ),
 ]
 
 NEGATIVE = [
@@ -172,6 +207,16 @@ NEGATIVE = [
     ("neg_infinity", _task(_req('"alpha":-Infinity', '"requested_operation":"PLACE_CURVE"'))),
     ("structural_space", '{"tasks": []}'),
     ("structural_newline", '{"tasks":[\n]}'),
+    (
+        "lone_high_surrogate",
+        '{"tasks":[{"request":{"requested_operation":"PLACE_CURVE"},'
+        '"task_id":"\\uD800"}]}',
+    ),
+    (
+        "lone_low_surrogate",
+        '{"tasks":[{"request":{"requested_operation":"PLACE_CURVE"},'
+        '"task_id":"\\uDC00"}]}',
+    ),
 ]
 
 
@@ -197,6 +242,93 @@ def test_model_and_engine_counters(generation):
     assert generation.provenance["engine_calls"] == 0
 
 
+def test_t18_provenance_complete(generation):
+    p = generation.provenance
+    assert p["constraint_patcher_source_sha256"]
+    assert p["unicode_database_version"]
+    assert p["json_parser"]["module"] == "json"
+    assert p["pydantic_version"]
+    assert p["pydantic_core_version"]
+    assert p["python_version"]
+    assert p["r4_surrogate_lexical_narrowing"]["permitted_canonical_lexical_narrowing"] is True
+
+
 def test_accepts_helper_matches(generation):
     assert accepts(generation.grammar_bytes, '{"tasks":[]}')
     assert not accepts(generation.grammar_bytes, '{"tasks": []}')
+
+
+def test_fail_closed_schema_hash_mismatch():
+    with pytest.raises(GeneratorFail) as ei:
+        generate_from_schema_bytes(b'{"type":"object"}')
+    assert ei.value.code == "patched_schema_hash_mismatch"
+
+
+def _compiler_for(schema: dict) -> SchemaCompiler:
+    rules: dict[str, Alt] = {}
+    install_json_lexicals(rules, {})
+    c = SchemaCompiler(schema)
+    c.rules.update(rules)
+    return c
+
+
+def test_fail_closed_unknown_semantic_keyword():
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {"tasks": {"type": "array", "items": {"type": "string"}}},
+        "required": ["tasks"],
+        "minProperties": 1,
+    }
+    c = _compiler_for(schema)
+    with pytest.raises(GeneratorFail) as ei:
+        c.compile_root()
+    assert ei.value.code == "UNSUPPORTED_SCHEMA_CONSTRUCT"
+    assert "minProperties" in str(ei.value)
+
+
+def test_fail_closed_integer_site():
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {"n": {"type": "integer"}},
+        "required": ["n"],
+    }
+    c = _compiler_for(schema)
+    with pytest.raises(GeneratorFail) as ei:
+        c.compile_root()
+    assert ei.value.code == "q6_or_t15_numeric_unrepresentable"
+
+
+def test_fail_closed_unauthorized_oneof():
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "x": {
+                "oneOf": [
+                    {"type": "string"},
+                    {"type": "number"},
+                ]
+            }
+        },
+        "required": ["x"],
+    }
+    c = _compiler_for(schema)
+    with pytest.raises(GeneratorFail) as ei:
+        c.compile_root()
+    assert ei.value.code == "unrepresentable_xor"
+    assert "T14" in str(ei.value)
+
+
+def test_recognizer_rejects_non_ascii_identifier():
+    # UTF-8 ascending places non-ASCII after START; identifier must still be ASCII.
+    text = 'START ::= "a" ;\nCafé ::= "b" ;\n'
+    with pytest.raises(WellEbnf1Error):
+        parse_well_ebnf1(text)
+
+
+def test_recognizer_rejects_leading_zero_unsigned_int():
+    text = 'START ::= X ;\nX ::= "a"{01,2} ;\n'
+    with pytest.raises(WellEbnf1Error):
+        parse_well_ebnf1(text)

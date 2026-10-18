@@ -47,6 +47,13 @@ MAP_LIKE_ALLOWLIST = frozenset(
     }
 )
 
+# T14: only the frozen ClosedSemanticQuery XOR is authorized.
+AUTHORIZED_ONEOF_PATHS = frozenset(
+    {
+        "#/$defs/ClosedSemanticQuery",
+    }
+)
+
 
 def _as_alt(expr: Alt | Seq) -> Alt:
     return expr if isinstance(expr, Alt) else Alt((expr,))
@@ -86,7 +93,8 @@ class SchemaCompiler:
         self._nt_seq = 0
         self._compiling: set[str] = set()
 
-    def _note(self, path: str, construct: str, transform: str) -> None:
+    def _note(self, path: str, construct: str, transform: str) -> int:
+        """Append a transform record; return its index for later refinement."""
         self.coverage["schema_constructs_encountered"].append(
             {"path": path, "construct": construct}
         )
@@ -94,6 +102,14 @@ class SchemaCompiler:
             {"path": path, "construct": construct, "transform": transform}
         )
         self.ledger.append({"path": path, "transform": transform})
+        return len(self.ledger) - 1
+
+    def _refine(self, entry_index: int, transform: str) -> None:
+        """Update the transform string for a specific ledger/coverage entry."""
+        self.ledger[entry_index]["transform"] = transform
+        self.coverage["schema_constructs_transformed"][entry_index]["transform"] = (
+            transform
+        )
 
     def _fresh(self, prefix: str) -> str:
         self._nt_seq += 1
@@ -184,6 +200,14 @@ class SchemaCompiler:
     def _compile_one_of(
         self, node: dict[str, Any], path: str, *, preferred_name: str | None
     ) -> Alt:
+        if path not in AUTHORIZED_ONEOF_PATHS:
+            self.coverage["schema_constructs_rejected"].append(
+                {"path": path, "construct": "oneOf", "reason": "T14_unauthorized_oneof"}
+            )
+            raise GeneratorFail(
+                "unrepresentable_xor",
+                f"T14: oneOf only authorized for ClosedSemanticQuery; got {path}",
+            )
         branches = node["oneOf"]
         if not isinstance(branches, list) or len(branches) < 2:
             raise GeneratorFail("unrepresentable_xor", path)
@@ -219,14 +243,14 @@ class SchemaCompiler:
 
         if null_i is not None and len(branches) == 2:
             other = branches[1 - null_i]
-            self._note(path, "anyOf", "NULLABLE")
+            entry = self._note(path, "anyOf", "NULLABLE")
             nt = preferred_name or self._fresh("Nullable")
             inner_nt = _safe_ident(f"{nt}_Value")
             inner = self.compile_node(other, f"{path}/anyOf/non_null", preferred_name=inner_nt)
             if inner_nt not in self.rules:
                 self.rules[inner_nt] = inner
             self.rules[nt] = alt(Ident(inner_nt), Ident("JsonNull"))
-            self.ledger[-1]["transform"] = f"NULLABLE({inner_nt})"
+            self._refine(entry, f"NULLABLE({inner_nt})")
             return _as_alt(seq(Ident(nt)))
 
         self._note(path, "anyOf", "CLOSED_UNION_ANYOF")
@@ -278,7 +302,7 @@ class SchemaCompiler:
             raise GeneratorFail(
                 "UNSUPPORTED_SCHEMA_CONSTRUCT", f"array without items at {path}"
             )
-        self._note(path, "array", "ARRAY")
+        entry = self._note(path, "array", "ARRAY")
         nt = preferred_name or self._fresh("Array")
         item_nt = _safe_ident(f"{nt}_Item")
         item_expr = self.compile_node(
@@ -306,7 +330,7 @@ class SchemaCompiler:
         body = Atom(Group(Alt((nonempty,))), Optional())
         arr_expr = Alt((Seq((Atom(Lit("[")), body, Atom(Lit("]")))),))
         self.rules[nt] = arr_expr
-        self.ledger[-1]["transform"] = f"ARRAY({item_nt})"
+        self._refine(entry, f"ARRAY({item_nt})")
         return _as_alt(seq(Ident(nt)))
 
     def _compile_object(self, node: dict[str, Any], path: str, nt: str) -> Alt:
@@ -321,8 +345,8 @@ class SchemaCompiler:
                     "UNSUPPORTED_SCHEMA_CONSTRUCT",
                     f"map-like object not on allowlist: {path}",
                 )
-            self._note(path, "map_object", "MAP")
-            return self._compile_map(addl, path, nt)
+            entry = self._note(path, "map_object", "MAP")
+            return self._compile_map(addl, path, nt, entry_index=entry)
 
         if props is None:
             props = {}
@@ -396,7 +420,14 @@ class SchemaCompiler:
             (Seq((Atom(Lit("{")), Atom(Ident(slot(0, "NoPrior"))))),)
         )
 
-    def _compile_map(self, value_schema: dict[str, Any], path: str, nt: str) -> Alt:
+    def _compile_map(
+        self,
+        value_schema: dict[str, Any],
+        path: str,
+        nt: str,
+        *,
+        entry_index: int,
+    ) -> Alt:
         val_nt = _safe_ident(f"{nt}_Value")
         val = self.compile_node(
             value_schema, f"{path}/additionalProperties", preferred_name=val_nt
@@ -430,5 +461,5 @@ class SchemaCompiler:
             )
         )
         body = Atom(Group(Alt((nonempty,))), Optional())
-        self.ledger[-1]["transform"] = f"MAP(JSON_STRING, {val_nt})"
+        self._refine(entry_index, f"MAP(JSON_STRING, {val_nt})")
         return Alt((Seq((Atom(Lit("{")), body, Atom(Lit("}")))),))
