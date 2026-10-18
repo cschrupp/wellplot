@@ -10,7 +10,7 @@
     "F002"
   ],
   "candidate_sha": "73d9c31852a394701320dd50fcc6c83944936df1",
-  "tip_sha": "(pending SHA-record commit)",
+  "tip_sha": "3b2fc92b9061c6a85c5975a12a09c40c38b45965",
   "parent": {
     "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01R",
     "status": "REVISE",
