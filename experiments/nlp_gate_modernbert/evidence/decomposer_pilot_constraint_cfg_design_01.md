@@ -23,7 +23,7 @@ CANDIDATE SHA:
 d441534e97954a2e5f74c047c9be64b550ac5f1e
 
 TIP:
-(pending SHA-record commit)
+9e7f873256b7baf56c08de18fbb907beca81797a
 
 MODEL CALLS:
 0
