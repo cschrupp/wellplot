@@ -6,7 +6,7 @@
   "prior_candidate": "d441534e97954a2e5f74c047c9be64b550ac5f1e",
   "prior_result": "REVISE",
   "candidate_sha": "9d785e55f29fb3d2809c445b422c0a5c5af6ee6d",
-  "tip_sha": null,
+  "tip_sha": "77908665c66a50b322421f959bf8cbeba84b2b01",
   "parent": {
     "slice": "DECOMPOSER-PILOT-CONSTRAINT-REDESIGN-01R",
     "status": "ACCEPTED_CLOSED",
