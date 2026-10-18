@@ -14,7 +14,7 @@
   "prior_result": "REVISE (G2 independent rewrite proof)",
   "starting_tip": "43c05042c7a427c1b268e7357fb18165f6f5090e",
   "candidate_sha": "d680a315b5cf11ef7c89c70cf6222dd1d62b9a84",
-  "tip_sha": "(pending SHA-record commit)",
+  "tip_sha": "ef26b39981a9a1595bd71da62a6107dab9653f73",
   "model_calls": 0,
   "model_weights_loaded": false,
   "accepted_grammar_sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
