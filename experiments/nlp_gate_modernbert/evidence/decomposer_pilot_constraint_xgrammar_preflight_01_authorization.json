@@ -30,7 +30,7 @@
     "adapters": "NONE",
     "auto_download": false,
     "fallback_model": "NONE",
-    "config_sha256": "1ddb5b89ebc90dcbb417a45c213d818577e65976454d29385c8f6140771d95197",
+    "config_sha256": "1ddb5b89ebc90dcb417a45c213d818577e65976454d29385c8f6140771d95197",
     "tokenizer_artifact_sha256": {
       "tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
       "tokenizer_config.json": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
