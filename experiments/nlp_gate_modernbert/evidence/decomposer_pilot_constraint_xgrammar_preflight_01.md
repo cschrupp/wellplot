@@ -17,7 +17,7 @@ CANDIDATE SHA:
 a445c451e356b713cd24fcfb532a404421bc269e
 
 TIP:
-(pending SHA-record commit)
+68729d9c3125f3817b4b0b70561fd5afae8ecbbf
 
 RESULT:
 PASS
