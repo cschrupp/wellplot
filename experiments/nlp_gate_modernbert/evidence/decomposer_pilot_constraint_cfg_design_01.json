@@ -1,16 +1,26 @@
 {
-  "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01-AUTH-001",
-  "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01",
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01-REWORK-AUTH-001",
+  "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-DESIGN-01R",
   "mode": "DESIGN_INTERVIEW_ONLY",
-  "starting_tip": "9d4318953b28de651429983b2d097ed0707fa545",
-  "candidate_sha": "d441534e97954a2e5f74c047c9be64b550ac5f1e",
-  "tip_sha": "9e7f873256b7baf56c08de18fbb907beca81797a",
+  "starting_tip": "81c76ecfd58c440add469c57fe692a21acd8d9e4",
+  "prior_candidate": "d441534e97954a2e5f74c047c9be64b550ac5f1e",
+  "prior_result": "REVISE",
+  "candidate_sha": null,
+  "tip_sha": null,
   "parent": {
     "slice": "DECOMPOSER-PILOT-CONSTRAINT-REDESIGN-01R",
     "status": "ACCEPTED_CLOSED",
     "xgrammar_json_schema_route": "REJECTED",
     "candidate_sha": "b249b810908cbc0283e62f18e8780a4a4f7144d3"
   },
+  "rework": {
+    "R1": "Fully specify WELL-EBNF-1 metasyntax (byte-level dialect)",
+    "R2": "Remove WELL-EBNF-1 specification from Human gates (SOL authority)",
+    "R3": "Resolve Q6/T15: grammar = strict JSON-number syntax (no NaN/Infinity); freeze = finite/value validity",
+    "R4": "State global grammar-language relation and permitted canonical lexical narrowing",
+    "R5": "Update md/json closeout consistently"
+  },
+  "findings_addressed": ["F001", "F002"],
   "model_calls": 0,
   "claims": {
     "generator_implemented": false,
@@ -18,7 +28,8 @@
     "backend_compatibility_proven": false,
     "tokenizer_compatibility_proven": false,
     "model_capability": false,
-    "pilot_01_authorized": false
+    "pilot_01_authorized": false,
+    "well_ebnf_1_metasyntax_specified": true
   },
   "unauthorized": [
     "grammar_implementation",
@@ -41,130 +52,194 @@
     "path": "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_preflight_01_constraint.schema.json",
     "role": "exact frozen patched ClosedNormalizedProgram structural language; hash-verify before generate"
   },
+  "grammar_language_relation": {
+    "statement": "The CFG/WELL-EBNF-1 artifact defines a deliberately canonical generation surface for ClosedNormalizedProgram JSON texts. It is NOT required to equal the set of every byte string the pinned JSON parser accepts.",
+    "permitted_canonical_lexical_narrowing": [
+      "Q2 fixed property order for schema-closed objects",
+      "Q10 zero insignificant whitespace between structural tokens",
+      "R3 exclusion of non-JSON NaN/Infinity/-Infinity lexical aliases from number productions"
+    ],
+    "forbidden": [
+      "any other implicit lexical narrowing",
+      "semantic repair",
+      "silent widening beyond the frozen structural contract"
+    ],
+    "authority_split": {
+      "grammar": "canonical structural + lexical generation surface as frozen",
+      "json_parse": "materialize JSON values from admitted texts",
+      "freeze_candidate": "authoritative closed-model validation, canonicalization, finite numeric rejection"
+    }
+  },
+  "numeric_lexical_authority": {
+    "grammar_admits": "strict JSON-number lexical syntax as in ECMA-404 / RFC 8259 number production (optional minus; int; optional frac; optional exp)",
+    "grammar_rejects": [
+      "NaN",
+      "Infinity",
+      "-Infinity",
+      "+Infinity",
+      "nan",
+      "inf",
+      "and case variants of those aliases"
+    ],
+    "freeze_admits_or_rejects": "finite representability and ClosedNormalizedProgram field validity after parse; overflow-to-inf lexemes such as 1e309 may be syntactically grammar-legal JSON numbers and are decided by freeze_candidate/json.dumps(allow_nan=False) path",
+    "harness_note": "freeze.py uses json.dumps(..., allow_nan=False); harness rejects non-finite canonicalization",
+    "q6_clarification": "Q6 'full numeric lexical fidelity' means full strict JSON-number spelling surface under the pinned path, NOT Python json.loads nonstandard NaN/Infinity aliases",
+    "t15_unchanged_except_clarity": "integer vs number still derived from schema + pinned authoritative acceptance; integer sites must not invent convenience regex that contradicts pinned path"
+  },
+  "well_ebnf_1": {
+    "dialect_id": "WELL-EBNF-1",
+    "version": "1.0.0",
+    "encoding": "UTF-8",
+    "newline": "LF",
+    "eof": "file MUST end with a single LF; no trailing blank line beyond that terminator",
+    "comments": "FORBIDDEN",
+    "tabs": "FORBIDDEN",
+    "semantic_actions": "FORBIDDEN",
+    "host_code": "FORBIDDEN",
+    "engine_directives": "FORBIDDEN",
+    "byte_level_metasyntax": {
+      "grammar_file": "Rule (LF Rule)* LF",
+      "Rule": "Identifier SP '::=' SP Expression SP ';' ",
+      "note_rule_line": "Each Rule occupies exactly one physical line. No line wrapping.",
+      "Identifier": "[A-Za-z_][A-Za-z0-9_]*",
+      "reserved_identifiers": [],
+      "Expression": "Sequence (SP '|' SP Sequence)*",
+      "Sequence": "Atom (SP Atom)*",
+      "Atom": "Identifier | Literal | CharClass | '(' Expression ')' | AtomSuffix",
+      "AtomSuffix_note": "Suffix operators bind to the immediately preceding Atom only (Identifier, Literal, CharClass, or Group). Written without space before the suffix.",
+      "optional": "Atom '?'",
+      "zero_or_more": "Atom '*'",
+      "one_or_more": "Atom '+'",
+      "bounded_repeat": "Atom '{' UnsignedInt ',' UnsignedInt '}'",
+      "bounded_repeat_semantics": "Atom{m,n} means between m and n inclusive repetitions of Atom; require 0 <= m <= n; n must be finite",
+      "UnsignedInt": "0 | [1-9][0-9]*",
+      "Literal": "'\"' LitChar* '\"'",
+      "LitChar": "unescaped Unicode scalar except U+0000..U+001F, U+0022, U+005C | Escape",
+      "CharClass": "'[' '^'? ClassItem+ ']'",
+      "ClassItem": "ClassAtom | ClassAtom '-' ClassAtom",
+      "ClassAtom": "unescaped Unicode scalar except U+0000..U+001F, U+005D, U+005C, U+002D | Escape",
+      "Escape": "'\\\\' ( '\\\\' | '\"' | 'n' | 'r' | 't' | 'u' Hex4 | 'U' Hex8 )",
+      "Hex4": "[0-9A-Fa-f]{4}",
+      "Hex8": "[0-9A-Fa-f]{8}",
+      "Escape_u_semantics": "\\\\uXXXX denotes Unicode scalar U+XXXX for XXXX in 0000..D7FF or E000..FFFF; surrogate code units alone are ILLEGAL in WELL-EBNF-1 terminals",
+      "Escape_U_semantics": "\\\\UXXXXXXXX denotes Unicode scalar U+XXXXXXXX for valid scalar values 00000000..0010FFFF excluding surrogates",
+      "SP": "exactly one U+0020 SPACE",
+      "forbidden_in_formatting": ["TAB", "CR", "multiple consecutive SP where only one SP is specified", "SP at start or end of a Rule line", "blank lines between rules"]
+    },
+    "rule_ordering": "Rules MUST appear in deterministic generator-defined order: (1) START first if present as Identifier START; (2) then productions sorted by Identifier lexicographic UTF-8 byte order; OR generator emits a pinned topological order documented in generator provenance. The chosen ordering algorithm MUST be recorded in T18 provenance as rule_order_spec and must be pure.",
+    "rule_order_spec_default": "START first; remaining Identifiers ascending by UTF-8 code unit sequence",
+    "start_symbol": "The grammar MUST contain exactly one production with Identifier START. START ::= ClosedNormalizedProgram ;  (or the root object nonterminal name if ClosedNormalizedProgram is inlined—but T16 requires sole entry START).",
+    "equivalence": "Two WELL-EBNF-1 files define the same dialect text iff their UTF-8 bytes are identical after the formatting rules above."
+  },
   "decisions": {
     "Q1_provenance": {
       "status": "FROZEN",
       "choice": "A",
-      "summary": "Mechanically generated grammar from hash-verified patched schema; hand-patch forbidden; pure deterministic transform with grammar + generator hashes"
+      "summary": "Mechanically generated grammar from hash-verified patched schema; hand-patch forbidden"
     },
     "Q2_object_ordering": {
       "status": "FROZEN",
       "choice": "C",
-      "summary": "Canonical fixed property order for schema-closed objects; any-order allowlist = ClosedNormalizedTask.produces_binds only; order derived from persisted schema property order"
+      "summary": "Fixed property order for closed objects; produces_binds map-like only"
     },
     "Q3_produces_binds": {
       "status": "FROZEN",
       "choice": "A",
-      "summary": "Map surface {} or {\"json-string\":\"track\"(, ...)*}; duplicate dynamic keys not CFG-guaranteed; JSON parse + freeze_candidate authoritative for dict materialization; exception narrowly scoped to map-key uniqueness"
+      "summary": "Map surface with track values; duplicate keys not CFG-guaranteed"
     },
     "Q4_xor": {
       "status": "FROZEN",
       "choice": "A",
-      "summary": "ClosedSemanticQuery ::= TextQuery | LocalRefQuery exclusive productions; both/neither unreachable; no oneOf runtime; no post-parse XOR fallback"
+      "summary": "Exclusive TextQuery | LocalRefQuery productions"
     },
     "Q5_nonempty_json_string": {
       "status": "FROZEN",
       "choice": "B",
-      "summary": "Decode-faithful NONEMPTY_JSON_STRING matching str(value).strip()!=\"\"; classify by decoded atoms including escapes; raw-source .*\\\\S.* forbidden; Unicode-only narrowing forbidden; fail closed if unrepresentable"
+      "summary": "Decode-faithful nonempty; WELL-EBNF-1 Unicode ranges/escapes used to encode NON_WHITESPACE_DECODE_ATOM"
     },
     "Q6_numbers": {
       "status": "FROZEN",
       "choice": "A",
-      "summary": "Full numeric lexical surface of pinned JSON/Pydantic parse path for schema number; no deliberate spelling subset; semantic numeric domain remains freeze_candidate"
+      "summary": "Clarified by R3: strict JSON-number syntax (no NaN/Infinity aliases); freeze owns finite/value validity",
+      "rework_R3": true
     },
     "Q7_optionals_null_defaults": {
       "status": "FROZEN",
       "choice": "A",
-      "summary": "Sequential optional slots with NoPrior/HasPrior comma machine; required never skippable; defaults never grammar-materialized; absence/null/false/0/[] remain distinct where schema distinguishes"
+      "summary": "Sequential optional slots; NoPrior/HasPrior commas"
     },
     "Q8_arrays_nesting": {
       "status": "FROZEN",
       "choice": "A",
-      "summary": "Mechanical arrays [] | [T(,T)*]; honor only schema min/maxItems; shared $ref nonterminals; uniqueItems unrepresentable → FAIL; no invented caps; no inferred min tasks"
+      "summary": "Mechanical unbounded arrays unless schema bounds"
     },
     "Q9_ordinary_strings": {
       "status": "FROZEN",
       "choice": "A",
-      "summary": "Full pinned JSON string language for plain type:string including empty; Q5 nonempty only for ClosedSemanticQuery text/local_ref"
+      "summary": "Full JSON strings except Q5 sites"
     },
     "Q10_insignificant_whitespace": {
       "status": "FROZEN",
       "choice": "A",
-      "summary": "Zero insignificant JSON whitespace; separators ',' and ':'; compact only; string contents unaffected"
+      "summary": "Zero insignificant whitespace"
     },
     "T11_metalanguage": {
       "status": "FROZEN",
       "choice": "WELL-EBNF-1",
-      "summary": "Restricted WellPlot-owned engine-neutral EBNF dialect; exact textual syntax part of design before generator impl; optional deterministic engine lowering as second pure transform; engine syntax not source contract"
+      "summary": "Complete byte-level metasyntax specified in well_ebnf_1 (R1); no longer deferred to Human",
+      "rework_R1": true
     },
     "T12_bool_null": {
       "status": "FROZEN",
-      "summary": "Exact JSON literals true|false|null only"
+      "summary": "true|false|null only"
     },
     "T13_enum_const": {
       "status": "FROZEN",
-      "summary": "Finite mechanical alternation of exact JSON literals from schema; schema array order for enum; pinned canonical JSON literal serializer"
+      "summary": "Mechanical exact JSON literals from schema"
     },
     "T14_unions": {
       "status": "FROZEN",
-      "summary": "Closed whitelist: nullable T|null; exact language-union anyOf when every branch compilable; Q4 XOR special transform; other oneOf/not/if/allOf/unknown → GENERATOR_FAIL; no best-effort widening"
+      "summary": "Closed whitelist; else GENERATOR_FAIL"
     },
     "T15_integer_vs_number": {
       "status": "FROZEN",
-      "summary": "integer → pinned authoritative integer acceptance language; number → Q6; no assumed regex from memory; FAIL if unrepresentable"
+      "summary": "Schema-driven; number uses R3-clarified Q6; integer uses pinned authoritative integer language; FAIL if unrepresentable",
+      "rework_R3": true
     },
     "T16_root": {
       "status": "FROZEN",
-      "summary": "START ::= ClosedNormalizedProgram sole entry; Q2/Q7 root object; no wrapper/prefix/suffix/whitespace"
+      "summary": "START ::= ClosedNormalizedProgram"
     },
     "T17_empty_tasks": {
       "status": "FROZEN",
-      "summary": "tasks:[] grammar-legal; no invented minItems"
+      "summary": "tasks:[] grammar-legal"
     },
     "T18_provenance": {
       "status": "FROZEN",
-      "summary": "Canonical WELL-EBNF-1 bytes + full transform provenance including runtime/parser/Unicode identities for Q5/Q6/T15; input_schema_sha256 must equal preflight patched schema"
+      "summary": "Full provenance including well_ebnf_1.version and rule_order_spec"
     },
     "T19_generator_fail": {
       "status": "FROZEN",
-      "summary": "No weaken/fallback modes; hard-failure catalogue + UNSUPPORTED_SCHEMA_CONSTRUCT catch-all"
+      "summary": "No weaken/fallback modes"
     },
     "T20_engine_requirements": {
       "status": "FROZEN",
-      "summary": "Requirements only; consume WELL-EBNF-1 or language-preserving lowering; hard token mask; fidelity to Q2–Q10/T15; fail closed; provenance; practical constructibility; candidates deferred; install/probe/PILOT not authorized"
+      "summary": "Requirements only; no selection/install/probe"
     },
     "T21_closeout_artifacts": {
       "status": "FROZEN",
-      "summary": "Paired md+json evidence; this materialization"
+      "summary": "Paired md+json; this rework updates both"
     }
   },
-  "well_ebnf_1_requirements": [
-    "UTF-8 bytes",
-    "LF line endings only",
-    "deterministic rule ordering",
-    "deterministic whitespace/formatting",
-    "named productions",
-    "sequence",
-    "alternation",
-    "grouping",
-    "optionality",
-    "repetition",
-    "quoted literal terminals",
-    "mechanically generated Unicode scalar/range terminals sufficient for Q5/Q9",
-    "no semantic actions",
-    "no embedded host code",
-    "no engine-specific directives"
-  ],
-  "well_ebnf_1_note": "Exact textual syntax of WELL-EBNF-1 is part of the design contract and must be fully specified before generator implementation; this closeout freezes the dialect identity and requirements, not a complete metasyntax document.",
-  "provenance_chain": [
-    "frozen ClosedNormalizedProgram contract",
-    "documented XOR / non-whitespace patch semantics",
-    "persisted decomposer_pilot_preflight_01_constraint.schema.json (hash verify)",
-    "deterministic grammar generator",
-    "canonical WELL-EBNF-1 bytes",
-    "optional deterministic engine-native lowering",
-    "SHA-256 + generator identity"
-  ],
+  "json_number_production_normative_sketch": {
+    "note": "Normative target for generator NUMBER nonterminal; must match ECMA-404 number without nonstandard aliases",
+    "Number": "OptionalMinus Int Frac? Exp?",
+    "OptionalMinus": "'-'?",
+    "Int": "'0' | [1-9] [0-9]*",
+    "Frac": "'.' [0-9]+",
+    "Exp": "[eE] [+-]? [0-9]+",
+    "excluded_aliases": ["NaN", "Infinity", "-Infinity", "+Infinity"]
+  },
   "generator_fail_classes": [
     "patched_schema_hash_mismatch",
     "unsupported_schema_keyword_with_semantic_effect",
@@ -181,6 +256,7 @@
     "detected_modification_of_generated_grammar_bytes",
     "attempted_hand_patch",
     "engine_lowering_not_language_preserving",
+    "well_ebnf_1_emit_nondeterministic_or_ill_formed",
     "UNSUPPORTED_SCHEMA_CONSTRUCT"
   ],
   "forbidden_generator_modes": [
@@ -198,7 +274,7 @@
       "consume WELL-EBNF-1 or deterministic language-preserving lowering",
       "not use rejected JSON-Schema oneOf path as substitute",
       "hard token-level enforcement with pinned Qwen tokenizer",
-      "preserve Q2–Q10 and T15 semantics",
+      "preserve Q2–Q10 and T15 (with R3 numeric clarification)",
       "fail closed on unsupported/compile/tokenizer/resource failure",
       "pin engine/tokenizer/grammar/lowering/config/compile/resource evidence in future probe",
       "demonstrate practical constructibility under bounded documented resource envelope"
@@ -211,7 +287,6 @@
   },
   "unresolved_human_gates": [
     "authorize generator implementation (separate AUTH)",
-    "authorize WELL-EBNF-1 full metasyntax specification document if treated as separate deliverable",
     "authorize engine construction probe (separate AUTH)",
     "authorize PILOT-01 (separate AUTH)",
     "Human escalation if preferred engine changes dependency/cost/latency envelope"
