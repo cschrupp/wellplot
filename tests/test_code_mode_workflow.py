@@ -280,6 +280,21 @@ def test_graph_plans_at_zero_and_keeps_source_summary_path_free() -> None:
     ]
 
 
+def test_graph_planner_context_exposes_safe_existing_section_hints() -> None:
+    """Planner context includes titles without exposing nested canonical state."""
+    plan = SemanticPlan(
+        summary="section only",
+        section_tasks=(SectionTask(goal="update", capability_ids=("section.log_plot",)),),
+    )
+    planner = _Planner(plan)
+
+    asyncio.run(_graph(plan, _Workers(), planner).ainvoke(_state(plan)))
+
+    assert planner.summaries[0]["existing_section_hints"] == [
+        {"title": "Existing section", "subtitle": None}
+    ]
+
+
 def test_graph_failure_is_atomic_and_keeps_bounded_diagnostics() -> None:
     """A failed sibling prevents merged output even when others succeed."""
     plan = SemanticPlan(

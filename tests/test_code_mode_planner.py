@@ -351,6 +351,39 @@ def test_planner_preserves_revise_mode_as_semantic_context() -> None:
     assert '"mode":"revise"' in backend.requests[0].user_prompt
 
 
+def test_revise_plan_correction_receives_existing_section_hints() -> None:
+    """Missing revision targets get one bounded correction with safe context."""
+    invalid = _plan_payload()
+    invalid["section_tasks"] = (
+        {
+            **invalid["section_tasks"][0],
+            "existing_section_hint": None,
+        },
+    )
+    backend = _SequenceBackend(responses=[invalid, _plan_payload()])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    result = asyncio.run(
+        planner.plan(
+            request="Change the CBL display.",
+            mode="revise",
+            current_document_summary={
+                "existing_section_hints": [{"title": "Main Pass", "subtitle": "CBL presentation"}]
+            },
+            timeout_seconds=5.0,
+        )
+    )
+
+    assert result.section_tasks[0].existing_section_hint == (
+        "the existing main CBL presentation section"
+    )
+    correction = json.loads(backend.requests[1].user_prompt.split("Correction context:\n", 1)[1])
+    assert correction["diagnostic"]["code"] == "missing_existing_section_hint"
+    assert correction["current_document_summary"] == {
+        "existing_section_hints": [{"title": "Main Pass", "subtitle": "CBL presentation"}]
+    }
+
+
 def _invalid_plan_payload(kind: str) -> dict[str, object]:
     """Return one structurally valid plan with one semantic error."""
     payload = _plan_payload()
@@ -419,7 +452,7 @@ def test_planner_corrects_each_typed_semantic_error_once(kind: str) -> None:
     assert "Keep the section readable." in correction_prompt
     assert "source_hints" in correction_prompt
     assert "use the staged CBL DLIS" in correction_prompt
-    assert "existing_section_hint" not in correction_prompt
+    assert "existing_section_hint" in correction_prompt
 
 
 def test_section_correction_projection_preserves_source_and_scientific_requirements() -> None:
@@ -443,6 +476,19 @@ def test_section_correction_projection_preserves_source_and_scientific_requireme
         "Use source origin 40, source step 10, and 7 ticks.",
     ]
     assert projected["constraints"] == ["Keep the 200-400 scale reversed."]
+
+
+def test_section_correction_projection_preserves_existing_section_hint() -> None:
+    """Planner correction retains the safe clue needed to target a revision."""
+    projected = _safe_task_for_correction(
+        SectionTask(
+            goal="Update the existing section.",
+            capability_ids=("section.log_plot",),
+            existing_section_hint="Main Log – Upper",
+        )
+    )
+
+    assert projected["existing_section_hint"] == "Main Log – Upper"
 
 
 def test_report_correction_projection_does_not_add_source_hints() -> None:
@@ -937,6 +983,28 @@ def test_semantic_plan_rejects_unknown_and_wrong_category_capabilities() -> None
             ),
             registry,
         )
+
+
+def test_revision_plan_requires_existing_section_hint() -> None:
+    """Revision work fails closed before enrichment when the target is omitted."""
+    plan = _section_plan(("section.log_plot",))
+
+    with pytest.raises(PlannerSemanticError) as caught:
+        validate_semantic_plan(plan, create_builtin_registry(), mode="revise")
+
+    assert caught.value.code == "missing_existing_section_hint"
+
+
+def test_revision_plan_accepts_existing_section_hint() -> None:
+    """A revision plan with a natural-language target remains valid."""
+    task = (
+        _section_plan(("section.log_plot",))
+        .section_tasks[0]
+        .model_copy(update={"existing_section_hint": "Main Log – Upper"})
+    )
+    plan = SemanticPlan(summary="Validate a revision target.", section_tasks=(task,))
+
+    assert validate_semantic_plan(plan, create_builtin_registry(), mode="revise") == plan
 
 
 def _section_plan(capability_ids: tuple[str, ...]) -> SemanticPlan:

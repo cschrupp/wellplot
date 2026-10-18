@@ -187,7 +187,7 @@ class SemanticPlanner:
             )
         plan = SemanticPlan.model_validate(generated.value)
         try:
-            return validate_semantic_plan(plan, self.registry)
+            return validate_semantic_plan(plan, self.registry, mode=mode)
         except PlannerSemanticError as first_error:
             if invalid_response_retry_used:
                 raise PlannerSemanticFailure(
@@ -198,6 +198,7 @@ class SemanticPlanner:
                 _correction_request(
                     mode=mode,
                     request=request,
+                    current_document_summary=current_document_summary,
                     source_summary=source_summary,
                     previous_plan=plan,
                     diagnostic=first_error,
@@ -210,7 +211,7 @@ class SemanticPlanner:
             )
             corrected_plan = SemanticPlan.model_validate(corrected.value)
             try:
-                return validate_semantic_plan(corrected_plan, self.registry)
+                return validate_semantic_plan(corrected_plan, self.registry, mode=mode)
             except PlannerSemanticError as second_error:
                 raise PlannerSemanticFailure(
                     second_error.code,
@@ -218,8 +219,13 @@ class SemanticPlanner:
                 ) from second_error
 
 
-def validate_semantic_plan(plan: SemanticPlan, registry: CapabilityRegistry) -> SemanticPlan:
-    """Validate selected capabilities without resolving document structure."""
+def validate_semantic_plan(
+    plan: SemanticPlan,
+    registry: CapabilityRegistry,
+    *,
+    mode: CompilationMode = "reconstruct",
+) -> SemanticPlan:
+    """Validate capabilities and revision target contracts without host resolution."""
     if plan.report_task is not None:
         report_specs = _validate_capabilities(
             plan.report_task.capability_ids,
@@ -230,6 +236,14 @@ def validate_semantic_plan(plan: SemanticPlan, registry: CapabilityRegistry) -> 
         _validate_parent_closure(report_specs, plan.report_task.capability_ids)
 
     for task in plan.section_tasks:
+        if mode == "revise" and task.existing_section_hint is None:
+            raise PlannerSemanticError(
+                "missing_existing_section_hint",
+                (
+                    "Revision SectionTasks must identify an existing section with a "
+                    "natural-language hint."
+                ),
+            )
         specs = _validate_capabilities(task.capability_ids, registry, task_kind="section")
         _validate_unique_capabilities(task.capability_ids)
         categories = {spec.category for spec in specs}
@@ -371,6 +385,7 @@ def _correction_request(
     *,
     mode: CompilationMode,
     request: str,
+    current_document_summary: Mapping[str, object] | None = None,
     source_summary: Mapping[str, object] | None = None,
     previous_plan: SemanticPlan,
     diagnostic: PlannerSemanticError,
@@ -383,6 +398,7 @@ def _correction_request(
     context = {
         "mode": mode,
         "original_request": _safe_correction_text(request),
+        "current_document_summary": _safe_document_summary(current_document_summary),
         "source_summary": _safe_source_summary(source_summary),
         "capabilities": _planning_catalog(registry),
         "previous_plan": _safe_plan_for_correction(previous_plan),
@@ -417,7 +433,7 @@ def _safe_plan_for_correction(plan: SemanticPlan) -> dict[str, object]:
 
 
 def _safe_task_for_correction(task: ReportTask | SectionTask) -> dict[str, object]:
-    """Preserve semantic task text while excluding host-owned selection fields."""
+    """Preserve semantic text and safe natural-language target clues for correction."""
     payload: dict[str, object] = {
         "goal": _safe_correction_text(task.goal),
         "capability_ids": list(task.capability_ids),
@@ -425,6 +441,8 @@ def _safe_task_for_correction(task: ReportTask | SectionTask) -> dict[str, objec
         "constraints": [_safe_correction_text(value) for value in task.constraints],
     }
     if isinstance(task, SectionTask):
+        if task.existing_section_hint is not None:
+            payload["existing_section_hint"] = _safe_correction_text(task.existing_section_hint)
         payload["source_hints"] = [_safe_correction_text(value) for value in task.source_hints]
     return payload
 
@@ -484,6 +502,33 @@ def _safe_source_summary(summary: Mapping[str, object] | None) -> dict[str, obje
     }
 
 
+def _safe_document_summary(summary: Mapping[str, object] | None) -> dict[str, object]:
+    """Project only section title clues needed for bounded plan correction."""
+    if summary is None:
+        return {"existing_section_hints": []}
+    raw_hints = summary.get("existing_section_hints", ())
+    if not isinstance(raw_hints, (list, tuple)):
+        raise ValueError("Document summary existing section hints must be a sequence.")
+
+    hints: list[dict[str, str | None]] = []
+    for raw_hint in raw_hints:
+        if not isinstance(raw_hint, Mapping):
+            raise ValueError("Document summary section hints must be mappings.")
+        title = raw_hint.get("title")
+        subtitle = raw_hint.get("subtitle")
+        if not isinstance(title, str) or not title.strip():
+            raise ValueError("Document summary section hint titles must be non-empty text.")
+        if subtitle is not None and not isinstance(subtitle, str):
+            raise ValueError("Document summary section hint subtitles must be text or null.")
+        hints.append(
+            {
+                "title": _safe_correction_text(title),
+                "subtitle": (None if subtitle is None else _safe_correction_text(subtitle)),
+            }
+        )
+    return {"existing_section_hints": hints}
+
+
 def _require_nonempty_items(values: tuple[str, ...]) -> None:
     """Require each semantic list item to contain meaningful text."""
     if any(not isinstance(value, str) or not value.strip() for value in values):
@@ -513,6 +558,11 @@ input source in natural language, preserve that clue in SectionTask.source_hints
 Source hints are ordered semantic clues for later host resolution. Do not emit
 filesystem paths, source formats, host candidate IDs, or invented source
 identities. Keep source clues attached to the section they describe.
+In revise mode, every SectionTask must include an existing_section_hint. Copy an
+exact supplied section title or subtitle from current_document_summary's
+existing_section_hints; do not leave the hint null and do not invent a section
+identity. Revision workers cannot safely target an existing section without this
+host-resolvable natural-language clue.
 When the bounded source summary contains multiple sources and the request selects
 one of them, copy one supplied source label exactly into source_hints; do not
 paraphrase, abbreviate, or invent a source label. The host resolves that label

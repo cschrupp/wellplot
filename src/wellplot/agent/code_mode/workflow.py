@@ -59,11 +59,19 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
     async def plan_node(state: CodeModeGraphState) -> dict[str, object]:
         """Plan from a bounded document summary, never the full document."""
         document = _document(state)
-        summary = AuthoringInspectionFacade(document).document_summary()
+        inspection = AuthoringInspectionFacade(document)
+        summary = inspection.document_summary().model_dump(mode="json")
+        summary["existing_section_hints"] = [
+            {
+                "title": section.title,
+                "subtitle": section.subtitle,
+            }
+            for section in inspection.sections()
+        ]
         plan = await dependencies.planner.plan(
             request=state["request"],
             mode=state.get("mode", "reconstruct"),
-            current_document_summary=summary.model_dump(mode="json"),
+            current_document_summary=summary,
             source_summary=_planner_source_summary(state),
             timeout_seconds=state["timeout_seconds"],
             temperature=state.get("planner_temperature", 0.0),
