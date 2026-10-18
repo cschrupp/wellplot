@@ -1,0 +1,99 @@
+{
+  "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01",
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01-AUTH-001",
+  "model_calls": 0,
+  "model_weights_loaded": false,
+  "g1_input_identity": {
+    "grammar_sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
+    "grammar_sha256_expected": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
+    "grammar_match": true,
+    "tokenizer": {
+      "snapshot_path": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/modelscope_cache/models/Qwen--Qwen3-1.7B/snapshots/master",
+      "artifact_sha256": {
+        "tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+        "tokenizer_config.json": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+        "merges.txt": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+        "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+      }
+    },
+    "pass": true
+  },
+  "backends": {
+    "xgrammar": {
+      "status": "PASS",
+      "provenance": {
+        "backend": "xgrammar",
+        "route": "native_ebnf",
+        "package_version": "0.2.8",
+        "lowerer_id": "well_ebnf1_to_xgrammar_ebnf.v1",
+        "lowerer_source_sha256": "216976a6e7b8a6838862198fa4d37168666fab602ec643c7369ca100179d377e",
+        "source_grammar_sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
+        "backend_native_grammar_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
+        "compile_seconds": 0.9099156140000559,
+        "vocab_size": 151936
+      },
+      "build_wall_seconds": 2.0239937079895753,
+      "gates": {
+        "G1": true,
+        "G2": true,
+        "G3": true,
+        "G4": true,
+        "G5": true,
+        "G6": true,
+        "G7": true,
+        "G8": true
+      },
+      "text_parity": {
+        "pass": true,
+        "positive_pass": true,
+        "negative_pass": true,
+        "positive_failures": [],
+        "negative_failures": []
+      },
+      "token_replay": {
+        "pass": true,
+        "positive_pass": true,
+        "negative_pass": true,
+        "positive_failures": [],
+        "negative_failures": [],
+        "mask_step_latency_seconds": {
+          "n": 485,
+          "mean": 0.01049897381933838,
+          "max": 0.10338001500349492,
+          "min": 1.1780066415667534e-06
+        }
+      },
+      "resources": {
+        "compile_seconds": 0.9099156140000559,
+        "lowered_grammar_bytes": 1226434
+      }
+    },
+    "llguidance": {
+      "backend": "llguidance",
+      "status": "REJECTED",
+      "reject_gate": "G7",
+      "reason": "matcher_error_state:panic: assertion failed: grammar.symbols.len() < u16::MAX as usize - 10\n<backtrace>\n   0: <unknown>\n   1: <unknown>\n   2: <unknown>\n   3: <unknown>\n   4: <unknown>\n   5: <unknown>\n   6: <unknown>\n   7: <unknown>\n   8: <unknown>\n   9: <unknown>\n  10: <unknown>\n  11: <unknown>\n  12: <unknown>\n  13: <unknown>\n  14: <unknown>\n  15: <unknown>\n  16: type_call\n  17: _PyEval_EvalFrameDefault\n  18: PyEval_EvalCode\n  19: run_eval_code_obj\n  20: run_mod.llvm.13204741583675259778\n  21: pyrun_file\n  22: _PyRun_SimpleFileObject\n  23: _PyRun_AnyFileObject\n  24: PyRun_AnyFileExFlags\n  25: pymain_run_stdin\n  26: Py_RunMain.cold\n  27: pymain_main.llvm.14292888426094420609\n  28: main\n  29: <unknown>\n  30: __libc_start_main\n  31: _start\n\n</backtrace>",
+      "package_version": "1.9.1",
+      "lowerer_id": "well_ebnf1_to_llguidance_lark.v1",
+      "lowerer_source_sha256": "852354266c9eafdf39760d5f567b174f3a1fa1f79732083040af7c73f17ca845",
+      "backend_native_grammar_sha256": "5068fa5da97be560119f90275acf84f8d9eeea7a0007e12ddcf478b7eee1bdc1",
+      "backend_native_grammar_bytes": 1475370,
+      "lower_seconds": 0.44206293299794197,
+      "tokenizer_wrap_seconds": 0.9516282819968183,
+      "construct_seconds": 0.9262698890233878,
+      "validate_message": "",
+      "pathology": "grammar_symbol_table_overflow"
+    }
+  },
+  "recommendation": "xgrammar",
+  "recommendation_reason": "XGrammar passed G1–G8. llguidance rejected on construction pathology (grammar symbol table overflow / u16 limit) under G7.",
+  "unauthorized_still": [
+    "model_weight_load",
+    "model_forward",
+    "model_generate",
+    "PILOT_01",
+    "tokenizer_autodownload",
+    "schema_prompt_changes",
+    "xgrammar_json_schema_route"
+  ]
+}
