@@ -1,6 +1,6 @@
 # wellplot Decision Log
 
-Last updated: 2026-03-20
+Last updated: 2026-10-18
 
 ## Purpose
 
@@ -180,6 +180,80 @@ This file records project decisions that should remain stable unless explicitly 
 
 - Package metadata currently states Python `>=3.11`.
 - CI validates 3.11, 3.12, 3.13, and 3.14.
+
+## Natural-Language Authoring Runtime Decisions (2026-10-18)
+
+These decisions govern the experimental NLP runtime unless explicitly revised.
+
+- Natural-language editing is layered over the existing deterministic WellPlot model:
+  - raw utterance + permitted projected workspace
+  - learned decomposer
+  - typed `ScopeNormalizedProgram`
+  - deterministic resolution / validation / projected effects
+  - canonical WellPlot intent and existing renderers
+- The learned model interprets language; it is not the semantic authority for WellPlot.
+- Persistent host identities are allocated deterministically by the host. Models do not generate
+  persistent WellPlot IDs.
+- `ScopeNormalizedProgram` is an ordered composition of atomic semantic tasks. Dependencies and
+  local binds are explicit rather than inferred from execution side effects.
+- Candidate programs must be frozen before oracle-side evaluation material becomes accessible.
+- Evaluation distinguishes schema/decode failure, runtime-terminal behavior, and semantic
+  equivalence instead of collapsing them into one accuracy number.
+- Deterministic semantic adjudication remains authoritative wherever the contract can express the
+  decision. The MB-01R / MB-02R work found no remaining learned semantic-gate requirement for the
+  studied runtime slice.
+- The current decomposer experiment uses `Qwen/Qwen3-1.7B`, thinking disabled, as a zero-shot
+  structured decomposer. This is an experiment configuration, not a product commitment.
+- No capability claim is made for that model until the complete constrained-decoding path passes
+  preflight and the frozen pilot is actually executed.
+- Hard structural constraints derive mechanically from the frozen patched
+  `ClosedNormalizedProgram` contract.
+- The canonical engine-neutral grammar representation is `WELL-EBNF-1`.
+- Canonical `WELL-EBNF-1` bytes are mechanically generated from the pinned patched schema; hand
+  edits and semantic patch layers are forbidden.
+- Canonical rule ordering is `START` first, then remaining identifiers by UTF-8 byte sequence.
+- The accepted schema→grammar generator artifact currently has:
+  - grammar SHA-256:
+    `f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3`
+- The Outlines constrained JSON-Schema path and XGrammar JSON-Schema route were rejected for this
+  experiment. That does not reject XGrammar grammar mode.
+- No hard-constraint engine is selected yet. The next technical step is an engine bakeoff against
+  the immutable accepted grammar.
+- Engine acceptance does not itself authorize model inference or `PILOT-01`.
+
+## Agentic Development Operating Decisions (2026-10-18)
+
+Repository-wide durable operating rules live in the root `AGENTS.md`; active slice state and
+temporary authorization do not.
+
+Stable role split:
+
+- Human:
+  - product direction
+  - material scope/cost/risk/dependency tradeoffs
+  - explicit authorization and major acceptance gates
+- SOL / technical architect:
+  - architecture
+  - semantic contracts
+  - experimental methodology
+  - high-stakes technical decisions
+  - independent semantic review
+- implementation agent:
+  - bounded implementation
+  - routine local engineering choices that do not alter accepted contracts
+- deterministic tooling:
+  - mechanical evidence such as topology, hashes, path bounds, tests, counters, and manifests
+
+Operational rules:
+
+- proceed by default inside an authorized frozen slice
+- do not turn routine implementation into a serial Human/SOL questionnaire
+- batch genuine contract-level blockers into one SOL handoff
+- escalate to the Human only when the decision crosses a Human-owned boundary
+- prefer deterministic gates for mechanically computable governance facts
+- treat implementation reports as handoffs, not proof
+- keep accepted design, observed evidence, acceptance, and downstream authorization as distinct
+  states
 
 ## Revision Rule
 
