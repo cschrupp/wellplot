@@ -7,6 +7,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import pytest
 from scripts.verify_cbl_packet import verify_cbl_packet
 from tests._mcp_fixtures import REPO_ROOT
 from tests.test_nlp_d4_live_acceptance import _build_rehearsal_cbl_artifact
@@ -24,10 +25,14 @@ from wellplot.agent.code_mode.enrichment import (
     SourceContext,
 )
 from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan
-from wellplot.agent.code_mode.semantic_actions import ReconstructSectionAction
+from wellplot.agent.code_mode.semantic_actions import (
+    ReconstructSectionAction,
+    SemanticActionError,
+)
 from wellplot.agent.code_mode.typed_section_worker import (
     CanonicalSectionWorker,
     _normalize_reconstruct_request_semantics,
+    _normalize_reconstruct_track_dimensions,
 )
 from wellplot.agent.providers.base import (
     ProviderMetrics,
@@ -540,6 +545,170 @@ def test_canonical_report_worker_merges_planner_metadata_with_raw_request() -> N
         "general.company": "University of Utah",
         "general.country": "Utah",
     }
+
+
+def test_canonical_report_worker_uses_generic_labeled_report_requirements() -> None:
+    """Paraphrased report instructions preserve a renamed remark verbatim."""
+    report_context = ReportContext(
+        header_slots=(
+            HeaderSlotInspectionSummary(
+                slot_id="general.company",
+                key="company",
+                label="Company",
+            ),
+            HeaderSlotInspectionSummary(slot_id="service_title.1"),
+        ),
+        general_slot_ids=("general.company",),
+        service_title_slot_ids=("service_title.1",),
+    )
+    backend = _StructuredFixtureBackend([{"title": "Provider Draft"}])
+    result = asyncio.run(
+        CanonicalReportWorker(backend=backend).compile(
+            task=ReportTask(
+                goal="Capture labeled report details.",
+                capability_ids=("report.standard",),
+                requirements=(
+                    "Company: North Star Labs",
+                    "Service titles: Cement Review",
+                    "Remark 1: Scope Boundary — Preserve this exact sentence, "
+                    "including punctuation.",
+                ),
+            ),
+            report_context=report_context,
+            document=_document(),
+            authoritative_request=(
+                "Please record the labeled details below.\n"
+                "Company: North Star Labs\n"
+                "Service titles: Cement Review\n"
+                "Remark 1: Scope Boundary — Preserve this exact sentence, including punctuation."
+            ),
+            timeout_seconds=10,
+        )
+    )
+    assert result.success is True
+    assert result.intent_fragment is not None
+    assert result.intent_fragment.header is not None
+    assert result.intent_fragment.remarks is not None
+    assert result.intent_fragment.remarks[0].title == "Scope Boundary"
+    assert result.intent_fragment.remarks[0].text == (
+        "Preserve this exact sentence, including punctuation."
+    )
+
+
+def test_section_normalization_matches_reordered_tracks_by_identity() -> None:
+    """Reordered model tracks receive dimensions and styles by identity, not position."""
+    action = ReconstructSectionAction.model_validate(
+        {
+            "action": "reconstruct",
+            "section": {
+                "title": "Main",
+                "source_candidate": "source-1",
+                "tracks": [
+                    {
+                        "semantic_id": "model-depth",
+                        "kind": "reference",
+                        "title": "Depth",
+                        "bindings": [{"semantic_id": "cali", "channel": "CALI"}],
+                    },
+                    {
+                        "semantic_id": "model-combo",
+                        "kind": "normal",
+                        "title": "Combo",
+                        "bindings": [{"semantic_id": "gr", "channel": "GR"}],
+                    },
+                ],
+            },
+        }
+    )
+    task = SectionTask(
+        goal="Build the requested tracks.",
+        capability_ids=("section.log_plot", "track.normal", "track.reference"),
+        requirements=(
+            "Track 1 (combo): normal, 42 mm",
+            "Track 2 (depth): reference, 12 mm",
+            "Track 1: GR -> Gamma Ray.",
+            "Track 2: CALI -> Caliper.",
+            "Combo bindings: GR -> Gamma Ray, linear 5..125, #123456 dashed, width 0.65",
+            "Depth bindings: CALI -> Caliper, linear 1..10, #abcdef dotted, width 0.40",
+        ),
+    )
+    normalized = _normalize_reconstruct_track_dimensions(action, task)
+    normalized = _normalize_reconstruct_request_semantics(
+        normalized,
+        task=task,
+        authoritative_request="Build the requested tracks.",
+    )
+    depth, combo = normalized.section.tracks
+    assert (depth.semantic_id, depth.width_mm, depth.kind) == ("depth", 12, "reference")
+    assert (combo.semantic_id, combo.width_mm, combo.kind) == ("combo", 42, "normal")
+    assert combo.bindings[0].scale is not None
+    assert combo.bindings[0].scale.minimum == 5
+    assert combo.bindings[0].style is not None
+    assert combo.bindings[0].style.color == "#123456"
+    assert depth.bindings[0].style is not None
+    assert depth.bindings[0].style.color == "#abcdef"
+
+
+def test_section_normalization_rejects_requested_track_kind_mismatch() -> None:
+    """A requested kind mismatch fails instead of being silently discarded."""
+    action = ReconstructSectionAction.model_validate(
+        {
+            "action": "reconstruct",
+            "section": {
+                "title": "Main",
+                "source_candidate": "source-1",
+                "tracks": [
+                    {
+                        "semantic_id": "combo",
+                        "kind": "normal",
+                        "title": "Combo",
+                        "bindings": [{"semantic_id": "gr", "channel": "GR"}],
+                    }
+                ],
+            },
+        }
+    )
+    task = SectionTask(
+        goal="Build a reference track.",
+        capability_ids=("section.log_plot", "track.reference"),
+        requirements=("Track 1 (combo): reference, 42 mm", "Track 1: GR -> Gamma Ray."),
+    )
+    with pytest.raises(SemanticActionError, match="requested kind 'reference'"):
+        _normalize_reconstruct_track_dimensions(action, task)
+
+
+def test_section_normalization_does_not_fallback_to_track_position() -> None:
+    """An unmatched explicit track block cannot mutate the first response track."""
+    action = ReconstructSectionAction.model_validate(
+        {
+            "action": "reconstruct",
+            "section": {
+                "title": "Main",
+                "source_candidate": "source-1",
+                "tracks": [
+                    {
+                        "semantic_id": "unrelated",
+                        "kind": "normal",
+                        "title": "Unrelated",
+                        "bindings": [{"semantic_id": "cali", "channel": "CALI"}],
+                    }
+                ],
+            },
+        }
+    )
+    task = SectionTask(
+        goal="Build the combo track.",
+        capability_ids=("section.log_plot", "track.normal"),
+        requirements=(
+            "Combo bindings: GR -> Gamma Ray, linear 5..125, #123456 dashed, width 0.65",
+        ),
+    )
+    with pytest.raises(SemanticActionError, match="could not be matched by identity"):
+        _normalize_reconstruct_request_semantics(
+            action,
+            task=task,
+            authoritative_request="Build the combo track.",
+        )
 
 
 def test_section_worker_normalizes_explicit_curve_presentation() -> None:

@@ -103,6 +103,10 @@ _TRACK_DIMENSION_RE = re.compile(
     r"(?P<kind>normal|reference|array)\s*,\s*(?P<width>[0-9]+(?:\.[0-9]+)?)\s*mm\b",
     re.IGNORECASE,
 )
+_TRACK_CHANNEL_LINE_RE = re.compile(
+    r"^\s*Track\s+(?P<number>\d+)(?:\s+\([^)]*\))?\s*:\s*(?P<body>.*)$",
+    re.IGNORECASE,
+)
 _TRACK_BLOCK_RE = re.compile(
     r"^\s*On\s+(?P<track>[^:\n]+):\s*\n(?P<body>.*?)(?=^\s*On\s+[^:\n]+:\s*$|"
     r"^\s*Use only channels|\Z)",
@@ -520,39 +524,48 @@ def _normalize_reconstruct_track_dimensions(
     action: SectionSemanticAction,
     task: SectionTask,
 ) -> SectionSemanticAction:
-    """Apply explicit task track identity and width to a reconstruction draft."""
+    """Apply explicit track identity and width without relying on response order."""
     if action.action != "reconstruct":
         return action
     dimensions: dict[int, tuple[str, str, float]] = {}
+    channel_signatures: dict[int, tuple[str, ...]] = {}
     for requirement in task.requirements:
         match = _TRACK_DIMENSION_RE.match(requirement)
-        if match is None:
+        if match is not None:
+            track_number = int(match.group("number"))
+            if track_number not in dimensions:
+                dimensions[track_number] = (
+                    match.group("semantic_id").strip(),
+                    match.group("kind").casefold(),
+                    float(match.group("width")),
+                )
             continue
-        track_number = int(match.group("number"))
-        if track_number in dimensions:
-            continue
-        dimensions[track_number] = (
-            match.group("semantic_id").strip(),
-            match.group("kind").casefold(),
-            float(match.group("width")),
-        )
+        channel_match = _TRACK_CHANNEL_LINE_RE.match(requirement)
+        if channel_match is not None:
+            channel_signatures[int(channel_match.group("number"))] = _channel_signature(
+                channel_match.group("body")
+            )
     if not dimensions:
         return action
-    tracks = []
-    for index, track in enumerate(action.section.tracks, start=1):
-        dimension = dimensions.get(index)
-        if dimension is None:
-            tracks.append(track)
-            continue
-        semantic_id, _, width_mm = dimension
-        tracks.append(
-            track.model_copy(
-                update={
-                    "semantic_id": semantic_id,
-                    "width_mm": width_mm,
-                }
-            )
+    tracks = list(action.section.tracks)
+    used_indices: set[int] = set()
+    for track_number, (semantic_id, kind, width_mm) in dimensions.items():
+        signature = channel_signatures.get(track_number, ())
+        index = _find_track_index(
+            tracks,
+            identifiers=(semantic_id,),
+            channel_signature=signature,
+            used_indices=used_indices,
         )
+        track = tracks[index]
+        actual_kind = str(getattr(track, "kind", "")).casefold()
+        if actual_kind != kind:
+            raise SemanticActionError(
+                "semantic_contract_incomplete",
+                f"Track '{semantic_id}' requested kind '{kind}', received '{actual_kind}'.",
+            )
+        tracks[index] = track.model_copy(update={"semantic_id": semantic_id, "width_mm": width_mm})
+        used_indices.add(index)
     return action.model_copy(
         update={"section": action.section.model_copy(update={"tracks": tuple(tracks)})}
     )
@@ -579,11 +592,21 @@ def _normalize_reconstruct_request_semantics(
     if not blocks:
         return action
     tracks = list(action.section.tracks)
+    matched_blocks: set[int] = set()
     for index, track in enumerate(tracks):
-        block = _matching_track_block(track, blocks, index)
+        block = _matching_track_block(track, blocks)
         if block is None:
             continue
+        matched_blocks.add(id(block))
         tracks[index] = _normalize_track_request_semantics(track, block.group("body"))
+    if len(matched_blocks) != len(blocks):
+        unmatched = tuple(
+            block.group("track").strip() for block in blocks if id(block) not in matched_blocks
+        )
+        raise SemanticActionError(
+            "semantic_contract_incomplete",
+            "Explicit track semantics could not be matched by identity: " + ", ".join(unmatched),
+        )
     return action.model_copy(
         update={"section": action.section.model_copy(update={"tracks": tuple(tracks)})}
     )
@@ -592,17 +615,109 @@ def _normalize_reconstruct_request_semantics(
 def _matching_track_block(
     track: object,
     blocks: tuple[re.Match[str], ...],
-    index: int,
 ) -> re.Match[str] | None:
-    """Match a request block by semantic ID/title, then by stable order."""
-    identifiers = {
-        str(getattr(track, "semantic_id", "")).casefold(),
-        str(getattr(track, "title", "")).casefold(),
+    """Match a request block by semantic identity or channel signature only."""
+    identifiers = (
+        str(getattr(track, "semantic_id", "")),
+        str(getattr(track, "title", "")),
+    )
+    identity_matches = [
+        block for block in blocks if _identifiers_match(identifiers, block.group("track"))
+    ]
+    if len(identity_matches) == 1:
+        return identity_matches[0]
+    if len(identity_matches) > 1:
+        raise SemanticActionError(
+            "semantic_contract_incomplete",
+            f"Track identity is ambiguous for '{getattr(track, 'semantic_id', '')}'.",
+        )
+    track_signature = _track_binding_signature(track)
+    if not track_signature:
+        return None
+    signature_matches = [
+        block for block in blocks if _channel_signature(block.group("body")) == track_signature
+    ]
+    if len(signature_matches) == 1:
+        return signature_matches[0]
+    if len(signature_matches) > 1:
+        raise SemanticActionError(
+            "semantic_contract_incomplete",
+            f"Track channel signature is ambiguous for '{getattr(track, 'semantic_id', '')}'.",
+        )
+    return None
+
+
+def _normalize_track_identifier(value: str) -> str:
+    """Normalize human track labels for exact identity comparison."""
+    return " ".join(re.findall(r"[a-z0-9]+", value.casefold()))
+
+
+def _identifiers_match(identifiers: tuple[str, ...], requested: str) -> bool:
+    """Return whether a requested track label matches one known identity."""
+    normalized_requested = _normalize_track_identifier(requested)
+    return bool(normalized_requested) and normalized_requested in {
+        _normalize_track_identifier(identifier) for identifier in identifiers if identifier
     }
-    for block in blocks:
-        if block.group("track").strip().casefold() in identifiers:
-            return block
-    return blocks[index] if index < len(blocks) else None
+
+
+def _channel_signature(value: str) -> tuple[str, ...]:
+    """Build an order-independent signature from explicit channel clauses."""
+    channels = re.findall(
+        r"\b[A-Z][A-Z0-9_]*\b(?=\s*(?:→|->))",
+        value,
+    )
+    return tuple(sorted(item.casefold() for item in channels))
+
+
+def _track_binding_signature(track: object) -> tuple[str, ...]:
+    """Build the same signature from a generated track's binding channels."""
+    return tuple(
+        sorted(
+            str(getattr(binding, "channel", "")).casefold()
+            for binding in getattr(track, "bindings", ())
+        )
+    )
+
+
+def _find_track_index(
+    tracks: list[object],
+    *,
+    identifiers: tuple[str, ...],
+    channel_signature: tuple[str, ...],
+    used_indices: set[int],
+) -> int:
+    """Find one unused response track by identity, then by channel signature."""
+    identity_matches = [
+        index
+        for index, track in enumerate(tracks)
+        if index not in used_indices
+        and _identifiers_match(
+            identifiers,
+            str(getattr(track, "semantic_id", "")),
+        )
+    ]
+    if not identity_matches:
+        identity_matches = [
+            index
+            for index, track in enumerate(tracks)
+            if index not in used_indices
+            and _identifiers_match(
+                identifiers,
+                str(getattr(track, "title", "")),
+            )
+        ]
+    if not identity_matches and channel_signature:
+        identity_matches = [
+            index
+            for index, track in enumerate(tracks)
+            if index not in used_indices and _track_binding_signature(track) == channel_signature
+        ]
+    if len(identity_matches) != 1:
+        raise SemanticActionError(
+            "semantic_contract_incomplete",
+            f"Track identity could not be resolved uniquely for '{identifiers[0]}'.",
+        )
+    return identity_matches[0]
 
 
 def _normalize_track_request_semantics(track: object, body: str) -> object:

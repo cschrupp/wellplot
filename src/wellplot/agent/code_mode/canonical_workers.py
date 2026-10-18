@@ -419,49 +419,24 @@ def _apply_explicit_report_request(
 ) -> ReportSemanticResponse:
     """Prefer explicit report clauses over ambiguous model slot synonyms."""
     response = _preserve_unrequested_report_depth(response, authoritative_request)
-    metadata = _request_clause_block(
-        authoritative_request,
-        start=r"Set the report metadata to:",
-        end=r"(?:Include\s+three\s+remarks:|For\s+each\s+pass:)",
-    )
-    services = _request_clause_block(
-        authoritative_request,
-        start=r"Use these service titles, in order:",
-        end=r"Set the report metadata to:",
-    )
-    remarks = _request_clause_block(
-        authoritative_request,
-        start=r"Include\s+three\s+remarks:",
-        end=r"For\s+each\s+pass:",
-    )
+    metadata_parts: list[str] = []
+    services: str | None = None
+    remark_parts: list[str] = []
     if task_requirements:
-        requirement_metadata = tuple(
-            item
-            for item in task_requirements
-            if not item.casefold().startswith(("service titles:", "remark "))
+        requirement_metadata, services, requirement_remarks = _report_requirement_fragments(
+            task_requirements
         )
-        if requirement_metadata:
-            requirement_text = "; ".join(requirement_metadata)
-            metadata = requirement_text if metadata is None else f"{metadata}; {requirement_text}"
-        if services is None:
-            services = next(
-                (
-                    item.partition(":")[2].strip()
-                    for item in task_requirements
-                    if item.casefold().startswith("service titles:")
-                ),
-                None,
-            )
-        if remarks is None:
-            requirement_remarks = tuple(
-                item.partition(":")[2].strip()
-                for item in task_requirements
-                if item.casefold().startswith("remark ") and ":" in item
-            )
-            if requirement_remarks:
-                remarks = "\n".join(
-                    f"{index}. {value}" for index, value in enumerate(requirement_remarks, 1)
-                )
+        metadata_parts.extend(requirement_metadata)
+        remark_parts.extend(requirement_remarks)
+    request_metadata, request_services, request_remarks = _generic_report_request_fragments(
+        authoritative_request
+    )
+    metadata_parts.extend(request_metadata)
+    if services is None:
+        services = request_services
+    remark_parts.extend(request_remarks)
+    metadata = "; ".join(metadata_parts) or None
+    remarks = "\n".join(f"{index}. {value}" for index, value in enumerate(remark_parts, 1)) or None
     if metadata is None and services is None and remarks is None:
         return response
 
@@ -508,16 +483,56 @@ def _preserve_unrequested_report_depth(
     return response.model_copy(update={"depth_unit": None, "depth_scale": None})
 
 
-def _request_clause_block(request: str, *, start: str, end: str) -> str | None:
-    """Extract one bounded request section without retaining unrelated text."""
-    if not request:
-        return None
-    match = re.search(
-        rf"{start}\s*(?P<body>.*?)(?=\n\s*{end}|\Z)",
-        request,
-        flags=re.IGNORECASE | re.DOTALL,
+def _report_requirement_fragments(
+    requirements: tuple[str, ...],
+) -> tuple[tuple[str, ...], str | None, tuple[str, ...]]:
+    """Extract normalized report labels from planner-owned requirements."""
+    metadata: list[str] = []
+    services: str | None = None
+    remarks: list[str] = []
+    for requirement in requirements:
+        if "\n" in requirement:
+            continue
+        label, separator, value = requirement.partition(":")
+        normalized_label = _slot_alias(label)
+        if separator and normalized_label in {"servicetitles", "servicetitle"}:
+            services = value.strip()
+        elif separator and re.fullmatch(r"remark\d+", normalized_label):
+            remarks.append(value.strip())
+        else:
+            metadata.append(requirement.strip())
+    return (
+        tuple(item for item in metadata if item),
+        services,
+        tuple(item for item in remarks if item),
     )
-    return None if match is None else match.group("body").strip()
+
+
+def _generic_report_request_fragments(
+    request: str,
+) -> tuple[tuple[str, ...], str | None, tuple[str, ...]]:
+    """Read generic labeled request fragments without depending on prose headings."""
+    if not request:
+        return (), None, ()
+    metadata: list[str] = []
+    services: str | None = None
+    remarks: list[str] = []
+    for fragment in re.split(r"[;\n]", request):
+        fragment = fragment.strip()
+        if not fragment:
+            continue
+        label, separator, value = fragment.partition(":")
+        if not separator:
+            continue
+        normalized_label = _slot_alias(label)
+        value = value.strip()
+        if normalized_label in {"servicetitles", "servicetitle"}:
+            services = value
+        elif re.fullmatch(r"remark\d+", normalized_label):
+            remarks.append(value)
+        elif re.fullmatch(r"[a-z][a-z _-]*", normalized_label):
+            metadata.append(f"{label.strip()}: {value}")
+    return tuple(metadata), services, tuple(remarks)
 
 
 def _explicit_report_slot_values(
@@ -625,14 +640,7 @@ def _explicit_remarks(remarks: str | None) -> tuple[ReportRemark, ...]:
     parsed: list[ReportRemark] = []
     for index, match in enumerate(matches, start=1):
         title = " ".join(match.group("title").split())
-        text = " ".join(match.group("text").split())
-        if title.casefold() == "supported reconstruction scope":
-            text = re.sub(
-                r"^reconstruct only the supported heading",
-                "Reconstruct only the supported subset",
-                text,
-                flags=re.IGNORECASE,
-            )
+        text = match.group("text").strip()
         if text:
             parsed.append(
                 ReportRemark(
