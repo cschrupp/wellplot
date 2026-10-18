@@ -6,7 +6,7 @@
   "prior_stage_a_candidate": "bce546960284be712e0d3b8f4d80d1eaec14e60f",
   "prior_stage_a_result": "REVISE",
   "candidate_sha": "b249b810908cbc0283e62f18e8780a4a4f7144d3",
-  "tip_sha": null,
+  "tip_sha": "e8032453e1489a5e7a0c05567f0f02128215b298",
   "parent": {
     "slice": "DECOMPOSER-PILOT-PREFLIGHT-01R",
     "result": "FAIL",
