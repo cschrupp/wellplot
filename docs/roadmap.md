@@ -142,31 +142,23 @@ judged.
 
 ## Immediate Roadmap
 
-### 1. CFG-ENGINE-BAKEOFF-01 — next
+### 1. CFG-ENGINE-BAKEOFF-01 — completed
 
-Evaluate hard grammar engines against the same immutable accepted
-`WELL-EBNF-1` artifact.
+Human/SOL accepted `CFG-ENGINE-BAKEOFF-01R2` selected **XGrammar 0.2.8 / native EBNF**.
+llguidance 1.9.1 was rejected at G7 because matcher construction exceeded its grammar-symbol-table bound.
 
-Candidate backends may include:
+The accepted bakeoff established:
 
-- XGrammar grammar mode
-- llguidance
-- another hard-constraint backend if technically justified
+- independent language-preserving WELL-EBNF-1 → XGrammar lowering audit
+- pinned Qwen tokenizer compatibility
+- hard token-mask replay with completion/stop semantics
+- deterministic repeated mask traces
+- bounded compile/resource behavior
+- zero model calls / no model weights loaded
 
-The bakeoff should establish:
+### 2. Selected-backend constrained-decoding preflight — current
 
-- exact or language-preserving grammar ingestion/lowering
-- compatibility with the pinned Qwen tokenizer
-- hard token-level masking
-- fail-closed behavior
-- construction/compile resource requirements
-- provenance and repeatability
-
-This step must not change the accepted schema→grammar semantics.
-
-### 2. Constrained-decoding preflight
-
-Once one backend is technically accepted:
+Using the accepted XGrammar path:
 
 - construct the complete constraint path
 - verify the immutable grammar and pinned tokenizer together
@@ -308,8 +300,8 @@ Longer term:
 ## Immediate Next Tasks
 
 1. Keep this roadmap and decision log synchronized with accepted runtime work.
-2. Run `CFG-ENGINE-BAKEOFF-01` as the next isolated experiment.
-3. Do not authorize model inference from a successful engine bakeoff alone.
+2. Run the selected-backend XGrammar constrained-decoding preflight as the current isolated experiment.
+3. Do not authorize model inference from a successful preflight alone.
 4. Continue release/documentation maintenance without allowing it to dominate the active R&D track.
 5. Revisit renderer/report polish in parallel where it improves real user workflows.
 
