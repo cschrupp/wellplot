@@ -2,7 +2,7 @@
   "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01-AUTH-001",
   "authority_remote_head": "b6352a778f62982b4c42ff2ef773a622e351dcf7",
   "auto_download": false,
-  "candidate_sha": "(pending commit)",
+  "candidate_sha": "a445c451e356b713cd24fcfb532a404421bc269e",
   "failures": [],
   "gates": {
     "P1": {
