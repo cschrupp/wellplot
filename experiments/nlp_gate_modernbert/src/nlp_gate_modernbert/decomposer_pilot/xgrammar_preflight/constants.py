@@ -1,0 +1,74 @@
+"""Frozen authority pins for XGrammar constrained-decoding preflight."""
+
+from __future__ import annotations
+
+AUTH = (
+    "WELLPLOT-NLP-RUNTIME-V2-"
+    "DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01-AUTH-001"
+)
+SLICE = "DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01"
+STARTING_TIP = "e04cf55a5efdbcc242b92f592c8861f1730de348"
+AUTHORITY_REMOTE_HEAD = "b6352a778f62982b4c42ff2ef773a622e351dcf7"
+
+REQUIRED_XGRAMMAR = "0.2.8"
+LOWERER_ID = "well_ebnf1_to_xgrammar_ebnf.v1"
+LOWERER_SOURCE_SHA256 = (
+    "216976a6e7b8a6838862198fa4d37168666fab602ec643c7369ca100179d377e"
+)
+WELL_EBNF1_SHA256 = (
+    "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3"
+)
+XGRAMMAR_NATIVE_GRAMMAR_SHA256 = (
+    "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89"
+)
+
+CONFIG_SHA256 = (
+    "1ddb5b89ebc90dcb417a45c213d818577e65976454d29385c8f6140771d95197"
+)
+TOKENIZER_ARTIFACT_SHA256 = {
+    "tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+    "tokenizer_config.json": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+    "merges.txt": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+    "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+}
+
+EXPECTED_WEIGHT_MANIFEST = (
+    {
+        "path": "model-00001-of-00002.safetensors",
+        "sha256": "169ad53ec313c3a34b06c0809216e4fc072cce444a5d4ff2b59690d064130ed5",
+        "size_bytes": 3441185608,
+    },
+    {
+        "path": "model-00002-of-00002.safetensors",
+        "sha256": "912becff8d60672aa8628ef08c05898d9adf17c2ad4ae3caf99b065622fdeff9",
+        "size_bytes": 622329984,
+    },
+)
+AGGREGATE_WEIGHT_MANIFEST_SHA256 = (
+    "005d20550c04f4e246e5b434448786b44a0196b47d758d0acc77aba279e5bbc5"
+)
+
+SYSTEM_PROMPT_SHA256 = (
+    "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4"
+)
+USER_TEMPLATE_SHA256 = (
+    "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb"
+)
+CHAT_TEMPLATE_TEXT_SHA256 = (
+    "e255510bc9a300c02dda23801a72e4c6a5736d5a995768cb44791f9651727b03"
+)
+SERIALIZER_IMPLEMENTATION_SHA256 = (
+    "95514c73fc1a25c5c52d784a3c2126543dfd8845f8f21aabafd103642a152740"
+)
+
+INVOCATION_ORDER = (
+    "D5GAP-0085",
+    "D5GAP-0089",
+    "D5GAP-0117",
+    "D5GAP-0096",
+    "D5GAP-0101",
+    "SEED-cm-9643c020e2e02463",
+)
+
+ADAPTER_ID = "pilot_xgrammar_transformers_hard_mask.v1"
+MASKED_LOGIT_VALUE = float("-inf")

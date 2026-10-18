@@ -1,0 +1,32 @@
+{
+  "adapter_id": "pilot_xgrammar_transformers_hard_mask.v1",
+  "allowed_logits_remain_finite": true,
+  "compile_seconds": 0.8973669380065985,
+  "disallowed_logits_masked_to_neginf": true,
+  "failures": [],
+  "hf_logits_processor": {
+    "generate_invoked": false,
+    "synthetic_call_masked": true,
+    "type": "LogitsProcessor"
+  },
+  "invalid_transition_fail_closed": true,
+  "lowered_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
+  "no_repair_or_normalize": true,
+  "package_version": "0.2.8",
+  "pass": true,
+  "positive_case": {
+    "completed": true,
+    "label": "empty_tasks",
+    "n_tokens": 4,
+    "pass": true,
+    "stop_allowed": true
+  },
+  "reset_mask_deterministic": true,
+  "synthetic_mask_latency_seconds": {
+    "max": 0.0007582840044051409,
+    "mean": 0.0002276689961685666,
+    "min": 9.015988325700164e-06,
+    "n": 7
+  },
+  "vocab_size": 151936
+}
