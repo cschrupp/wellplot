@@ -12,7 +12,7 @@
     "F004"
   ],
   "candidate_sha": "f3607ff9d0733712ecd86742496620e4aa77d9a4",
-  "tip_sha": "(pending SHA-record commit)",
+  "tip_sha": "a74b4e5b6be6d99d2bdf70006d1bb0bc54a1d7e7",
   "model_calls": 0,
   "engine_calls": 0,
   "generator_version": "decomposer_pilot_cfg_generator.v1.1",
