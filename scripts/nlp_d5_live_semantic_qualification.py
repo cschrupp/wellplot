@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import errno
 import hashlib
 import importlib.metadata
 import inspect
@@ -119,11 +120,20 @@ class D5StaticPreflightError(D5HarnessError):
 class D5ReadinessError(D5HarnessError):
     """Raised when the two-observation operational readiness contract fails."""
 
-    def __init__(self, reason: str, endpoint_calls: int = 0) -> None:
+    def __init__(
+        self,
+        reason: str,
+        endpoint_calls: int = 0,
+        *,
+        http_status: int | None = None,
+        mismatched_fields: Sequence[str] = (),
+    ) -> None:
         """Retain a bounded reason and truthful endpoint call count."""
         super().__init__(reason)
         self.reason = reason
         self.endpoint_calls = endpoint_calls
+        self.http_status = http_status
+        self.mismatched_fields = tuple(sorted(set(mismatched_fields)))
 
 
 class D5CallCapExceeded(D5HarnessError):
@@ -880,12 +890,20 @@ def verify_custody_artifacts(paths: EvidencePaths) -> dict[str, str]:
 def _project_model_catalog(payload: object, expected_model: str) -> tuple[str, ...]:
     """Project exactly one model ID without retaining the response body."""
     if not isinstance(payload, Mapping) or not isinstance(payload.get("data"), list):
-        raise D5ReadinessError("endpoint_identity_mismatch", 1)
+        raise D5ReadinessError(
+            "endpoint_identity_mismatch",
+            1,
+            mismatched_fields=("model_catalog",),
+        )
     identifiers = tuple(
         str(item.get("id", "")).strip() for item in payload["data"] if isinstance(item, Mapping)
     )
     if identifiers != (expected_model,):
-        raise D5ReadinessError("endpoint_identity_mismatch", 1)
+        raise D5ReadinessError(
+            "endpoint_identity_mismatch",
+            1,
+            mismatched_fields=("model_catalog",),
+        )
     return identifiers
 
 
@@ -965,12 +983,19 @@ def validate_readiness_projection(
     expected = dict(authorization.endpoint_identity)
     if not isinstance(expected.get("chat_template_sha256"), str):
         raise D5ReadinessError("thinking_off_not_established", 2)
+    mismatched_fields: list[str] = []
     for key, value in expected.items():
         observed_value = observed.get(key)
         if isinstance(observed_value, tuple) and isinstance(value, list):
             observed_value = list(observed_value)
         if observed_value != value:
-            raise D5ReadinessError("endpoint_identity_mismatch", 2)
+            mismatched_fields.append(key)
+    if mismatched_fields:
+        raise D5ReadinessError(
+            "endpoint_identity_mismatch",
+            2,
+            mismatched_fields=mismatched_fields,
+        )
     thinking_off = (
         authorization.thinking_off is True
         and observed["chat_template_sha256"] == expected["chat_template_sha256"]
@@ -1023,7 +1048,12 @@ def prepare_readiness(
         observed = {"model_catalog": catalog, **props}
         projection = validate_readiness_projection(observed, authorization)
     except D5ReadinessError as error:
-        raise D5ReadinessError(error.reason, len(calls)) from None
+        raise D5ReadinessError(
+            error.reason,
+            len(calls),
+            http_status=error.http_status,
+            mismatched_fields=error.mismatched_fields,
+        ) from None
     except Exception:
         raise D5ReadinessError("endpoint_unreachable", len(calls)) from None
     if tuple(calls) != (project_config.model_catalog_url, project_config.props_url):
@@ -1176,8 +1206,41 @@ def _credential_bearing_json_get(url: str, api_key: str) -> object:
             body = response.read(MAX_ENDPOINT_RESPONSE_BYTES + 1)
     except D5ReadinessError:
         raise
-    except (OSError, urllib.error.URLError, urllib.error.HTTPError):
-        raise D5ReadinessError("endpoint_unreachable", 0) from None
+    except urllib.error.HTTPError as error:
+        if error.code in {401, 403}:
+            reason = "endpoint_authentication_failed"
+        elif error.code == 404:
+            reason = "endpoint_path_not_found"
+        elif 500 <= error.code <= 599:
+            reason = "endpoint_server_error"
+        else:
+            reason = "endpoint_http_error"
+        raise D5ReadinessError(reason, 0, http_status=error.code) from None
+    except urllib.error.URLError as error:
+        cause = error.reason
+        if isinstance(cause, (TimeoutError,)):
+            reason = "endpoint_timeout"
+        elif isinstance(cause, ConnectionRefusedError):
+            reason = "endpoint_connection_refused"
+        elif isinstance(cause, OSError) and cause.errno in {
+            errno.ENETUNREACH,
+            errno.EHOSTUNREACH,
+        }:
+            reason = "endpoint_network_unreachable"
+        else:
+            reason = "endpoint_transport_error"
+        raise D5ReadinessError(reason, 0) from None
+    except TimeoutError:
+        raise D5ReadinessError("endpoint_timeout", 0) from None
+    except ConnectionRefusedError:
+        raise D5ReadinessError("endpoint_connection_refused", 0) from None
+    except OSError as error:
+        reason = (
+            "endpoint_network_unreachable"
+            if error.errno in {errno.ENETUNREACH, errno.EHOSTUNREACH}
+            else "endpoint_transport_error"
+        )
+        raise D5ReadinessError(reason, 0) from None
     if len(body) > MAX_ENDPOINT_RESPONSE_BYTES:
         raise D5ReadinessError("endpoint_identity_mismatch", 0)
     try:
@@ -1532,6 +1595,25 @@ def _load_authorization(path: Path) -> D5Authorization:
     return D5Authorization.from_mapping(json.loads(path.read_text(encoding="utf-8")))
 
 
+def _readiness_failure_result(error: D5ReadinessError) -> dict[str, Any]:
+    """Return bounded pre-campaign failure evidence without endpoint payloads."""
+    result: dict[str, Any] = {
+        "experiment_version": D5_EXPERIMENT_VERSION,
+        "status": "NOT_READY",
+        "reason": error.reason,
+        "endpoint_calls": error.endpoint_calls,
+        "provider_calls": 0,
+        "model_calls": 0,
+        "started": False,
+        "campaign_consumed": False,
+    }
+    if error.http_status is not None:
+        result["http_status"] = error.http_status
+    if error.mismatched_fields:
+        result["mismatched_fields"] = list(error.mismatched_fields)
+    return result
+
+
 def main() -> int:
     """Run provider-free preflight or one explicit live campaign."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -1554,11 +1636,15 @@ def main() -> int:
     if args.provider_free_preflight:
         result = provider_free_preflight(repo_root, authorization, paths)
     else:
-        result = execute_live_campaign(
-            repo_root=repo_root,
-            authorization=authorization,
-            artifact_root=artifact_root,
-        )
+        try:
+            result = execute_live_campaign(
+                repo_root=repo_root,
+                authorization=authorization,
+                artifact_root=artifact_root,
+            )
+        except D5ReadinessError as error:
+            print(json.dumps(_readiness_failure_result(error), indent=2, sort_keys=True))
+            return 2
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 

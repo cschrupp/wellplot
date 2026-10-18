@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import sys
+import urllib.error
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -384,7 +386,139 @@ def test_identity_mismatch_is_bounded_after_two_gets() -> None:
             static_preflight={"status": "PASS"},
         )
     assert raised.value.endpoint_calls == 1
+    assert raised.value.mismatched_fields == ("model_catalog",)
     assert calls == [PROJECT_CONFIG.model_catalog_url]
+
+
+def test_identity_mismatch_reports_only_safe_field_names() -> None:
+    """Runtime drift identifies fields without exposing observed values."""
+    authorization = _authorization()
+    observed = dict(authorization.endpoint_identity)
+    observed["build_info"] = "unexpected private build detail"
+
+    with pytest.raises(d5.D5ReadinessError) as raised:
+        d5.validate_readiness_projection(observed, authorization)
+
+    assert raised.value.reason == "endpoint_identity_mismatch"
+    assert raised.value.endpoint_calls == 2
+    assert raised.value.mismatched_fields == ("build_info",)
+    assert "unexpected private build detail" not in str(raised.value)
+
+
+@pytest.mark.parametrize(
+    ("status", "reason"),
+    [
+        (401, "endpoint_authentication_failed"),
+        (403, "endpoint_authentication_failed"),
+        (404, "endpoint_path_not_found"),
+        (503, "endpoint_server_error"),
+    ],
+)
+def test_readiness_http_failures_preserve_status_and_category(
+    monkeypatch: pytest.MonkeyPatch,
+    status: int,
+    reason: str,
+) -> None:
+    """HTTP failures are not misreported as network unreachability."""
+
+    def fail(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        raise urllib.error.HTTPError("https://endpoint.test", status, "failure", {}, None)
+
+    monkeypatch.setattr(d5.urllib.request, "urlopen", fail)
+    with pytest.raises(d5.D5ReadinessError) as raised:
+        d5._credential_bearing_json_get("https://endpoint.test", "secret-token")
+
+    assert raised.value.reason == reason
+    assert raised.value.http_status == status
+
+
+def test_readiness_transport_failure_is_distinct_from_http_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Connection refusal remains a transport failure with no HTTP status."""
+
+    def fail(*args: object, **kwargs: object) -> object:
+        del args, kwargs
+        raise urllib.error.URLError(ConnectionRefusedError("refused"))
+
+    monkeypatch.setattr(d5.urllib.request, "urlopen", fail)
+    with pytest.raises(d5.D5ReadinessError) as raised:
+        d5._credential_bearing_json_get("https://endpoint.test", "secret-token")
+
+    assert raised.value.reason == "endpoint_connection_refused"
+    assert raised.value.http_status is None
+
+
+def test_prepare_readiness_preserves_failure_metadata_and_call_count() -> None:
+    """Readiness wrapping keeps transport evidence and truthful call custody."""
+
+    def endpoint_get(url: str, token: str) -> object:
+        del url, token
+        raise d5.D5ReadinessError(
+            "endpoint_authentication_failed",
+            http_status=401,
+        )
+
+    with pytest.raises(d5.D5ReadinessError) as raised:
+        d5.prepare_readiness(
+            authorization=_authorization(),
+            project_config=PROJECT_CONFIG,
+            api_key_loader=lambda: "secret-token",
+            endpoint_get=endpoint_get,
+            static_preflight={"status": "PASS"},
+        )
+
+    assert raised.value.reason == "endpoint_authentication_failed"
+    assert raised.value.endpoint_calls == 1
+    assert raised.value.http_status == 401
+
+
+def test_cli_reports_bounded_not_ready_result(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+) -> None:
+    """A pre-STARTED readiness failure produces structured terminal output."""
+    authorization_path = tmp_path / "authorization.json"
+    authorization_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(d5, "_load_authorization", lambda path: _authorization())
+
+    def fail_live(**kwargs: object) -> dict[str, object]:
+        del kwargs
+        raise d5.D5ReadinessError(
+            "endpoint_identity_mismatch",
+            2,
+            mismatched_fields=("build_info",),
+        )
+
+    monkeypatch.setattr(d5, "execute_live_campaign", fail_live)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "nlp_d5_live_semantic_qualification.py",
+            "--repo-root",
+            str(REPO_ROOT),
+            "--execute-live",
+            "--authorization-json",
+            str(authorization_path),
+        ],
+    )
+
+    assert d5.main() == 2
+    result = json.loads(capsys.readouterr().out)
+    assert result == {
+        "campaign_consumed": False,
+        "endpoint_calls": 2,
+        "experiment_version": d5.D5_EXPERIMENT_VERSION,
+        "mismatched_fields": ["build_info"],
+        "model_calls": 0,
+        "provider_calls": 0,
+        "reason": "endpoint_identity_mismatch",
+        "started": False,
+        "status": "NOT_READY",
+    }
 
 
 def test_runtime_defaults_drift_is_not_ready() -> None:
