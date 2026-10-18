@@ -4,7 +4,7 @@
   "mode": "BOUNDED_ENGINE_BAKEOFF",
   "starting_tip": "928d77672afcbb00cc514940b5ce3935847496ee",
   "candidate_sha": "0fd552bc527aa56b68fa17220288530e02471316",
-  "tip_sha": "(pending SHA-record commit)",
+  "tip_sha": "f9fcf402a9bb7f71c17158b550b330b651660e08",
   "model_calls": 0,
   "model_weights_loaded": false,
   "accepted_grammar_sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
