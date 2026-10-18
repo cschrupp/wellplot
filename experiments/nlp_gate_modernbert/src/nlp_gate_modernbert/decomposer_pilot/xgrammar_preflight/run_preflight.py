@@ -27,15 +27,23 @@ from nlp_gate_modernbert.decomposer_pilot.xgrammar_preflight.constants import (
     AUTHORITY_REMOTE_HEAD,
     CHAT_TEMPLATE_TEXT_SHA256,
     INVOCATION_ORDER,
+    PRIOR_CANDIDATE,
+    PRIOR_SLICE,
     REQUIRED_XGRAMMAR,
     SLICE,
     STARTING_TIP,
     WELL_EBNF1_SHA256,
     XGRAMMAR_NATIVE_GRAMMAR_SHA256,
 )
+from nlp_gate_modernbert.decomposer_pilot.xgrammar_preflight.fail_closed import (
+    run_fail_closed_suite,
+)
 from nlp_gate_modernbert.decomposer_pilot.xgrammar_preflight.identity import (
     IdentityMismatchError,
     verify_identities,
+)
+from nlp_gate_modernbert.decomposer_pilot.xgrammar_preflight.manifest_q6 import (
+    validate_q6_run_manifest,
 )
 from nlp_gate_modernbert.paths import EVIDENCE_DIR, REPO_ROOT, SLM01_ROOT
 
@@ -53,6 +61,14 @@ class AutoModelForbiddenError(RuntimeError):
     """Raised if AutoModel weight load is attempted during preflight."""
 
 
+class ForwardForbiddenError(RuntimeError):
+    """Raised if model.forward / PreTrainedModel invocation is attempted."""
+
+
+class AutoDownloadForbiddenError(RuntimeError):
+    """Raised if a non-local tokenizer/config load is attempted."""
+
+
 def _pkg_version(name: str) -> str | None:
     try:
         return importlib.metadata.version(name)
@@ -66,10 +82,11 @@ def _install_guards() -> list[str]:
         from transformers.generation import GenerationMixin
 
         def _blocked_generate(self, *args, **kwargs):  # noqa: ANN001
-            global MODEL_GENERATE_CALLS
+            global MODEL_GENERATE_CALLS, MODEL_CALLS
             MODEL_GENERATE_CALLS += 1
+            MODEL_CALLS += 1
             raise GenerateForbiddenError(
-                "model.generate forbidden during XGRAMMAR-PREFLIGHT-01"
+                "model.generate forbidden during XGRAMMAR-PREFLIGHT-01R"
             )
 
         GenerationMixin.generate = _blocked_generate  # type: ignore[method-assign]
@@ -86,8 +103,11 @@ def _install_guards() -> list[str]:
                 return
 
             def _blocked_from_pretrained(cls_, *args, **kwargs):  # noqa: ANN001
+                global MODEL_WEIGHTS_LOADED, MODEL_CALLS
+                MODEL_WEIGHTS_LOADED = True
+                MODEL_CALLS += 1
                 raise AutoModelForbiddenError(
-                    f"{attr}.from_pretrained forbidden during XGRAMMAR-PREFLIGHT-01"
+                    f"{attr}.from_pretrained forbidden during XGRAMMAR-PREFLIGHT-01R"
                 )
 
             cls.from_pretrained = classmethod(_blocked_from_pretrained)  # type: ignore[method-assign]
@@ -97,6 +117,49 @@ def _install_guards() -> list[str]:
             _block_auto(name)
     except ImportError:
         notes.append("transformers_unavailable_for_automodel_guard")
+
+    # Forward / model-call boundary
+    try:
+        from transformers.modeling_utils import PreTrainedModel
+
+        def _blocked_forward(self, *args, **kwargs):  # noqa: ANN001
+            global MODEL_FORWARD_CALLS, MODEL_CALLS
+            MODEL_FORWARD_CALLS += 1
+            MODEL_CALLS += 1
+            raise ForwardForbiddenError(
+                "model.forward forbidden during XGRAMMAR-PREFLIGHT-01R"
+            )
+
+        PreTrainedModel.forward = _blocked_forward  # type: ignore[method-assign]
+        notes.append("PreTrainedModel.forward_blocked")
+    except ImportError:
+        notes.append("transformers_unavailable_for_forward_guard")
+
+    # Non-local download rejection for tokenizer / config
+    try:
+        from transformers import AutoConfig, AutoTokenizer
+
+        def _wrap_local_only(owner: Any, attr: str, label: str) -> None:
+            original = getattr(owner, attr)
+            # Preserve classmethod binding (HF Auto* APIs).
+            underlying = getattr(original, "__func__", original)
+
+            @classmethod  # type: ignore[misc]
+            def _guarded(cls, *args, **kwargs):  # noqa: ANN001
+                if kwargs.get("local_files_only") is not True:
+                    raise AutoDownloadForbiddenError(
+                        f"{label} requires local_files_only=True "
+                        "(autodownload forbidden in XGRAMMAR-PREFLIGHT-01R)"
+                    )
+                return underlying(cls, *args, **kwargs)
+
+            setattr(owner, attr, _guarded)
+            notes.append(f"{label}_local_files_only_required")
+
+        _wrap_local_only(AutoTokenizer, "from_pretrained", "AutoTokenizer")
+        _wrap_local_only(AutoConfig, "from_pretrained", "AutoConfig")
+    except ImportError:
+        notes.append("transformers_unavailable_for_download_guard")
     return notes
 
 
@@ -159,7 +222,7 @@ def _closeout_md(report: dict[str, Any]) -> str:
             "P9",
         )
     )
-    return f"""# DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01 — Closeout
+    return f"""# DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R — Closeout
 
 ```
 SLICE:
@@ -167,6 +230,13 @@ SLICE:
 
 AUTHORITY:
 {AUTH}
+
+MODE:
+BOUNDED PREFLIGHT HARDENING
+
+PRIOR CANDIDATE:
+{PRIOR_CANDIDATE}
+RESULT: REVISE (F001–F004)
 
 STARTING TIP:
 {STARTING_TIP}
@@ -199,6 +269,16 @@ PILOT-01:
 NOT AUTHORIZED
 ```
 
+## Corrective scope (R1–R5)
+
+| ID | Correction |
+|----|------------|
+| R1 | P2 field-level Q6 MODEL completeness from full provenance |
+| R2 | P7 adversarial fail-closed suite (evidence-derived) |
+| R3 | P8 forward + autodownload guards with negative tests |
+| R4 | P5 HF LogitsProcessor progressive synthetic replay |
+| R5 | Regenerated evidence / P1–P9 |
+
 ## Gates
 
 | Gate | Result | Summary |
@@ -213,7 +293,7 @@ WELL-EBNF-1 {WELL_EBNF1_SHA256}
   → XGrammar EBNF {XGRAMMAR_NATIVE_GRAMMAR_SHA256}
   → XGrammar {REQUIRED_XGRAMMAR}
   → pinned Qwen3-1.7B tokenizer
-  → PilotXGrammarHardMaskAdapter
+  → PilotXGrammarHardMaskAdapter / xgr.contrib.hf.LogitsProcessor
 ```
 
 ## Evidence artifacts
@@ -222,6 +302,7 @@ WELL-EBNF-1 {WELL_EBNF1_SHA256}
 - `decomposer_pilot_constraint_xgrammar_preflight_01_parity.json`
 - `decomposer_pilot_constraint_xgrammar_preflight_01_adapter.json`
 - `decomposer_pilot_constraint_xgrammar_preflight_01_case_hashes.json`
+- `decomposer_pilot_constraint_xgrammar_preflight_01_fail_closed.json`
 - `decomposer_pilot_constraint_xgrammar_preflight_01.json`
 - `decomposer_pilot_constraint_xgrammar_preflight_01.md`
 
@@ -232,6 +313,7 @@ AutoModel / model weight load: NOT AUTHORIZED
 model.forward:                 NOT AUTHORIZED
 model.generate:                NOT AUTHORIZED
 real model logits:             NOT AUTHORIZED
+autodownload:                  NOT AUTHORIZED
 PILOT-01:                      NOT AUTHORIZED
 ```
 
@@ -242,7 +324,7 @@ IMPLEMENTATION_COMPLETE_AWAITING_INDEPENDENT_REVIEW
 ```
 
 STATUS:
-STOP FOR INDEPENDENT DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01 REVIEW
+STOP FOR INDEPENDENT DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R REVIEW
 """
 
 
@@ -388,19 +470,47 @@ def run_xgrammar_preflight(
             case_payload = {"pass": False, "error": str(exc)}
             failures.append(f"P6:{exc}")
 
+    # --- P7 adversarial fail-closed (evidence-derived) ---
+    fail_closed_payload: dict[str, Any] = {"pass": False}
+    p7_pass = False
+    if p1_pass:
+        try:
+            fail_closed_payload = run_fail_closed_suite(
+                well_text=well_text, snapshot_path=str(snapshot)
+            )
+            p7_pass = bool(fail_closed_payload["pass"]) and (
+                "GenerationMixin.generate_blocked" in guards
+                and "PreTrainedModel.forward_blocked" in guards
+            )
+            if not p7_pass:
+                failures.append("P7:fail_closed_suite_or_guards")
+        except Exception as exc:  # noqa: BLE001
+            fail_closed_payload = {"pass": False, "error": str(exc)}
+            failures.append(f"P7:{exc}")
+    else:
+        fail_closed_payload = {"pass": False, "skipped": "P1_failed"}
+        failures.append("P7:skipped_due_to_P1")
+
     setup_wall = time.perf_counter() - t_setup0
 
-    # --- P8 zero-model counters ---
+    # --- P8 zero-model + prevention guards present ---
+    p8_guard_ok = (
+        "GenerationMixin.generate_blocked" in guards
+        and "PreTrainedModel.forward_blocked" in guards
+        and any(g.endswith("from_pretrained_blocked") for g in guards)
+        and "AutoTokenizer_local_files_only_required" in guards
+    )
     p8_pass = (
         MODEL_CALLS == 0
         and MODEL_WEIGHTS_LOADED is False
         and MODEL_FORWARD_CALLS == 0
         and MODEL_GENERATE_CALLS == 0
+        and p8_guard_ok
     )
     if not p8_pass:
-        failures.append("P8:model_boundary")
+        failures.append("P8:model_boundary_or_guards")
 
-    # --- P2 run manifest ---
+    # --- P2 run manifest (field-level Q6 validation) ---
     inf = inference_pins.inference_config_dict()
     run_manifest = {
         "MODEL": identity.get("model_provenance")
@@ -441,7 +551,7 @@ def run_xgrammar_preflight(
             "no_model_generate": True,
             "slm01_root": str(SLM01_ROOT),
             "template_smoke": smoke,
-            "generate_guard": guards,
+            "guards": guards,
             "invocation_order": list(INVOCATION_ORDER),
         },
         "SOFTWARE": {
@@ -453,22 +563,17 @@ def run_xgrammar_preflight(
         },
         "authority": AUTH,
         "slice": SLICE,
+        "prior_slice": PRIOR_SLICE,
+        "prior_candidate": PRIOR_CANDIDATE,
         "starting_tip": STARTING_TIP,
         "pilot_01": "NOT_AUTHORIZED",
         "pass_does_not_authorize_pilot_01": True,
     }
-    p2_pass = all(
-        k in run_manifest
-        for k in (
-            "MODEL",
-            "CONSTRAINT",
-            "PROMPT",
-            "WORKSPACE_SERIALIZATION",
-            "INFERENCE",
-        )
-    ) and p1_pass
+    p2_validation = validate_q6_run_manifest(run_manifest)
+    p2_pass = bool(p2_validation["pass"]) and p1_pass
+    run_manifest["P2_validation"] = p2_validation
     if not p2_pass:
-        failures.append("P2:manifest_incomplete")
+        failures.append(f"P2:{p2_validation.get('errors')}")
 
     # --- P9 resources ---
     resources = {
@@ -493,34 +598,49 @@ def run_xgrammar_preflight(
     if not p9_pass and "P9" not in str(failures):
         failures.append("P9:resources")
 
-    # --- P7 fail-closed attestation ---
-    p7_pass = True
-    if not all([p1_pass, p2_pass, p3_pass, p4_pass, p5_pass, p6_pass, p8_pass, p9_pass]):
-        # Fail-closed means we recorded failures and did not call the model.
-        p7_pass = p8_pass and MODEL_CALLS == 0
-    # Also: guards installed
-    if "GenerationMixin.generate_blocked" not in guards:
-        p7_pass = False
-        failures.append("P7:generate_guard_missing")
-
     gates = {
         "P1": {"pass": p1_pass, "summary": "immutable identities/hashes"},
-        "P2": {"pass": p2_pass, "summary": "complete Q6 run manifest"},
+        "P2": {
+            "pass": p2_pass,
+            "summary": "field-level Q6 run manifest completeness",
+        },
         "P3": {"pass": p3_pass, "summary": "frozen prompt/template smoke"},
         "P4": {"pass": p4_pass, "summary": "XGrammar construction + parity"},
-        "P5": {"pass": p5_pass, "summary": "synthetic-logits hard-mask adapter"},
+        "P5": {
+            "pass": p5_pass,
+            "summary": "adapter + HF LogitsProcessor synthetic replay",
+        },
         "P6": {"pass": p6_pass, "summary": "six-case pre-inference hashes"},
-        "P7": {"pass": p7_pass, "summary": "fail-closed + generate guard"},
-        "P8": {"pass": p8_pass, "summary": "zero model/forward/generate"},
+        "P7": {
+            "pass": p7_pass,
+            "summary": "adversarial fail-closed suite (evidence-derived)",
+        },
+        "P8": {
+            "pass": p8_pass,
+            "summary": "zero model + load/forward/generate/download guards",
+        },
         "P9": {"pass": p9_pass, "summary": "resource/setup evidence"},
     }
     all_pass = all(g["pass"] for g in gates.values()) and not failures
     result = "PASS" if all_pass else "FAIL"
 
+    # Strip bulky full provenance from handoff identity view
+    identity_view = {}
+    if isinstance(identity, dict):
+        identity_view = {
+            k: v
+            for k, v in identity.items()
+            if k not in ("grammar_bytes", "full_model_provenance")
+        }
+
     report = {
         "authority": AUTH,
         "slice": SLICE,
-        "mode": "SELECTED_BACKEND_ZERO_MODEL_PREFLIGHT",
+        "mode": "BOUNDED_PREFLIGHT_HARDENING",
+        "rework": ["R1", "R2", "R3", "R4", "R5"],
+        "prior_slice": PRIOR_SLICE,
+        "prior_candidate": PRIOR_CANDIDATE,
+        "prior_result": "REVISE (F001–F004)",
         "starting_tip": STARTING_TIP,
         "authority_remote_head": AUTHORITY_REMOTE_HEAD,
         "candidate_sha": "(pending commit)",
@@ -535,18 +655,16 @@ def run_xgrammar_preflight(
         "auto_download": False,
         "pilot_01": "NOT_AUTHORIZED",
         "pass_does_not_authorize_pilot_01": True,
-        "identity": {
-            k: v
-            for k, v in (identity.items() if isinstance(identity, dict) else [])
-            if k != "grammar_bytes"
-        },
+        "identity": identity_view,
+        "p2_validation": p2_validation,
         "resources": resources,
-        "generate_guard": guards,
+        "guards": guards,
         "unauthorized_still": [
             "AutoModel/model_weight_load",
             "model_forward",
             "model_generate",
             "real_model_logits",
+            "autodownload",
             "PILOT_01",
             "prompt_schema_serializer_changes",
             "grammar_backend_changes",
@@ -569,6 +687,10 @@ def run_xgrammar_preflight(
     _write_json(
         evidence / "decomposer_pilot_constraint_xgrammar_preflight_01_case_hashes.json",
         case_payload,
+    )
+    _write_json(
+        evidence / "decomposer_pilot_constraint_xgrammar_preflight_01_fail_closed.json",
+        fail_closed_payload,
     )
     _write_json(
         evidence / "decomposer_pilot_constraint_xgrammar_preflight_01.json",

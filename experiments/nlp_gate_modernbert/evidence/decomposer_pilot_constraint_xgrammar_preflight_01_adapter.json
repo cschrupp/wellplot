@@ -1,12 +1,21 @@
 {
   "adapter_id": "pilot_xgrammar_transformers_hard_mask.v1",
   "allowed_logits_remain_finite": true,
-  "compile_seconds": 0.8973669380065985,
+  "compile_seconds": 0.8397553369868547,
   "disallowed_logits_masked_to_neginf": true,
   "failures": [],
   "hf_logits_processor": {
+    "completed": true,
+    "dual_replay_identical": true,
+    "failures": [],
+    "fresh_mask_deterministic": true,
     "generate_invoked": false,
-    "synthetic_call_masked": true,
+    "invalid_next_token_masked": true,
+    "module": "xgrammar.contrib.hf",
+    "n_steps": 5,
+    "pass": true,
+    "progressive_valid_sequence": true,
+    "stop_allowed": true,
     "type": "LogitsProcessor"
   },
   "invalid_transition_fail_closed": true,
@@ -23,10 +32,10 @@
   },
   "reset_mask_deterministic": true,
   "synthetic_mask_latency_seconds": {
-    "max": 0.0007582840044051409,
-    "mean": 0.0002276689961685666,
-    "min": 9.015988325700164e-06,
-    "n": 7
+    "max": 0.0007777780119795352,
+    "mean": 0.0004180196701781824,
+    "min": 8.561008144170046e-06,
+    "n": 12
   },
   "vocab_size": 151936
 }

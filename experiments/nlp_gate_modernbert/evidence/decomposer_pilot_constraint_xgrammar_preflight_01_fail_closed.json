@@ -1,0 +1,73 @@
+{
+  "cases": [
+    {
+      "expect_exception": "IdentityMismatchError",
+      "model_boundary": {
+        "model_calls": 0,
+        "model_forward_calls": 0,
+        "model_generate_calls": 0,
+        "model_weights_loaded": false
+      },
+      "name": "grammar_hash_mismatch",
+      "pass": true,
+      "raised": "IdentityMismatchError:grammar_sha:0b9f345948346186f29acff574642cadd875613c3862816127918af2bfe210ab",
+      "zero_model_preserved": true
+    },
+    {
+      "expect_exception": "PinnedTokenizerUnavailable",
+      "model_boundary": {
+        "model_calls": 0,
+        "model_forward_calls": 0,
+        "model_generate_calls": 0,
+        "model_weights_loaded": false
+      },
+      "name": "missing_tokenizer_artifact",
+      "pass": true,
+      "raised": "PinnedTokenizerUnavailable:missing /tmp/tmpu2ayw9wy/tokenizer.json",
+      "zero_model_preserved": true
+    },
+    {
+      "expect_exception": "AdapterFailClosedError",
+      "model_boundary": {
+        "model_calls": 0,
+        "model_forward_calls": 0,
+        "model_generate_calls": 0,
+        "model_weights_loaded": false
+      },
+      "name": "native_grammar_sha_mismatch",
+      "pass": true,
+      "raised": "AdapterFailClosedError:native grammar sha mismatch: got 506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89 expected 0000000000000000000000000000000000000000000000000000000000000000",
+      "zero_model_preserved": true
+    },
+    {
+      "expect_exception": "AdapterFailClosedError",
+      "model_boundary": {
+        "model_calls": 0,
+        "model_forward_calls": 0,
+        "model_generate_calls": 0,
+        "model_weights_loaded": false
+      },
+      "name": "adapter_blocked_token",
+      "pass": true,
+      "raised": "AdapterFailClosedError:blocked_token:0",
+      "zero_model_preserved": true
+    },
+    {
+      "expect_exception": "IdentityMismatchError",
+      "model_boundary": {
+        "model_calls": 0,
+        "model_forward_calls": 0,
+        "model_generate_calls": 0,
+        "model_weights_loaded": false
+      },
+      "name": "contamination_detection",
+      "pass": true,
+      "raised": "IdentityMismatchError:contamination:['D5GAP-0085']",
+      "zero_model_preserved": true
+    }
+  ],
+  "n_cases": 5,
+  "n_passed": 5,
+  "pass": true,
+  "result_policy": "each injection raises; model_calls remain 0"
+}

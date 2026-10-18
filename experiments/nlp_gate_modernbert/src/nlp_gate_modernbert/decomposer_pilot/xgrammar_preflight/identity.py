@@ -28,6 +28,9 @@ from nlp_gate_modernbert.decomposer_pilot.xgrammar_preflight.constants import (
     USER_TEMPLATE_SHA256,
     WELL_EBNF1_SHA256,
 )
+from nlp_gate_modernbert.decomposer_pilot.xgrammar_preflight.manifest_q6 import (
+    build_q6_model_section,
+)
 from nlp_gate_modernbert.paths import REPO_ROOT
 
 
@@ -67,6 +70,7 @@ def verify_identities() -> dict[str, Any]:
     if workspace_serialize.serializer_source_sha256() != SERIALIZER_IMPLEMENTATION_SHA256:
         errors.append("serializer_sha")
 
+    # Full provenance — do not discard Q6 MODEL fields.
     prov = model_provenance.collect_model_provenance()
     if prov.get("config_sha256") != CONFIG_SHA256:
         errors.append(f"config_sha:{prov.get('config_sha256')}")
@@ -86,7 +90,13 @@ def verify_identities() -> dict[str, Any]:
         if int(got["size_bytes"]) != int(expected["size_bytes"]):
             errors.append(f"weight_size:{expected['path']}")
 
-    # Provenance attestation: weights hashed as bytes only (no tensor load).
+    tok_art = prov.get("tokenizer_artifact_sha256") or {}
+    for name, expected in TOKENIZER_ARTIFACT_SHA256.items():
+        if tok_art.get(name) != expected:
+            errors.append(f"prov_tokenizer:{name}")
+
+    model_section = build_q6_model_section(prov)
+
     result = {
         "pass": not errors,
         "errors": errors,
@@ -95,16 +105,8 @@ def verify_identities() -> dict[str, Any]:
         "lowerer_source_sha256": low_sha,
         "xgrammar_version": xg_ver,
         "tokenizer": tok,
-        "model_provenance": {
-            "config_sha256": prov.get("config_sha256"),
-            "aggregate_weight_manifest_sha256": prov.get(
-                "aggregate_weight_manifest_sha256"
-            ),
-            "weight_file_manifest": prov.get("weight_file_manifest"),
-            "snapshot_path": prov.get("snapshot_path"),
-            "weights_deserialized_as_tensors": False,
-            "auto_model_invoked": False,
-        },
+        "model_provenance": model_section,
+        "full_model_provenance": prov,
         "prompt": {
             "system_prompt_sha256": prompt_contract.system_prompt_sha256(),
             "user_template_sha256": prompt_contract.user_template_sha256(),

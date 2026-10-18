@@ -2,7 +2,7 @@
   "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01-AUTH-001",
   "authority_remote_head": "b6352a778f62982b4c42ff2ef773a622e351dcf7",
   "auto_download": false,
-  "candidate_sha": "a445c451e356b713cd24fcfb532a404421bc269e",
+  "candidate_sha": "(pending commit)",
   "failures": [],
   "gates": {
     "P1": {
@@ -11,7 +11,7 @@
     },
     "P2": {
       "pass": true,
-      "summary": "complete Q6 run manifest"
+      "summary": "field-level Q6 run manifest completeness"
     },
     "P3": {
       "pass": true,
@@ -23,7 +23,7 @@
     },
     "P5": {
       "pass": true,
-      "summary": "synthetic-logits hard-mask adapter"
+      "summary": "adapter + HF LogitsProcessor synthetic replay"
     },
     "P6": {
       "pass": true,
@@ -31,22 +31,25 @@
     },
     "P7": {
       "pass": true,
-      "summary": "fail-closed + generate guard"
+      "summary": "adversarial fail-closed suite (evidence-derived)"
     },
     "P8": {
       "pass": true,
-      "summary": "zero model/forward/generate"
+      "summary": "zero model + load/forward/generate/download guards"
     },
     "P9": {
       "pass": true,
       "summary": "resource/setup evidence"
     }
   },
-  "generate_guard": [
+  "guards": [
     "GenerationMixin.generate_blocked",
     "AutoModel.from_pretrained_blocked",
     "AutoModelForCausalLM.from_pretrained_blocked",
-    "AutoModelForSeq2SeqLM.from_pretrained_blocked"
+    "AutoModelForSeq2SeqLM.from_pretrained_blocked",
+    "PreTrainedModel.forward_blocked",
+    "AutoTokenizer_local_files_only_required",
+    "AutoConfig_local_files_only_required"
   ],
   "identity": {
     "errors": [],
@@ -54,10 +57,23 @@
     "lowerer_id": "well_ebnf1_to_xgrammar_ebnf.v1",
     "lowerer_source_sha256": "216976a6e7b8a6838862198fa4d37168666fab602ec643c7369ca100179d377e",
     "model_provenance": {
+      "adapters": "NONE",
       "aggregate_weight_manifest_sha256": "005d20550c04f4e246e5b434448786b44a0196b47d758d0acc77aba279e5bbc5",
+      "auto_download": false,
       "auto_model_invoked": false,
       "config_sha256": "1ddb5b89ebc90dcb417a45c213d818577e65976454d29385c8f6140771d95197",
+      "fallback_model": "NONE",
+      "model_id": "Qwen/Qwen3-1.7B",
       "snapshot_path": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/modelscope_cache/models/Qwen--Qwen3-1.7B/snapshots/master",
+      "snapshot_revision": "master",
+      "source": "existing local ModelScope snapshot",
+      "tokenizer_artifact_sha256": {
+        "merges.txt": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+        "tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+        "tokenizer_config.json": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+        "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+      },
+      "variant": "instruction/non-Base checkpoint",
       "weight_file_manifest": [
         {
           "path": "model-00001-of-00002.safetensors",
@@ -89,39 +105,75 @@
     },
     "xgrammar_version": "0.2.8"
   },
-  "mode": "SELECTED_BACKEND_ZERO_MODEL_PREFLIGHT",
+  "mode": "BOUNDED_PREFLIGHT_HARDENING",
   "model_calls": 0,
   "model_forward_calls": 0,
   "model_generate_calls": 0,
   "model_weights_loaded": false,
+  "p2_validation": {
+    "checked_sections": [
+      "MODEL",
+      "CONSTRAINT",
+      "PROMPT",
+      "WORKSPACE_SERIALIZATION",
+      "INFERENCE"
+    ],
+    "errors": [],
+    "pass": true,
+    "required_model_fields": [
+      "model_id",
+      "variant",
+      "source",
+      "snapshot_path",
+      "snapshot_revision",
+      "config_sha256",
+      "tokenizer_artifact_sha256",
+      "weight_file_manifest",
+      "aggregate_weight_manifest_sha256",
+      "adapters",
+      "auto_download",
+      "fallback_model"
+    ]
+  },
   "pass_does_not_authorize_pilot_01": true,
   "pilot_01": "NOT_AUTHORIZED",
+  "prior_candidate": "a445c451e356b713cd24fcfb532a404421bc269e",
+  "prior_result": "REVISE (F001–F004)",
+  "prior_slice": "DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01",
   "resources": {
     "adapter_synthetic_mask_latency_seconds": {
-      "max": 0.0007582840044051409,
-      "mean": 0.0002276689961685666,
-      "min": 9.015988325700164e-06,
-      "n": 7
+      "max": 0.0007777780119795352,
+      "mean": 0.0004180196701781824,
+      "min": 8.561008144170046e-06,
+      "n": 12
     },
-    "compile_seconds": 1.8780135209963191,
+    "compile_seconds": 1.727385709004011,
     "parity_mask_step_latency_seconds": {
-      "max": 0.10339955499512143,
-      "mean": 0.010359619068392237,
-      "min": 1.2870004866272211e-06,
+      "max": 0.11097350000636652,
+      "mean": 0.010605669942102849,
+      "min": 1.2379896361380816e-06,
       "n": 514
     },
-    "setup_wall_seconds": 17.94455847100471
+    "setup_wall_seconds": 20.275096066005062
   },
   "result": "PASS",
-  "slice": "DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01",
-  "starting_tip": "e04cf55a5efdbcc242b92f592c8861f1730de348",
+  "rework": [
+    "R1",
+    "R2",
+    "R3",
+    "R4",
+    "R5"
+  ],
+  "slice": "DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R",
+  "starting_tip": "96d5a75a08a3a885cc10596092ad4d41409ef3e8",
   "terminal_state": "IMPLEMENTATION_COMPLETE_AWAITING_INDEPENDENT_REVIEW",
-  "tip_sha": "68729d9c3125f3817b4b0b70561fd5afae8ecbbf",
+  "tip_sha": "(pending SHA-record commit)",
   "unauthorized_still": [
     "AutoModel/model_weight_load",
     "model_forward",
     "model_generate",
     "real_model_logits",
+    "autodownload",
     "PILOT_01",
     "prompt_schema_serializer_changes",
     "grammar_backend_changes"

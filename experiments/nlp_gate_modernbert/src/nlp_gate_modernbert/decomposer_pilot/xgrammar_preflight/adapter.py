@@ -265,21 +265,10 @@ def run_synthetic_adapter_suite(path: CompiledConstraintPath) -> dict[str, Any]:
         except AdapterFailClosedError:
             invalid_fail_closed = True
 
-    # --- HF processor path exists (not invoked via generate) ---
-    proc = adapter.transformers_logits_processor()
-    hf_processor_type = type(proc).__name__
-
-    # Exercise HF processor with synthetic scores only (no model)
-    adapter_hf = PilotXGrammarHardMaskAdapter(path)
-    proc2 = adapter_hf.transformers_logits_processor()
-    syn_ids = torch.zeros((1, 1), dtype=torch.long)  # prefills without accepting
-    syn_scores = torch.full((1, path.vocab_size), 2.0, dtype=torch.float32)
-    t0 = time.perf_counter()
-    out_scores = proc2(syn_ids, syn_scores.clone())
-    latencies.append(time.perf_counter() - t0)
-    hf_masked = bool(torch.isneginf(out_scores).any().item())
-    if not hf_masked:
-        failures.append("hf_processor_did_not_mask")
+    # --- Exact HF LogitsProcessor path (synthetic logits; no generate) ---
+    hf_report = _replay_hf_logits_processor(path, ids, latencies)
+    if not hf_report["pass"]:
+        failures.extend(hf_report.get("failures") or [])
 
     passed = (
         reset_identical
@@ -287,7 +276,7 @@ def run_synthetic_adapter_suite(path: CompiledConstraintPath) -> dict[str, Any]:
         and blocked_ok
         and pos_ok
         and invalid_fail_closed
-        and hf_masked
+        and hf_report["pass"]
         and not adapter.has_repair_or_normalize()
         and not failures
     )
@@ -309,11 +298,7 @@ def run_synthetic_adapter_suite(path: CompiledConstraintPath) -> dict[str, Any]:
             "stop_allowed": pos_ok and stop_ok,
         },
         "invalid_transition_fail_closed": invalid_fail_closed,
-        "hf_logits_processor": {
-            "type": hf_processor_type,
-            "synthetic_call_masked": hf_masked,
-            "generate_invoked": False,
-        },
+        "hf_logits_processor": hf_report,
         "no_repair_or_normalize": True,
         "failures": failures,
         "synthetic_mask_latency_seconds": {
@@ -322,4 +307,126 @@ def run_synthetic_adapter_suite(path: CompiledConstraintPath) -> dict[str, Any]:
             "max": max(latencies) if latencies else None,
             "min": min(latencies) if latencies else None,
         },
+    }
+
+
+def _bitmask_digest(bitmask: Any) -> str:
+    raw = bitmask.detach().cpu().numpy().tobytes()
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _score_allowed(scores: torch.Tensor, token_id: int) -> bool:
+    return bool(torch.isfinite(scores[0, int(token_id)]).item())
+
+
+def _replay_hf_logits_processor(
+    path: CompiledConstraintPath,
+    token_ids: list[int],
+    latencies: list[float],
+) -> dict[str, Any]:
+    """R4: progressive synthetic replay through xgr.contrib.hf.LogitsProcessor."""
+    failures: list[str] = []
+
+    # Fresh-state determinism on first mask
+    p_a = xgr.contrib.hf.LogitsProcessor(path.compiled)
+    p_b = xgr.contrib.hf.LogitsProcessor(path.compiled)
+    dummy = torch.zeros((1, 1), dtype=torch.long)
+    scores0 = torch.full((1, path.vocab_size), 1.0, dtype=torch.float32)
+    t0 = time.perf_counter()
+    out_a = p_a(dummy, scores0.clone())
+    latencies.append(time.perf_counter() - t0)
+    out_b = p_b(dummy, scores0.clone())
+    digest_a = _bitmask_digest(p_a.token_bitmask)
+    digest_b = _bitmask_digest(p_b.token_bitmask)
+    fresh_identical = digest_a == digest_b
+    if not fresh_identical:
+        failures.append("hf_fresh_mask_not_deterministic")
+    if not torch.isneginf(out_a).any().item():
+        failures.append("hf_first_call_did_not_mask")
+
+    # Invalid next token is impossible under first mask
+    blocked = next(
+        (
+            t
+            for t in range(min(path.vocab_size, 8192))
+            if not _score_allowed(out_a, t)
+        ),
+        None,
+    )
+    invalid_masked = blocked is not None and not _score_allowed(out_a, blocked)
+    if not invalid_masked:
+        failures.append("hf_invalid_token_not_masked")
+
+    # Progressive replay of a complete valid sequence
+    proc = xgr.contrib.hf.LogitsProcessor(path.compiled)
+    scores = torch.full((1, path.vocab_size), 1.0, dtype=torch.float32)
+    input_ids = torch.zeros((1, 1), dtype=torch.long)
+    t0 = time.perf_counter()
+    scores = proc(input_ids, scores.clone())
+    latencies.append(time.perf_counter() - t0)
+    step_digests = [_bitmask_digest(proc.token_bitmask)]
+    progressive_ok = True
+    for i, tid in enumerate(token_ids):
+        if not _score_allowed(scores, tid):
+            progressive_ok = False
+            failures.append(f"hf_token_blocked_mid_replay:{i}:{tid}")
+            break
+        # Next generate step: processor accepts last id in input_ids
+        input_ids = torch.tensor([token_ids[: i + 1]], dtype=torch.long)
+        scores = torch.full((1, path.vocab_size), 1.0, dtype=torch.float32)
+        t0 = time.perf_counter()
+        scores = proc(input_ids, scores.clone())
+        latencies.append(time.perf_counter() - t0)
+        step_digests.append(_bitmask_digest(proc.token_bitmask))
+
+    completed = False
+    stop_allowed = False
+    if progressive_ok and proc.matchers:
+        completed = bool(proc.matchers[0].is_completed())
+        stop_ids = list(proc.matchers[0].stop_token_ids)
+        stop_allowed = any(_score_allowed(scores, int(s)) for s in stop_ids)
+        if not completed:
+            failures.append("hf_not_completed_after_valid_sequence")
+        if not stop_allowed:
+            failures.append("hf_stop_not_allowed_after_complete")
+
+    # Second full replay — identical digests (fresh processor)
+    proc2 = xgr.contrib.hf.LogitsProcessor(path.compiled)
+    scores2 = torch.full((1, path.vocab_size), 1.0, dtype=torch.float32)
+    input_ids2 = torch.zeros((1, 1), dtype=torch.long)
+    scores2 = proc2(input_ids2, scores2.clone())
+    digests2 = [_bitmask_digest(proc2.token_bitmask)]
+    for i, tid in enumerate(token_ids):
+        if not _score_allowed(scores2, tid):
+            break
+        input_ids2 = torch.tensor([token_ids[: i + 1]], dtype=torch.long)
+        scores2 = torch.full((1, path.vocab_size), 1.0, dtype=torch.float32)
+        scores2 = proc2(input_ids2, scores2.clone())
+        digests2.append(_bitmask_digest(proc2.token_bitmask))
+    replay_identical = digests2 == step_digests
+    if not replay_identical:
+        failures.append("hf_dual_replay_digest_mismatch")
+
+    passed = (
+        fresh_identical
+        and invalid_masked
+        and progressive_ok
+        and completed
+        and stop_allowed
+        and replay_identical
+        and not failures
+    )
+    return {
+        "pass": passed,
+        "type": "LogitsProcessor",
+        "module": "xgrammar.contrib.hf",
+        "generate_invoked": False,
+        "fresh_mask_deterministic": fresh_identical,
+        "invalid_next_token_masked": invalid_masked,
+        "progressive_valid_sequence": progressive_ok,
+        "completed": completed,
+        "stop_allowed": stop_allowed,
+        "dual_replay_identical": replay_identical,
+        "n_steps": len(step_digests),
+        "failures": failures,
     }
