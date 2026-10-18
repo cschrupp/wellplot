@@ -1,34 +1,38 @@
-# DECOMPOSER-PILOT-CONSTRAINT-REDESIGN-01 — Stage A (paper/docs)
+# DECOMPOSER-PILOT-CONSTRAINT-REDESIGN-01R — Stage A rework (paper/docs)
 
 ```
 SLICE:
-DECOMPOSER-PILOT-CONSTRAINT-REDESIGN-01
+DECOMPOSER-PILOT-CONSTRAINT-REDESIGN-01R
 
 AUTHORITY:
-WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-REDESIGN-01-AUTH-001
+WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-REDESIGN-01-REWORK-AUTH-001
 
 STAGE:
-A — PAPER/DOCS COMPATIBILITY
+A — PAPER/DOCS COMPATIBILITY (REWORK)
+
+PRIOR STAGE-A CANDIDATE:
+bce546960284be712e0d3b8f4d80d1eaec14e60f
+RESULT: REVISE
+
+STARTING TIP:
+c6aba48be4c2f8b7e7cf0954f812b2838883ab12
+
+CANDIDATE SHA:
+(pending commit)
+
+TIP:
+(pending SHA-record commit)
 
 PARENT:
 DECOMPOSER-PILOT-PREFLIGHT-01R
 ACCEPTED / CLOSED — RESULT: FAIL
 CANDIDATE: f5a9f1d947212cd0b2ea0fe588dc1409df126e7f
 
-STARTING TIP:
-b16b338bcdd1605f96cf026ecafde80907e57aa5
-
-CANDIDATE SHA:
-bce546960284be712e0d3b8f4d80d1eaec14e60f
-
-TIP:
-6428c62e1d2010c2b2e6ede57dffdc717e07f3e7
-
 PRIMARY BACKEND FAMILY:
-XGrammar
+XGrammar (JSON-Schema route)
 
 XGRAMMAR_STAGE_A:
-PROCEED_TO_STAGE_B_ELIGIBLE
+REJECT_BACKEND
 
 MODEL CALLS:
 0
@@ -42,9 +46,21 @@ NOT AUTHORIZED
 STAGE B:
 NOT AUTHORIZED
 
+CFG/EBNF REDESIGN:
+NOT PART OF THIS REWORK
+
 PILOT-01:
 NOT AUTHORIZED
 ```
+
+## Rework (R1–R4)
+
+| id | Correction |
+|----|------------|
+| R1 | XGrammar 0.2.8 / PR #672: non-provably-disjoint `oneOf` **warns** and falls back to **`anyOf`** (`ParseAnyOf`), not fail-closed |
+| R2 | Frozen text-vs-`local_ref` XOR object arms are **outside** v0.2.8 published disjointness proofs |
+| R3 | **G9** = `UNSUPPORTED`; **G2a** qualifies native fail-closed `oneOf` unavailable for this shape |
+| R4 | `XGRAMMAR_STAGE_A` = `REJECT_BACKEND` |
 
 ## Problem (frozen)
 
@@ -52,18 +68,39 @@ Hard-enforce the already-frozen patched `ClosedNormalizedProgram` structural
 language at token level with the pinned Qwen3-1.7B tokenizer, without changing
 decomposer semantics, evaluator, or the six-case pilot.
 
-## Stage A scope
+## Stage A decision rule (unchanged)
 
-Public documentation and published converter/source evidence only. No install,
-no code, no model load. Classification vocabulary:
+Proceed only if no required feature is documented `UNSUPPORTED`, no evidence of
+necessary schema weakening, and residual uncertainty is empirical. **Any required
+`UNSUPPORTED` gate → reject backend.**
 
-- `SUPPORTED`
-- `UNSUPPORTED`
-- `UNCLEAR_REQUIRES_CONSTRUCTION_PROBE`
+## XOR shape vs XGrammar 0.2.8 disjointness prover (R2)
 
-Proceed to Stage B eligibility only if: no required feature is documented
-unsupported; no evidence of necessary schema weakening; residual uncertainty is
-empirical/constructibility.
+Frozen branches:
+
+```
+branch A: required [kind, text];     kind = shared enum; text = pattern .*\\S.*;     additionalProperties: false
+branch B: required [kind, local_ref]; kind = same enum;  local_ref = pattern .*\\S.*; additionalProperties: false
+```
+
+Published prover covers (approx.): common required discriminator with **finite
+disjoint const/enum** per branch, or simple type/finite-value arms. Here `kind`
+is the only finite common required key and its enum **overlaps completely**;
+`text` / `local_ref` are not common finite discriminators. Therefore the prover
+**cannot** establish pairwise disjointness → documented path:
+
+```
+oneOf unsupported for this shape
+  → WARNING
+  → ParseAnyOf(...)   # anyOf semantics
+```
+
+([PR #672](https://github.com/mlc-ai/xgrammar/pull/672),
+[json_schema_converter.cc](https://github.com/mlc-ai/xgrammar/blob/main/cpp/json_schema_converter.cc)).
+
+Nuance: if `additionalProperties: false` is faithful under the resulting union,
+acceptance language **may** still match intended `oneOf` (including `xor_both`
+REJECT). That possible equivalence **does not** satisfy G9.
 
 ## Nine-gate matrix (+ JSON Schema sub-capabilities)
 
@@ -71,7 +108,7 @@ empirical/constructibility.
 |----|------|----------------|
 | G1 | Hard token-level enforcement | SUPPORTED |
 | G2 | Frozen ClosedNormalizedProgram fidelity | UNCLEAR_REQUIRES_CONSTRUCTION_PROBE |
-| G2a | `oneOf` | UNCLEAR_REQUIRES_CONSTRUCTION_PROBE |
+| G2a | `oneOf` | UNCLEAR_REQUIRES_CONSTRUCTION_PROBE (native fail-closed unavailable for this shape) |
 | G2b | `pattern` / non-whitespace | UNCLEAR_REQUIRES_CONSTRUCTION_PROBE |
 | G2c | `additionalProperties: false` | SUPPORTED |
 | G2d | `$defs` / `$ref` | SUPPORTED |
@@ -81,117 +118,68 @@ empirical/constructibility.
 | G6 | Constructible without pathological explosion | UNCLEAR_REQUIRES_CONSTRUCTION_PROBE |
 | G7 | No semantic repair layer | SUPPORTED |
 | G8 | Deterministic / versioned provenance | SUPPORTED |
-| G9 | Fail-closed behavior | UNCLEAR_REQUIRES_CONSTRUCTION_PROBE |
+| G9 | Fail-closed behavior | **UNSUPPORTED** |
 
-Machine-readable detail (same classifications/citations):  
-`decomposer_pilot_constraint_redesign_01.json`.
+Machine-readable detail: `decomposer_pilot_constraint_redesign_01.json`.
 
-### Concise rationale
+### Concise rationale (reworked)
 
-**G1 SUPPORTED.** Docs describe per-step token bitmasks applied to logits;
-HF `xgr.contrib.hf.LogitsProcessor(compiled_grammar)` is the documented
-Transformers integration
-([constrained decoding](https://xgrammar.mlc.ai/docs/latest/start/constrained_decoding.md),
-[quick start](https://xgrammar.mlc.ai/docs/latest/start/quick_start.html)).
+**G1 / G2c / G2d / G7 / G8 SUPPORTED.** Unchanged: hard token masking, closed
+objects, `$defs`/`$ref`, no post-decode repair API, pinnable releases.
 
-**G2 UNCLEAR.** `compile_json_schema` accepts schema string/dict/Pydantic
-([GrammarCompiler](https://xgrammar.mlc.ai/docs/latest/api/python/grammar_compiler.html));
-exact fidelity to our persisted artifact is unproven.
+**G2a UNCLEAR (qualified).** Native fail-closed `oneOf` is **unavailable** for
+this XOR shape under v0.2.8 (warn → `anyOf`). Qualification:
+`NATIVE_ONEOF_UNSUPPORTED_FOR_THIS_SHAPE`. Resulting-language equivalence to
+exact `oneOf` remains empirically testable and is **not** used to proceed.
 
-**G2a UNCLEAR.** `oneOf` is recognized; DeepWiki notes fallback to `anyOf` when
-branches are not provably disjoint; [PR #672](https://github.com/mlc-ai/xgrammar/pull/672)
-documents historical exactly-one loss and proposes fail-closed. Our XOR branches
-are exclusive object shapes (`required` + `additionalProperties: false`) and are
-not a documented hard unsupported, but parity needs a probe.
+**G3 UNCLEAR.** Acceptance parity under `anyOf` fallback is unproven; not claimed
+false-accept of `xor_both` on paper.
 
-**G2b UNCLEAR.** `pattern` is supported via ECMA-262-subset regex conversion
-([feature matrix](https://deepwiki.com/mlc-ai/xgrammar/5.2-supported-json-schema-features);
-[testing module](https://xgrammar.mlc.ai/docs/_modules/xgrammar/testing.html)).
-`.*\S.*` avoids documented unsupported regex features, but tab/JSON-escape
-fidelity (Outlines failure mode) is empirical.
+**G2b / G4 / G5 / G6 UNCLEAR.** Pattern/Qwen/compile risks remain paper-open but
+**moot** for JSON-Schema Stage B after reject.
 
-**G2c SUPPORTED.** `additionalProperties` / `unevaluatedProperties` handled;
-`strict_mode=True` by default
-([GrammarCompiler](https://xgrammar.mlc.ai/docs/latest/api/python/grammar_compiler.html);
-[PR #594](https://github.com/mlc-ai/xgrammar/pull/594)).
-
-**G2d SUPPORTED.** Converter recognizes `$defs`/`definitions` and `$ref` JSON
-Pointers with circular-ref handling
-([feature matrix](https://deepwiki.com/mlc-ai/xgrammar/5.2-supported-json-schema-features);
-[json_schema_converter.cc](https://github.com/mlc-ai/xgrammar/blob/main/cpp/json_schema_converter.cc)).
-
-**G3 / G4 UNCLEAR.** Depend on G2a/G2b construction parity against the PREFLIGHT
-probe suite.
-
-**G5 UNCLEAR.** `TokenizerInfo.from_huggingface` documented; Qwen appears in
-upstream matcher tests; must pass `config.vocab_size` when logits dim ≠ tokenizer
-vocab
-([workflow](https://xgrammar.mlc.ai/docs/latest/start/workflow_of_xgrammar.html)).
-
-**G6 UNCLEAR.** Different engine than `outlines_core` Index (grammar compile +
-adaptive mask cache). PREFLIGHT DFA failure does not transfer; full-schema
-constructibility remains the central Stage B question.
-
-**G7 SUPPORTED.** Documented path is generative masking only; no semantic
-post-decode repair API described for JSON Schema guidance.
-
-**G8 SUPPORTED.** Released versions are pinnable
-([releases](https://github.com/mlc-ai/xgrammar/releases)); compile kwargs are
-explicit. Stage B must record concrete version + artifact hashes.
-
-**G9 UNCLEAR.** Some unsatisfiable schemas fail closed; `oneOf` anyOf-fallback
-is a known non-fail-closed historical path for overlapping branches. Our
-exclusive-property XOR is not proven fail-closed on paper.
-
-## Residual risks
-
-1. `oneOf` → `anyOf` fallback if branches are not “provably disjoint.”
-2. `pattern: ".*\\S.*"` tab / JSON-escape fidelity.
-3. Full patched schema may still fail to compile or explode at Stage B.
-4. Qwen `config.vocab_size` vs tokenizer vocab must be pinned correctly.
-5. `strict_mode` / separators / `any_order` must be frozen to match canonical
-   schema serialization.
+**G9 UNSUPPORTED (R3).** Frozen requirement: unsupported/unsound constructs must
+**fail closed**, never silently weaken/fallback. XGrammar 0.2.8 does the opposite
+for this non-provably-disjoint `oneOf` (warn → `anyOf`). That is documented
+behavior, not `UNCLEAR`.
 
 ## Stage A disposition
 
 ```
 XGRAMMAR_STAGE_A:
-  PROCEED_TO_STAGE_B_ELIGIBLE
+  REJECT_BACKEND
 
 unsupported_required_features:
-  (none)
+  - G9_fail_closed_behavior
 
-known_necessary_schema_weakening:
-  false
+json_schema_route_status:
+  REJECTED_ON_PAPER
 ```
 
-**Meaning:** No documented incompatibility blocks an empirical construction
-probe.
+**Meaning:** The XGrammar **JSON-Schema** route fails Stage A because required
+G9 is `UNSUPPORTED`. This closes Stage B eligibility for that route.
 
 ```
-PROCEED_TO_STAGE_B_ELIGIBLE
-  ≠ XGrammar accepted as production constraint engine
-  ≠ installation authorized
-  ≠ construction probe authorized
-  ≠ PILOT-01 authorized
+REJECT_BACKEND
+  ≠ evaluation of CFG/EBNF representation
+  ≠ ban on considering XGrammar later as a grammar engine under new AUTH
+  ≠ PILOT-01 authorization
 ```
 
-
-Stage B, if authorized later, would be a separate AUTH such as
-`DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PROBE-01` (install/pin, tokenizer-only,
-exact persisted schema, compile, structural parity; `model_calls=0`).
+This rework does **not** authorize or select a next CFG/EBNF candidate.
 
 ## Explicit non-authorizations
 
 ```
-XGrammar install:          NOT AUTHORIZED
-implementation code:       NOT AUTHORIZED
-Stage B construction:      NOT AUTHORIZED
-model.generate / forward:  NOT AUTHORIZED
-schema weakening:          NOT AUTHORIZED
-PILOT-01:                  NOT AUTHORIZED
-CFG auto-fallback:         NOT AUTHORIZED
+XGrammar install:                    NOT AUTHORIZED
+dependency changes:                  NOT AUTHORIZED
+implementation code:                 NOT AUTHORIZED
+construction probe / Stage B:        NOT AUTHORIZED
+schema mutation:                     NOT AUTHORIZED
+CFG/EBNF redesign:                   NOT PART OF THIS REWORK
+model.generate / forward:            NOT AUTHORIZED
+PILOT-01:                            NOT AUTHORIZED
 ```
 
 STATUS:
-STOP FOR INDEPENDENT CONSTRAINT-REDESIGN-01 STAGE-A REVIEW
+STOP FOR INDEPENDENT CONSTRAINT-REDESIGN-01R REVIEW
