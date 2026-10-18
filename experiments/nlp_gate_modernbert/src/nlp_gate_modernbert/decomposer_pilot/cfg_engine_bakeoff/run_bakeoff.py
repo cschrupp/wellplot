@@ -12,6 +12,9 @@ from nlp_gate_modernbert.decomposer_pilot.cfg_engine_bakeoff import backend_xgra
 from nlp_gate_modernbert.decomposer_pilot.cfg_engine_bakeoff.g2_audit import (
     audit_xgrammar_lowering,
 )
+from nlp_gate_modernbert.decomposer_pilot.cfg_engine_bakeoff.lower_xgrammar import (
+    lower_well_ebnf1_to_xgrammar_ebnf,
+)
 from nlp_gate_modernbert.decomposer_pilot.cfg_engine_bakeoff.pins import (
     ACCEPTED_GRAMMAR_SHA256,
     load_accepted_grammar,
@@ -40,16 +43,22 @@ def run_bakeoff(repo_root: Path | None = None) -> dict[str, Any]:
     # R2: independent source-language oracle on fixed corpus
     oracle = source_oracle_parity(root, grammar_bytes)
 
-    # R1: evidence-derived G2 lowering audit
-    g2 = audit_xgrammar_lowering(well_text)
+    # Produce lowered EBNF outside the audit (audit never calls the lowerer).
+    lowered_a = lower_well_ebnf1_to_xgrammar_ebnf(well_text)
+    lowered_b = lower_well_ebnf1_to_xgrammar_ebnf(well_text)
+    # R1: independent G2 audit of already-produced target vs source
+    g2 = audit_xgrammar_lowering(
+        well_text, lowered_a, lowered_ebnf_replay=lowered_b
+    )
 
     report: dict[str, Any] = {
-        "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01R",
+        "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01R2",
         "authority": (
             "WELLPLOT-NLP-RUNTIME-V2-"
             "DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01-AUTH-001"
         ),
         "rework": ["R1", "R2", "R3", "R4", "R5"],
+        "prior_slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01R",
         "model_calls": model_calls,
         "model_weights_loaded": model_weights_loaded,
         "g1_input_identity": {

@@ -1,5 +1,5 @@
 {
-  "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01R",
+  "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01R2",
   "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01-AUTH-001",
   "rework": [
     "R1",
@@ -8,6 +8,7 @@
     "R4",
     "R5"
   ],
+  "prior_slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01R",
   "model_calls": 0,
   "model_weights_loaded": false,
   "g1_input_identity": {
@@ -34,6 +35,7 @@
   },
   "g2_lowering_audit": {
     "pass": true,
+    "audit_mode": "independent_source_vs_produced_target",
     "source_rule_count": 8841,
     "target_rule_count": 8841,
     "same_rule_count": true,
@@ -47,14 +49,15 @@
     "lowered_sha256_replay": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
     "authorized_transform_set": [
       "strip_rule_terminator_sp_semicolon",
-      "escape_line_breaking_scalars_in_literals_and_classes"
+      "escape_authorized_scalars_in_literals_and_classes"
     ],
     "force_escape_codepoints": [
       10,
       13,
       8232,
       8233
-    ]
+    ],
+    "control_scalar_escape": "cp < 0x20"
   },
   "backends": {
     "xgrammar": {
@@ -67,10 +70,10 @@
         "lowerer_source_sha256": "216976a6e7b8a6838862198fa4d37168666fab602ec643c7369ca100179d377e",
         "source_grammar_sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
         "backend_native_grammar_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
-        "compile_seconds": 0.927526493993355,
+        "compile_seconds": 0.8871955330250785,
         "vocab_size": 151936
       },
-      "build_wall_seconds": 2.008869261975633,
+      "build_wall_seconds": 1.9532606680004392,
       "gates": {
         "G1": true,
         "G2": true,
@@ -450,9 +453,9 @@
         ],
         "mask_step_latency_seconds": {
           "n": 514,
-          "mean": 0.010486849754514692,
-          "max": 0.10550640602014028,
-          "min": 1.2240197975188494e-06
+          "mean": 0.010172123499321098,
+          "max": 0.10023041800013743,
+          "min": 1.313019311055541e-06
         }
       },
       "g6_repeated_replay": {
@@ -463,7 +466,7 @@
         "compile_both_succeeded": true
       },
       "resources": {
-        "compile_seconds": 0.927526493993355,
+        "compile_seconds": 0.8871955330250785,
         "lowered_grammar_bytes": 1226434
       }
     },
@@ -477,9 +480,9 @@
       "lowerer_source_sha256": "852354266c9eafdf39760d5f567b174f3a1fa1f79732083040af7c73f17ca845",
       "backend_native_grammar_sha256": "5068fa5da97be560119f90275acf84f8d9eeea7a0007e12ddcf478b7eee1bdc1",
       "backend_native_grammar_bytes": 1475370,
-      "lower_seconds": 0.42985937601770274,
-      "tokenizer_wrap_seconds": 0.9888839790073689,
-      "construct_seconds": 0.9400315890088677,
+      "lower_seconds": 0.40961091200006194,
+      "tokenizer_wrap_seconds": 0.9747533839836251,
+      "construct_seconds": 0.9363736930245068,
       "validate_message": "",
       "pathology": "grammar_symbol_table_overflow"
     }
