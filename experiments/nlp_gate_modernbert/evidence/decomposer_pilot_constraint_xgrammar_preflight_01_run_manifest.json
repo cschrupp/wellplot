@@ -13,10 +13,11 @@
     "auto_download": false,
     "guards": [
       "GenerationMixin.generate_blocked",
+      "PreTrainedModel.from_pretrained_blocked",
       "AutoModel.from_pretrained_blocked",
       "AutoModelForCausalLM.from_pretrained_blocked",
       "AutoModelForSeq2SeqLM.from_pretrained_blocked",
-      "PreTrainedModel.forward_blocked",
+      "PreTrainedModel.__call___blocked",
       "AutoTokenizer_local_files_only_required",
       "AutoConfig_local_files_only_required"
     ],
@@ -35,6 +36,14 @@
     "no_download": true,
     "no_model_forward": true,
     "no_model_generate": true,
+    "p8_guard_evidence": {
+      "direct_concrete_model_load_blocked": true,
+      "generate_blocked": true,
+      "non_local_tokenizer_config_blocked": true,
+      "pass": true,
+      "probe_errors": [],
+      "subclass_model_invocation_blocked": true
+    },
     "slm01_root": "/home/user/projects/wellplot/experiments/nlp_slm_01",
     "template_smoke": {
       "chat_template_match": true,
@@ -189,8 +198,8 @@
   "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01-AUTH-001",
   "pass_does_not_authorize_pilot_01": true,
   "pilot_01": "NOT_AUTHORIZED",
-  "prior_candidate": "a445c451e356b713cd24fcfb532a404421bc269e",
-  "prior_slice": "DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01",
-  "slice": "DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R",
-  "starting_tip": "96d5a75a08a3a885cc10596092ad4d41409ef3e8"
+  "prior_candidate": "b0641eef502530aa841b3c5c6fa6cc60ca089dfb",
+  "prior_slice": "DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R",
+  "slice": "DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R2",
+  "starting_tip": "0905a6a7c05c97eee47fe10430cf7e418583eb7b"
 }

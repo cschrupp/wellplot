@@ -23,7 +23,7 @@
       },
       "name": "missing_tokenizer_artifact",
       "pass": true,
-      "raised": "PinnedTokenizerUnavailable:missing /tmp/tmpu2ayw9wy/tokenizer.json",
+      "raised": "PinnedTokenizerUnavailable:missing /tmp/tmptkleg1oc/tokenizer.json",
       "zero_model_preserved": true
     },
     {

@@ -1,30 +1,30 @@
-# DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R — Closeout
+# DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R2 — Closeout
 
 ```
 SLICE:
-DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R
+DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R2
 
 AUTHORITY:
 WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01-AUTH-001
 
 MODE:
-BOUNDED PREFLIGHT HARDENING
+BOUNDED P8 ENFORCEMENT HARDENING
 
 PRIOR CANDIDATE:
-a445c451e356b713cd24fcfb532a404421bc269e
-RESULT: REVISE (F001–F004)
+b0641eef502530aa841b3c5c6fa6cc60ca089dfb
+RESULT: REVISE (P8 universal prevention guard)
 
 STARTING TIP:
-96d5a75a08a3a885cc10596092ad4d41409ef3e8
+0905a6a7c05c97eee47fe10430cf7e418583eb7b
 
 AUTHORITY REMOTE HEAD:
 b6352a778f62982b4c42ff2ef773a622e351dcf7
 
 CANDIDATE SHA:
-b0641eef502530aa841b3c5c6fa6cc60ca089dfb
+(pending commit)
 
 TIP:
-eba943846534a3809b50be6e413d518839fce961
+(pending SHA-record commit)
 
 RESULT:
 PASS
@@ -49,11 +49,11 @@ NOT AUTHORIZED
 
 | ID | Correction |
 |----|------------|
-| R1 | P2 field-level Q6 MODEL completeness from full provenance |
-| R2 | P7 adversarial fail-closed suite (evidence-derived) |
-| R3 | P8 forward + autodownload guards with negative tests |
-| R4 | P5 HF LogitsProcessor progressive synthetic replay |
-| R5 | Regenerated evidence / P1–P9 |
+| R1 | Block model invocation via `PreTrainedModel.__call__` (subclass-forward-safe) |
+| R2 | Block `PreTrainedModel.from_pretrained` (concrete Qwen3 load path) |
+| R3 | Negative probes on `Qwen3ForCausalLM` load/call (no weights) |
+| R4 | Keep AutoTokenizer/AutoConfig local-only download guards |
+| R5 | Regenerated P8 evidence / closeout |
 
 ## Gates
 
@@ -66,7 +66,7 @@ NOT AUTHORIZED
 | P5 | PASS | adapter + HF LogitsProcessor synthetic replay |
 | P6 | PASS | six-case pre-inference hashes |
 | P7 | PASS | adversarial fail-closed suite (evidence-derived) |
-| P8 | PASS | zero model + load/forward/generate/download guards |
+| P8 | PASS | zero observed execution + universal __call__/from_pretrained/generate/download guards |
 | P9 | PASS | resource/setup evidence |
 
 ## Selected path
@@ -108,4 +108,4 @@ IMPLEMENTATION_COMPLETE_AWAITING_INDEPENDENT_REVIEW
 ```
 
 STATUS:
-STOP FOR INDEPENDENT DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R REVIEW
+STOP FOR INDEPENDENT DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R2 REVIEW

@@ -100,14 +100,22 @@ def test_p7_fail_closed_adversarial_suite():
         assert c["pass"] is True
 
 
-def test_p8_guards_block_load_forward_generate_download():
+def test_p8_guards_block_concrete_qwen3_load_call_generate_download():
     report = run_xgrammar_preflight(evidence_dir=EVIDENCE_DIR)
     assert report["result"] == "PASS"
-    assert report["slice"].endswith("01R")
+    assert report["slice"].endswith("01R2")
     assert report["model_calls"] == 0
     assert report["model_weights_loaded"] is False
     assert report["model_forward_calls"] == 0
     assert report["model_generate_calls"] == 0
+
+    # Explicit P8 prevention evidence (not name-only)
+    ge = report["p8_guard_evidence"]
+    assert ge["pass"] is True
+    assert ge["direct_concrete_model_load_blocked"] is True
+    assert ge["subclass_model_invocation_blocked"] is True
+    assert ge["generate_blocked"] is True
+    assert ge["non_local_tokenizer_config_blocked"] is True
 
     # P2 field-level completeness
     assert report["p2_validation"]["pass"] is True
@@ -115,9 +123,8 @@ def test_p8_guards_block_load_forward_generate_download():
         assert field in report["p2_validation"]["required_model_fields"]
 
     from transformers.generation import GenerationMixin
-    from transformers.modeling_utils import PreTrainedModel
+    from transformers import AutoTokenizer, Qwen3ForCausalLM
     import transformers
-    from transformers import AutoTokenizer
 
     with pytest.raises(GenerateForbiddenError):
         GenerationMixin.generate(object())
@@ -125,8 +132,14 @@ def test_p8_guards_block_load_forward_generate_download():
     with pytest.raises(AutoModelForbiddenError):
         transformers.AutoModelForCausalLM.from_pretrained("x")
 
+    # Concrete pilot class — not Auto* factory
+    with pytest.raises(AutoModelForbiddenError):
+        Qwen3ForCausalLM.from_pretrained("Qwen/Qwen3-1.7B", local_files_only=True)
+
+    # Subclass __call__ (bypasses overridden forward)
+    stub = object.__new__(Qwen3ForCausalLM)
     with pytest.raises(ForwardForbiddenError):
-        PreTrainedModel.forward(object())
+        stub()
 
     with pytest.raises(AutoDownloadForbiddenError):
         AutoTokenizer.from_pretrained(

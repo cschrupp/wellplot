@@ -1,5 +1,5 @@
 {
-  "compile_seconds": 0.8397553369868547,
+  "compile_seconds": 0.839969108987134,
   "native_grammar_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
   "oracle_backend_agreement": {
     "mismatches": [],
@@ -281,9 +281,9 @@
       }
     ],
     "mask_step_latency_seconds": {
-      "max": 0.11097350000636652,
-      "mean": 0.010605669942102849,
-      "min": 1.2379896361380816e-06,
+      "max": 0.10571329898084514,
+      "mean": 0.010560529985148477,
+      "min": 1.2399978004395962e-06,
       "n": 514
     },
     "negative_pass": true,

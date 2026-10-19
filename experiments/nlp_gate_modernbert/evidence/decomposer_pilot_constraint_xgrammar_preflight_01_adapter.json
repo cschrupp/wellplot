@@ -1,7 +1,7 @@
 {
   "adapter_id": "pilot_xgrammar_transformers_hard_mask.v1",
   "allowed_logits_remain_finite": true,
-  "compile_seconds": 0.8397553369868547,
+  "compile_seconds": 0.839969108987134,
   "disallowed_logits_masked_to_neginf": true,
   "failures": [],
   "hf_logits_processor": {
@@ -32,9 +32,9 @@
   },
   "reset_mask_deterministic": true,
   "synthetic_mask_latency_seconds": {
-    "max": 0.0007777780119795352,
-    "mean": 0.0004180196701781824,
-    "min": 8.561008144170046e-06,
+    "max": 0.0008827419951558113,
+    "mean": 0.00042642924866716686,
+    "min": 8.432980393990874e-06,
     "n": 12
   },
   "vocab_size": 151936
