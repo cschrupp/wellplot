@@ -94,6 +94,7 @@
   ],
   "slice": "C02-02",
   "starting_sha": "9025ecbb6c2ceaf4a2ee89da53a1242eb96d7f67",
+  "tip_sha": "a85d840bd219ff818e468edb48ec0000c0a818ec",
   "unsupported": [
     "identical_hard_xgrammar_mask_parity_with_pilot_run_1",
     "using_frontier_or_budget_model_as_semantic_oracle"
