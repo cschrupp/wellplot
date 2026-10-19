@@ -133,20 +133,20 @@ def test_cost_card_from_c02_02_snapshot_no_inference() -> None:
 
 def test_api_key_presence_does_not_expose_secret(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    absent = inspect_api_key_presence()
+    absent = inspect_api_key_presence(load_dotenv=False)
     assert absent.present is False
-    assert absent.to_json()["secret_exported"] is False
+    assert absent.to_json()["OPENROUTER_API_KEY_PRESENT"] is False
     with pytest.raises(ApiKeyError):
-        load_api_key()
+        load_api_key(load_dotenv=False)
 
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-SECRETVALUE")
-    present = inspect_api_key_presence()
+    present = inspect_api_key_presence(load_dotenv=False)
     assert present.present is True
-    assert present.length == len("sk-or-v1-SECRETVALUE")
-    assert "SECRETVALUE" not in present.prefix_redacted
-    assert "SECRETVALUE" not in json.dumps(present.to_json())
-    # load returns secret to caller but tests must not print it
-    key = load_api_key()
+    dumped = json.dumps(present.to_json())
+    assert "SECRETVALUE" not in dumped
+    assert "length" not in dumped
+    assert present.to_json()["OPENROUTER_API_KEY_PRESENT"] is True
+    key = load_api_key(load_dotenv=False)
     assert key.startswith("sk-or-")
     del key
 

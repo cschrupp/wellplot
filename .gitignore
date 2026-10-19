@@ -32,6 +32,9 @@ experiments/nlp_slm_01/*.egg-info/
 experiments/nlp_gate_modernbert/**/__pycache__/
 experiments/nlp_gate_modernbert/.pytest_cache/
 experiments/nlp_gate_modernbert/*.egg-info/
+experiments/nlp_gate_modernbert/.env
+experiments/nlp_gate_modernbert/.env.local
+experiments/nlp_gate_modernbert/.env.*.local
 *.gguf
 *.safetensors
 adapter_model.*

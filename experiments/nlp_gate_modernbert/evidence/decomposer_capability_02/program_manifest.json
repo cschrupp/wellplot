@@ -6,9 +6,14 @@
     "inference_authorized": false,
     "title": "Gemini 4 Argon frozen-protocol capability ceiling design"
   },
+  "c02_03_env_config": {
+    "authority": "WP-DC02-03-ENV-CONFIG-AUTH-001",
+    "execution_status": "EXECUTED_AWAITING_REVIEW",
+    "inference_authorized": false
+  },
   "c02_03_execution_prep": {
     "authority": "WP-DC02-03-EXECUTION-PREPARATION-AUTH-001",
-    "execution_status": "EXECUTED_AWAITING_REVIEW",
+    "execution_status": "CLOSED_ACCEPTED_WITH_ENV_FOLLOW_UP",
     "inference_authorized": false
   },
   "candidate_sha": "d2951ad06ef3a8568f4d893e3f5f9ae3931b1a54",
