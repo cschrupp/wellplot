@@ -170,10 +170,10 @@ The accepted preflight established:
 - concrete-model load / invocation / generate / non-local-download guards
 - zero model calls, zero model forward/generate calls, and no model weights loaded
 
-### 3. DECOMPOSER-PILOT-01 — next scientific slice, not yet authorized
+### 3. DECOMPOSER-PILOT-01 — AUTHORIZED / current scientific slice
 
-The infrastructure is now ready for the frozen six-call pilot, but execution still requires a
-separate explicit pilot authority. Once authorized:
+Human authorization has been granted under
+`WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-01-AUTH-001` for exactly the frozen six-call pilot:
 
 - model: `Qwen/Qwen3-1.7B`
 - instruction checkpoint
@@ -305,8 +305,8 @@ Longer term:
 ## Immediate Next Tasks
 
 1. Keep this roadmap and decision log synchronized with accepted runtime work.
-2. Keep `DECOMPOSER-PILOT-01` blocked until a separate explicit authority is issued.
-3. When authorized, run exactly the frozen six-call Qwen3-1.7B decomposer pilot with no retries or repair.
+2. Execute `DECOMPOSER-PILOT-01` under its explicit six-call authority.
+3. Stop after immutable pilot evidence is published for independent scientific review.
 4. Continue release/documentation maintenance without allowing it to dominate the active R&D track.
 5. Revisit renderer/report polish in parallel where it improves real user workflows.
 
