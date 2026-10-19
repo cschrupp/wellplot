@@ -8,6 +8,7 @@
   },
   "authority": "WP-DC02-03-EXECUTION-PREPARATION-AUTH-001",
   "billable_openrouter_calls": 0,
+  "candidate_sha": "d2951ad06ef3a8568f4d893e3f5f9ae3931b1a54",
   "cost_card_path": "c02_03_execution_prep/execution_cost_card.json",
   "design_accepted_tip": "fc8bd36dd638ff065e562a60cb8c9fabbd491470",
   "design_authority": "WP-DC02-03-GEMINI-CEILING-DESIGN-AUTH-001",

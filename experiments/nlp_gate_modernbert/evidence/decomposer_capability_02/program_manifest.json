@@ -11,7 +11,7 @@
     "execution_status": "EXECUTED_AWAITING_REVIEW",
     "inference_authorized": false
   },
-  "candidate_sha": "8225f5d8da629927bc240ac79177c3d75457d0ba",
+  "candidate_sha": "d2951ad06ef3a8568f4d893e3f5f9ae3931b1a54",
   "inference_authorized": false,
   "live_scientific_execution_readiness": "NOT_ESTABLISHED",
   "model_calls_authorized": 0,
