@@ -98,8 +98,12 @@ same deterministic WellPlot outcome contract.
 ## Validation Handoff
 
 ```yaml
-candidate_checkpoint: <filled after commit>
+implementation_checkpoint: d90b769782eaa864fe944fac3d277192da4e0b57
 parent: 63aa1f9e0fecbfd15abefa20ab57e8e3d366a6a2
+changed_files:
+  - scripts/d5_5_comparative_model_qualification.py
+  - tests/test_d5_5_comparative_model_qualification.py
+  - docs/architecture/D5_COMPARATIVE_MODEL_QUALIFICATION_RESULT.md
 provider_free_qwen_rehearsal: 9/9 PASS / 18 logical calls
 provider_free_luna_rehearsal: 9/9 PASS / 18 logical calls
 single_engine_attestation: PASS
