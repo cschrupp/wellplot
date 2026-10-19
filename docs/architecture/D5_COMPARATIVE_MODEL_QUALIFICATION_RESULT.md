@@ -18,6 +18,9 @@ This artifact records the D5-5B harness boundary only. It does not authorize
 or perform Qwen or Luna endpoint activity. Live execution remains a separate
 Gate-B decision after independent review.
 
+The frozen design is repository-resident at
+`docs/architecture/D5_5_COMPARATIVE_MODEL_QUALIFICATION.md`.
+
 ## Comparative Boundary
 
 The two lanes vary only at the existing OpenAI-compatible provider boundary:
@@ -95,11 +98,18 @@ heterogeneous models. Latency, token usage, endpoint identity, and provider
 runtime metadata remain lane observations. The acceptance object remains the
 same deterministic WellPlot outcome contract.
 
+The executable provider-free boundary also exercises lane-specific readiness
+with injected endpoint responses, existing provider-factory construction, the
+existing D5-4 live adapter with in-memory transport, and the shared
+`D5CampaignRunner` STARTED/terminal custody. Qwen performs the two llama.cpp
+identity observations; Luna performs only its OpenAI-compatible model-catalog
+observation. No provider or model request is sent.
+
 ## Validation Handoff
 
 ```yaml
-implementation_checkpoint: d90b769782eaa864fe944fac3d277192da4e0b57
-parent: 63aa1f9e0fecbfd15abefa20ab57e8e3d366a6a2
+implementation_checkpoint: 1f347c854c2a8911b7776dd712c5ff9bf514d48a
+parent: d90b769782eaa864fe944fac3d277192da4e0b57
 changed_files:
   - scripts/d5_5_comparative_model_qualification.py
   - tests/test_d5_5_comparative_model_qualification.py

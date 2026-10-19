@@ -3,18 +3,27 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any
 
 import pytest
 from scripts import d5_5_comparative_model_qualification as d5_5
 from scripts import nlp_d4_live_acceptance as d4
+from scripts import nlp_d5_live_semantic_qualification as d5
 from tests.test_d5_provider_free_parity_acceptance import (
     _assert_frozen_las_contract,
     _assert_reloaded,
     _d4_case,
     _d4_gold,
     _new_direct_harness,
+)
+from tests.test_nlp_d5_live_semantic_qualification import (
+    _authorization,
+    _provenance,
+    _ready,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -155,6 +164,158 @@ def test_provider_factory_arguments_are_lane_local_and_share_boundary() -> None:
     ]
     assert arguments[0]["base_url"] != arguments[1]["base_url"]
     assert all(item["timeout"] == 900.0 for item in arguments)
+
+
+def test_lane_readiness_uses_only_its_provider_contract() -> None:
+    """Qwen uses llama props while Luna uses only its model catalog."""
+    config = d5_5.load_project_config(REPO_ROOT)
+    calls_by_lane: dict[str, list[str]] = {}
+    for lane in d5_5.lane_configurations(config):
+        calls: list[str] = []
+        calls_by_lane[lane.lane_id] = calls
+        authorization = replace(
+            _authorization(),
+            campaign_id=lane.campaign_id,
+            provider=lane.provider,
+            model=lane.model,
+            artifact_root=f"workspace/evaluations/d5-5/{lane.lane_id}",
+        )
+
+        def endpoint_get(
+            url: str,
+            token: str,
+            *,
+            calls: list[str] = calls,
+        ) -> object:
+            del token
+            calls.append(url)
+            if url == config.model_catalog_url:
+                return {"data": [{"id": "qwen3.6-35b-a3b"}]}
+            if url == config.props_url:
+                return {
+                    "model_path": "/srv/models/qwen3.6-35b-a3b.gguf",
+                    "default_generation_settings": {
+                        "n_ctx": 32768,
+                        "temperature": 0.0,
+                        "top_p": 1.0,
+                    },
+                    "build_info": "llama.cpp provider-free test build",
+                    "total_slots": 1,
+                    "chat_template": "qwen3",
+                    "gguf_byte_identity": "NOT_AVAILABLE",
+                }
+            return {"data": [{"id": "openai/gpt-6-luna"}]}
+
+        readiness = d5_5.prepare_lane_readiness(
+            lane=lane,
+            authorization=authorization,
+            project_config=config,
+            api_key_loader=lambda: "provider-free-token",
+            endpoint_get=endpoint_get,
+            static_preflight={"status": "PASS"},
+        )
+        if lane.lane_id == "qwen":
+            assert calls == [config.model_catalog_url, config.props_url]
+            assert readiness.endpoint_calls == ("/v1/models", "/props")
+        else:
+            assert calls == ["https://openrouter.ai/api/v1/models"]
+            assert config.props_url not in calls
+            assert readiness.endpoint_calls == ("/models",)
+            assert "model_path_basename" not in readiness.projection.as_dict()
+
+    assert calls_by_lane["qwen"][-1] == config.props_url
+    assert calls_by_lane["luna"] == ["https://openrouter.ai/api/v1/models"]
+
+
+def test_lane_live_adapters_use_existing_provider_path_without_requests() -> None:
+    """Both descriptors construct the accepted D5-4 adapter with fake transport."""
+    import httpx
+
+    config = d5_5.load_project_config(REPO_ROOT)
+    for lane in d5_5.lane_configurations(config):
+        clients: list[httpx.AsyncClient] = []
+
+        def factory(
+            observer: Callable[[object], Any],
+            *,
+            clients: list[httpx.AsyncClient] = clients,
+        ) -> httpx.AsyncClient:
+            client = httpx.AsyncClient(
+                transport=httpx.MockTransport(lambda request: httpx.Response(500, request=request)),
+                event_hooks={"request": [observer]},
+            )
+            clients.append(client)
+            return client
+
+        with TemporaryDirectory(dir=REPO_ROOT) as temporary:
+            adapter = d5_5.create_lane_live_adapter(
+                repo_root=REPO_ROOT,
+                artifact_root=Path(temporary),
+                api_key="provider-free-token",
+                lane=lane,
+                project_config=config,
+                http_client_factory=factory,
+            )
+            backend = adapter.inner.session.session.compiler.dependencies.planner.backend
+            assert backend.delegate.model == lane.model
+            assert str(backend.delegate.client.base_url).startswith(lane.base_url)
+        assert len(clients) == 1
+        asyncio.run(clients[0].aclose())
+
+
+def test_executable_lane_boundary_enters_shared_runner_without_provider_calls() -> None:
+    """Both lanes reach STARTED custody and fail closed before delegation."""
+    result = d5_5.verify_executable_lane_boundary(
+        REPO_ROOT,
+        implementation_checkpoint=d5_5._git(REPO_ROOT, "rev-parse", "HEAD"),
+    )
+    assert result["provider_calls"] == result["model_calls"] == 0
+    assert {item["shared_runner"] for item in result["lanes"]} == {"D5CampaignRunner"}
+    assert {item["live_adapter"] for item in result["lanes"]} == {"_ObservedLiveAdapter"}
+    assert result["lanes"][0]["endpoint_calls"][-1].endswith("/props")
+    assert result["lanes"][1]["endpoint_calls"] == ["https://openrouter.ai/api/v1/models"]
+
+
+def test_lane_custody_and_call_caps_are_independent_and_fail_closed(tmp_path: Path) -> None:
+    """Lane namespaces cannot cross-consume and caps reject before delegation."""
+    qwen = replace(
+        _authorization(campaign_id="d5-5-qwen-001"),
+        model="qwen3.6-35b-a3b",
+        artifact_root=str(tmp_path / "qwen"),
+    )
+    luna = replace(
+        _authorization(campaign_id="d5-5-luna-001"),
+        model="openai/gpt-6-luna",
+        artifact_root=str(tmp_path / "luna"),
+    )
+    qwen_paths = d5.EvidencePaths(tmp_path / "qwen", qwen.campaign_id)
+    luna_paths = d5.EvidencePaths(tmp_path / "luna", luna.campaign_id)
+    qwen_custody = d5.D5CampaignCustody.start(
+        qwen_paths,
+        authorization=qwen,
+        provenance=_provenance(),
+        readiness=_ready().projection,
+    )
+    qwen_custody.finish("INCONCLUSIVE", attribution="TEST", rows=[])
+    with pytest.raises(d5.D5HarnessError, match="campaign path"):
+        d5.D5CampaignCustody.start(
+            luna_paths,
+            authorization=qwen,
+            provenance=_provenance(),
+            readiness=_ready().projection,
+        )
+    assert not any(path.exists() for path in luna_paths.all_paths())
+
+    ledger = d5.D5LogicalCallLedger()
+    for _ in range(d5.MAX_LOGICAL_CALLS):
+        ledger.reserve("planner")
+    with pytest.raises(d5.D5CallCapExceeded, match="logical call 46"):
+        ledger.reserve("planner")
+    logical_index = ledger.calls[0]["logical_call_index"]
+    for _ in range(d5.MAX_PHYSICAL_ATTEMPTS):
+        ledger.physical_attempt(logical_index)
+    with pytest.raises(d5.D5CallCapExceeded, match="physical attempt ceiling"):
+        ledger.physical_attempt(logical_index)
 
 
 def test_provider_free_contract_rebinds_to_current_checkpoint_without_calls() -> None:

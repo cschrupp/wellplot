@@ -25,7 +25,7 @@ import uuid
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from scripts import nlp_d4_live_acceptance as d4
 from wellplot.project_config import ProjectConfig, load_project_config
@@ -272,6 +272,14 @@ class D5ReadinessProjection:
             "structured_output_contract": self.structured_output_contract,
             "gguf_byte_identity": self.gguf_byte_identity,
         }
+
+
+class D5ReadinessProjectionProtocol(Protocol):
+    """Sanitized readiness projection accepted by shared campaign custody."""
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return redacted readiness evidence."""
+        ...
 
 
 def _sha256_json(value: object) -> str:
@@ -627,6 +635,7 @@ class D5CampaignCustody:
     ledger: D5LogicalCallLedger
     authorization_id: str
     live: bool = False
+    endpoint_call_count: int = 2
     require_physical_observer: bool = False
     _active_logical_index: int | None = None
     _terminal_written: bool = False
@@ -638,8 +647,9 @@ class D5CampaignCustody:
         *,
         authorization: D5Authorization,
         provenance: Mapping[str, Any],
-        readiness: D5ReadinessProjection,
+        readiness: D5ReadinessProjectionProtocol,
         live: bool = False,
+        endpoint_call_count: int = 2,
     ) -> D5CampaignCustody:
         """Create STARTED custody only after successful readiness."""
         ensure_fresh_namespace(paths)
@@ -651,12 +661,12 @@ class D5CampaignCustody:
             "authorization_id": authorization.authorization_id,
             "status": "STARTED",
             "readiness_status": "LIVE_READY",
-            "provider": EXPECTED_PROVIDER,
-            "model": EXPECTED_MODEL,
+            "provider": authorization.provider,
+            "model": authorization.model,
             "logical_generation_calls": 0,
             "physical_generation_attempts": 0,
-            "identity_endpoint_calls": 2,
-            "endpoint_calls": 2 if live else 0,
+            "identity_endpoint_calls": endpoint_call_count,
+            "endpoint_calls": endpoint_call_count if live else 0,
             "provider_calls": 0,
             "model_calls": 0,
             "live_execution": live,
@@ -684,6 +694,7 @@ class D5CampaignCustody:
             ledger=D5LogicalCallLedger(),
             authorization_id=authorization.authorization_id,
             live=live,
+            endpoint_call_count=endpoint_call_count,
         )
 
     def record_call_started(self, event: Mapping[str, Any]) -> None:
@@ -799,7 +810,7 @@ class D5CampaignCustody:
                 "completed_turns": len(rows),
                 "logical_generation_calls": self.ledger.logical_calls,
                 "physical_generation_attempts": self.ledger.physical_attempts,
-                "endpoint_calls": 2 if self.live else 0,
+                "endpoint_calls": self.endpoint_call_count if self.live else 0,
                 "provider_calls": self.ledger.logical_calls if self.live else 0,
                 "model_calls": self.ledger.logical_calls if self.live else 0,
             }
@@ -821,7 +832,7 @@ class D5CampaignCustody:
             "completed_turns": len(rows),
             "logical_generation_calls": self.ledger.logical_calls,
             "physical_generation_attempts": self.ledger.physical_attempts,
-            "endpoint_calls": 2 if self.live else 0,
+            "endpoint_calls": self.endpoint_call_count if self.live else 0,
             "provider_calls": self.ledger.logical_calls if self.live else 0,
             "model_calls": self.ledger.logical_calls if self.live else 0,
             "state_snapshot_sha256": state_digest,
@@ -838,7 +849,7 @@ class D5CampaignCustody:
             "completed_turns": len(rows),
             "logical_generation_calls": self.ledger.logical_calls,
             "physical_generation_attempts": self.ledger.physical_attempts,
-            "endpoint_calls": 2 if self.live else 0,
+            "endpoint_calls": self.endpoint_call_count if self.live else 0,
             "provider_calls": self.ledger.logical_calls if self.live else 0,
             "model_calls": self.ledger.logical_calls if self.live else 0,
             "terminal_sha256": _sha256_file(self.paths.terminal),
@@ -1010,8 +1021,8 @@ def validate_readiness_projection(
 class D5OperationalReadiness:
     """Successful two-GET readiness result with no generation probe."""
 
-    projection: D5ReadinessProjection
-    endpoint_calls: tuple[str, str]
+    projection: D5ReadinessProjectionProtocol
+    endpoint_calls: tuple[str, ...]
     adapter: object | None = None
     live: bool = False
     provider_calls: int = 0
@@ -1139,6 +1150,9 @@ def create_live_adapter(
     api_key: str,
     project_config: ProjectConfig,
     http_client_factory: Callable[[Callable[[object], Any]], object] | None = None,
+    base_url: str | None = None,
+    model: str | None = None,
+    provider_name: str | None = None,
 ) -> _ObservedLiveAdapter:
     """Build the accepted canonical adapter with retry-visible HTTP transport."""
     import httpx
@@ -1153,15 +1167,18 @@ def create_live_adapter(
         if http_client_factory is not None
         else httpx.AsyncClient(event_hooks={"request": [observer.on_request]})
     )
+    resolved_base_url = base_url or project_config.openai_compat_base_url
+    resolved_model = model or project_config.provider.model
+    resolved_provider = provider_name or project_config.provider.name
     client = AsyncOpenAI(
         api_key=api_key,
-        base_url=project_config.openai_compat_base_url,
+        base_url=resolved_base_url,
         timeout=project_config.provider.timeout_seconds,
         max_retries=project_config.provider.max_retries,
         http_client=http_client,
     )
     backend = OpenAICompatibleBackendV2(
-        model=project_config.provider.model,
+        model=resolved_model,
         client=client,
         structured_output=project_config.runtime.structured_output,
     )
@@ -1169,15 +1186,15 @@ def create_live_adapter(
     ledger = d4.LogicalCallLedger()
     counted = d4.CountingBackend(
         delegate=backend,
-        provider=project_config.provider.name,
-        model=project_config.provider.model,
+        provider=resolved_provider,
+        model=resolved_model,
         calls=calls,
         ledger=ledger,
     )
     session = d4.build_notebook_session(
         backend=counted,
-        provider=project_config.provider.name,
-        model=project_config.provider.model,
+        provider=resolved_provider,
+        model=resolved_model,
         server_root=repo_root,
         credential_source="configured",
         timeout=project_config.provider.timeout_seconds,
@@ -1326,6 +1343,8 @@ def _bounded_turn_row(
     execution_index: int,
     call_count: int,
     physical_attempt_count: int,
+    provider: str = EXPECTED_PROVIDER,
+    model: str = EXPECTED_MODEL,
 ) -> dict[str, Any]:
     """Project one D4 actual/grade pair into redacted D5 evidence."""
     verifier = grade.get("verifier_requirements", [])
@@ -1349,8 +1368,8 @@ def _bounded_turn_row(
         "rendered": actual.get("rendered") is True,
         "logical_generation_calls": call_count,
         "physical_attempts": physical_attempt_count,
-        "provider": EXPECTED_PROVIDER,
-        "model": EXPECTED_MODEL,
+        "provider": provider,
+        "model": model,
     }
 
 
@@ -1463,6 +1482,7 @@ class D5CampaignRunner:
             provenance=self.provenance,
             readiness=self.readiness.projection,
             live=self.readiness.live,
+            endpoint_call_count=len(self.readiness.endpoint_calls),
         )
         custody.require_physical_observer = bool(
             getattr(adapter, "observes_physical_attempts", False)
@@ -1503,6 +1523,8 @@ class D5CampaignRunner:
                     execution_index=execution_index,
                     call_count=calls,
                     physical_attempt_count=custody.ledger.physical_attempts - physical_cursor,
+                    provider=self.authorization.provider,
+                    model=self.authorization.model,
                 )
                 row["duration_seconds"] = round(time.perf_counter() - started, 6)
                 row["authorization_id"] = self.authorization.authorization_id
