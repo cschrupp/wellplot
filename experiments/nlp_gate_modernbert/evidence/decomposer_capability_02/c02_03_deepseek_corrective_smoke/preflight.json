@@ -1,0 +1,99 @@
+{
+  "OPENROUTER_API_KEY_PRESENT": true,
+  "allow_fallbacks": false,
+  "authority": "WP-DC02-03-DEEPSEEK-CORRECTIVE-SMOKE-AUTH-001",
+  "budgets": {
+    "logical_calls_authorized": 1,
+    "transport_attempts_authorized": 2
+  },
+  "cases_2_through_6_authorized": false,
+  "decomposer_input_sha256": "91622db600dd94d48881adbdad694188bb34c4117f6f9ee9f9ce557cfd70ac4f",
+  "evidence_destination": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_03_deepseek_corrective_smoke",
+  "expected_prompt_system_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+  "expected_prompt_user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+  "gemini_retest_authorized": false,
+  "include_reasoning": false,
+  "live_morph_rate_archive": {
+    "billable_inference_calls": 0,
+    "morph_endpoint_count": 1,
+    "note": "Catalog/endpoints GET only; not a chat completion.",
+    "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+    "pinned_provider": "Morph",
+    "preferred_tag": "morph/fp8",
+    "selected_endpoint": {
+      "completion_usd_per_1m_tokens": 0.6,
+      "max_completion_tokens": 943718,
+      "pricing": {
+        "completion": "0.0000006",
+        "discount": 0,
+        "input_cache_read": "0.000000008",
+        "prompt": "0.00000005"
+      },
+      "prompt_usd_per_1m_tokens": 0.049999999999999996,
+      "provider_name": "Morph",
+      "quantization": "fp8",
+      "supported_parameters": [
+        "reasoning",
+        "include_reasoning",
+        "max_tokens",
+        "temperature",
+        "stop",
+        "top_p",
+        "top_k",
+        "min_p",
+        "frequency_penalty",
+        "presence_penalty",
+        "repetition_penalty",
+        "seed",
+        "logit_bias",
+        "tools",
+        "tool_choice",
+        "structured_outputs",
+        "response_format",
+        "reasoning_effort"
+      ],
+      "tag": "morph/fp8"
+    },
+    "snapshot_kind": "live_openrouter_endpoints_preflight",
+    "snapshot_utc": "2026-10-19T23:26:35.511952+00:00"
+  },
+  "live_morph_rate_card": {
+    "billable_inference_calls": 0,
+    "catalog_completion_usd_per_1m": null,
+    "catalog_prompt_usd_per_1m": null,
+    "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+    "pinned_provider": "Morph",
+    "rate": {
+      "completion_usd_per_1m": 0.6,
+      "prompt_usd_per_1m": 0.049999999999999996,
+      "provider_name": "Morph",
+      "tag": "morph/fp8"
+    },
+    "snapshot_utc": "2026-10-19T23:26:35.511952+00:00",
+    "source_path": "live_openrouter_endpoints:deepseek/deepseek-v4.1-flash-1017"
+  },
+  "max_tokens": 4096,
+  "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+  "oracle_cleaned_program_sha256": "9181ee1d1d414870b59ca4d4946b3f0c0607d1d8e19388e099711e7cd15a164d",
+  "oracle_frozen_candidate_sha256": "54b7045da274250bc971588282bb5e441b74e96ca250ea76a699ea2e46b514bb",
+  "oracle_ref_file_sha256": "c2964381b0cd50bff503fa6d51d8cf994e9ad071f3c2462648c992adfeb7cdf2",
+  "original_joint_smoke_deepseek_immutable": true,
+  "parent_is_ancestor_or_equal": true,
+  "parent_sha": "f0459470e448bf06525024d6141822e7859057b7",
+  "preflight_utc": "2026-10-19T23:26:35.512063+00:00",
+  "prompt_match": true,
+  "prompt_system_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+  "prompt_user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+  "provider_order": [
+    "Morph"
+  ],
+  "reasoning": {
+    "effort": "low"
+  },
+  "response_format": {
+    "type": "json_object"
+  },
+  "smoke_case_id": "D5GAP-0085",
+  "starting_head": "f0459470e448bf06525024d6141822e7859057b7",
+  "temperature": 0.0
+}

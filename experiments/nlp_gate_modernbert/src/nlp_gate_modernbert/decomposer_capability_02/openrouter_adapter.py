@@ -62,6 +62,7 @@ class OpenRouterAdapter:
         max_tokens: int = 1024,
         request_json_object: bool = True,
         include_reasoning: bool = False,
+        reasoning: dict[str, Any] | None = None,
         provider_order: list[str] | None = None,
         allow_fallbacks: bool = False,
         max_transport_attempts_per_logical_call: int = 2,
@@ -79,6 +80,7 @@ class OpenRouterAdapter:
         self.max_tokens = max_tokens
         self.request_json_object = request_json_object
         self.include_reasoning = include_reasoning
+        self.reasoning = dict(reasoning) if reasoning is not None else None
         self.provider_order = list(provider_order or [])
         self.allow_fallbacks = allow_fallbacks
         self.max_transport_attempts_per_logical_call = max_transport_attempts_per_logical_call
@@ -99,11 +101,12 @@ class OpenRouterAdapter:
             "messages": messages,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
+            "include_reasoning": bool(self.include_reasoning),
         }
         if self.request_json_object:
             body["response_format"] = {"type": "json_object"}
-        if self.include_reasoning:
-            body["include_reasoning"] = True
+        if self.reasoning is not None:
+            body["reasoning"] = dict(self.reasoning)
         if self.provider_order:
             body["provider"] = {
                 "order": list(self.provider_order),

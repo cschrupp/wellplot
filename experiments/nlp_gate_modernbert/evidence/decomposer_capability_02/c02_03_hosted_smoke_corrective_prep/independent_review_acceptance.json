@@ -1,0 +1,9 @@
+{
+  "accepted_tip": "f0459470e448bf06525024d6141822e7859057b7",
+  "additional_inference_authorized_by_this_review": false,
+  "execution_status": "CLOSED_ACCEPTED",
+  "follow_up_authority": "WP-DC02-03-DEEPSEEK-CORRECTIVE-SMOKE-AUTH-001",
+  "review_authority": "WP-DC02-03-HOSTED-SMOKE-CORRECTIVE-PREP-REVIEW-ACCEPT-001",
+  "review_disposition": "ACCEPTED_PREP_CLOSED",
+  "slice": "C02-03-HOSTED-SMOKE-CORRECTIVE-PREP"
+}

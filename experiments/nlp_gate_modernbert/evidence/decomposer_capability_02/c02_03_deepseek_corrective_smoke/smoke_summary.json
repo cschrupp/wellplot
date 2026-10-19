@@ -1,0 +1,99 @@
+{
+  "arm": {
+    "arm": "deepseek_corrective",
+    "authority": "WP-DC02-03-DEEPSEEK-CORRECTIVE-SMOKE-AUTH-001",
+    "case_id": "D5GAP-0085",
+    "completion_tokens": 1329,
+    "dual_cost": {
+      "accounting_rule": "Use provider_reported_usd as the observed charge for cost-effectiveness. Retain estimated_usd_from_pre_run_cost_card for comparison only. Do not overwrite historical smoke rows.",
+      "cost_card_rates_usd_per_1m": {
+        "completion": 0.6,
+        "prompt": 0.049999999999999996,
+        "provider": "Morph",
+        "tag": "morph/fp8"
+      },
+      "estimated_usd_from_pre_run_cost_card": 0.00082615,
+      "provider_reported_usd": 0.00082615,
+      "reported_over_estimate_ratio": 1.0
+    },
+    "error": null,
+    "estimated_usd_from_live_rate_card": 0.00082615,
+    "failure_labels": [
+      "DECOMPOSITION_SCHEMA_INVALID"
+    ],
+    "final_answer_sha256": "a42e670df0de46b0b363c93961e54167f9f0807d1f351d4c5440f050d343ee85",
+    "finish_reason": "stop",
+    "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+    "generation_id": "gen-1792452396-LpuxmjlCoJ1f4idfT2oD",
+    "include_reasoning": false,
+    "latency_seconds": 8.395442895998713,
+    "model_path": "deepseek-v4.1-flash-1017",
+    "observed_provider": "Morph",
+    "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+    "operational_smoke_pass": true,
+    "original_joint_smoke_retained_immutable": true,
+    "prompt_tokens": 575,
+    "provider_reported_usd": 0.00082615,
+    "raw_output_sha256": "9f80459b79766b1f498157de2324239e006077d31de4bea9cb164b280bc532fb",
+    "raw_usage": {
+      "completion_tokens": 1329,
+      "completion_tokens_details": {
+        "audio_tokens": 0,
+        "image_tokens": 0,
+        "reasoning_tokens": 1240
+      },
+      "cost": 0.00082615,
+      "cost_details": {
+        "upstream_inference_completions_cost": 0.0007974,
+        "upstream_inference_cost": 0.00082615,
+        "upstream_inference_prompt_cost": 2.875e-05
+      },
+      "is_byok": false,
+      "prompt_tokens": 575,
+      "prompt_tokens_details": {
+        "audio_tokens": 0,
+        "cache_write_tokens": 0,
+        "cached_tokens": 0,
+        "video_tokens": 0
+      },
+      "total_tokens": 1904
+    },
+    "reached_freeze": false,
+    "reasoning_tokens": 1240,
+    "request_max_tokens": 4096,
+    "request_reasoning": {
+      "effort": "low"
+    },
+    "requested_provider_order": [
+      "Morph"
+    ],
+    "schema_valid": false,
+    "semantic_equivalent": false,
+    "semantic_layer1_completed": false,
+    "total_tokens": 1904,
+    "transport_attempts": 1
+  },
+  "authority": "WP-DC02-03-DEEPSEEK-CORRECTIVE-SMOKE-AUTH-001",
+  "cases_2_through_6_executed": false,
+  "completed_utc": "2026-10-19T23:26:43.910104+00:00",
+  "completion_tokens": 1329,
+  "error": null,
+  "estimated_usd_from_live_rate_card": 0.00082615,
+  "finish_reason": "stop",
+  "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+  "gemini_retest_executed": false,
+  "logical_calls": 1,
+  "observed_provider": "Morph",
+  "operational_smoke_pass": true,
+  "original_joint_smoke_retained_immutable": true,
+  "parent_sha": "f0459470e448bf06525024d6141822e7859057b7",
+  "prompt_tokens": 575,
+  "provider_reported_usd": 0.00082615,
+  "reasoning_tokens": 1240,
+  "schema_valid": false,
+  "semantic_equivalent": false,
+  "semantic_layer1_completed": false,
+  "smoke_case_id": "D5GAP-0085",
+  "status": "STOP_FOR_INDEPENDENT_CORRECTIVE_SMOKE_REVIEW",
+  "transport_attempts": 1
+}
