@@ -220,9 +220,14 @@ These decisions govern the experimental NLP runtime unless explicitly revised.
 - The hard-constraint engine selected by the accepted bakeoff is **XGrammar 0.2.8 / native EBNF**.
 - llguidance 1.9.1 is rejected for this accepted grammar because matcher construction exceeds its
   u16 grammar-symbol-table bound; the accepted grammar is not weakened to accommodate it.
-- The next technical step is a selected-backend constrained-decoding preflight using XGrammar,
-  the immutable accepted grammar, and the pinned Qwen tokenizer with model calls remaining zero.
-- Engine acceptance does not itself authorize model inference or `PILOT-01`.
+- The selected-backend constrained-decoding preflight is now Human/SOL accepted and closed as
+  `DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R2` with P1–P9 PASS.
+- The accepted preflight freezes the exact pilot infrastructure: accepted WELL-EBNF-1 → XGrammar
+  0.2.8 native EBNF → pinned Qwen3-1.7B tokenizer → frozen HF hard-mask adapter.
+- The preflight executed zero model calls, loaded no model weights, and independently exercised
+  fail-closed model-load/invocation/generate/download guards.
+- The next scientific slice is the frozen six-call `DECOMPOSER-PILOT-01`, but it remains
+  unauthorized until a separate explicit pilot authority is issued.
 
 ## Agentic Development Operating Decisions (2026-10-18)
 
@@ -257,6 +262,13 @@ Operational rules:
 - treat implementation reports as handoffs, not proof
 - keep accepted design, observed evidence, acceptance, and downstream authorization as distinct
   states
+
+- Once SOL acceptance exists and the Human explicitly states acceptance/closure in the same
+  conversation, record the durable closure artifacts automatically. Do not ask for another
+  confirmation merely to perform acceptance bookkeeping.
+- Human acceptance of an upstream slice authorizes closure bookkeeping for that slice only. It does
+  not implicitly authorize the next governed slice; downstream execution still requires whatever
+  explicit authority its contract requires.
 
 ## Revision Rule
 
