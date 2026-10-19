@@ -226,8 +226,12 @@ These decisions govern the experimental NLP runtime unless explicitly revised.
   0.2.8 native EBNF → pinned Qwen3-1.7B tokenizer → frozen HF hard-mask adapter.
 - The preflight executed zero model calls, loaded no model weights, and independently exercised
   fail-closed model-load/invocation/generate/download guards.
-- The next scientific slice is the frozen six-call `DECOMPOSER-PILOT-01`, but it remains
-  unauthorized until a separate explicit pilot authority is issued.
+- The frozen six-call `DECOMPOSER-PILOT-01` is now explicitly Human-authorized under
+  `WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-01-AUTH-001`.
+- That authority permits exactly one constrained generation attempt for each of the six frozen
+  cases, in frozen order, using the accepted local Qwen3-1.7B / XGrammar path; retries, repair,
+  downloads, model substitution, and broader follow-up experiments remain forbidden.
+- The pilot must stop after publishing immutable run evidence for independent scientific review.
 
 ## Agentic Development Operating Decisions (2026-10-18)
 
