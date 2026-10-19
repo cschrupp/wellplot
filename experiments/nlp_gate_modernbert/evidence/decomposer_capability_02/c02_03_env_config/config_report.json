@@ -20,5 +20,6 @@
     "env_var"
   ],
   "setup_doc": "experiments/nlp_gate_modernbert/ENV_SETUP.md",
-  "slice": "C02-03-ENV-CONFIG"
+  "slice": "C02-03-ENV-CONFIG",
+  "tip_sha": "d56e8e74662fc910ed1f224f5231ff6ec853e749"
 }
