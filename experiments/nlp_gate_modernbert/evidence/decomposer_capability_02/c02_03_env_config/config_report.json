@@ -2,6 +2,7 @@
   "OPENROUTER_API_KEY_PRESENT": false,
   "authority": "WP-DC02-03-ENV-CONFIG-AUTH-001",
   "billable_openrouter_calls": 0,
+  "candidate_sha": "4a2124ee1410e68a3e0d475ada9da5e81755a657",
   "dotenv_autoload": true,
   "dotenv_override_explicit_env": false,
   "env_example_path": "experiments/nlp_gate_modernbert/.env.example",

@@ -16,7 +16,7 @@
     "execution_status": "CLOSED_ACCEPTED_WITH_ENV_FOLLOW_UP",
     "inference_authorized": false
   },
-  "candidate_sha": "d2951ad06ef3a8568f4d893e3f5f9ae3931b1a54",
+  "candidate_sha": "4a2124ee1410e68a3e0d475ada9da5e81755a657",
   "inference_authorized": false,
   "live_scientific_execution_readiness": "NOT_ESTABLISHED",
   "model_calls_authorized": 0,
