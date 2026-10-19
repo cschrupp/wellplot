@@ -10,6 +10,7 @@
     "D5GAP-0101",
     "SEED-cm-9643c020e2e02463"
   ],
+  "correction_candidate_sha": "96bbbbf7f6105f03ef9fc559d506e40cb364a5e2",
   "decision": "INCONCLUSIVE",
   "evidence_corrections": [
     {
@@ -81,6 +82,7 @@
   "model_load_seconds": 2.6265333139745053,
   "model_loads": 1,
   "model_weights_loaded": true,
+  "original_run_candidate_sha": "32edc35af3824b7f62e60c6d8fa572051e135580",
   "per_case_status": [
     {
       "case_id": "D5GAP-0085",
