@@ -17,6 +17,10 @@ from nlp_gate_modernbert.decomposer_capability_02.openrouter_adapter import (
 # C02-03 design: preferred Google AI Studio; no silent fallback.
 GEMINI_PROVIDER_ORDER = ("Google AI Studio",)
 
+# Joint smoke: freeze Morph from C02-02 DeepSeek endpoint snapshot
+# (response_format + structured_outputs; no silent fallback).
+DEEPSEEK_PROVIDER_ORDER = ("Morph",)
+
 # Verified via OpenRouter public catalog GET /api/v1/models (not inference).
 OPENROUTER_GEMINI_4_ARGON = "google/gemini-4-argon"
 OPENROUTER_DEEPSEEK_V41_FLASH_1017 = "deepseek/deepseek-v4.1-flash-1017"
@@ -142,6 +146,32 @@ def build_gemini_ceiling_prep_adapter(
     return OpenRouterAdapter(
         model_path=ModelPathId.GEMINI_4_ARGON,
         openrouter_model_id=OPENROUTER_GEMINI_4_ARGON,
+        budgets=budgets,
+        transport=transport,
+        include_reasoning=False,
+        provider_order=list(provider_order),
+        allow_fallbacks=False,
+        require_provider_pin=True,
+        max_transport_attempts_per_logical_call=2,
+        cost_card=card,
+    )
+
+
+def build_deepseek_budget_adapter(
+    *,
+    budgets: ExecutionBudgets,
+    transport,
+    cost_card: CostCard | None = None,
+    provider_order: tuple[str, ...] = DEEPSEEK_PROVIDER_ORDER,
+) -> OpenRouterAdapter:
+    """Pinned DeepSeek V4.1 Flash adapter (budget reference)."""
+    card = cost_card or load_cost_card(
+        openrouter_model_id=OPENROUTER_DEEPSEEK_V41_FLASH_1017,
+        pinned_provider=provider_order[0],
+    )
+    return OpenRouterAdapter(
+        model_path=ModelPathId.DEEPSEEK_V41_FLASH_1017,
+        openrouter_model_id=OPENROUTER_DEEPSEEK_V41_FLASH_1017,
         budgets=budgets,
         transport=transport,
         include_reasoning=False,

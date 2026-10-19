@@ -1,0 +1,25 @@
+{
+  "max_tokens": 1024,
+  "messages": [
+    {
+      "content": "You are a WELL-IR decomposer. Translate one user request plus a projected workspace into exactly one ScopeNormalizedProgram as JSON.\n\nOutput rules:\n- JSON only; no prose, markdown, explanation, confidence, or repair notes.\n- Conform to the frozen ScopeNormalizedProgram schema provided by constrained decoding.\n- Preserve explicit user semantics; do not invent workspace entities or unsupported operations.\n- Supported operations include CREATE_TRACK, PLACE_CURVE, CONFIGURE_CURVE_DISPLAY, DEFINE_FILL, and other schema-enumerated operations.\n- Use local_ref to refer to entities created earlier in the same program when later tasks must bind to them.\n- Use depends_on only for genuine semantic dependency required by the utterance; do not invent ordering.\n\nDo not include case identifiers, fixture identifiers, evaluation labels, expected task counts, or oracle-derived guidance.\n",
+      "role": "system"
+    },
+    {
+      "content": "Utterance:\nMake both CBL views use 0\u2013100, then fill between them in blue.\n\nProjected workspace (JSON):\n{\"curves\":[{\"aliases\":[\"cbl\",\"curve 1\",\"cement bond\",\"cbl amplitude wide\",\"amplitude\",\"wide\"],\"channel\":\"CBL\",\"handle\":\"curve-1\",\"id\":\"curve-1\",\"label\":\"CBL Amplitude wide\",\"scale_kind\":\"linear\",\"scale_max\":100.0,\"scale_min\":0.0,\"scale_reverse\":false,\"track_ref\":1},{\"aliases\":[\"cbl\",\"curve 2\",\"cement bond\",\"cbl amplitude narrow\",\"amplitude\",\"narrow\"],\"channel\":\"CBL\",\"handle\":\"curve-2\",\"id\":\"curve-2\",\"label\":\"CBL Amplitude narrow\",\"scale_kind\":\"linear\",\"scale_max\":10.0,\"scale_min\":0.0,\"scale_reverse\":false,\"track_ref\":1},{\"aliases\":[\"gr\",\"curve 3\",\"gamma\",\"gamma ray\",\"gr\"],\"channel\":\"GR\",\"handle\":\"curve-3\",\"id\":\"curve-3\",\"label\":\"GR\",\"scale_kind\":\"linear\",\"scale_max\":150.0,\"scale_min\":0.0,\"scale_reverse\":false,\"track_ref\":2}],\"depth_unit\":\"ft\",\"fills\":[],\"supported_depth_units\":[\"m\",\"ft\"],\"tracks\":[{\"curves\":[\"curve-1\",\"curve-2\"],\"id\":\"cbl\",\"ref\":1,\"title\":\"CBL\"},{\"curves\":[\"curve-3\"],\"id\":\"gr\",\"ref\":2,\"title\":\"Gamma Ray\"}]}\n",
+      "role": "user"
+    }
+  ],
+  "model": "deepseek/deepseek-v4.1-flash-1017",
+  "provider": {
+    "allow_fallbacks": false,
+    "order": [
+      "Morph"
+    ],
+    "require_parameters": true
+  },
+  "response_format": {
+    "type": "json_object"
+  },
+  "temperature": 0.0
+}
