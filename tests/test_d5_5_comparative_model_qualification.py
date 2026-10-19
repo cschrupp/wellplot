@@ -9,7 +9,6 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-import httpx
 import pytest
 from scripts import d5_5_comparative_model_qualification as d5_5
 from scripts import nlp_d4_live_acceptance as d4
@@ -28,18 +27,6 @@ from tests.test_nlp_d5_live_semantic_qualification import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-
-
-def _bounded_generation_handler(
-    requests: list[httpx.Request],
-) -> Callable[[httpx.Request], Any]:
-    """Return one immediate malformed completion without provider retry backoff."""
-
-    async def handler(request: httpx.Request) -> httpx.Response:
-        requests.append(request)
-        return httpx.Response(200, json={}, request=request)
-
-    return handler
 
 
 def _run_revision_with_count(
@@ -293,8 +280,6 @@ def test_execute_live_lane_runs_static_readiness_adapter_and_shared_runner_provi
     tmp_path: Path,
 ) -> None:
     """The exact live entrypoint is exercised with only injected transports."""
-    import httpx
-
     config = d5_5.load_project_config(REPO_ROOT)
     current = d5_5._git(REPO_ROOT, "rev-parse", "HEAD")
     for lane in d5_5.lane_configurations(config):
@@ -344,22 +329,6 @@ def test_execute_live_lane_runs_static_readiness_adapter_and_shared_runner_provi
                 }
             return {"data": [{"id": lane.model}]}
 
-        clients: list[httpx.AsyncClient] = []
-        generation_requests: list[httpx.Request] = []
-
-        def client_factory(
-            observer: Callable[[object], Any],
-            *,
-            clients: list[httpx.AsyncClient] = clients,
-            generation_requests: list[httpx.Request] = generation_requests,
-        ) -> httpx.AsyncClient:
-            client = httpx.AsyncClient(
-                    transport=httpx.MockTransport(_bounded_generation_handler(generation_requests)),
-                event_hooks={"request": [observer]},
-            )
-            clients.append(client)
-            return client
-
         def static_checker(
             repo_root: Path,
             checked_lane: d5_5.ComparativeLane,
@@ -376,6 +345,18 @@ def test_execute_live_lane_runs_static_readiness_adapter_and_shared_runner_provi
                 expected_artifact_root=artifact_root,
             )
 
+        constructed: list[str] = []
+
+        def live_adapter_factory(
+            token: str,
+            *,
+            lane: d5_5.ComparativeLane = lane,
+            constructed: list[str] = constructed,
+        ) -> object:
+            assert token == "provider-free-token"
+            constructed.append(lane.lane_id)
+            return d5_5._ProviderFreeBoundaryAdapter(lane)
+
         result = d5_5.execute_live_lane(
             repo_root=REPO_ROOT,
             lane=lane,
@@ -383,7 +364,7 @@ def test_execute_live_lane_runs_static_readiness_adapter_and_shared_runner_provi
             endpoint_get=endpoint_get,
             api_key_loader=lambda: "provider-free-token",
             static_checker=static_checker,
-            http_client_factory=client_factory,
+            live_adapter_factory=live_adapter_factory,
         )
         sequence.append("runner")
         assert result["static_preflight"]["status"] == "PASS"
@@ -391,13 +372,12 @@ def test_execute_live_lane_runs_static_readiness_adapter_and_shared_runner_provi
         assert result["result"]["completed_turns"] == 0
         assert readiness_calls
         assert sequence == ["static", "runner"]
-        assert len(generation_requests) >= 1
+        assert constructed == [lane.lane_id]
+        assert result["result"]["logical_generation_calls"] == 1
         assert result["result"]["terminal"]["decision"] == "INCONCLUSIVE"
         assert result["readiness"]["model_catalog"] == [lane.model]
         if lane.lane_id == "luna":
             assert config.props_url not in readiness_calls
-        for client in clients:
-            asyncio.run(client.aclose())
 
 
 def test_lane_custody_and_call_caps_are_independent_and_fail_closed(tmp_path: Path) -> None:

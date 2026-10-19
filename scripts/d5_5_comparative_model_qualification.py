@@ -668,6 +668,7 @@ def execute_live_lane(
     static_checker: Callable[[Path, ComparativeLane, d5.D5Authorization], dict[str, object]]
     | None = None,
     http_client_factory: Callable[[Callable[[object], Any]], object] | None = None,
+    live_adapter_factory: Callable[[str], object] | None = None,
 ) -> dict[str, object]:
     """Execute one explicitly authorized lane through shared D5 custody."""
     config = load_project_config(repo_root)
@@ -683,6 +684,8 @@ def execute_live_lane(
     load_key = api_key_loader or (lambda: load_lane_api_key(repo_root, lane))
 
     def provider_factory(token: str) -> object:
+        if live_adapter_factory is not None:
+            return live_adapter_factory(token)
         return create_lane_live_adapter(
             repo_root=repo_root,
             artifact_root=artifact_root,
