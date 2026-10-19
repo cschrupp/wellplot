@@ -1,5 +1,6 @@
 {
   "authority": "WP-DC02-03-GEMINI-CEILING-DESIGN-AUTH-001",
+  "candidate_sha": "8225f5d8da629927bc240ac79177c3d75457d0ba",
   "cases": {
     "benchmark_id": "DECOMPOSER-PILOT-01-SIX-CASE-PROBE",
     "case_id_in_model_input": false,
@@ -109,7 +110,7 @@
   ],
   "live_provider_probing": false,
   "model": {
-    "alias_migration": "FORBIDDEN — pin exact id; do not accept silent alias swap",
+    "alias_migration": "FORBIDDEN \u2014 pin exact id; do not accept silent alias swap",
     "display_name": "Gemini 4 Argon",
     "include_reasoning": false,
     "max_tokens": 1024,
@@ -206,7 +207,7 @@
       "CEILING_PASS": "credible semantic competence on the six-case probe under disclosed decoding (strong evidence representation is tractable on these cases)",
       "INCONCLUSIVE": "Layer 0 incomplete or evidence cannot distinguish explanations",
       "PROTOCOL_DEFECT": "transport/accounting/decoding/evaluation contract invalidates scientific comparison",
-      "REPRESENTATION_SUSPECT": "semantic failures dominate after successful freezes; investigate representation/prompt/task — not automatic proof of defect"
+      "REPRESENTATION_SUSPECT": "semantic failures dominate after successful freezes; investigate representation/prompt/task \u2014 not automatic proof of defect"
     },
     "layer0": "reached_freeze / 6; decode/schema failures counted separately",
     "layer1": "semantically_equivalent among frozen and overall",
@@ -215,7 +216,7 @@
     "reuse_pilot_layers": true
   },
   "slice": "C02-03",
-  "slice_title": "Gemini 4 Argon frozen-protocol capability ceiling — DESIGN ONLY",
+  "slice_title": "Gemini 4 Argon frozen-protocol capability ceiling \u2014 DESIGN ONLY",
   "starting_sha": "2db64aa96549e96161ff8cb2e7df2f03c885be55",
   "token_cost_accounting": {
     "charge_attempted_calls_on_parse_or_freeze_failure": true,
