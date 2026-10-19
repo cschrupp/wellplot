@@ -1,0 +1,237 @@
+{
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-01-AUTH-001",
+  "slice": "DECOMPOSER-PILOT-01",
+  "mode": "FROZEN_SIX_CASE_MODEL_EXECUTION",
+  "human_authorized": true,
+  "starting_tip": "bad4ad33f1dd6f0c6976e8213012f66e16f19ea9",
+  "accepted_predecessors": {
+    "pilot_design": {
+      "slice": "DECOMPOSER-PILOT-DESIGN-01R",
+      "candidate": "1ad45677418cccdde7f7e432d8defc2fe2d28b3c",
+      "status": "ACCEPTED_CLOSED"
+    },
+    "eval_harness": {
+      "slice": "NL-PROGRAM-EVAL-HARNESS-01R2",
+      "candidate": "a2dce439a9bcaddeb91f02fc44b9ff77467b77c8",
+      "status": "ACCEPTED_CLOSED"
+    },
+    "cfg_generator": {
+      "candidate": "f3607ff9d0733712ecd86742496620e4aa77d9a4",
+      "grammar_sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
+      "status": "HUMAN_ACCEPTED_CLOSED"
+    },
+    "cfg_engine_bakeoff": {
+      "candidate": "d680a315b5cf11ef7c89c70cf6222dd1d62b9a84",
+      "selected_backend": "XGrammar 0.2.8 / native EBNF",
+      "status": "HUMAN_ACCEPTED_CLOSED"
+    },
+    "xgrammar_preflight": {
+      "slice": "DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R2",
+      "candidate": "8c5b5d0ca4f7588bc7b6f6b31ac9aba2d3abc9e0",
+      "tip": "ee337e02c4de285c2897f3fe071e2c575d4b33dd",
+      "remote_head": "d40d2e5510e4ec3181fc654f36c70f578b1e1fb5",
+      "status": "SOL_AND_HUMAN_ACCEPTED_CLOSED",
+      "gates": "P1-P9_PASS"
+    }
+  },
+  "scientific_question": "Under the frozen zero-shot prompt, workspace projection, accepted WELL-EBNF-1/XGrammar hard constraint, and no-repair policy, can Qwen/Qwen3-1.7B produce semantically equivalent ScopeNormalizedProgram outputs on the six frozen pilot cases?",
+  "model": {
+    "model_id": "Qwen/Qwen3-1.7B",
+    "variant": "instruction/non-Base checkpoint",
+    "source": "existing local ModelScope snapshot only",
+    "snapshot_path": "experiments/nlp_slm_01/artifacts/modelscope_cache/models/Qwen--Qwen3-1.7B/snapshots/master",
+    "snapshot_revision": "master",
+    "config_sha256": "1ddb5b89ebc90dcb417a45c213d818577e65976454d29385c8f6140771d95197",
+    "tokenizer_artifact_sha256": {
+      "tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+      "tokenizer_config.json": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+      "merges.txt": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+      "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    },
+    "weight_file_manifest": [
+      {
+        "path": "model-00001-of-00002.safetensors",
+        "size_bytes": 3441185608,
+        "sha256": "169ad53ec313c3a34b06c0809216e4fc072cce444a5d4ff2b59690d064130ed5"
+      },
+      {
+        "path": "model-00002-of-00002.safetensors",
+        "size_bytes": 622329984,
+        "sha256": "912becff8d60672aa8628ef08c05898d9adf17c2ad4ae3caf99b065622fdeff9"
+      }
+    ],
+    "aggregate_weight_manifest_sha256": "005d20550c04f4e246e5b434448786b44a0196b47d758d0acc77aba279e5bbc5",
+    "adapters": "NONE",
+    "auto_download": false,
+    "fallback_model": "NONE",
+    "model_loads_authorized": 1
+  },
+  "constraint": {
+    "source": "accepted WELL-EBNF-1 generated from frozen ClosedNormalizedProgram lineage",
+    "well_ebnf1_sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
+    "backend": "xgrammar",
+    "backend_version": "0.2.8",
+    "route": "native EBNF",
+    "native_grammar_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
+    "adapter_id": "pilot_xgrammar_transformers_hard_mask.v1",
+    "same_artifact_all_six": true,
+    "json_schema_route": "FORBIDDEN"
+  },
+  "prompt": {
+    "regime": "zero-shot",
+    "exemplars": 0,
+    "system_prompt_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+    "user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+    "chat_template_text_sha256": "e255510bc9a300c02dda23801a72e4c6a5736d5a995768cb44791f9651727b03",
+    "thinking_enabled": false,
+    "same_prompt_all_six": true,
+    "changes": "FORBIDDEN"
+  },
+  "workspace_serialization": {
+    "version": "decomposer_pilot_preflight_01.workspace_serialize.v1",
+    "implementation_sha256": "95514c73fc1a25c5c52d784a3c2126543dfd8845f8f21aabafd103642a152740",
+    "permitted_model_input": [
+      "utterance",
+      "ProjectedWorkspace"
+    ],
+    "forbidden_model_input": [
+      "case_id",
+      "fixture_id",
+      "oracle witness/program",
+      "accepted harness candidate fixtures",
+      "coverage atoms/checkers",
+      "expected outcomes",
+      "manifest labels",
+      "runtime traces",
+      "prior evaluation results",
+      "gold operations",
+      "representability annotations",
+      "failure taxonomy"
+    ],
+    "changes": "FORBIDDEN"
+  },
+  "inference": {
+    "version": "decomposer_pilot_preflight_01.inference.v1",
+    "inference_config_sha256": "6daab17278547241563d1bc6bec92fcdd882ed48c8de3e18db81e737c732b54b",
+    "max_new_tokens": 1024,
+    "seed": 20261016,
+    "temperature": 0,
+    "do_sample": false,
+    "thinking_enabled": false,
+    "adapters": "NONE",
+    "retries": 0,
+    "repair_passes": 0,
+    "self_critique": 0,
+    "best_of_n": 0,
+    "oracle_feedback": 0,
+    "cross_case_feedback": 0,
+    "runtime": {
+      "cuda_available": false,
+      "device": "cpu",
+      "dtype": "float32",
+      "torch_version": "2.14.1+cpu",
+      "device_policy": "cuda_if_available_else_cpu",
+      "dtype_policy": "float16_if_cuda_else_float32"
+    },
+    "runtime_rule": "The pilot must reproduce the accepted inference_config_sha256 exactly. A runtime/device/dtype/version mismatch stops before model inference; do not silently switch CPU/GPU or dtype."
+  },
+  "invocation_order": [
+    "D5GAP-0085",
+    "D5GAP-0089",
+    "D5GAP-0117",
+    "D5GAP-0096",
+    "D5GAP-0101",
+    "SEED-cm-9643c020e2e02463"
+  ],
+  "execution_authorized": [
+    "implement any minimal private experiment-only pilot runner needed to execute the already-frozen design",
+    "reverify every accepted preflight identity/hash and six-case pre-inference hash before model load",
+    "load the pinned local Qwen3-1.7B model weights exactly once after all pre-run gates pass",
+    "execute exactly one constrained generation attempt per frozen case, in the frozen order, for exactly six high-level decomposer inference calls total",
+    "use the accepted XGrammar 0.2.8 HF LogitsProcessor with the accepted native grammar",
+    "record generated token ids including termination metadata",
+    "derive payload token ids by excluding only framework/XGrammar-authorized terminal stop token ids; no content repair or normalization",
+    "decode payload token ids deterministically with cleanup disabled and persist exact UTF-8 output bytes plus SHA-256",
+    "freeze each completed candidate before any oracle access",
+    "evaluate only through the accepted NL-PROGRAM-EVAL-HARNESS-01R2 after candidate freeze",
+    "persist complete per-case evaluation results and mechanically compute the frozen Layer 0/1/2 summary and decision"
+  ],
+  "call_accounting": {
+    "high_level_model_calls_authorized": 6,
+    "exactly_one_generation_attempt_per_case": true,
+    "retries": 0,
+    "model_loads_authorized": 1,
+    "internal_forward_passes": "AUTHORIZED only as implementation detail of the six generation calls; record diagnostics if available but do not count them as additional decomposer calls",
+    "case_local_generation_failure": "Count the attempted generation as that case's sole call and record DECOMPOSITION_DECODE_FAILURE. Do not retry. Continue only if the same loaded model/runtime remains healthy and all frozen invariants still hold.",
+    "shared_infrastructure_failure": "STOP the run; do not reload/substitute/change runtime. Preserve partial evidence and mark run INCOMPLETE/INVALID_FOR_SCIENTIFIC_DECISION."
+  },
+  "pre_run_hard_gates": [
+    "accepted preflight closure exists and is HUMAN/SOL ACCEPTED",
+    "model/config/tokenizer/weight hashes match exactly",
+    "WELL-EBNF/native grammar/XGrammar/adapter identities match exactly",
+    "prompt and serializer hashes match exactly",
+    "inference_config_sha256 matches exactly, including CPU/float32/torch runtime fields",
+    "six pre-inference case hashes recompute exactly in frozen order",
+    "network/autodownload disabled",
+    "no oracle/gold data reachable by the model-input construction path"
+  ],
+  "per_case_protocol": [
+    "recompute and verify frozen DecomposerInput/workspace/utterance/rendered-model-input/constraint/inference hashes before the call",
+    "construct model input from utterance + ProjectedWorkspace only; case_id remains evaluator-side only",
+    "instantiate a fresh XGrammar HF LogitsProcessor for the case",
+    "perform one greedy generate invocation with the frozen configuration",
+    "record call index, case id, start/end/latency, input hashes, generated token ids, termination reason, completion state, raw payload bytes, raw payload sha256",
+    "if decode is complete, call freeze_candidate() before any oracle access",
+    "if frozen, evaluate through accepted harness and persist the complete EvaluationResult",
+    "if decode cannot produce a complete legal object, label DECOMPOSITION_DECODE_FAILURE without retry"
+  ],
+  "output_boundary": {
+    "raw_output_definition": "UTF-8 decode of generated payload token ids after removing only trailing authorized framework/XGrammar stop token ids; no whitespace trimming, JSON fixing, field insertion, semantic normalization, or other repair.",
+    "preserve_generated_token_ids": true,
+    "preserve_termination_metadata": true,
+    "freeze_before_oracle": true
+  },
+  "mechanical_summary": {
+    "layer0": "reached_freeze / 6; decode failures; schema-invalid failures",
+    "layer1": "semantically_equivalent / 6",
+    "layer2": "mechanism attribution + frozen Veto A/B using the accepted case/label map",
+    "decision_rules": [
+      "If Layer 0 != 6/6: INCONCLUSIVE (constraint/decode/infrastructure attribution; not a decomposer-family failure).",
+      "If Layer 0 = 6/6 and semantic equivalence = 6/6: STRONG PASS.",
+      "If Layer 0 = 6/6 and semantic equivalence >=5/6: CONTINUE FAMILY unless Layer-2 critical-mechanism veto fires.",
+      "If Layer 0 = 6/6 and semantic equivalence <=4/6: STOP / REDESIGN.",
+      "If >=5/6 but frozen critical-mechanism veto fires: STOP / REDESIGN."
+    ],
+    "no_manual_override": true
+  },
+  "required_evidence": [
+    "decomposer_pilot_01_authorization.json",
+    "decomposer_pilot_01_authorization.md",
+    "decomposer_pilot_01_run_manifest.json",
+    "decomposer_pilot_01_results.jsonl",
+    "decomposer_pilot_01_summary.json",
+    "decomposer_pilot_01.md"
+  ],
+  "forbidden": [
+    "network/model/tokenizer download",
+    "different model snapshot or model family",
+    "SLM-02/SLM-03 adapters or any fine-tuning adapter",
+    "prompt edits or exemplars",
+    "workspace serializer changes",
+    "schema/grammar/lowerer/backend/adapter changes",
+    "case-specific prompt or grammar specialization",
+    "retry, repair, self-critique, best-of-N, fallback decode",
+    "oracle/gold/expected-result material before candidate freeze",
+    "manual semantic scoring or decision override",
+    "production WellPlot changes",
+    "more than six high-level inference calls",
+    "rerunning a failed case"
+  ],
+  "result_policy": {
+    "completion": "A complete scientific run requires exactly six case attempts in frozen order with complete evidence, regardless of semantic success/failure.",
+    "stop_for_review": "After the run artifacts and immutable candidate/tip are published, STOP for independent scientific review.",
+    "no_automatic_followup": "Do not start broader heldout evaluation, fine-tuning, model comparison, production integration, or a rerun without a later authority."
+  },
+  "pilot_01": "AUTHORIZED",
+  "model_inference": "AUTHORIZED_WITHIN_THIS_EXACT_SIX_CALL_SCOPE"
+}
