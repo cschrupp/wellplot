@@ -1,5 +1,6 @@
 {
   "authority": "WP-DC02-03-JOINT-HOSTED-FULL-RUN-AUTH-001",
+  "candidate_sha": "54d3b96a29b3ee434265c30cce0ffcea89333893",
   "case_1_rerun": false,
   "completed_utc": "2026-10-19T23:34:52.178307+00:00",
   "decoding_limitation": "Hosted arms use response_format=json_object plus deterministic freeze_candidate. This is NOT equivalent to Pilot Run 1 XGrammar hard structural masking.",
