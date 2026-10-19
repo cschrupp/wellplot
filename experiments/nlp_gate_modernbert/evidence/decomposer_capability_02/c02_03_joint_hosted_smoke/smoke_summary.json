@@ -103,6 +103,7 @@
   ],
   "authority": "WP-DC02-03-JOINT-HOSTED-SMOKE-AUTH-001",
   "both_operational_pass": false,
+  "candidate_sha": "e00475f262987d2a9113809f708324d73c084d50",
   "cases_2_through_6_executed": false,
   "completed_utc": "2026-10-19T23:09:59.043258+00:00",
   "decoding_comparability": "NOT_XGRAMMAR_HARD_MASK",

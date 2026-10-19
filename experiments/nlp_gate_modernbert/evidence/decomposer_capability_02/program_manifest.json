@@ -25,7 +25,7 @@
     "execution_status": "EXECUTED_AWAITING_REVIEW",
     "logical_calls": 2
   },
-  "candidate_sha": "4a2124ee1410e68a3e0d475ada9da5e81755a657",
+  "candidate_sha": "e00475f262987d2a9113809f708324d73c084d50",
   "gemini_six_case_execution_authorized": false,
   "inference_authorized": false,
   "live_scientific_execution_readiness": "NOT_ESTABLISHED",
