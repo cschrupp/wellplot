@@ -1,4 +1,10 @@
 {
+  "c02_03": {
+    "authority": "WP-DC02-03-GEMINI-CEILING-DESIGN-AUTH-001",
+    "execution_status": "DESIGN_EXECUTED_AWAITING_REVIEW",
+    "inference_authorized": false,
+    "title": "Gemini 4 Argon frozen-protocol capability ceiling design"
+  },
   "candidate_sha": "0099508caccb039ee552a66506bf7364d240f861",
   "inference_authorized": false,
   "live_scientific_execution_readiness": "NOT_ESTABLISHED",
@@ -79,14 +85,16 @@
       "title": "Model/provider harness qualification"
     },
     "G0": {
+      "accepted_tip": "2db64aa96549e96161ff8cb2e7df2f03c885be55",
       "authority": "WP-DC02-G0-PHASE0-READINESS-REVIEW-AUTH-001",
       "decision_id": "WP-DC02-G0-READINESS-DECISION-001",
       "design_status": "FROZEN",
-      "execution_status": "EXECUTED_AWAITING_REVIEW",
+      "execution_status": "CLOSED_ACCEPTED",
       "title": "Phase 0 readiness review"
     }
   },
   "phase0_design_acceptance": "WP-DC02-PHASE0-DESIGN-ACCEPT-001",
+  "phase0_status": "CLOSED",
   "phase0_technical_readiness": "READY",
   "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
   "provisional_later_phases": "C02-03_through_C02-17_PROPOSED_NOT_FROZEN",

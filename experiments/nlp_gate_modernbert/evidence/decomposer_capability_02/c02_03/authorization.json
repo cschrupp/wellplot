@@ -1,0 +1,10 @@
+{
+  "authority": "WP-DC02-03-GEMINI-CEILING-DESIGN-AUTH-001",
+  "human_authorized": true,
+  "inference_authorized": false,
+  "mode": "DESIGN_ONLY",
+  "openrouter_calls_authorized": 0,
+  "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
+  "slice": "C02-03",
+  "starting_sha": "2db64aa96549e96161ff8cb2e7df2f03c885be55"
+}

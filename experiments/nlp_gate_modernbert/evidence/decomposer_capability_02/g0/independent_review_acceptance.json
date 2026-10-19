@@ -1,0 +1,13 @@
+{
+  "accepted_candidate": "0099508caccb039ee552a66506bf7364d240f861",
+  "accepted_tip": "2db64aa96549e96161ff8cb2e7df2f03c885be55",
+  "human_review": "ACCEPTED",
+  "live_scientific_execution_readiness": "NOT_ESTABLISHED",
+  "next_authorized": "WP-DC02-03-GEMINI-CEILING-DESIGN-AUTH-001",
+  "phase0_status": "CLOSED",
+  "phase0_technical_readiness": "READY",
+  "review_authority": "WP-DC02-G0-INDEPENDENT-REVIEW-ACCEPT-001",
+  "slice": "G0",
+  "sol_review": "ACCEPTED",
+  "status": "CLOSED"
+}
