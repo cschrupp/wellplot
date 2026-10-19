@@ -1,0 +1,67 @@
+{
+  "deferred": [
+    {
+      "metric": "rendered_model_input_sha256_live_reverification",
+      "reason": "requires tokenizer load; not complete",
+      "status": "DEFERRED"
+    },
+    {
+      "metric": "gemini_openrouter_endpoint_identity",
+      "reason": "C02-02 acceptance blocker",
+      "status": "DEFERRED"
+    },
+    {
+      "metric": "deepseek_provider_price_snapshot",
+      "reason": "C02-02 qualification",
+      "status": "DEFERRED"
+    },
+    {
+      "metric": "cost_effectiveness_per_dollar",
+      "reason": "requires authorized inference arms",
+      "status": "DEFERRED"
+    },
+    {
+      "metric": "diagnostic_and_sealed_set_scores",
+      "reason": "partitions designed but empty; dataset expansion not authorized in C02-01",
+      "status": "DEFERRED"
+    },
+    {
+      "metric": "quantitative_promotion_thresholds",
+      "reason": "Phase-0 narrow freeze excludes thresholds",
+      "status": "NOT_FROZEN"
+    }
+  ],
+  "reproducible_now": [
+    {
+      "evidence": "evaluate_raw_candidate(case, oracle_clean) == True for all six",
+      "metric": "oracle_self_semantic_equivalence",
+      "status": "REPRODUCIBLE"
+    },
+    {
+      "evidence": "existing harness tests + C02-01 unit tests",
+      "metric": "freeze_candidate_schema_gate",
+      "status": "REPRODUCIBLE"
+    },
+    {
+      "evidence": "FAILURE_LABELS frozen in compare.py; preserved in failure_taxonomy.json",
+      "metric": "semantic_failure_label_taxonomy",
+      "status": "REPRODUCIBLE"
+    },
+    {
+      "evidence": "C02-00 recovery + C02-01 benchmark_manifest cross-check",
+      "metric": "six_case_input_digests",
+      "status": "REPRODUCIBLE"
+    },
+    {
+      "evidence": "pilot_01.constants.MECHANISM_ATTRIBUTION",
+      "metric": "layer2_mechanism_attribution_map",
+      "status": "REPRODUCIBLE"
+    },
+    {
+      "evidence": "c02_00/case_archive/*/run1_output.json",
+      "metric": "run1_historical_scores",
+      "status": "REPRODUCIBLE_FROM_ARCHIVED_RESULTS"
+    }
+  ],
+  "slice": "C02-01"
+}

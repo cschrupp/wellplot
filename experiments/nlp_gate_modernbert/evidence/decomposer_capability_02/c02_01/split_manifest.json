@@ -1,0 +1,54 @@
+{
+  "dataset_expansion": "NOT_AUTHORIZED_IN_C02_01",
+  "leakage_rules": [
+    "zero semantic-group overlap across partitions when populated",
+    "historical_pilot_six never enters training",
+    "sealed_final never used for checkpoint selection or prompt repair",
+    "DeepSeek/Gemini teacher proposals require deterministic validation before any future corpus admission"
+  ],
+  "partitions": {
+    "development_diagnostic": {
+      "case_ids": [],
+      "freeze_gate": "later design gate before population",
+      "proposed_size_range_not_frozen": "60-100",
+      "purpose": "failure classification and implementation checks",
+      "status": "DESIGNED_EMPTY"
+    },
+    "historical_pilot_six": {
+      "case_ids": [
+        "D5GAP-0085",
+        "D5GAP-0089",
+        "D5GAP-0117",
+        "D5GAP-0096",
+        "D5GAP-0101",
+        "SEED-cm-9643c020e2e02463"
+      ],
+      "overlap_with_other_partitions": "FORBIDDEN",
+      "purpose": "protocol replication / capability ceiling probe",
+      "status": "FROZEN"
+    },
+    "sealed_final": {
+      "case_ids": [],
+      "contamination_rule": "no sealed-test-derived training material",
+      "freeze_gate": "before sealed evaluation",
+      "proposed_size_range_not_frozen": "100-150",
+      "purpose": "final generalization comparison",
+      "status": "DESIGNED_EMPTY"
+    },
+    "training_corpus": {
+      "case_ids": [],
+      "freeze_gate": "C02-11",
+      "proposed_size_range_not_frozen": "300-500",
+      "purpose": "QLoRA adaptation (Phase 4 if justified)",
+      "status": "DESIGNED_EMPTY"
+    },
+    "validation": {
+      "case_ids": [],
+      "freeze_gate": "later design gate before population",
+      "proposed_size_range_not_frozen": "60-100",
+      "purpose": "checkpoint selection",
+      "status": "DESIGNED_EMPTY"
+    }
+  },
+  "slice": "C02-01"
+}

@@ -1,18 +1,68 @@
 {
   "candidate_sha": "3f42c9a2449f932ff4d4fd4abc2ba5ae0cca11e9",
   "model_calls_authorized": 0,
+  "model_inventory_amendment": "WP-DC02-MODEL-INVENTORY-AMEND-001",
+  "models": [
+    {
+      "display_name": "Gemini 4 Argon",
+      "id": "gemini-4-argon",
+      "openrouter_model_id": null,
+      "openrouter_model_id_status": "NOT_RESOLVED_REQUIRED_BEFORE_C02_02",
+      "provider": "OpenRouter",
+      "role": "frontier_capability_ceiling",
+      "training_eligible": false
+    },
+    {
+      "display_name": "Qwen3-4B-Instruct-2507",
+      "id": "qwen3-4b-instruct-2507",
+      "provider": "local",
+      "role": "local_candidate_A",
+      "training_eligible": true
+    },
+    {
+      "display_name": "Qwen3-4B-Thinking-2507",
+      "id": "qwen3-4b-thinking-2507",
+      "provider": "local",
+      "role": "local_candidate_B",
+      "training_eligible": true
+    },
+    {
+      "display_name": "DeepSeek V4.1 Flash 1017",
+      "id": "deepseek-v4.1-flash-1017",
+      "notes": [
+        "Not the frontier ceiling",
+        "Same semantic inputs and scoring contract as other models",
+        "Structured-output / JSON-schema enforcement may vary by provider; disclose differences",
+        "Cost-effectiveness metrics (correctness per dollar; cost per completely correct request including retries) planned for later phases"
+      ],
+      "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+      "provider": "OpenRouter",
+      "released": "2026-10-17",
+      "role": "budget_capability_reference",
+      "training_eligible": false
+    },
+    {
+      "baseline_experiment": "DECOMPOSER-PILOT-01 / RUN 1",
+      "display_name": "Qwen/Qwen3-1.7B",
+      "id": "qwen3-1.7b",
+      "provider": "local",
+      "role": "frozen_historical_baseline",
+      "training_eligible": false
+    }
+  ],
   "openrouter_calls_authorized": 0,
   "phase0": {
     "C02-00": {
+      "accepted_tip": "a8ced8a69ee8c65e0bf292a6952d77b6ef9e2392",
       "authority": "WP-DC02-00-BASELINE-RECOVERY-AUTH-001",
       "design_status": "FROZEN",
-      "execution_status": "EXECUTED_AWAITING_REVIEW",
+      "execution_status": "CLOSED_ACCEPTED",
       "title": "Experimental provenance and baseline recovery"
     },
     "C02-01": {
-      "authority": null,
+      "authority": "WP-DC02-01-BENCHMARK-ORACLE-AUTH-001",
       "design_status": "FROZEN_AS_PHASE0_INVENTORY",
-      "execution_status": "NOT_AUTHORIZED",
+      "execution_status": "EXECUTED_AWAITING_REVIEW",
       "title": "Frozen benchmark and semantic oracle"
     },
     "C02-02": {

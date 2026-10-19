@@ -1,0 +1,108 @@
+{
+  "case_id": "SEED-cm-9643c020e2e02463",
+  "cleaned_normalized_program": {
+    "tasks": [
+      {
+        "depends_on": [],
+        "produces_binds": {
+          "$track1": "track"
+        },
+        "request": {
+          "requested_operation": "CREATE_TRACK",
+          "track_title": "Petrophysics"
+        },
+        "task_id": "t1"
+      },
+      {
+        "depends_on": [
+          "t1"
+        ],
+        "produces_binds": {},
+        "request": {
+          "query": {
+            "kind": "curve",
+            "local_ref": null,
+            "text": "GR"
+          },
+          "requested_operation": "PLACE_CURVE",
+          "target": {
+            "kind": "track",
+            "local_ref": "$track1",
+            "text": null
+          }
+        },
+        "task_id": "t2"
+      },
+      {
+        "depends_on": [
+          "t2"
+        ],
+        "produces_binds": {},
+        "request": {
+          "query": {
+            "kind": "curve",
+            "local_ref": null,
+            "text": "GR"
+          },
+          "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+          "scale_bounds": {
+            "kind": "linear",
+            "maximum": 140.0,
+            "minimum": -10.0
+          }
+        },
+        "task_id": "t3"
+      },
+      {
+        "depends_on": [
+          "t3"
+        ],
+        "produces_binds": {},
+        "request": {
+          "query": {
+            "kind": "curve",
+            "local_ref": null,
+            "text": "RT"
+          },
+          "requested_operation": "PLACE_CURVE",
+          "target": {
+            "kind": "track",
+            "local_ref": "$track1",
+            "text": null
+          }
+        },
+        "task_id": "t4"
+      },
+      {
+        "depends_on": [
+          "t4"
+        ],
+        "produces_binds": {},
+        "request": {
+          "query": {
+            "kind": "curve",
+            "local_ref": null,
+            "text": "RT"
+          },
+          "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+          "scale_bounds": {
+            "kind": "log",
+            "maximum": 10000.0,
+            "minimum": 0.1
+          }
+        },
+        "task_id": "t5"
+      }
+    ],
+    "version": "scope-design-01r"
+  },
+  "cleaned_program_sha256": "f852de326e85d6f56ca2476e61e31844116b0d0f2759a36f5e3ceddd163f783c",
+  "frozen_candidate_sha256": "a95cc7cc10de71f896265883ddf7089c650a9f38500d94f5a5a726c5ad750693",
+  "oracle_witness_id": "SEED-cm-9643c020e2e02463",
+  "self_evaluation": {
+    "failure_labels": [],
+    "freeze_status": "FROZEN",
+    "semantically_equivalent": true
+  },
+  "witness_source": "experiments/nlp_gate_modernbert/evidence/scope_contract_design_01.json"
+}

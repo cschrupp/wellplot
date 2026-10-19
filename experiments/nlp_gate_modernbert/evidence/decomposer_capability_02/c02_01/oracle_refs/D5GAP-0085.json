@@ -1,0 +1,73 @@
+{
+  "case_id": "D5GAP-0085",
+  "cleaned_normalized_program": {
+    "tasks": [
+      {
+        "depends_on": [],
+        "produces_binds": {},
+        "request": {
+          "query": {
+            "kind": "curve",
+            "local_ref": null,
+            "text": "wide CBL"
+          },
+          "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+          "scale_bounds": {
+            "kind": "linear",
+            "maximum": 100.0,
+            "minimum": 0.0
+          }
+        },
+        "task_id": "t1"
+      },
+      {
+        "depends_on": [
+          "t1"
+        ],
+        "produces_binds": {},
+        "request": {
+          "query": {
+            "kind": "curve",
+            "local_ref": null,
+            "text": "narrow CBL"
+          },
+          "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+          "scale_bounds": {
+            "kind": "linear",
+            "maximum": 100.0,
+            "minimum": 0.0
+          }
+        },
+        "task_id": "t2"
+      },
+      {
+        "depends_on": [
+          "t2"
+        ],
+        "produces_binds": {},
+        "request": {
+          "fill": {
+            "mode": "BETWEEN_INSTANCES",
+            "predicate": {
+              "kind": "BETWEEN_CURVES",
+              "secondary_query": "second CBL"
+            },
+            "primary_query": "first CBL"
+          },
+          "requested_operation": "DEFINE_FILL"
+        },
+        "task_id": "t3"
+      }
+    ],
+    "version": "scope-design-01r"
+  },
+  "cleaned_program_sha256": "9181ee1d1d414870b59ca4d4946b3f0c0607d1d8e19388e099711e7cd15a164d",
+  "frozen_candidate_sha256": "54b7045da274250bc971588282bb5e441b74e96ca250ea76a699ea2e46b514bb",
+  "oracle_witness_id": "D5GAP-0085",
+  "self_evaluation": {
+    "failure_labels": [],
+    "freeze_status": "FROZEN",
+    "semantically_equivalent": true
+  },
+  "witness_source": "experiments/nlp_gate_modernbert/evidence/scope_contract_design_01.json"
+}

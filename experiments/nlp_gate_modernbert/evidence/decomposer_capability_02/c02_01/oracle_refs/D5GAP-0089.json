@@ -1,0 +1,53 @@
+{
+  "case_id": "D5GAP-0089",
+  "cleaned_normalized_program": {
+    "tasks": [
+      {
+        "depends_on": [],
+        "produces_binds": {},
+        "request": {
+          "query": {
+            "kind": "curve",
+            "local_ref": null,
+            "text": "narrow CBL"
+          },
+          "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+          "scale_bounds": {
+            "kind": "linear",
+            "maximum": 100.0,
+            "minimum": 0.0
+          }
+        },
+        "task_id": "t1"
+      },
+      {
+        "depends_on": [
+          "t1"
+        ],
+        "produces_binds": {},
+        "request": {
+          "fill": {
+            "mode": "BETWEEN_INSTANCES",
+            "predicate": {
+              "kind": "BETWEEN_CURVES",
+              "secondary_query": "second CBL"
+            },
+            "primary_query": "first CBL"
+          },
+          "requested_operation": "DEFINE_FILL"
+        },
+        "task_id": "t2"
+      }
+    ],
+    "version": "scope-design-01r"
+  },
+  "cleaned_program_sha256": "f766f41378bed40d6bd116312782200d61b9d83b5de1893da827185eb66fe374",
+  "frozen_candidate_sha256": "603b90832d0244bd6347dc87a259db3f637ef459c0ee42c771bef8a228515a7b",
+  "oracle_witness_id": "D5GAP-0089",
+  "self_evaluation": {
+    "failure_labels": [],
+    "freeze_status": "FROZEN",
+    "semantically_equivalent": true
+  },
+  "witness_source": "experiments/nlp_gate_modernbert/evidence/scope_contract_design_01.json"
+}

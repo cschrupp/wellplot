@@ -1,0 +1,92 @@
+{
+  "forbidden_scoring": [
+    "manual override",
+    "partial credit",
+    "looks semantically correct",
+    "accepting equivalent final state outside Q3",
+    "relabeling after inspection",
+    "changing expected outcome after model output",
+    "using Gemini or DeepSeek outputs as gold"
+  ],
+  "layer2_mechanism_attribution": {
+    "composition": {
+      "labels": [
+        "MISSING_TASK",
+        "SEMANTIC_OVERREACH",
+        "SEMANTIC_UNDERSPECIFICATION",
+        "WRONG_OPERATION"
+      ],
+      "only_on_cases": [
+        "D5GAP-0096",
+        "D5GAP-0101"
+      ]
+    },
+    "independent_order_handling": {
+      "labels": [
+        "WRONG_DEPENDENCY",
+        "WRONG_ORDER"
+      ],
+      "only_on_cases": [
+        "D5GAP-0096",
+        "D5GAP-0117"
+      ]
+    },
+    "local_binding": {
+      "labels": [
+        "WRONG_BINDING",
+        "WRONG_DEPENDENCY"
+      ],
+      "only_on_cases": [
+        "D5GAP-0096",
+        "D5GAP-0101"
+      ]
+    },
+    "reference_resolution": {
+      "labels": [
+        "MISSING_TASK",
+        "WRONG_BINDING",
+        "WRONG_OPERAND"
+      ],
+      "only_on_cases": [
+        "D5GAP-0085",
+        "D5GAP-0089"
+      ]
+    },
+    "required_ordering": {
+      "labels": [
+        "WRONG_ORDER"
+      ],
+      "only_on_cases": [
+        "D5GAP-0085",
+        "D5GAP-0089",
+        "SEED-cm-9643c020e2e02463"
+      ]
+    }
+  },
+  "preservation": "ACCEPTED_UNCHANGED_FROM_PILOT_DESIGN_AND_HARNESS",
+  "semantic_failure_labels": [
+    "MISSING_TASK",
+    "EXTRA_UNSUPPORTED_TASK",
+    "WRONG_OPERATION",
+    "WRONG_OPERAND",
+    "WRONG_ORDER",
+    "WRONG_DEPENDENCY",
+    "WRONG_BINDING",
+    "SEMANTIC_OVERREACH",
+    "SEMANTIC_UNDERSPECIFICATION",
+    "RUNTIME_TERMINAL_MISMATCH",
+    "COMPARATOR_SCOPE_UNSUPPORTED"
+  ],
+  "slice": "C02-01",
+  "source": "nlp_gate_modernbert.nl_program_eval.compare.FAILURE_LABELS + pilot Layer-0 structural classes",
+  "structural_failure_labels": [
+    {
+      "label": "DECOMPOSITION_DECODE_FAILURE",
+      "meaning": "constrained generation cannot produce a complete legal object (grammar exhaustion, max-token termination, backend failure)"
+    },
+    {
+      "label": "DECOMPOSITION_SCHEMA_INVALID",
+      "meaning": "object returned but freeze_candidate() rejects"
+    }
+  ]
+}
