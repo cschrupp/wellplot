@@ -176,7 +176,7 @@
   "slice": "DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R2",
   "starting_tip": "0905a6a7c05c97eee47fe10430cf7e418583eb7b",
   "terminal_state": "IMPLEMENTATION_COMPLETE_AWAITING_INDEPENDENT_REVIEW",
-  "tip_sha": "(pending SHA-record commit)",
+  "tip_sha": "ee337e02c4de285c2897f3fe071e2c575d4b33dd",
   "unauthorized_still": [
     "AutoModel/model_weight_load",
     "model_forward",
