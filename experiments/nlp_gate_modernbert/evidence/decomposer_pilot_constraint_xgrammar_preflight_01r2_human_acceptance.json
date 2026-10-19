@@ -1,0 +1,32 @@
+{
+  "slice": "DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R2",
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01-AUTH-001",
+  "sol_review": "ACCEPTED",
+  "human_review": "ACCEPTED",
+  "status": "CLOSED",
+  "accepted_candidate": "8c5b5d0ca4f7588bc7b6f6b31ac9aba2d3abc9e0",
+  "accepted_tip": "ee337e02c4de285c2897f3fe071e2c575d4b33dd",
+  "accepted_remote_head": "d40d2e5510e4ec3181fc654f36c70f578b1e1fb5",
+  "gates": {
+    "P1": "PASS",
+    "P2": "PASS",
+    "P3": "PASS",
+    "P4": "PASS",
+    "P5": "PASS",
+    "P6": "PASS",
+    "P7": "PASS",
+    "P8": "PASS",
+    "P9": "PASS"
+  },
+  "counters": {
+    "model_calls": 0,
+    "model_weights_loaded": false,
+    "model_forward_calls": 0,
+    "model_generate_calls": 0,
+    "auto_download": false
+  },
+  "selected_backend": "XGrammar 0.2.8 / native EBNF",
+  "infrastructure_readiness": "PASS",
+  "pilot_01": "NOT_AUTHORIZED",
+  "downstream_authority": "NONE"
+}
