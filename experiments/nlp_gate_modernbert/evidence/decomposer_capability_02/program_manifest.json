@@ -121,5 +121,5 @@
   "provisional_later_phases": "C02-03_through_C02-17_PROPOSED_NOT_FROZEN",
   "repository_home": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02",
   "reuse_note": "Reuse accepted nlp_gate_modernbert harness/grammar/eval; do not fork production WELL-IR runtime.",
-  "tip_sha": "d56e8e74662fc910ed1f224f5231ff6ec853e749"
+  "tip_sha": "328dc7116dcd9a76e0fca384ce8189dc21c86d22"
 }

@@ -115,5 +115,6 @@
   "parent_sha": "ab6fcd29f4545e0128afaefb2c1b032df8f30bc7",
   "smoke_case_id": "D5GAP-0085",
   "status": "STOP_FOR_INDEPENDENT_SMOKE_REVIEW",
+  "tip_sha": "328dc7116dcd9a76e0fca384ce8189dc21c86d22",
   "transport_attempts": 2
 }
