@@ -1,0 +1,127 @@
+{
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-01-AUTH-001",
+  "authority_remote_head": "9fbfb74cac97773519171a6b30fa6865e6201b8e",
+  "candidate_sha": "(pending commit)",
+  "case_order": [
+    "D5GAP-0085",
+    "D5GAP-0089",
+    "D5GAP-0117",
+    "D5GAP-0096",
+    "D5GAP-0101",
+    "SEED-cm-9643c020e2e02463"
+  ],
+  "decision": "INCONCLUSIVE",
+  "high_level_model_calls": 6,
+  "high_level_model_calls_authorized": 6,
+  "layer0": {
+    "decode_failures": 0,
+    "n": 6,
+    "reached_freeze": 5,
+    "schema_invalid_failures": 1
+  },
+  "layer1": {
+    "n": 6,
+    "semantically_equivalent": 0
+  },
+  "layer2": {
+    "critical_mechanism_veto": false,
+    "failed_probe_cases_by_mechanism": {
+      "composition": [
+        "D5GAP-0096"
+      ],
+      "independent_order_handling": [],
+      "local_binding": [
+        "D5GAP-0096"
+      ],
+      "reference_resolution": [
+        "D5GAP-0085"
+      ],
+      "required_ordering": [
+        "D5GAP-0085"
+      ]
+    },
+    "per_case_mechanisms": {
+      "D5GAP-0085": [
+        "reference_resolution",
+        "required_ordering"
+      ],
+      "D5GAP-0089": [],
+      "D5GAP-0096": [
+        "composition",
+        "local_binding"
+      ],
+      "D5GAP-0101": [],
+      "D5GAP-0117": [],
+      "SEED-cm-9643c020e2e02463": []
+    },
+    "veto_a": false,
+    "veto_a_mechanisms": [],
+    "veto_b": false,
+    "veto_b_mechanisms": []
+  },
+  "model_load_seconds": 2.6265333139745053,
+  "model_loads": 1,
+  "model_weights_loaded": true,
+  "per_case_status": [
+    {
+      "case_id": "D5GAP-0085",
+      "failure_labels": [
+        "MISSING_TASK",
+        "WRONG_ORDER"
+      ],
+      "latency_seconds": 6.586548493010923,
+      "reached_freeze": true,
+      "semantically_equivalent": false
+    },
+    {
+      "case_id": "D5GAP-0089",
+      "failure_labels": [
+        "RUNTIME_TERMINAL_MISMATCH"
+      ],
+      "latency_seconds": 79.16190488499706,
+      "reached_freeze": true,
+      "semantically_equivalent": false
+    },
+    {
+      "case_id": "D5GAP-0117",
+      "failure_labels": [
+        "RUNTIME_TERMINAL_MISMATCH"
+      ],
+      "latency_seconds": 95.853488216002,
+      "reached_freeze": true,
+      "semantically_equivalent": false
+    },
+    {
+      "case_id": "D5GAP-0096",
+      "failure_labels": [
+        "WRONG_BINDING",
+        "WRONG_OPERATION"
+      ],
+      "latency_seconds": 29.97277096399921,
+      "reached_freeze": true,
+      "semantically_equivalent": false
+    },
+    {
+      "case_id": "D5GAP-0101",
+      "failure_labels": [
+        "DECOMPOSITION_SCHEMA_INVALID"
+      ],
+      "latency_seconds": 314.5926402529876,
+      "reached_freeze": false,
+      "semantically_equivalent": false
+    },
+    {
+      "case_id": "SEED-cm-9643c020e2e02463",
+      "failure_labels": [
+        "RUNTIME_TERMINAL_MISMATCH"
+      ],
+      "latency_seconds": 35.11653508199379,
+      "reached_freeze": true,
+      "semantically_equivalent": false
+    }
+  ],
+  "slice": "DECOMPOSER-PILOT-01",
+  "starting_tip": "bad4ad33f1dd6f0c6976e8213012f66e16f19ea9",
+  "terminal_state": "RUN_COMPLETE_AWAITING_INDEPENDENT_SCIENTIFIC_REVIEW",
+  "tip_sha": "(pending SHA-record commit)"
+}

@@ -1,0 +1,61 @@
+# DECOMPOSER-PILOT-01 — Run closeout
+
+```
+SLICE:
+DECOMPOSER-PILOT-01
+
+AUTHORITY:
+WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-01-AUTH-001
+
+STARTING TIP:
+bad4ad33f1dd6f0c6976e8213012f66e16f19ea9
+
+AUTHORITY REMOTE HEAD:
+9fbfb74cac97773519171a6b30fa6865e6201b8e
+
+CANDIDATE SHA:
+(pending commit)
+
+TIP:
+(pending SHA-record commit)
+
+HIGH-LEVEL MODEL CALLS:
+6 / 6
+
+MODEL LOADS:
+1
+
+DECISION:
+INCONCLUSIVE
+```
+
+## Layer 0 / 1 / 2
+
+| Layer | Result |
+|-------|--------|
+| 0 reached_freeze | 5/6 |
+| 0 decode failures | 0 |
+| 0 schema-invalid | 1 |
+| 1 semantically_equivalent | 0/6 |
+| 2 veto A | False [] |
+| 2 veto B | False [] |
+
+## Per-case
+
+| Case | Freeze | Equivalent | Labels | Latency s |
+|------|--------|------------|--------|-----------|
+| D5GAP-0085 | FROZEN | False | MISSING_TASK,WRONG_ORDER | 6.586548493010923 |
+| D5GAP-0089 | FROZEN | False | RUNTIME_TERMINAL_MISMATCH | 79.16190488499706 |
+| D5GAP-0117 | FROZEN | False | RUNTIME_TERMINAL_MISMATCH | 95.853488216002 |
+| D5GAP-0096 | FROZEN | False | WRONG_BINDING,WRONG_OPERATION | 29.97277096399921 |
+| D5GAP-0101 | DECOMPOSITION_SCHEMA_INVALID | False | DECOMPOSITION_SCHEMA_INVALID | 314.5926402529876 |
+| SEED-cm-9643c020e2e02463 | FROZEN | False | RUNTIME_TERMINAL_MISMATCH | 35.11653508199379 |
+
+## Terminal state
+
+```
+RUN_COMPLETE_AWAITING_INDEPENDENT_SCIENTIFIC_REVIEW
+```
+
+STATUS:
+STOP FOR INDEPENDENT SCIENTIFIC DECOMPOSER-PILOT-01 REVIEW
