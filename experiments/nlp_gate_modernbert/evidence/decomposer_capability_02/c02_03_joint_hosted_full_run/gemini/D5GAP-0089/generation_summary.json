@@ -1,0 +1,91 @@
+{
+  "arm": "gemini",
+  "case_id": "D5GAP-0089",
+  "completion_tokens": 265,
+  "dual_cost": {
+    "accounting_rule": "Use provider_reported_usd as the observed charge for cost-effectiveness. Retain estimated_usd_from_pre_run_cost_card for comparison only. Do not overwrite historical smoke rows.",
+    "cost_card_rates_usd_per_1m": {
+      "completion": 5.0,
+      "prompt": 1.0,
+      "provider": "Google AI Studio",
+      "tag": "google-ai-studio/flex"
+    },
+    "estimated_usd_from_pre_run_cost_card": 0.001945,
+    "provider_reported_usd": 0.00389,
+    "reported_over_estimate_ratio": 2.0
+  },
+  "error": null,
+  "estimated_usd_from_live_rate_card": 0.001945,
+  "evaluation": {
+    "candidate_digest": null,
+    "canonicalization_version": null,
+    "case_id": "D5GAP-0089",
+    "decomposer_input_keys": [
+      "projected_workspace",
+      "utterance"
+    ],
+    "diagnostics": [],
+    "failure_labels": [
+      "DECOMPOSITION_SCHEMA_INVALID"
+    ],
+    "freeze_detail": "10 validation errors for ClosedNormalizedProgram\ntasks.0.request\n  Field required [type=missing, input_value={'constraints': [], 'depe...': 1}}, 'task_id': 't1'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.0.constraints\n  Extra inputs are not permitted [type=extra_forbidden, input_value=[], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.0.op\n  Extra inputs are not permitted [type=extra_forbidden, input_value='CONFIGURE_CURVE_DISPLAY', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.0.parameters\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'scale_max': 100.0, 'scale_min': 0.0}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.0.target\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'entity_kind': 'CURVE', ...w CBL', 'track_ref': 1}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.request\n  Field required [type=missing, input_value={'constraints': [], 'depe...': 1}}, 'task_id': 't2'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.1.constraints\n  Extra inputs are not permitted [type=extra_forbidden, input_value=[], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.op\n  Extra inputs are not permitted [type=extra_forbidden, input_value='DEFINE_FILL', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.parameters\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'fill_kind': 'between_in...ef': 1}, 'track_ref': 1}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.target\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'entity_kind': 'TRACK', ... 'CBL', 'track_ref': 1}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden",
+    "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+    "oracle_access_before_freeze": false,
+    "oracle_access_enabled_after_freeze": false,
+    "q3_comparison": {},
+    "runtime_gate": {},
+    "schema_valid": false,
+    "semantically_equivalent": false
+  },
+  "failure_labels": [
+    "DECOMPOSITION_SCHEMA_INVALID"
+  ],
+  "final_answer_sha256": "eda58b0b01e089e5998faa7b174ef5e1c266208e25050d5b9e0fbe7c028da46f",
+  "finish_reason": "stop",
+  "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+  "generation_id": "gen-1792452790-TYfWindsYO8bDYjxp7cX",
+  "latency_seconds": 6.014072981022764,
+  "model_path": "gemini-4-argon",
+  "observed_provider": "Google AI Studio",
+  "openrouter_model_id": "google/gemini-4-argon",
+  "pipeline_exercised": true,
+  "prompt_tokens": 620,
+  "provider_reported_usd": 0.00389,
+  "raw_output_sha256": "eda58b0b01e089e5998faa7b174ef5e1c266208e25050d5b9e0fbe7c028da46f",
+  "raw_usage": {
+    "completion_tokens": 265,
+    "completion_tokens_details": {
+      "audio_tokens": 0,
+      "image_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "cost": 0.00389,
+    "cost_details": {
+      "upstream_inference_completions_cost": 0.00265,
+      "upstream_inference_cost": 0.00389,
+      "upstream_inference_prompt_cost": 0.00124
+    },
+    "is_byok": false,
+    "prompt_tokens": 620,
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "video_tokens": 0
+    },
+    "total_tokens": 885
+  },
+  "reached_freeze": false,
+  "reasoning_tokens": 0,
+  "request_max_tokens": 1024,
+  "request_reasoning": null,
+  "requested_provider_order": [
+    "Google AI Studio"
+  ],
+  "schema_valid": false,
+  "semantic_equivalent": false,
+  "semantic_layer1_completed": false,
+  "source": "live_full_run",
+  "total_tokens": 885,
+  "transport_attempts": 1
+}

@@ -1,0 +1,1 @@
+{"operations":[{"curve_ref":"curve-1","op":"CONFIGURE_CURVE_DISPLAY","scale_max":100.0,"scale_min":0.0},{"curve_ref":"curve-2","op":"CONFIGURE_CURVE_DISPLAY","scale_max":100.0,"scale_min":0.0},{"between":["curve-1","curve-2"],"color":"blue","op":"DEFINE_FILL"}]}

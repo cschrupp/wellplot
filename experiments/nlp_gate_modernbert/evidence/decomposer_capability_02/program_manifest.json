@@ -8,14 +8,13 @@
     "title": "Gemini 4 Argon frozen-protocol capability ceiling design"
   },
   "c02_03_deepseek_corrective_smoke": {
+    "accepted_tip": "27db77a3ca913b4298afef291f09064d9d1931d2",
     "authority": "WP-DC02-03-DEEPSEEK-CORRECTIVE-SMOKE-AUTH-001",
-    "cases_2_through_6_authorized": false,
-    "execution_status": "EXECUTED_AWAITING_REVIEW",
-    "gemini_retest_authorized": false,
+    "execution_status": "CLOSED_ACCEPTED_OPERATIONAL_SMOKE_PASSED",
     "inference_authorized": false,
     "logical_calls": 1,
     "operational_smoke_pass": true,
-    "parent_sha": "f0459470e448bf06525024d6141822e7859057b7"
+    "review_authority": "WP-DC02-03-DEEPSEEK-CORRECTIVE-SMOKE-REVIEW-ACCEPT-001"
   },
   "c02_03_env_config": {
     "accepted_tip": "580c5c87dbd8200d1a8b54ffe66a11a54d58ca35",
@@ -34,6 +33,17 @@
     "execution_status": "CLOSED_ACCEPTED",
     "inference_authorized": false,
     "review_authority": "WP-DC02-03-HOSTED-SMOKE-CORRECTIVE-PREP-REVIEW-ACCEPT-001"
+  },
+  "c02_03_joint_hosted_full_run": {
+    "authority": "WP-DC02-03-JOINT-HOSTED-FULL-RUN-AUTH-001",
+    "case_1_rerun": false,
+    "deepseek_schema_valid": 0,
+    "execution_status": "EXECUTED_AWAITING_REVIEW",
+    "gemini_schema_valid": 0,
+    "inference_authorized": false,
+    "logical_calls_new": 10,
+    "n_hosted_benchmark_observations": 12,
+    "parent_sha": "27db77a3ca913b4298afef291f09064d9d1931d2"
   },
   "c02_03_joint_hosted_smoke": {
     "authority": "WP-DC02-03-JOINT-HOSTED-SMOKE-AUTH-001",

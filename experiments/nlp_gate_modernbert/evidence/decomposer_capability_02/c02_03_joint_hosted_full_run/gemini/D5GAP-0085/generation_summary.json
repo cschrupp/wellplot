@@ -1,0 +1,51 @@
+{
+  "arm": "gemini",
+  "case_id": "D5GAP-0085",
+  "completion_tokens": 615,
+  "error": null,
+  "estimated_usd": 0.003689,
+  "failure_labels": [
+    "DECOMPOSITION_SCHEMA_INVALID"
+  ],
+  "final_answer_sha256": "a4d2bdb643921686890369fe23304d89ea4ec38742f3a75158c25520816437ca",
+  "finish_reason": "stop",
+  "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+  "generation_id": "gen-1792451358-WwSTPaWOVb0RbW0kndHJ",
+  "latency_seconds": 31.96245547401486,
+  "model_path": "gemini-4-argon",
+  "observed_provider": "Google AI Studio",
+  "openrouter_model_id": "google/gemini-4-argon",
+  "operational_smoke_pass": true,
+  "prompt_tokens": 614,
+  "raw_output_sha256": "8595e13b0ee0acf70315d87c42002dd3097017b5d644ed66ce9ab18952318917",
+  "raw_usage": {
+    "completion_tokens": 615,
+    "completion_tokens_details": {
+      "audio_tokens": 0,
+      "image_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "cost": 0.007378,
+    "cost_details": {
+      "upstream_inference_completions_cost": 0.00615,
+      "upstream_inference_cost": 0.007378,
+      "upstream_inference_prompt_cost": 0.001228
+    },
+    "is_byok": false,
+    "prompt_tokens": 614,
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "video_tokens": 0
+    },
+    "total_tokens": 1229
+  },
+  "reasoning_tokens": 0,
+  "requested_provider_order": [
+    "Google AI Studio"
+  ],
+  "semantic_equivalent": false,
+  "total_tokens": 1229,
+  "transport_attempts": 1
+}

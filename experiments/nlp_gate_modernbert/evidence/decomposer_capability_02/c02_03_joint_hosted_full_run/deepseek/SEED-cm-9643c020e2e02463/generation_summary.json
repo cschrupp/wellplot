@@ -1,0 +1,93 @@
+{
+  "arm": "deepseek",
+  "case_id": "SEED-cm-9643c020e2e02463",
+  "completion_tokens": 1924,
+  "dual_cost": {
+    "accounting_rule": "Use provider_reported_usd as the observed charge for cost-effectiveness. Retain estimated_usd_from_pre_run_cost_card for comparison only. Do not overwrite historical smoke rows.",
+    "cost_card_rates_usd_per_1m": {
+      "completion": 0.6,
+      "prompt": 0.049,
+      "provider": "Morph",
+      "tag": "morph/fp8"
+    },
+    "estimated_usd_from_pre_run_cost_card": 0.0011813499999999998,
+    "provider_reported_usd": 0.00118135,
+    "reported_over_estimate_ratio": 1.0000000000000002
+  },
+  "error": null,
+  "estimated_usd_from_live_rate_card": 0.0011813499999999998,
+  "evaluation": {
+    "candidate_digest": null,
+    "canonicalization_version": null,
+    "case_id": "SEED-cm-9643c020e2e02463",
+    "decomposer_input_keys": [
+      "projected_workspace",
+      "utterance"
+    ],
+    "diagnostics": [],
+    "failure_labels": [
+      "DECOMPOSITION_SCHEMA_INVALID"
+    ],
+    "freeze_detail": "29 validation errors for ClosedNormalizedProgram\ntasks.0.task_id\n  Field required [type=missing, input_value={'depends_on': [], 'id': ...'track_type': 'normal'}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.0.request\n  Field required [type=missing, input_value={'depends_on': [], 'id': ...'track_type': 'normal'}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.0.id\n  Extra inputs are not permitted [type=extra_forbidden, input_value='task_1', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.0.local_ref\n  Extra inputs are not permitted [type=extra_forbidden, input_value='track_petrophysics', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.0.op\n  Extra inputs are not permitted [type=extra_forbidden, input_value='CREATE_TRACK', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.0.params\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'name': 'Petrophysics', 'track_type': 'normal'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.task_id\n  Field required [type=missing, input_value={'depends_on': ['task_1']...: 'track_petrophysics'}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.1.request\n  Field required [type=missing, input_value={'depends_on': ['task_1']...: 'track_petrophysics'}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.1.id\n  Extra inputs are not permitted [type=extra_forbidden, input_value='task_2', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.local_ref\n  Extra inputs are not permitted [type=extra_forbidden, input_value='gr_binding', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.op\n  Extra inputs are not permitted [type=extra_forbidden, input_value='PLACE_CURVE', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.params\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'curve_ref': 'GR', 'trac...': 'track_petrophysics'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.2.task_id\n  Field required [type=missing, input_value={'depends_on': ['task_2']...get_ref': 'gr_binding'}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.2.request\n  Field required [type=missing, input_value={'depends_on': ['task_2']...get_ref': 'gr_binding'}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.2.id\n  Extra inputs are not permitted [type=extra_forbidden, input_value='task_3', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.2.op\n  Extra inputs are not permitted [type=extra_forbidden, input_value='CONFIGURE_CURVE_DISPLAY', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.2.params\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'max': 140, 'min': -10, ...rget_ref': 'gr_binding'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.3.task_id\n  Field required [type=missing, input_value={'depends_on': ['task_3']...: 'track_petrophysics'}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.3.request\n  Field required [type=missing, input_value={'depends_on': ['task_3']...: 'track_petrophysics'}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.3.id\n  Extra inputs are not permitted [type=extra_forbidden, input_value='task_4', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.3.local_ref\n  Extra inputs are not permitted [type=extra_forbidden, input_value='rt_binding', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.3.op\n  Extra inputs are not permitted [type=extra_forbidden, input_value='PLACE_CURVE', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.3.params\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'curve_ref': 'RT', 'trac...': 'track_petrophysics'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.4.task_id\n  Field required [type=missing, input_value={'depends_on': ['task_4']...get_ref': 'rt_binding'}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.4.request\n  Field required [type=missing, input_value={'depends_on': ['task_4']...get_ref': 'rt_binding'}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.4.id\n  Extra inputs are not permitted [type=extra_forbidden, input_value='task_5', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.4.op\n  Extra inputs are not permitted [type=extra_forbidden, input_value='CONFIGURE_CURVE_DISPLAY', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.4.params\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'max': 10000, 'min': 0.1...rget_ref': 'rt_binding'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntype\n  Extra inputs are not permitted [type=extra_forbidden, input_value='ScopeNormalizedProgram', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden",
+    "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+    "oracle_access_before_freeze": false,
+    "oracle_access_enabled_after_freeze": false,
+    "q3_comparison": {},
+    "runtime_gate": {},
+    "schema_valid": false,
+    "semantically_equivalent": false
+  },
+  "failure_labels": [
+    "DECOMPOSITION_SCHEMA_INVALID"
+  ],
+  "final_answer_sha256": "779c879ac9f322ebbb5576f0f6959cd72c2b712ca7011e11936b56c54bb57a50",
+  "finish_reason": "stop",
+  "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+  "generation_id": "gen-1792452872-I6iZRPnRe4IbyFNp5xPm",
+  "latency_seconds": 20.802995270001702,
+  "model_path": "deepseek-v4.1-flash-1017",
+  "observed_provider": "Morph",
+  "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+  "pipeline_exercised": true,
+  "prompt_tokens": 550,
+  "provider_reported_usd": 0.00118135,
+  "raw_output_sha256": "2c7d7fb35c2f109e8ec874547b8697b4d9f5ab730f54d8c6752f835d0045d0a4",
+  "raw_usage": {
+    "completion_tokens": 1924,
+    "completion_tokens_details": {
+      "audio_tokens": 0,
+      "image_tokens": 0,
+      "reasoning_tokens": 1673
+    },
+    "cost": 0.00118135,
+    "cost_details": {
+      "upstream_inference_completions_cost": 0.0011544,
+      "upstream_inference_cost": 0.00118135,
+      "upstream_inference_prompt_cost": 2.695e-05
+    },
+    "is_byok": false,
+    "prompt_tokens": 550,
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "video_tokens": 0
+    },
+    "total_tokens": 2474
+  },
+  "reached_freeze": false,
+  "reasoning_tokens": 1673,
+  "request_max_tokens": 4096,
+  "request_reasoning": {
+    "effort": "low"
+  },
+  "requested_provider_order": [
+    "Morph"
+  ],
+  "schema_valid": false,
+  "semantic_equivalent": false,
+  "semantic_layer1_completed": false,
+  "source": "live_full_run",
+  "total_tokens": 2474,
+  "transport_attempts": 1
+}

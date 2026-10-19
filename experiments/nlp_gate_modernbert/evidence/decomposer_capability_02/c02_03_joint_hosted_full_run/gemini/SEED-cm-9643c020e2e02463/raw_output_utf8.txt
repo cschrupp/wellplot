@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.0",
+  "tasks": [
+    {
+      "task_id": "t1",
+      "operation": "CREATE_TRACK",
+      "target": {
+        "kind": "track",
+        "local_ref": "track_petro"
+      },
+      "arguments": {
+        "title": "Petrophysics",
+        "track_type": "normal"
+      },
+      "depends_on": []
+    },
+    {
+      "task_id": "t2",
+      "operation": "PLACE_CURVE",
+      "target": {
+        "kind": "curve",
+        "entity_id": "GR"
+      },
+      "arguments": {
+        "target_track": {
+          "kind": "track",
+          "local_ref": "track_petro"
+        }
+      },
+      "depends_on": [
+        "t1"
+      ]
+    },
+    {
+      "task_id": "t3",
+      "operation": "CONFIGURE_CURVE_DISPLAY",
+      "target": {
+        "kind": "curve",
+        "entity_id": "GR"
+      },
+      "arguments": {
+        "scale_max": 140,
+        "scale_min": -10,
+        "scale_type": "linear"
+      },
+      "depends_on": [
+        "t2"
+      ]
+    },
+    {
+      "task_id": "t4",
+      "operation": "PLACE_CURVE",
+      "target": {
+        "kind": "curve",
+        "entity_id": "RT"
+      },
+      "arguments": {
+        "target_track": {
+          "kind": "track",
+          "local_ref": "track_petro"
+        }
+      },
+      "depends_on": [
+        "t1",
+        "t2"
+      ]
+    },
+    {
+      "task_id": "t5",
+      "operation": "CONFIGURE_CURVE_DISPLAY",
+      "target": {
+        "kind": "curve",
+        "entity_id": "RT"
+      },
+      "arguments": {
+        "scale_max": 10000,
+        "scale_min": 0.1,
+        "scale_type": "logarithmic"
+      },
+      "depends_on": [
+        "t4"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "authority": "WP-DC02-03-JOINT-HOSTED-FULL-RUN-AUTH-001",
+  "case_1_rerun_authorized": false,
+  "deepseek_cases": [
+    "D5GAP-0089",
+    "D5GAP-0117",
+    "D5GAP-0096",
+    "D5GAP-0101",
+    "SEED-cm-9643c020e2e02463"
+  ],
+  "gemini_cases": [
+    "D5GAP-0089",
+    "D5GAP-0117",
+    "D5GAP-0096",
+    "D5GAP-0101",
+    "SEED-cm-9643c020e2e02463"
+  ],
+  "logical_calls_authorized": 10,
+  "parent_sha": "27db77a3ca913b4298afef291f09064d9d1931d2"
+}

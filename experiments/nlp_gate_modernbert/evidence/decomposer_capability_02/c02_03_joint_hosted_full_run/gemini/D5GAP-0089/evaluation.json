@@ -1,0 +1,21 @@
+{
+  "candidate_digest": null,
+  "canonicalization_version": null,
+  "case_id": "D5GAP-0089",
+  "decomposer_input_keys": [
+    "projected_workspace",
+    "utterance"
+  ],
+  "diagnostics": [],
+  "failure_labels": [
+    "DECOMPOSITION_SCHEMA_INVALID"
+  ],
+  "freeze_detail": "10 validation errors for ClosedNormalizedProgram\ntasks.0.request\n  Field required [type=missing, input_value={'constraints': [], 'depe...': 1}}, 'task_id': 't1'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.0.constraints\n  Extra inputs are not permitted [type=extra_forbidden, input_value=[], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.0.op\n  Extra inputs are not permitted [type=extra_forbidden, input_value='CONFIGURE_CURVE_DISPLAY', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.0.parameters\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'scale_max': 100.0, 'scale_min': 0.0}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.0.target\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'entity_kind': 'CURVE', ...w CBL', 'track_ref': 1}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.request\n  Field required [type=missing, input_value={'constraints': [], 'depe...': 1}}, 'task_id': 't2'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.1.constraints\n  Extra inputs are not permitted [type=extra_forbidden, input_value=[], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.op\n  Extra inputs are not permitted [type=extra_forbidden, input_value='DEFINE_FILL', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.parameters\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'fill_kind': 'between_in...ef': 1}, 'track_ref': 1}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.target\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'entity_kind': 'TRACK', ... 'CBL', 'track_ref': 1}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden",
+  "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+  "oracle_access_before_freeze": false,
+  "oracle_access_enabled_after_freeze": false,
+  "q3_comparison": {},
+  "runtime_gate": {},
+  "schema_valid": false,
+  "semantically_equivalent": false
+}

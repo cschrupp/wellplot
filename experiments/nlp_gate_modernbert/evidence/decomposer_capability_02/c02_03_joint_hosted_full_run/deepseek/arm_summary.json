@@ -1,0 +1,133 @@
+{
+  "arm": "deepseek",
+  "cases": [
+    {
+      "case_id": "D5GAP-0085",
+      "completion_tokens": 1329,
+      "error": null,
+      "failure_labels": [
+        "DECOMPOSITION_SCHEMA_INVALID"
+      ],
+      "finish_reason": "stop",
+      "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+      "latency_seconds": 8.395442895998713,
+      "observed_provider": "Morph",
+      "prompt_tokens": 575,
+      "provider_reported_usd": 0.00082615,
+      "reasoning_tokens": 1240,
+      "schema_valid": false,
+      "semantic_equivalent": false,
+      "semantic_layer1_completed": false,
+      "source": "imported_case1_smoke"
+    },
+    {
+      "case_id": "D5GAP-0089",
+      "completion_tokens": 1329,
+      "error": null,
+      "failure_labels": [
+        "DECOMPOSITION_SCHEMA_INVALID"
+      ],
+      "finish_reason": "stop",
+      "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+      "latency_seconds": 10.106108960986603,
+      "observed_provider": "Morph",
+      "prompt_tokens": 581,
+      "provider_reported_usd": 0.000825869,
+      "reasoning_tokens": 1277,
+      "schema_valid": false,
+      "semantic_equivalent": false,
+      "semantic_layer1_completed": false,
+      "source": "live_full_run"
+    },
+    {
+      "case_id": "D5GAP-0117",
+      "completion_tokens": 1038,
+      "error": null,
+      "failure_labels": [
+        "DECOMPOSITION_SCHEMA_INVALID"
+      ],
+      "finish_reason": "stop",
+      "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+      "latency_seconds": 9.549233803991228,
+      "observed_provider": "Morph",
+      "prompt_tokens": 934,
+      "provider_reported_usd": 0.000668566,
+      "reasoning_tokens": 967,
+      "schema_valid": false,
+      "semantic_equivalent": false,
+      "semantic_layer1_completed": false,
+      "source": "live_full_run"
+    },
+    {
+      "case_id": "D5GAP-0096",
+      "completion_tokens": 1247,
+      "error": null,
+      "failure_labels": [
+        "DECOMPOSITION_SCHEMA_INVALID"
+      ],
+      "finish_reason": "stop",
+      "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+      "latency_seconds": 9.894575767975766,
+      "observed_provider": "Morph",
+      "prompt_tokens": 933,
+      "provider_reported_usd": 0.000793917,
+      "reasoning_tokens": 1094,
+      "schema_valid": false,
+      "semantic_equivalent": false,
+      "semantic_layer1_completed": false,
+      "source": "live_full_run"
+    },
+    {
+      "case_id": "D5GAP-0101",
+      "completion_tokens": 784,
+      "error": null,
+      "failure_labels": [
+        "DECOMPOSITION_SCHEMA_INVALID"
+      ],
+      "finish_reason": "stop",
+      "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+      "latency_seconds": 7.268508471985115,
+      "observed_provider": "Morph",
+      "prompt_tokens": 731,
+      "provider_reported_usd": 0.000506219,
+      "reasoning_tokens": 658,
+      "schema_valid": false,
+      "semantic_equivalent": false,
+      "semantic_layer1_completed": false,
+      "source": "live_full_run"
+    },
+    {
+      "case_id": "SEED-cm-9643c020e2e02463",
+      "completion_tokens": 1924,
+      "error": null,
+      "failure_labels": [
+        "DECOMPOSITION_SCHEMA_INVALID"
+      ],
+      "finish_reason": "stop",
+      "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+      "latency_seconds": 20.802995270001702,
+      "observed_provider": "Morph",
+      "prompt_tokens": 550,
+      "provider_reported_usd": 0.00118135,
+      "reasoning_tokens": 1673,
+      "schema_valid": false,
+      "semantic_equivalent": false,
+      "semantic_layer1_completed": false,
+      "source": "live_full_run"
+    }
+  ],
+  "completion_tokens_total": 7651,
+  "failure_label_distribution": {
+    "DECOMPOSITION_SCHEMA_INVALID": 6
+  },
+  "latency_seconds_total": 66.01686517093913,
+  "n_cases": 6,
+  "prompt_tokens_total": 4304,
+  "provider_reported_usd_total": 0.004802071,
+  "reached_freeze_count": 0,
+  "reasoning_tokens_total": 6909,
+  "schema_valid_count": 0,
+  "semantic_equivalent_among_frozen": 0,
+  "semantic_equivalent_among_frozen_denominator": 0,
+  "semantic_equivalent_overall": 0
+}

@@ -1,0 +1,1 @@
+{"operations":[{"op":"CONFIGURE_CURVE_DISPLAY","curve_ref":"curve-3","scale_min":1.95,"scale_max":2.95,"scale_reverse":true},{"op":"DEFINE_FILL","curve_ref":"curve-3","fill_type":"split","split_value":2.45}]}

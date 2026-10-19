@@ -1,0 +1,21 @@
+{
+  "candidate_digest": null,
+  "canonicalization_version": null,
+  "case_id": "D5GAP-0085",
+  "decomposer_input_keys": [
+    "projected_workspace",
+    "utterance"
+  ],
+  "diagnostics": [],
+  "failure_labels": [
+    "DECOMPOSITION_SCHEMA_INVALID"
+  ],
+  "freeze_detail": "13 validation errors for ClosedNormalizedProgram\ntasks.0.request\n  Field required [type=missing, input_value={'arguments': [{'name': '...ve-1'}, 'task_id': 't1'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.0.arguments\n  Extra inputs are not permitted [type=extra_forbidden, input_value=[{'name': 'scale_min', 'v...mber', 'value': 100.0}}], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.0.operation\n  Extra inputs are not permitted [type=extra_forbidden, input_value='CONFIGURE_CURVE_DISPLAY', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.0.target\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'kind': 'curve_handle', 'value': 'curve-1'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.request\n  Field required [type=missing, input_value={'arguments': [{'name': '...ve-2'}, 'task_id': 't2'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.1.arguments\n  Extra inputs are not permitted [type=extra_forbidden, input_value=[{'name': 'scale_min', 'v...mber', 'value': 100.0}}], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.operation\n  Extra inputs are not permitted [type=extra_forbidden, input_value='CONFIGURE_CURVE_DISPLAY', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.target\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'kind': 'curve_handle', 'value': 'curve-2'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.2.request\n  Field required [type=missing, input_value={'arguments': [{'name': '...e': 1}, 'task_id': 't3'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.2.arguments\n  Extra inputs are not permitted [type=extra_forbidden, input_value=[{'name': 'fill_kind', 'v...lor', 'value': 'blue'}}], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.2.operation\n  Extra inputs are not permitted [type=extra_forbidden, input_value='DEFINE_FILL', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.2.target\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'kind': 'track_ref', 'value': 1}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\nschema_version\n  Extra inputs are not permitted [type=extra_forbidden, input_value='0.1', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden",
+  "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+  "oracle_access_before_freeze": false,
+  "oracle_access_enabled_after_freeze": false,
+  "q3_comparison": {},
+  "runtime_gate": {},
+  "schema_valid": false,
+  "semantically_equivalent": false
+}

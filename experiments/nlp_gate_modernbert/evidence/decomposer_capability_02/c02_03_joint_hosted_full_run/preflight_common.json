@@ -1,0 +1,60 @@
+{
+  "OPENROUTER_API_KEY_PRESENT": true,
+  "authority": "WP-DC02-03-JOINT-HOSTED-FULL-RUN-AUTH-001",
+  "case_1_rerun_authorized": false,
+  "case_digests": {
+    "D5GAP-0085": {
+      "decomposer_input_sha256": "91622db600dd94d48881adbdad694188bb34c4117f6f9ee9f9ce557cfd70ac4f",
+      "oracle_cleaned_program_sha256": "9181ee1d1d414870b59ca4d4946b3f0c0607d1d8e19388e099711e7cd15a164d",
+      "oracle_frozen_candidate_sha256": "54b7045da274250bc971588282bb5e441b74e96ca250ea76a699ea2e46b514bb",
+      "utterance_sha256": "6546ed8a15574fc6b8fbd6b3b68e349c3dad8aa78f8a6574467c66b260cb5044"
+    },
+    "D5GAP-0089": {
+      "decomposer_input_sha256": "79f1f37a0a44a7c6fcc81afe0bcaf517952c52954a483fce0b336b8665e948de",
+      "oracle_cleaned_program_sha256": "f766f41378bed40d6bd116312782200d61b9d83b5de1893da827185eb66fe374",
+      "oracle_frozen_candidate_sha256": "603b90832d0244bd6347dc87a259db3f637ef459c0ee42c771bef8a228515a7b",
+      "utterance_sha256": "e1c8c1008c080e980c51272f95a9ac220e1a33993228d867245ba366a393fecf"
+    },
+    "D5GAP-0096": {
+      "decomposer_input_sha256": "2b3245908efd22b40301b9adebd93226f2323766bfd5b77b0e56dcce96fa7620",
+      "oracle_cleaned_program_sha256": "0129f340bf1e7a3bd19999c92c8a47970fa226f30fad65aee37bddd94cb6dc53",
+      "oracle_frozen_candidate_sha256": "1b1a72f1827148dae0977228d1a5937d3190542e76012822fcee53164adb7560",
+      "utterance_sha256": "55727bdba29f25aca4182344eaa91a2f93852010cb5b3737040cbbd8ef7d5f4a"
+    },
+    "D5GAP-0101": {
+      "decomposer_input_sha256": "11327486a44838c9be9505ae71945d1ba6539a5ed7500b0002637c4d55f3b085",
+      "oracle_cleaned_program_sha256": "4e8073da85cc9b8268a283e550ac5fe6d2ff4d0cffddcd0e5e2c80047364e473",
+      "oracle_frozen_candidate_sha256": "80f442bab67dd8831d1e2b61759ffe144ac58a8dadc9eed4c36ff18274721706",
+      "utterance_sha256": "d65c70f7a7e3f7edb106dd467a8978374e123879b5a79352ce2e264d77452f51"
+    },
+    "D5GAP-0117": {
+      "decomposer_input_sha256": "797fcb9e1d42e8a1bca212c15d13d110b5c043a78602dc7938893580771eccbd",
+      "oracle_cleaned_program_sha256": "2255a21cf3c4f60bf2a62f98cdc40597b2375b7238274eac7386fd7ead204f65",
+      "oracle_frozen_candidate_sha256": "da85a77a313ef8d6b13c7b34ae292774a6619fa623d2bbf082aed0dc347280c1",
+      "utterance_sha256": "cf1995f4db09c8ecb71878ad05121e63f1a2272338c1b9ba800a777fef92fb7e"
+    },
+    "SEED-cm-9643c020e2e02463": {
+      "decomposer_input_sha256": "42aacf3d5392d64841e02dd96ed318b8a3e377b77a7237635ebe14bc33a4c7a0",
+      "oracle_cleaned_program_sha256": "f852de326e85d6f56ca2476e61e31844116b0d0f2759a36f5e3ceddd163f783c",
+      "oracle_frozen_candidate_sha256": "a95cc7cc10de71f896265883ddf7089c650a9f38500d94f5a5a726c5ad750693",
+      "utterance_sha256": "9364dd86a0faacd47a0bfe9f511596b8024f3463146b95e47519df14145d30f8"
+    }
+  },
+  "cases_authorized_new": [
+    "D5GAP-0089",
+    "D5GAP-0117",
+    "D5GAP-0096",
+    "D5GAP-0101",
+    "SEED-cm-9643c020e2e02463"
+  ],
+  "decoding_comparability": "json_object_plus_freeze_NOT_XGRAMMAR_HARD_MASK",
+  "deepseek_case1_source": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_03_deepseek_corrective_smoke/deepseek",
+  "gemini_case1_source": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_03_joint_hosted_smoke/gemini",
+  "original_failed_deepseek_qualification_only": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_03_joint_hosted_smoke/deepseek",
+  "parent_sha": "27db77a3ca913b4298afef291f09064d9d1931d2",
+  "preflight_utc": "2026-10-19T23:33:08.553752+00:00",
+  "prompt_match": true,
+  "prompt_system_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+  "prompt_user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+  "starting_head": "27db77a3ca913b4298afef291f09064d9d1931d2"
+}

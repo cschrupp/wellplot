@@ -1,0 +1,43 @@
+{
+  "billable_inference_calls": 0,
+  "note": "Catalog/endpoints GET only; not a chat completion.",
+  "openrouter_model_id": "google/gemini-4-argon",
+  "pinned_provider": "Google AI Studio",
+  "preferred_tag": "google-ai-studio/flex",
+  "provider_endpoint_count": 3,
+  "selected_endpoint": {
+    "completion_usd_per_1m_tokens": 5.0,
+    "max_completion_tokens": 943718,
+    "pricing": {
+      "audio": "0.000001",
+      "completion": "0.000005",
+      "discount": 0.5,
+      "image": "0.000001",
+      "input_audio_cache": "0.00000005",
+      "input_cache_read": "0.00000005",
+      "input_cache_write": "0.00000009375",
+      "internal_reasoning": "0.000005",
+      "prompt": "0.000001",
+      "web_search": "0.014"
+    },
+    "prompt_usd_per_1m_tokens": 1.0,
+    "provider_name": "Google AI Studio",
+    "quantization": "unknown",
+    "supported_parameters": [
+      "reasoning",
+      "include_reasoning",
+      "max_tokens",
+      "temperature",
+      "top_p",
+      "seed",
+      "response_format",
+      "tools",
+      "tool_choice",
+      "structured_outputs",
+      "reasoning_effort"
+    ],
+    "tag": "google-ai-studio/flex"
+  },
+  "snapshot_kind": "live_openrouter_endpoints_preflight",
+  "snapshot_utc": "2026-10-19T23:33:09.370723+00:00"
+}

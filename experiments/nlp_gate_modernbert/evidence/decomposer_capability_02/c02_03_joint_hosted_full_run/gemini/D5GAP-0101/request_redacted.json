@@ -1,0 +1,26 @@
+{
+  "include_reasoning": false,
+  "max_tokens": 1024,
+  "messages": [
+    {
+      "content": "You are a WELL-IR decomposer. Translate one user request plus a projected workspace into exactly one ScopeNormalizedProgram as JSON.\n\nOutput rules:\n- JSON only; no prose, markdown, explanation, confidence, or repair notes.\n- Conform to the frozen ScopeNormalizedProgram schema provided by constrained decoding.\n- Preserve explicit user semantics; do not invent workspace entities or unsupported operations.\n- Supported operations include CREATE_TRACK, PLACE_CURVE, CONFIGURE_CURVE_DISPLAY, DEFINE_FILL, and other schema-enumerated operations.\n- Use local_ref to refer to entities created earlier in the same program when later tasks must bind to them.\n- Use depends_on only for genuine semantic dependency required by the utterance; do not invent ordering.\n\nDo not include case identifiers, fixture identifiers, evaluation labels, expected task counts, or oracle-derived guidance.\n",
+      "role": "system"
+    },
+    {
+      "content": "Utterance:\nAppend a 24 mm Caliper QC track and plot CALI on it at 6\u201312.\n\nProjected workspace (JSON):\n{\"curves\":[{\"aliases\":[\"vdl\"],\"channel\":\"VDL\",\"id\":\"VDL\"},{\"aliases\":[\"cbl\",\"curve 1\",\"cement bond\",\"cbl\"],\"channel\":\"CBL\",\"handle\":\"curve-1\",\"id\":\"curve-1\",\"label\":\"CBL\",\"scale_kind\":\"linear\",\"scale_max\":100.0,\"scale_min\":0.0,\"scale_reverse\":false,\"track_ref\":2},{\"aliases\":[\"gr\",\"curve 2\",\"gamma\",\"gamma ray\",\"gr\"],\"channel\":\"GR\",\"handle\":\"curve-2\",\"id\":\"curve-2\",\"label\":\"GR\",\"scale_kind\":\"linear\",\"scale_max\":100.0,\"scale_min\":0.0,\"scale_reverse\":false,\"track_ref\":4},{\"aliases\":[\"cali\",\"curve 3\",\"caliper\",\"cal\",\"cali\"],\"channel\":\"CALI\",\"handle\":\"curve-3\",\"id\":\"curve-3\",\"label\":\"CALI\",\"scale_kind\":\"linear\",\"scale_max\":12.0,\"scale_min\":6.0,\"scale_reverse\":false,\"track_ref\":5},{\"aliases\":[\"rt\",\"curve 4\",\"resistivity\",\"res\",\"rt\"],\"channel\":\"RT\",\"handle\":\"curve-4\",\"id\":\"curve-4\",\"label\":\"RT\",\"scale_kind\":\"log\",\"scale_max\":2000.0,\"scale_min\":0.2,\"scale_reverse\":false,\"track_ref\":6}],\"depth_unit\":\"ft\",\"fills\":[],\"supported_depth_units\":[\"m\",\"ft\"],\"tracks\":[{\"curves\":[],\"id\":\"depth\",\"ref\":1,\"title\":\"Depth\"},{\"curves\":[\"curve-1\"],\"id\":\"cbl\",\"ref\":2,\"title\":\"CBL\"},{\"curves\":[],\"id\":\"vdl\",\"ref\":3,\"title\":\"VDL\"},{\"curves\":[\"curve-2\"],\"id\":\"gr\",\"ref\":4,\"title\":\"Gamma Ray\"},{\"curves\":[\"curve-3\"],\"id\":\"cali\",\"ref\":5,\"title\":\"Caliper\"},{\"curves\":[\"curve-4\"],\"id\":\"rt\",\"ref\":6,\"title\":\"Resistivity\"}]}\n",
+      "role": "user"
+    }
+  ],
+  "model": "google/gemini-4-argon",
+  "provider": {
+    "allow_fallbacks": false,
+    "order": [
+      "Google AI Studio"
+    ],
+    "require_parameters": true
+  },
+  "response_format": {
+    "type": "json_object"
+  },
+  "temperature": 0.0
+}

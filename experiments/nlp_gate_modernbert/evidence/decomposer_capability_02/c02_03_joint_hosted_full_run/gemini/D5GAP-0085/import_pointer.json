@@ -1,0 +1,6 @@
+{
+  "case_id": "D5GAP-0085",
+  "imported": true,
+  "note": "Case 1 not re-executed; copied from accepted smoke evidence.",
+  "source_path": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_03_joint_hosted_smoke/gemini"
+}

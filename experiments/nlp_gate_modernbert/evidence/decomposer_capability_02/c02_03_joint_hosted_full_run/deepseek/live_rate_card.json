@@ -1,0 +1,44 @@
+{
+  "billable_inference_calls": 0,
+  "note": "Catalog/endpoints GET only; not a chat completion.",
+  "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+  "pinned_provider": "Morph",
+  "preferred_tag": "morph/fp8",
+  "provider_endpoint_count": 1,
+  "selected_endpoint": {
+    "completion_usd_per_1m_tokens": 0.6,
+    "max_completion_tokens": 943718,
+    "pricing": {
+      "completion": "0.0000006",
+      "discount": 0,
+      "input_cache_read": "0.000000008",
+      "prompt": "0.000000049"
+    },
+    "prompt_usd_per_1m_tokens": 0.049,
+    "provider_name": "Morph",
+    "quantization": "fp8",
+    "supported_parameters": [
+      "reasoning",
+      "include_reasoning",
+      "max_tokens",
+      "temperature",
+      "stop",
+      "top_p",
+      "top_k",
+      "min_p",
+      "frequency_penalty",
+      "presence_penalty",
+      "repetition_penalty",
+      "seed",
+      "logit_bias",
+      "tools",
+      "tool_choice",
+      "structured_outputs",
+      "response_format",
+      "reasoning_effort"
+    ],
+    "tag": "morph/fp8"
+  },
+  "snapshot_kind": "live_openrouter_endpoints_preflight",
+  "snapshot_utc": "2026-10-19T23:33:54.525645+00:00"
+}
