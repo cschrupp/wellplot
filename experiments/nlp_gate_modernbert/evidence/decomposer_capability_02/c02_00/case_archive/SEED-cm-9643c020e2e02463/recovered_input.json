@@ -1,0 +1,138 @@
+{
+  "case_id": "SEED-cm-9643c020e2e02463",
+  "digests": {
+    "decomposer_input_sha256": "42aacf3d5392d64841e02dd96ed318b8a3e377b77a7237635ebe14bc33a4c7a0",
+    "utterance_sha256": "9364dd86a0faacd47a0bfe9f511596b8024f3463146b95e47519df14145d30f8",
+    "workspace_sha256": "6859b9f991b2a78611dae5e0b85bbe82ef3647d4eae4d7c6d87f48c5cc403103"
+  },
+  "model_facing_payload": {
+    "projected_workspace": {
+      "curves": [
+        {
+          "aliases": [
+            "gamma",
+            "gamma ray",
+            "gr"
+          ],
+          "channel": "GR",
+          "handle": null,
+          "id": "GR",
+          "label": null,
+          "scale_kind": null,
+          "scale_max": 150.0,
+          "scale_min": 0.0,
+          "scale_reverse": false,
+          "track_ref": 2
+        },
+        {
+          "aliases": [
+            "neutron",
+            "neutron porosity",
+            "nphi"
+          ],
+          "channel": "NPHI",
+          "handle": null,
+          "id": "NPHI",
+          "label": null,
+          "scale_kind": null,
+          "scale_max": -0.15,
+          "scale_min": 0.45,
+          "scale_reverse": true,
+          "track_ref": 3
+        },
+        {
+          "aliases": [
+            "density",
+            "bulk density",
+            "rhob",
+            "rhob"
+          ],
+          "channel": "RHOB",
+          "handle": null,
+          "id": "RHOB",
+          "label": null,
+          "scale_kind": null,
+          "scale_max": null,
+          "scale_min": null,
+          "scale_reverse": null,
+          "track_ref": null
+        },
+        {
+          "aliases": [
+            "caliper",
+            "cal",
+            "cali"
+          ],
+          "channel": "CALI",
+          "handle": null,
+          "id": "CALI",
+          "label": null,
+          "scale_kind": null,
+          "scale_max": null,
+          "scale_min": null,
+          "scale_reverse": null,
+          "track_ref": null
+        },
+        {
+          "aliases": [
+            "resistivity",
+            "res",
+            "rt"
+          ],
+          "channel": "RT",
+          "handle": null,
+          "id": "RT",
+          "label": null,
+          "scale_kind": null,
+          "scale_max": null,
+          "scale_min": null,
+          "scale_reverse": null,
+          "track_ref": null
+        }
+      ],
+      "depth_unit": "m",
+      "fills": [],
+      "fixture_id": "d0_base",
+      "focus_curve_handle": null,
+      "focus_track_ref": null,
+      "supported_depth_units": [
+        "m",
+        "ft"
+      ],
+      "tracks": [
+        {
+          "curves": [],
+          "id": "track_1",
+          "ref": 1,
+          "title": null
+        },
+        {
+          "curves": [
+            "GR"
+          ],
+          "id": "track_2",
+          "ref": 2,
+          "title": null
+        },
+        {
+          "curves": [
+            "NPHI"
+          ],
+          "id": "track_3",
+          "ref": 3,
+          "title": null
+        },
+        {
+          "curves": [],
+          "id": "track_4",
+          "ref": 4,
+          "title": null
+        }
+      ]
+    },
+    "utterance": "Create one normal track named Petrophysics. First plot GR linearly from -10 to 140. Then plot RT logarithmically from 0.1 to 10000. Preserve that binding order."
+  },
+  "projected_workspace_json": "{\"curves\":[{\"aliases\":[\"caliper\",\"cal\",\"cali\"],\"channel\":\"CALI\",\"id\":\"CALI\"},{\"aliases\":[\"gamma\",\"gamma ray\",\"gr\"],\"channel\":\"GR\",\"id\":\"GR\",\"scale_max\":150.0,\"scale_min\":0.0,\"scale_reverse\":false,\"track_ref\":2},{\"aliases\":[\"neutron\",\"neutron porosity\",\"nphi\"],\"channel\":\"NPHI\",\"id\":\"NPHI\",\"scale_max\":-0.15,\"scale_min\":0.45,\"scale_reverse\":true,\"track_ref\":3},{\"aliases\":[\"density\",\"bulk density\",\"rhob\",\"rhob\"],\"channel\":\"RHOB\",\"id\":\"RHOB\"},{\"aliases\":[\"resistivity\",\"res\",\"rt\"],\"channel\":\"RT\",\"id\":\"RT\"}],\"depth_unit\":\"m\",\"fills\":[],\"supported_depth_units\":[\"m\",\"ft\"],\"tracks\":[{\"curves\":[],\"id\":\"track_1\",\"ref\":1},{\"curves\":[\"GR\"],\"id\":\"track_2\",\"ref\":2},{\"curves\":[\"NPHI\"],\"id\":\"track_3\",\"ref\":3},{\"curves\":[],\"id\":\"track_4\",\"ref\":4}]}",
+  "source": "nlp_gate_modernbert.nl_program_eval.input.build_decomposer_input",
+  "utterance": "Create one normal track named Petrophysics. First plot GR linearly from -10 to 140. Then plot RT logarithmically from 0.1 to 10000. Preserve that binding order."
+}

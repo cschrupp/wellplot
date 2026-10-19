@@ -1,0 +1,24 @@
+{
+  "case_id": "D5GAP-0096",
+  "classification_correction": null,
+  "failure_labels": [
+    "WRONG_BINDING",
+    "WRONG_OPERATION"
+  ],
+  "freeze_status": "FROZEN",
+  "latency_seconds": 29.97277096399921,
+  "n_generated_tokens": 92,
+  "n_payload_tokens": 91,
+  "raw_output_sha256": "e87f766ba8f6cffcc3a1ca42a5a5d1bd2a1db5ffd2054fab1c1f54f962a1a52f",
+  "raw_output_utf8": "{\"tasks\":[{\"depends_on\":[],\"produces_binds\":{},\"request\":{\"interval_bounds\":{},\"line_width\":1,\"report_title\":null,\"requested_operation\":\"CREATE_TRACK\",\"track_title\":\"Gamma Ray\",\"track_width_mm\":1000},\"task_id\":\"task-1\"}],\"version\":\"1.0\"}",
+  "reached_freeze": true,
+  "semantically_equivalent": false,
+  "source_results_line_sha256": "490ee1d64bf0a97cd8c0603b78eb99b1e5059737d9854ea046aed12d6426f3f3",
+  "status": "EVALUATED",
+  "termination": {
+    "ended_with_stop_stripped": true,
+    "stop_ids": [
+      151645
+    ]
+  }
+}

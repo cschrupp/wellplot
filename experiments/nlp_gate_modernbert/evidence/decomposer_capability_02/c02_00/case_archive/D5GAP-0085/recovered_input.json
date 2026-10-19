@@ -1,0 +1,102 @@
+{
+  "case_id": "D5GAP-0085",
+  "digests": {
+    "decomposer_input_sha256": "91622db600dd94d48881adbdad694188bb34c4117f6f9ee9f9ce557cfd70ac4f",
+    "utterance_sha256": "6546ed8a15574fc6b8fbd6b3b68e349c3dad8aa78f8a6574467c66b260cb5044",
+    "workspace_sha256": "e7b4c11947d8682bbdd5ee2a65973d6c02ae008fadb0f9d499e7791e12fb4e69"
+  },
+  "model_facing_payload": {
+    "projected_workspace": {
+      "curves": [
+        {
+          "aliases": [
+            "cbl",
+            "curve 1",
+            "cement bond",
+            "cbl amplitude wide",
+            "amplitude",
+            "wide"
+          ],
+          "channel": "CBL",
+          "handle": "curve-1",
+          "id": "curve-1",
+          "label": "CBL Amplitude wide",
+          "scale_kind": "linear",
+          "scale_max": 100.0,
+          "scale_min": 0.0,
+          "scale_reverse": false,
+          "track_ref": 1
+        },
+        {
+          "aliases": [
+            "cbl",
+            "curve 2",
+            "cement bond",
+            "cbl amplitude narrow",
+            "amplitude",
+            "narrow"
+          ],
+          "channel": "CBL",
+          "handle": "curve-2",
+          "id": "curve-2",
+          "label": "CBL Amplitude narrow",
+          "scale_kind": "linear",
+          "scale_max": 10.0,
+          "scale_min": 0.0,
+          "scale_reverse": false,
+          "track_ref": 1
+        },
+        {
+          "aliases": [
+            "gr",
+            "curve 3",
+            "gamma",
+            "gamma ray",
+            "gr"
+          ],
+          "channel": "GR",
+          "handle": "curve-3",
+          "id": "curve-3",
+          "label": "GR",
+          "scale_kind": "linear",
+          "scale_max": 150.0,
+          "scale_min": 0.0,
+          "scale_reverse": false,
+          "track_ref": 2
+        }
+      ],
+      "depth_unit": "ft",
+      "fills": [],
+      "fixture_id": "d5_duplicate_cbl",
+      "focus_curve_handle": null,
+      "focus_track_ref": null,
+      "supported_depth_units": [
+        "m",
+        "ft"
+      ],
+      "tracks": [
+        {
+          "curves": [
+            "curve-1",
+            "curve-2"
+          ],
+          "id": "cbl",
+          "ref": 1,
+          "title": "CBL"
+        },
+        {
+          "curves": [
+            "curve-3"
+          ],
+          "id": "gr",
+          "ref": 2,
+          "title": "Gamma Ray"
+        }
+      ]
+    },
+    "utterance": "Make both CBL views use 0–100, then fill between them in blue."
+  },
+  "projected_workspace_json": "{\"curves\":[{\"aliases\":[\"cbl\",\"curve 1\",\"cement bond\",\"cbl amplitude wide\",\"amplitude\",\"wide\"],\"channel\":\"CBL\",\"handle\":\"curve-1\",\"id\":\"curve-1\",\"label\":\"CBL Amplitude wide\",\"scale_kind\":\"linear\",\"scale_max\":100.0,\"scale_min\":0.0,\"scale_reverse\":false,\"track_ref\":1},{\"aliases\":[\"cbl\",\"curve 2\",\"cement bond\",\"cbl amplitude narrow\",\"amplitude\",\"narrow\"],\"channel\":\"CBL\",\"handle\":\"curve-2\",\"id\":\"curve-2\",\"label\":\"CBL Amplitude narrow\",\"scale_kind\":\"linear\",\"scale_max\":10.0,\"scale_min\":0.0,\"scale_reverse\":false,\"track_ref\":1},{\"aliases\":[\"gr\",\"curve 3\",\"gamma\",\"gamma ray\",\"gr\"],\"channel\":\"GR\",\"handle\":\"curve-3\",\"id\":\"curve-3\",\"label\":\"GR\",\"scale_kind\":\"linear\",\"scale_max\":150.0,\"scale_min\":0.0,\"scale_reverse\":false,\"track_ref\":2}],\"depth_unit\":\"ft\",\"fills\":[],\"supported_depth_units\":[\"m\",\"ft\"],\"tracks\":[{\"curves\":[\"curve-1\",\"curve-2\"],\"id\":\"cbl\",\"ref\":1,\"title\":\"CBL\"},{\"curves\":[\"curve-3\"],\"id\":\"gr\",\"ref\":2,\"title\":\"Gamma Ray\"}]}",
+  "source": "nlp_gate_modernbert.nl_program_eval.input.build_decomposer_input",
+  "utterance": "Make both CBL views use 0–100, then fill between them in blue."
+}

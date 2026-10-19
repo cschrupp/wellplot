@@ -1,0 +1,23 @@
+{
+  "case_id": "D5GAP-0089",
+  "classification_correction": null,
+  "failure_labels": [
+    "RUNTIME_TERMINAL_MISMATCH"
+  ],
+  "freeze_status": "FROZEN",
+  "latency_seconds": 79.16190488499706,
+  "n_generated_tokens": 293,
+  "n_payload_tokens": 292,
+  "raw_output_sha256": "8ada802546769205ec16d37f369c5660bafd7567e9172272754970e85a0110dc",
+  "raw_output_utf8": "{\"tasks\":[{\"depends_on\":[\"curve-1\"],\"produces_binds\":{\"/curve-1\":\"track\",\"/curve-2\":\"track\"},\"request\":{\"alpha\":0.0,\"fill\":{\"asserts_scale_mismatch\":false,\"baseline_value\":0.0,\"mode\":\"BETWEEN\",\"predicate\":{\"kind\":\"BETWEEN_CURVES\",\"value\":1}},\"report_title\":\"Fill between curve 1 and 2\",\"requested_operation\":\"DEFINE_FILL\",\"track_width_mm\":1000.0},\"task_id\":\"task-1\"},{\"depends_on\":[\"curve-2\"],\"produces_binds\":{\"/curve-2\":\"track\"},\"request\":{\"alpha\":0.0,\"fill\":{\"asserts_scale_mismatch\":false,\"baseline_value\":0.0,\"mode\":\"BETWEEN\",\"predicate\":{\"kind\":\"BETWEEN_CURVES\",\"value\":1}},\"report_title\":\"Fill between curve 1 and 2\",\"requested_operation\":\"DEFINE_FILL\",\"track_width_mm\":1000.0},\"task_id\":\"task-2\"}]}",
+  "reached_freeze": true,
+  "semantically_equivalent": false,
+  "source_results_line_sha256": "9b78c466e46aa7912c7c47b4780fa38fec07da41292d73fd7e87c6b3c1ee5191",
+  "status": "EVALUATED",
+  "termination": {
+    "ended_with_stop_stripped": true,
+    "stop_ids": [
+      151645
+    ]
+  }
+}

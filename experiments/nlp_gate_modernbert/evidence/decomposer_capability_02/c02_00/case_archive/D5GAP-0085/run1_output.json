@@ -1,0 +1,24 @@
+{
+  "case_id": "D5GAP-0085",
+  "classification_correction": null,
+  "failure_labels": [
+    "MISSING_TASK",
+    "WRONG_ORDER"
+  ],
+  "freeze_status": "FROZEN",
+  "latency_seconds": 6.586548493010923,
+  "n_generated_tokens": 10,
+  "n_payload_tokens": 9,
+  "raw_output_sha256": "b5f82fa3440e9cbe139790569cdf73264a32f20a10fe8d71e04e25dc077956b6",
+  "raw_output_utf8": "{\"tasks\":[],\"version\":null}",
+  "reached_freeze": true,
+  "semantically_equivalent": false,
+  "source_results_line_sha256": "fd12c9075fa8f16d58e3a6118ee595f0321e0773e3515e5f8ec5610cd76b1d90",
+  "status": "EVALUATED",
+  "termination": {
+    "ended_with_stop_stripped": true,
+    "stop_ids": [
+      151645
+    ]
+  }
+}

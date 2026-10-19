@@ -1,0 +1,27 @@
+{
+  "authority": "WP-DC02-00-BASELINE-RECOVERY-AUTH-001",
+  "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
+  "slice": "C02-00",
+  "human_authorized": true,
+  "mode": "PROVENANCE_AND_BASELINE_RECOVERY_ONLY",
+  "phase0_design_acceptance": "WP-DC02-PHASE0-DESIGN-ACCEPT-001",
+  "starting_tip": "b451d9ca431c235e5779340f9dcc188764cb1446",
+  "authorized_actions": [
+    "recover_DECOMPOSER-PILOT-01_Run1_artifacts",
+    "hash_and_verify_six_case_protocol",
+    "write_baseline_manifest_and_missing_evidence_report",
+    "register_phase0_program_manifest"
+  ],
+  "forbidden_actions": [
+    "scientific_model_inference",
+    "openrouter_calls",
+    "gemini_calls",
+    "fine_tuning",
+    "synthetic_recreation_of_missing_historical_evidence",
+    "C02-01_implementation",
+    "C02-02_implementation",
+    "C02-03_through_C02-17"
+  ],
+  "model_calls_authorized": 0,
+  "openrouter_calls_authorized": 0
+}

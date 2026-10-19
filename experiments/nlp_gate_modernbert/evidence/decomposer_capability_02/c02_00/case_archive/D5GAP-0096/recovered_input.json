@@ -1,0 +1,227 @@
+{
+  "case_id": "D5GAP-0096",
+  "digests": {
+    "decomposer_input_sha256": "2b3245908efd22b40301b9adebd93226f2323766bfd5b77b0e56dcce96fa7620",
+    "utterance_sha256": "55727bdba29f25aca4182344eaa91a2f93852010cb5b3737040cbbd8ef7d5f4a",
+    "workspace_sha256": "0d6d0be53d9002844553eb65d836f2e8efec7c75f76e30e2b93f379e3647e74c"
+  },
+  "model_facing_payload": {
+    "projected_workspace": {
+      "curves": [
+        {
+          "aliases": [
+            "gr",
+            "curve 1",
+            "gamma",
+            "gamma ray",
+            "gr"
+          ],
+          "channel": "GR",
+          "handle": "curve-1",
+          "id": "curve-1",
+          "label": "GR",
+          "scale_kind": "linear",
+          "scale_max": 150.0,
+          "scale_min": 0.0,
+          "scale_reverse": false,
+          "track_ref": 1
+        },
+        {
+          "aliases": [
+            "nphi",
+            "curve 2",
+            "neutron",
+            "neutron porosity",
+            "nphi"
+          ],
+          "channel": "NPHI",
+          "handle": "curve-2",
+          "id": "curve-2",
+          "label": "NPHI",
+          "scale_kind": "linear",
+          "scale_max": 0.45,
+          "scale_min": -0.15,
+          "scale_reverse": true,
+          "track_ref": 2
+        },
+        {
+          "aliases": [
+            "rhob",
+            "curve 3",
+            "density",
+            "bulk density",
+            "rhob"
+          ],
+          "channel": "RHOB",
+          "handle": "curve-3",
+          "id": "curve-3",
+          "label": "RHOB",
+          "scale_kind": "linear",
+          "scale_max": 2.95,
+          "scale_min": 1.95,
+          "scale_reverse": true,
+          "track_ref": 2
+        },
+        {
+          "aliases": [
+            "rt",
+            "curve 4",
+            "resistivity",
+            "res",
+            "deep resistivity",
+            "rt"
+          ],
+          "channel": "RT",
+          "handle": "curve-4",
+          "id": "curve-4",
+          "label": "RT",
+          "scale_kind": "log",
+          "scale_max": 2000.0,
+          "scale_min": 0.2,
+          "scale_reverse": false,
+          "track_ref": 3
+        },
+        {
+          "aliases": [
+            "cali",
+            "curve 5",
+            "caliper",
+            "cal",
+            "cali"
+          ],
+          "channel": "CALI",
+          "handle": "curve-5",
+          "id": "curve-5",
+          "label": "CALI",
+          "scale_kind": "linear",
+          "scale_max": 16.0,
+          "scale_min": 6.0,
+          "scale_reverse": false,
+          "track_ref": 4
+        },
+        {
+          "aliases": [
+            "dt",
+            "curve 6",
+            "sonic",
+            "slowness",
+            "dt"
+          ],
+          "channel": "DT",
+          "handle": "curve-6",
+          "id": "curve-6",
+          "label": "DT",
+          "scale_kind": "linear",
+          "scale_max": 140.0,
+          "scale_min": 40.0,
+          "scale_reverse": false,
+          "track_ref": 5
+        },
+        {
+          "aliases": [
+            "photoelectric",
+            "photoelectric factor",
+            "pef"
+          ],
+          "channel": "PEF",
+          "handle": null,
+          "id": "PEF",
+          "label": null,
+          "scale_kind": null,
+          "scale_max": null,
+          "scale_min": null,
+          "scale_reverse": null,
+          "track_ref": null
+        },
+        {
+          "aliases": [
+            "spontaneous potential",
+            "sp",
+            "sp"
+          ],
+          "channel": "SP",
+          "handle": null,
+          "id": "SP",
+          "label": null,
+          "scale_kind": null,
+          "scale_max": null,
+          "scale_min": null,
+          "scale_reverse": null,
+          "track_ref": null
+        },
+        {
+          "aliases": [
+            "micro resistivity",
+            "msfl",
+            "msfl"
+          ],
+          "channel": "MSFL",
+          "handle": null,
+          "id": "MSFL",
+          "label": null,
+          "scale_kind": null,
+          "scale_max": null,
+          "scale_min": null,
+          "scale_reverse": null,
+          "track_ref": null
+        }
+      ],
+      "depth_unit": "m",
+      "fills": [],
+      "fixture_id": "d5_petrophysics",
+      "focus_curve_handle": null,
+      "focus_track_ref": null,
+      "supported_depth_units": [
+        "m",
+        "ft"
+      ],
+      "tracks": [
+        {
+          "curves": [
+            "curve-1"
+          ],
+          "id": "gr",
+          "ref": 1,
+          "title": "Gamma Ray"
+        },
+        {
+          "curves": [
+            "curve-2",
+            "curve-3"
+          ],
+          "id": "porosity",
+          "ref": 2,
+          "title": "Density Neutron"
+        },
+        {
+          "curves": [
+            "curve-4"
+          ],
+          "id": "rt",
+          "ref": 3,
+          "title": "Resistivity"
+        },
+        {
+          "curves": [
+            "curve-5"
+          ],
+          "id": "cali",
+          "ref": 4,
+          "title": "Caliper"
+        },
+        {
+          "curves": [
+            "curve-6"
+          ],
+          "id": "sonic",
+          "ref": 5,
+          "title": "Sonic"
+        }
+      ]
+    },
+    "utterance": "Add a Petrophysics track with GR 0–150 and RT logarithmic 0.2–2000."
+  },
+  "projected_workspace_json": "{\"curves\":[{\"aliases\":[\"micro resistivity\",\"msfl\",\"msfl\"],\"channel\":\"MSFL\",\"id\":\"MSFL\"},{\"aliases\":[\"photoelectric\",\"photoelectric factor\",\"pef\"],\"channel\":\"PEF\",\"id\":\"PEF\"},{\"aliases\":[\"spontaneous potential\",\"sp\",\"sp\"],\"channel\":\"SP\",\"id\":\"SP\"},{\"aliases\":[\"gr\",\"curve 1\",\"gamma\",\"gamma ray\",\"gr\"],\"channel\":\"GR\",\"handle\":\"curve-1\",\"id\":\"curve-1\",\"label\":\"GR\",\"scale_kind\":\"linear\",\"scale_max\":150.0,\"scale_min\":0.0,\"scale_reverse\":false,\"track_ref\":1},{\"aliases\":[\"nphi\",\"curve 2\",\"neutron\",\"neutron porosity\",\"nphi\"],\"channel\":\"NPHI\",\"handle\":\"curve-2\",\"id\":\"curve-2\",\"label\":\"NPHI\",\"scale_kind\":\"linear\",\"scale_max\":0.45,\"scale_min\":-0.15,\"scale_reverse\":true,\"track_ref\":2},{\"aliases\":[\"rhob\",\"curve 3\",\"density\",\"bulk density\",\"rhob\"],\"channel\":\"RHOB\",\"handle\":\"curve-3\",\"id\":\"curve-3\",\"label\":\"RHOB\",\"scale_kind\":\"linear\",\"scale_max\":2.95,\"scale_min\":1.95,\"scale_reverse\":true,\"track_ref\":2},{\"aliases\":[\"rt\",\"curve 4\",\"resistivity\",\"res\",\"deep resistivity\",\"rt\"],\"channel\":\"RT\",\"handle\":\"curve-4\",\"id\":\"curve-4\",\"label\":\"RT\",\"scale_kind\":\"log\",\"scale_max\":2000.0,\"scale_min\":0.2,\"scale_reverse\":false,\"track_ref\":3},{\"aliases\":[\"cali\",\"curve 5\",\"caliper\",\"cal\",\"cali\"],\"channel\":\"CALI\",\"handle\":\"curve-5\",\"id\":\"curve-5\",\"label\":\"CALI\",\"scale_kind\":\"linear\",\"scale_max\":16.0,\"scale_min\":6.0,\"scale_reverse\":false,\"track_ref\":4},{\"aliases\":[\"dt\",\"curve 6\",\"sonic\",\"slowness\",\"dt\"],\"channel\":\"DT\",\"handle\":\"curve-6\",\"id\":\"curve-6\",\"label\":\"DT\",\"scale_kind\":\"linear\",\"scale_max\":140.0,\"scale_min\":40.0,\"scale_reverse\":false,\"track_ref\":5}],\"depth_unit\":\"m\",\"fills\":[],\"supported_depth_units\":[\"m\",\"ft\"],\"tracks\":[{\"curves\":[\"curve-1\"],\"id\":\"gr\",\"ref\":1,\"title\":\"Gamma Ray\"},{\"curves\":[\"curve-2\",\"curve-3\"],\"id\":\"porosity\",\"ref\":2,\"title\":\"Density Neutron\"},{\"curves\":[\"curve-4\"],\"id\":\"rt\",\"ref\":3,\"title\":\"Resistivity\"},{\"curves\":[\"curve-5\"],\"id\":\"cali\",\"ref\":4,\"title\":\"Caliper\"},{\"curves\":[\"curve-6\"],\"id\":\"sonic\",\"ref\":5,\"title\":\"Sonic\"}]}",
+  "source": "nlp_gate_modernbert.nl_program_eval.input.build_decomposer_input",
+  "utterance": "Add a Petrophysics track with GR 0–150 and RT logarithmic 0.2–2000."
+}

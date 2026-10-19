@@ -1,0 +1,158 @@
+{
+  "case_id": "D5GAP-0101",
+  "digests": {
+    "decomposer_input_sha256": "11327486a44838c9be9505ae71945d1ba6539a5ed7500b0002637c4d55f3b085",
+    "utterance_sha256": "d65c70f7a7e3f7edb106dd467a8978374e123879b5a79352ce2e264d77452f51",
+    "workspace_sha256": "1d4bcec6f36f33095a5fc7365f58b917dc8a3ddbf5cb9f1c935bcafa2645c57d"
+  },
+  "model_facing_payload": {
+    "projected_workspace": {
+      "curves": [
+        {
+          "aliases": [
+            "cbl",
+            "curve 1",
+            "cement bond",
+            "cbl"
+          ],
+          "channel": "CBL",
+          "handle": "curve-1",
+          "id": "curve-1",
+          "label": "CBL",
+          "scale_kind": "linear",
+          "scale_max": 100.0,
+          "scale_min": 0.0,
+          "scale_reverse": false,
+          "track_ref": 2
+        },
+        {
+          "aliases": [
+            "gr",
+            "curve 2",
+            "gamma",
+            "gamma ray",
+            "gr"
+          ],
+          "channel": "GR",
+          "handle": "curve-2",
+          "id": "curve-2",
+          "label": "GR",
+          "scale_kind": "linear",
+          "scale_max": 100.0,
+          "scale_min": 0.0,
+          "scale_reverse": false,
+          "track_ref": 4
+        },
+        {
+          "aliases": [
+            "cali",
+            "curve 3",
+            "caliper",
+            "cal",
+            "cali"
+          ],
+          "channel": "CALI",
+          "handle": "curve-3",
+          "id": "curve-3",
+          "label": "CALI",
+          "scale_kind": "linear",
+          "scale_max": 12.0,
+          "scale_min": 6.0,
+          "scale_reverse": false,
+          "track_ref": 5
+        },
+        {
+          "aliases": [
+            "rt",
+            "curve 4",
+            "resistivity",
+            "res",
+            "rt"
+          ],
+          "channel": "RT",
+          "handle": "curve-4",
+          "id": "curve-4",
+          "label": "RT",
+          "scale_kind": "log",
+          "scale_max": 2000.0,
+          "scale_min": 0.2,
+          "scale_reverse": false,
+          "track_ref": 6
+        },
+        {
+          "aliases": [
+            "vdl"
+          ],
+          "channel": "VDL",
+          "handle": null,
+          "id": "VDL",
+          "label": null,
+          "scale_kind": null,
+          "scale_max": null,
+          "scale_min": null,
+          "scale_reverse": null,
+          "track_ref": null
+        }
+      ],
+      "depth_unit": "ft",
+      "fills": [],
+      "fixture_id": "d5_main_las",
+      "focus_curve_handle": null,
+      "focus_track_ref": null,
+      "supported_depth_units": [
+        "m",
+        "ft"
+      ],
+      "tracks": [
+        {
+          "curves": [],
+          "id": "depth",
+          "ref": 1,
+          "title": "Depth"
+        },
+        {
+          "curves": [
+            "curve-1"
+          ],
+          "id": "cbl",
+          "ref": 2,
+          "title": "CBL"
+        },
+        {
+          "curves": [],
+          "id": "vdl",
+          "ref": 3,
+          "title": "VDL"
+        },
+        {
+          "curves": [
+            "curve-2"
+          ],
+          "id": "gr",
+          "ref": 4,
+          "title": "Gamma Ray"
+        },
+        {
+          "curves": [
+            "curve-3"
+          ],
+          "id": "cali",
+          "ref": 5,
+          "title": "Caliper"
+        },
+        {
+          "curves": [
+            "curve-4"
+          ],
+          "id": "rt",
+          "ref": 6,
+          "title": "Resistivity"
+        }
+      ]
+    },
+    "utterance": "Append a 24 mm Caliper QC track and plot CALI on it at 6–12."
+  },
+  "projected_workspace_json": "{\"curves\":[{\"aliases\":[\"vdl\"],\"channel\":\"VDL\",\"id\":\"VDL\"},{\"aliases\":[\"cbl\",\"curve 1\",\"cement bond\",\"cbl\"],\"channel\":\"CBL\",\"handle\":\"curve-1\",\"id\":\"curve-1\",\"label\":\"CBL\",\"scale_kind\":\"linear\",\"scale_max\":100.0,\"scale_min\":0.0,\"scale_reverse\":false,\"track_ref\":2},{\"aliases\":[\"gr\",\"curve 2\",\"gamma\",\"gamma ray\",\"gr\"],\"channel\":\"GR\",\"handle\":\"curve-2\",\"id\":\"curve-2\",\"label\":\"GR\",\"scale_kind\":\"linear\",\"scale_max\":100.0,\"scale_min\":0.0,\"scale_reverse\":false,\"track_ref\":4},{\"aliases\":[\"cali\",\"curve 3\",\"caliper\",\"cal\",\"cali\"],\"channel\":\"CALI\",\"handle\":\"curve-3\",\"id\":\"curve-3\",\"label\":\"CALI\",\"scale_kind\":\"linear\",\"scale_max\":12.0,\"scale_min\":6.0,\"scale_reverse\":false,\"track_ref\":5},{\"aliases\":[\"rt\",\"curve 4\",\"resistivity\",\"res\",\"rt\"],\"channel\":\"RT\",\"handle\":\"curve-4\",\"id\":\"curve-4\",\"label\":\"RT\",\"scale_kind\":\"log\",\"scale_max\":2000.0,\"scale_min\":0.2,\"scale_reverse\":false,\"track_ref\":6}],\"depth_unit\":\"ft\",\"fills\":[],\"supported_depth_units\":[\"m\",\"ft\"],\"tracks\":[{\"curves\":[],\"id\":\"depth\",\"ref\":1,\"title\":\"Depth\"},{\"curves\":[\"curve-1\"],\"id\":\"cbl\",\"ref\":2,\"title\":\"CBL\"},{\"curves\":[],\"id\":\"vdl\",\"ref\":3,\"title\":\"VDL\"},{\"curves\":[\"curve-2\"],\"id\":\"gr\",\"ref\":4,\"title\":\"Gamma Ray\"},{\"curves\":[\"curve-3\"],\"id\":\"cali\",\"ref\":5,\"title\":\"Caliper\"},{\"curves\":[\"curve-4\"],\"id\":\"rt\",\"ref\":6,\"title\":\"Resistivity\"}]}",
+  "source": "nlp_gate_modernbert.nl_program_eval.input.build_decomposer_input",
+  "utterance": "Append a 24 mm Caliper QC track and plot CALI on it at 6–12."
+}

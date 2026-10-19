@@ -1,0 +1,35 @@
+{
+  "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
+  "phase0_design_acceptance": "WP-DC02-PHASE0-DESIGN-ACCEPT-001",
+  "repository_home": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02",
+  "reuse_note": "Reuse accepted nlp_gate_modernbert harness/grammar/eval; do not fork production WELL-IR runtime.",
+  "phase0": {
+    "C02-00": {
+      "title": "Experimental provenance and baseline recovery",
+      "design_status": "FROZEN",
+      "authority": "WP-DC02-00-BASELINE-RECOVERY-AUTH-001",
+      "execution_status": "EXECUTED_AWAITING_REVIEW"
+    },
+    "C02-01": {
+      "title": "Frozen benchmark and semantic oracle",
+      "design_status": "FROZEN_AS_PHASE0_INVENTORY",
+      "authority": null,
+      "execution_status": "NOT_AUTHORIZED"
+    },
+    "C02-02": {
+      "title": "Model/provider harness qualification",
+      "design_status": "FROZEN_AS_PHASE0_INVENTORY",
+      "authority": null,
+      "execution_status": "NOT_AUTHORIZED",
+      "blocker": "gemini_4_argon_openrouter_model_id_MUST_BE_RESOLVED_BEFORE_ACCEPTANCE"
+    },
+    "G0": {
+      "title": "Phase 0 readiness review",
+      "design_status": "FROZEN",
+      "execution_status": "NOT_REACHED"
+    }
+  },
+  "provisional_later_phases": "C02-03_through_C02-17_PROPOSED_NOT_FROZEN",
+  "model_calls_authorized": 0,
+  "openrouter_calls_authorized": 0
+}
