@@ -1,6 +1,7 @@
 {
   "authority": "WP-DC02-01-BENCHMARK-ORACLE-AUTH-001",
   "benchmark_id": "DECOMPOSER-PILOT-01-SIX-CASE-PROBE",
+  "candidate_sha": "8965dfb3571f36f413359042238434dc7ee12a32",
   "cases": [
     {
       "c02_00_archive_input": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0085/recovered_input.json",
