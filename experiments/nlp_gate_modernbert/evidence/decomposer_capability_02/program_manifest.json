@@ -6,8 +6,8 @@
     {
       "display_name": "Gemini 4 Argon",
       "id": "gemini-4-argon",
-      "openrouter_model_id": null,
-      "openrouter_model_id_status": "NOT_RESOLVED_REQUIRED_BEFORE_C02_02",
+      "openrouter_model_id": "google/gemini-4-argon",
+      "openrouter_model_id_status": "RESOLVED_C02_02",
       "provider": "OpenRouter",
       "role": "frontier_capability_ceiling",
       "training_eligible": false
@@ -36,7 +36,9 @@
         "Cost-effectiveness metrics (correctness per dollar; cost per completely correct request including retries) planned for later phases"
       ],
       "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+      "openrouter_model_id_status": "RESOLVED_C02_02",
       "provider": "OpenRouter",
+      "provider_price_snapshot": "c02_02/provider_price_routing_snapshot.json",
       "released": "2026-10-17",
       "role": "budget_capability_reference",
       "training_eligible": false
@@ -60,16 +62,17 @@
       "title": "Experimental provenance and baseline recovery"
     },
     "C02-01": {
+      "accepted_tip": "9025ecbb6c2ceaf4a2ee89da53a1242eb96d7f67",
       "authority": "WP-DC02-01-BENCHMARK-ORACLE-AUTH-001",
       "design_status": "FROZEN_AS_PHASE0_INVENTORY",
-      "execution_status": "EXECUTED_AWAITING_REVIEW",
+      "execution_status": "CLOSED_ACCEPTED",
       "title": "Frozen benchmark and semantic oracle"
     },
     "C02-02": {
-      "authority": null,
-      "blocker": "gemini_4_argon_openrouter_model_id_MUST_BE_RESOLVED_BEFORE_ACCEPTANCE",
+      "authority": "WP-DC02-02-PROVIDER-HARNESS-QUALIFICATION-AUTH-001",
+      "blocker": null,
       "design_status": "FROZEN_AS_PHASE0_INVENTORY",
-      "execution_status": "NOT_AUTHORIZED",
+      "execution_status": "EXECUTED_AWAITING_REVIEW",
       "title": "Model/provider harness qualification"
     },
     "G0": {

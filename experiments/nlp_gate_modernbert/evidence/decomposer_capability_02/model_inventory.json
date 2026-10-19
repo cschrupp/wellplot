@@ -10,8 +10,8 @@
     {
       "display_name": "Gemini 4 Argon",
       "id": "gemini-4-argon",
-      "openrouter_model_id": null,
-      "openrouter_model_id_status": "NOT_RESOLVED_REQUIRED_BEFORE_C02_02",
+      "openrouter_model_id": "google/gemini-4-argon",
+      "openrouter_model_id_status": "RESOLVED_C02_02",
       "provider": "OpenRouter",
       "role": "frontier_capability_ceiling",
       "training_eligible": false
@@ -40,7 +40,9 @@
         "Cost-effectiveness metrics (correctness per dollar; cost per completely correct request including retries) planned for later phases"
       ],
       "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+      "openrouter_model_id_status": "RESOLVED_C02_02",
       "provider": "OpenRouter",
+      "provider_price_snapshot": "c02_02/provider_price_routing_snapshot.json",
       "released": "2026-10-17",
       "role": "budget_capability_reference",
       "training_eligible": false
