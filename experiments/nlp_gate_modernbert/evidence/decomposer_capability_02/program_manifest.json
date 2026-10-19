@@ -42,7 +42,7 @@
     "execution_status": "REVIEWED_FULL_RUN_BLOCKED",
     "logical_calls": 2
   },
-  "candidate_sha": "8dd74b0f5871ff6b0e9a052bd2ba305ba4811925",
+  "candidate_sha": "3887bd59937d996af351f68320ce0d06264d981a",
   "gemini_six_case_execution_authorized": false,
   "inference_authorized": false,
   "live_scientific_execution_readiness": "NOT_ESTABLISHED",

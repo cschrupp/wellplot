@@ -74,6 +74,7 @@
     "transport_attempts": 1
   },
   "authority": "WP-DC02-03-DEEPSEEK-CORRECTIVE-SMOKE-AUTH-001",
+  "candidate_sha": "3887bd59937d996af351f68320ce0d06264d981a",
   "cases_2_through_6_executed": false,
   "completed_utc": "2026-10-19T23:26:43.910104+00:00",
   "completion_tokens": 1329,
