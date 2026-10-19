@@ -229,5 +229,6 @@
     "frozen_historical_baseline"
   ],
   "sixth_call_note": "D5GAP-0101 is a protocol call; Layer-0 decode failure in Run 1; not assumed to be an additional semantic success case",
-  "slice": "C02-01"
+  "slice": "C02-01",
+  "tip_sha": "a994e0eb5dc5a0652106b55bf0d686865be2890a"
 }
