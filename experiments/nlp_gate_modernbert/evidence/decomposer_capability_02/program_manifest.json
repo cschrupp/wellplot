@@ -1,35 +1,36 @@
 {
-  "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
-  "phase0_design_acceptance": "WP-DC02-PHASE0-DESIGN-ACCEPT-001",
-  "repository_home": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02",
-  "reuse_note": "Reuse accepted nlp_gate_modernbert harness/grammar/eval; do not fork production WELL-IR runtime.",
+  "candidate_sha": "3f42c9a2449f932ff4d4fd4abc2ba5ae0cca11e9",
+  "model_calls_authorized": 0,
+  "openrouter_calls_authorized": 0,
   "phase0": {
     "C02-00": {
-      "title": "Experimental provenance and baseline recovery",
-      "design_status": "FROZEN",
       "authority": "WP-DC02-00-BASELINE-RECOVERY-AUTH-001",
-      "execution_status": "EXECUTED_AWAITING_REVIEW"
+      "design_status": "FROZEN",
+      "execution_status": "EXECUTED_AWAITING_REVIEW",
+      "title": "Experimental provenance and baseline recovery"
     },
     "C02-01": {
-      "title": "Frozen benchmark and semantic oracle",
-      "design_status": "FROZEN_AS_PHASE0_INVENTORY",
       "authority": null,
-      "execution_status": "NOT_AUTHORIZED"
+      "design_status": "FROZEN_AS_PHASE0_INVENTORY",
+      "execution_status": "NOT_AUTHORIZED",
+      "title": "Frozen benchmark and semantic oracle"
     },
     "C02-02": {
-      "title": "Model/provider harness qualification",
-      "design_status": "FROZEN_AS_PHASE0_INVENTORY",
       "authority": null,
+      "blocker": "gemini_4_argon_openrouter_model_id_MUST_BE_RESOLVED_BEFORE_ACCEPTANCE",
+      "design_status": "FROZEN_AS_PHASE0_INVENTORY",
       "execution_status": "NOT_AUTHORIZED",
-      "blocker": "gemini_4_argon_openrouter_model_id_MUST_BE_RESOLVED_BEFORE_ACCEPTANCE"
+      "title": "Model/provider harness qualification"
     },
     "G0": {
-      "title": "Phase 0 readiness review",
       "design_status": "FROZEN",
-      "execution_status": "NOT_REACHED"
+      "execution_status": "NOT_REACHED",
+      "title": "Phase 0 readiness review"
     }
   },
+  "phase0_design_acceptance": "WP-DC02-PHASE0-DESIGN-ACCEPT-001",
+  "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
   "provisional_later_phases": "C02-03_through_C02-17_PROPOSED_NOT_FROZEN",
-  "model_calls_authorized": 0,
-  "openrouter_calls_authorized": 0
+  "repository_home": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02",
+  "reuse_note": "Reuse accepted nlp_gate_modernbert harness/grammar/eval; do not fork production WELL-IR runtime."
 }

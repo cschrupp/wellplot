@@ -17,6 +17,7 @@
     "runtime": "CPU / FP32",
     "semantic_equivalents_among_frozen": "0/5"
   },
+  "candidate_sha": "3f42c9a2449f932ff4d4fd4abc2ba5ae0cca11e9",
   "case_verification": [
     {
       "all_pass": true,
@@ -344,5 +345,6 @@
   "slice": "C02-00",
   "slice_title": "Experimental provenance and baseline recovery",
   "starting_repository_tip": "b451d9ca431c235e5779340f9dcc188764cb1446",
+  "status": "EXECUTED_AWAITING_INDEPENDENT_REVIEW",
   "synthetic_recreation": false
 }
