@@ -432,5 +432,6 @@
     }
   ],
   "status": "STOP_FOR_INDEPENDENT_HOSTED_SCREENING_REVIEW",
+  "tip_sha": "413547f4721fb461ba429c3b5cc433e424c4b973",
   "transport_attempts_new": 10
 }
