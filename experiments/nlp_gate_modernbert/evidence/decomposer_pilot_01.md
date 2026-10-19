@@ -17,7 +17,7 @@ CANDIDATE SHA:
 32edc35af3824b7f62e60c6d8fa572051e135580
 
 TIP:
-(pending SHA-record commit)
+fcfab82e0b1fec15550ed712a14caa9dce6ba64e
 
 HIGH-LEVEL MODEL CALLS:
 6 / 6
