@@ -1,0 +1,113 @@
+{
+  "d5_ref": "d5/single-engine-convergence",
+  "d5_sha": "560ec48d2b2809ed2feb55467da15195f527ec44",
+  "fixture_format": "d5_semantic_manifest_r1",
+  "manifest": {
+    "aliases": {},
+    "existing_curves": [
+      {
+        "aliases": [
+          "neutron",
+          "neutron porosity"
+        ],
+        "channel": "NPHI",
+        "handle": "curve-1",
+        "label": "NPHI",
+        "scale": {
+          "kind": "linear",
+          "maximum": 0.45,
+          "minimum": -0.15,
+          "reverse": true
+        },
+        "track_ref": 1,
+        "track_title": "Porosity"
+      },
+      {
+        "aliases": [
+          "density porosity",
+          "dphi"
+        ],
+        "channel": "DPHI",
+        "handle": "curve-2",
+        "label": "DPHI",
+        "scale": {
+          "kind": "linear",
+          "maximum": 0.45,
+          "minimum": -0.15,
+          "reverse": true
+        },
+        "track_ref": 1,
+        "track_title": "Porosity"
+      },
+      {
+        "aliases": [],
+        "channel": "GR",
+        "handle": "curve-3",
+        "label": "GR",
+        "scale": {
+          "kind": "linear",
+          "maximum": 150,
+          "minimum": 0,
+          "reverse": false
+        },
+        "track_ref": 2,
+        "track_title": "Gamma Ray"
+      }
+    ],
+    "fills": [],
+    "fixture_id": "d5_porosity_pair",
+    "focus": null,
+    "note": "NPHI and DPHI share one normal track and identical effective scales, satisfying the renderer fill-axis contract.",
+    "section": {
+      "depth_unit": "m",
+      "id": "main",
+      "title": "Main Log"
+    },
+    "sources": [
+      {
+        "candidate_id": "source-1",
+        "channels": [
+          {
+            "aliases": [
+              "neutron",
+              "neutron porosity"
+            ],
+            "kind": "scalar",
+            "mnemonic": "NPHI",
+            "unit": "v/v"
+          },
+          {
+            "aliases": [
+              "density porosity",
+              "dphi"
+            ],
+            "kind": "scalar",
+            "mnemonic": "DPHI",
+            "unit": "v/v"
+          },
+          {
+            "aliases": [],
+            "kind": "scalar",
+            "mnemonic": "GR",
+            "unit": "API"
+          }
+        ],
+        "source_format": "las"
+      }
+    ],
+    "tracks": [
+      {
+        "id": "porosity",
+        "kind": "normal",
+        "ref": 1,
+        "title": "Porosity"
+      },
+      {
+        "id": "gr",
+        "kind": "normal",
+        "ref": 2,
+        "title": "Gamma Ray"
+      }
+    ]
+  }
+}

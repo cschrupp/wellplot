@@ -1,0 +1,30 @@
+{
+  "confusion": {
+    "ambiguous": {
+      "ambiguous": 0,
+      "invalid": 1,
+      "ok": 4,
+      "unsupported": 0
+    },
+    "invalid": {
+      "ambiguous": 0,
+      "invalid": 0,
+      "ok": 2,
+      "unsupported": 0
+    },
+    "ok": {
+      "ambiguous": 0,
+      "invalid": 21,
+      "ok": 36,
+      "unsupported": 0
+    },
+    "unsupported": {
+      "ambiguous": 0,
+      "invalid": 0,
+      "ok": 4,
+      "unsupported": 2
+    }
+  },
+  "false_ok_on_ambiguous": 4,
+  "macro_f1": 0.2997572815533981
+}

@@ -1,0 +1,21 @@
+{
+  "candidate_digest": null,
+  "canonicalization_version": null,
+  "case_id": "D5GAP-0101",
+  "decomposer_input_keys": [
+    "projected_workspace",
+    "utterance"
+  ],
+  "diagnostics": [],
+  "failure_labels": [
+    "DECOMPOSITION_SCHEMA_INVALID"
+  ],
+  "freeze_detail": "2 validation errors for ClosedNormalizedProgram\ntasks\n  Field required [type=missing, input_value={'operations': [{'local_r...': 'track_caliper_qc'}]}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\noperations\n  Extra inputs are not permitted [type=extra_forbidden, input_value=[{'local_ref': 'track_cal...f': 'track_caliper_qc'}], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden",
+  "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+  "oracle_access_before_freeze": false,
+  "oracle_access_enabled_after_freeze": false,
+  "q3_comparison": {},
+  "runtime_gate": {},
+  "schema_valid": false,
+  "semantically_equivalent": false
+}

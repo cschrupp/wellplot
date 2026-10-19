@@ -28,6 +28,25 @@ This repository currently contains the current MVP baseline:
 - annotation tracks with typed `interval`, `text`, `marker`, `arrow`, and `glyph` objects
 - dedicated annotation label lanes for dense tracks
 
+
+### Experimental natural-language authoring runtime
+
+This branch also contains experimental work under `experiments/nlp_gate_modernbert/` for a
+natural-language authoring layer over the deterministic WellPlot document/runtime model.
+
+The current experimental foundation includes:
+
+- typed ordered `ScopeNormalizedProgram` tasks
+- deterministic semantic resolution / validation
+- oracle-safe evaluation tooling
+- an engine-neutral `WELL-EBNF-1` constraint representation
+- a deterministic patched-schema → `WELL-EBNF-1` generator with independent parity tests
+
+This work is **not yet part of the public WellPlot API**. The current decomposer model has not yet
+been cleanly evaluated through the complete constrained-decoding path; engine/tokenizer
+integration is the next experiment boundary.
+
+
 ## Architecture
 
 The package separates three layers:

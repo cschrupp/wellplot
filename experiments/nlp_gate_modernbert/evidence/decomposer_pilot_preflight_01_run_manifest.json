@@ -1,0 +1,210 @@
+{
+  "CONSTRAINT": {
+    "backend": "Outlines outlines_core via HF Transformers tokenizer path",
+    "backend_versions": {
+      "outlines": "1.3.3",
+      "outlines_core": "0.2.14"
+    },
+    "bytes_written": 5573,
+    "canonical_json_spec": {
+      "ensure_ascii": false,
+      "separators": [
+        ",",
+        ":"
+      ],
+      "sort_keys": true
+    },
+    "canonical_json_version": "decomposer_pilot_preflight_01.canonical_json.v1",
+    "constraint_patch_version": "decomposer_pilot_preflight_01.constraint_patch.v1",
+    "constraint_patcher_source_sha256": "efd9c7de143053c2e109d38a509a0ac48050a307c0e1f41220068074dbead727",
+    "constraint_source": "ClosedNormalizedProgram.model_json_schema() + XOR oneOf patch with pattern .*\\S.* on text/local_ref",
+    "outlines_compile": {
+      "backend": "outlines.types.JsonSchema",
+      "compiled": true,
+      "input_bytes": 5573,
+      "schema_attr_present": true,
+      "schema_type": "JsonSchema"
+    },
+    "parity_pass": false,
+    "patched_constraint_schema_sha256": "7fd52c8209be91495137ee03cc2fa78133c0e6657bfc2f45aac12eb59dd14848",
+    "path": "/home/user/projects/wellplot/experiments/nlp_gate_modernbert/evidence/decomposer_pilot_preflight_01_constraint.schema.json",
+    "raw_pydantic_schema_sha256": "6e3442ca5f396d44537a24bb60af107a455cefd1cdb0c8f870065a56cb238fa1",
+    "same_artifact_for_all_six": true
+  },
+  "GOVERNANCE": {
+    "model_weights_loaded": false,
+    "no_backend_swap": true,
+    "no_cfg_fallback": true,
+    "no_download": true,
+    "no_model_forward": true,
+    "no_model_generate": true,
+    "no_sealed_six_prompt_tuning": true,
+    "rework": [
+      "R1_nonempty_pattern",
+      "R2_token_guide",
+      "R3_provenance_pins"
+    ],
+    "slm01_root": "/home/user/projects/wellplot/experiments/nlp_slm_01",
+    "template_smoke": {
+      "chat_template_text_sha256": "e255510bc9a300c02dda23801a72e4c6a5736d5a995768cb44791f9651727b03",
+      "input_ids_length": 254,
+      "input_ids_sha256": "3380b3e8905d78e762e9c56aafd8e6f1c5bbcb8a412de8b1ec46e08de840ec6d",
+      "local_files_only": true,
+      "messages_sha256": "337f66f8c2f2ca63519330ed147202551cd7e6ddefbe714258425f75f0d4ec12",
+      "model_weights_loaded": false,
+      "tokenizer_loaded_from": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/modelscope_cache/models/Qwen--Qwen3-1.7B/snapshots/master"
+    }
+  },
+  "INFERENCE": {
+    "adapters": "NONE",
+    "auto_download": false,
+    "do_sample": false,
+    "fallback_model": "NONE",
+    "inference_config_sha256": "6daab17278547241563d1bc6bec92fcdd882ed48c8de3e18db81e737c732b54b",
+    "max_new_tokens": 1024,
+    "rng_policy": "random.seed(SEED); numpy.random.seed(SEED); torch.manual_seed(SEED); torch.cuda.manual_seed_all(SEED) if cuda",
+    "runtime": {
+      "cuda_available": false,
+      "device": "cpu",
+      "device_policy": "cuda_if_available_else_cpu",
+      "dtype": "float32",
+      "dtype_policy": "float16_if_cuda_else_float32",
+      "torch_version": "2.14.1+cpu"
+    },
+    "seed": 20261016,
+    "temperature": 0.0,
+    "thinking_disable_mechanism": "apply_chat_template(..., enable_thinking=False)",
+    "thinking_enabled": false,
+    "version": "decomposer_pilot_preflight_01.inference.v1"
+  },
+  "MODEL": {
+    "adapters": "NONE",
+    "aggregate_weight_manifest_sha256": "005d20550c04f4e246e5b434448786b44a0196b47d758d0acc77aba279e5bbc5",
+    "all_config_artifact_sha256": {
+      "config.json": "1ddb5b89ebc90dcb417a45c213d818577e65976454d29385c8f6140771d95197",
+      "configuration.json": "f888421726665e8a84b738eed42a64875aed79de8be7daade851ac8bf4c0cef9",
+      "generation_config.json": "2325da0f15bb848e018c5ae071b7943332e9f871d6b60e2ed22ca97d4cb993d2",
+      "merges.txt": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+      "tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+      "tokenizer_config.json": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+      "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    },
+    "auto_download": false,
+    "config_sha256": "1ddb5b89ebc90dcb417a45c213d818577e65976454d29385c8f6140771d95197",
+    "fallback_model": "NONE",
+    "model_id": "Qwen/Qwen3-1.7B",
+    "model_index_sha256": "0d660e94b165eb912669a5249dff44b83188c4777a07ddb9611fb78d91b0578d",
+    "snapshot_path": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/modelscope_cache/models/Qwen--Qwen3-1.7B/snapshots/master",
+    "snapshot_revision": "master",
+    "source": "existing local ModelScope snapshot",
+    "tokenizer_artifact_sha256": {
+      "merges.txt": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+      "tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+      "tokenizer_config.json": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+      "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    },
+    "variant": "instruction/non-Base checkpoint",
+    "weight_file_manifest": [
+      {
+        "path": "model-00001-of-00002.safetensors",
+        "sha256": "169ad53ec313c3a34b06c0809216e4fc072cce444a5d4ff2b59690d064130ed5",
+        "size_bytes": 3441185608
+      },
+      {
+        "path": "model-00002-of-00002.safetensors",
+        "sha256": "912becff8d60672aa8628ef08c05898d9adf17c2ad4ae3caf99b065622fdeff9",
+        "size_bytes": 622329984
+      }
+    ]
+  },
+  "PROMPT": {
+    "chat_template_kwargs": {
+      "add_generation_prompt": true,
+      "enable_thinking": false,
+      "tokenize": false
+    },
+    "chat_template_text_sha256": "e255510bc9a300c02dda23801a72e4c6a5736d5a995768cb44791f9651727b03",
+    "dummy_smoke": {
+      "note": "fixed dummy for template smoke only; not sealed-six material",
+      "utterance": "place the GR curve on track 1"
+    },
+    "exemplars": 0,
+    "input_ids_sha256": "3380b3e8905d78e762e9c56aafd8e6f1c5bbcb8a412de8b1ec46e08de840ec6d",
+    "messages_encoding_sha256": "337f66f8c2f2ca63519330ed147202551cd7e6ddefbe714258425f75f0d4ec12",
+    "regime": "zero-shot",
+    "system_prompt_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+    "thinking_disable_mechanism": "enable_thinking=False via apply_chat_template",
+    "user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+    "version": "decomposer_pilot_preflight_01.prompt.v1"
+  },
+  "SOFTWARE": {
+    "jsonschema": "4.26.0",
+    "outlines": "1.3.3",
+    "outlines_core": "0.2.14",
+    "pydantic": "2.14.1",
+    "python": "3.13.11",
+    "required": {
+      "outlines": "1.3.3",
+      "outlines_core": "0.2.14"
+    },
+    "torch": "2.14.1+cpu",
+    "transformers": "5.19.0"
+  },
+  "TOKEN_LEVEL_CONSTRAINT": {
+    "backend": "outlines_core",
+    "constraint_schema_sha256": "7fd52c8209be91495137ee03cc2fa78133c0e6657bfc2f45aac12eb59dd14848",
+    "construction": "FAIL",
+    "error": "Failed to build DFA number of DFA states exceeds limit of 2147483647",
+    "error_type": "ValueError",
+    "local_files_only": true,
+    "model_forward_calls": 0,
+    "model_generate_calls": 0,
+    "model_weights_loaded": false,
+    "process_logits_invoked": false,
+    "tokenizer_snapshot": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/modelscope_cache/models/Qwen--Qwen3-1.7B/snapshots/master"
+  },
+  "WORKSPACE_SERIALIZATION": {
+    "exclude_none": true,
+    "implementation_sha256": "95514c73fc1a25c5c52d784a3c2126543dfd8845f8f21aabafd103642a152740",
+    "json_dumps": {
+      "ensure_ascii": false,
+      "separators": [
+        ",",
+        ":"
+      ],
+      "sort_keys": true
+    },
+    "omit_fields": [
+      "fixture_id"
+    ],
+    "preserve_nested_array_order": [
+      "aliases",
+      "TrackFact.curves",
+      "supported_depth_units"
+    ],
+    "sort_curves_by": "(id, handle-or-empty)",
+    "sort_fills_by": "ref",
+    "sort_tracks_by": "ref",
+    "version": "decomposer_pilot_preflight_01.workspace_serialize.v1"
+  },
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-PREFLIGHT-01-REWORK-AUTH-001",
+  "candidate_sha": "f5a9f1d947212cd0b2ea0fe588dc1409df126e7f",
+  "failures": [
+    "parity_failed:['xor_both', 'xor_text_whitespace_tab', 'xor_local_ref_whitespace_tab']",
+    "token_level_constraint:Failed to build DFA number of DFA states exceeds limit of 2147483647"
+  ],
+  "generate_guard": [
+    "GenerationMixin.generate_blocked"
+  ],
+  "model_calls": 0,
+  "parent_design_tip": "d180050eddee5bb8e4f1a9a370fe1a8c83ddd7bc",
+  "pass_does_not_authorize_pilot_01": true,
+  "pilot_01": "NOT_AUTHORIZED",
+  "prior_candidate": "4d140dc1c0805ee77dbb906ea3f2866cf15f1152",
+  "prior_preflight_01_result": "REVISE",
+  "result": "FAIL",
+  "slice": "DECOMPOSER-PILOT-PREFLIGHT-01R",
+  "starting_sha": "1d84071576704909c9dce7e24011eb813009201c",
+  "starting_tip": "1d84071576704909c9dce7e24011eb813009201c",
+  "tip_sha": "6c4fc67c04e72c201778064f1afea39d235e9372"
+}

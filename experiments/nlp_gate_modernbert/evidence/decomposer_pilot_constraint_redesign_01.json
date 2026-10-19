@@ -1,0 +1,273 @@
+{
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-REDESIGN-01-REWORK-AUTH-001",
+  "slice": "DECOMPOSER-PILOT-CONSTRAINT-REDESIGN-01R",
+  "stage": "A_PAPER_DOCS_COMPATIBILITY",
+  "starting_tip": "c6aba48be4c2f8b7e7cf0954f812b2838883ab12",
+  "prior_stage_a_candidate": "bce546960284be712e0d3b8f4d80d1eaec14e60f",
+  "prior_stage_a_result": "REVISE",
+  "candidate_sha": "b249b810908cbc0283e62f18e8780a4a4f7144d3",
+  "tip_sha": "e8032453e1489a5e7a0c05567f0f02128215b298",
+  "parent": {
+    "slice": "DECOMPOSER-PILOT-PREFLIGHT-01R",
+    "result": "FAIL",
+    "candidate_sha": "f5a9f1d947212cd0b2ea0fe588dc1409df126e7f"
+  },
+  "rework": {
+    "R1": "XGrammar 0.2.8 / PR #672: non-provably-disjoint oneOf warns and falls back to anyOf (not fail-closed)",
+    "R2": "frozen text-vs-local_ref XOR object arms are outside v0.2.8 published disjointness proofs",
+    "R3": "G9 fail_closed_behavior = UNSUPPORTED; G2a qualifies native oneOf unavailable for this shape",
+    "R4": "XGRAMMAR_STAGE_A = REJECT_BACKEND"
+  },
+  "primary_backend_family": "XGrammar",
+  "json_schema_route_status": "REJECTED_ON_PAPER",
+  "docs_version_reference": "XGrammar 0.2.8 (includes PR #672 behavior) + published disjointness proof scope (paper only; not installed)",
+  "model_calls": 0,
+  "install_authorized": false,
+  "code_authorized": false,
+  "stage_b_authorized": false,
+  "pilot_01": "NOT_AUTHORIZED",
+  "input_contract": "exact frozen patched ClosedNormalizedProgram schema (decomposer_pilot_preflight_01_constraint.schema.json)",
+  "tokenizer_contract": "exact pinned local Qwen3-1.7B tokenizer",
+  "classification_vocabulary": [
+    "SUPPORTED",
+    "UNSUPPORTED",
+    "UNCLEAR_REQUIRES_CONSTRUCTION_PROBE"
+  ],
+  "stage_a_decision_criteria": {
+    "proceed_only_if": [
+      "no required semantic feature is documented unsupported",
+      "no evidence shows XGrammar necessarily weakens the frozen schema",
+      "remaining uncertainty is empirical/constructibility rather than a known contract mismatch"
+    ],
+    "reject_if": [
+      "any required gate is UNSUPPORTED"
+    ]
+  },
+  "xor_shape_vs_disjointness_prover": {
+    "branch_a": {
+      "required": [
+        "kind",
+        "text"
+      ],
+      "kind": "same enum as branch B",
+      "text": "pattern .*\\S.*",
+      "additionalProperties": false
+    },
+    "branch_b": {
+      "required": [
+        "kind",
+        "local_ref"
+      ],
+      "kind": "same enum as branch A",
+      "local_ref": "pattern .*\\S.*",
+      "additionalProperties": false
+    },
+    "prover_capabilities_v0_2_8": [
+      "common required discriminator with finite disjoint const/enum values per branch",
+      "simple type / finite-value arms"
+    ],
+    "covered_by_published_proofs": false,
+    "reason": "kind is the only finite common required key and its enum overlaps completely; text/local_ref are not common discriminators and are not finite const/enum; type/finite proof does not apply to these complex object schemas",
+    "documented_converter_path": "oneOf unsupported for this shape → WARNING → ParseAnyOf(...)"
+  },
+  "gates": [
+    {
+      "gate_id": "G1",
+      "gate_name": "hard_token_level_enforcement",
+      "classification": "SUPPORTED",
+      "requirement": "Hard token-level masking during decode; not post-hoc validation-only.",
+      "evidence": "XGrammar constrained-decoding docs: per-step token bitmask applied to logits (−∞ for illegal tokens). HF path: xgr.contrib.hf.LogitsProcessor(compiled_grammar).",
+      "citation": [
+        "https://xgrammar.mlc.ai/docs/latest/start/constrained_decoding.md",
+        "https://xgrammar.mlc.ai/docs/latest/start/quick_start.html"
+      ],
+      "rationale": "Public architecture is explicit token-mask constrained decoding via GrammarMatcher.fill_next_token_bitmask / HF LogitsProcessor.",
+      "stage_b_required": false
+    },
+    {
+      "gate_id": "G2",
+      "gate_name": "frozen_ClosedNormalizedProgram_fidelity",
+      "classification": "UNCLEAR_REQUIRES_CONSTRUCTION_PROBE",
+      "requirement": "Exact support for the frozen patched ClosedNormalizedProgram JSON Schema artifact (full nesting, enums, nullables, XOR patch).",
+      "evidence": "compile_json_schema accepts schema string/dict/Pydantic; Draft 2020-12 subset documented. JSON-Schema route for our XOR oneOf is rejected on G9 policy grounds before fidelity probing.",
+      "citation": [
+        "https://xgrammar.mlc.ai/docs/latest/api/python/grammar_compiler.html",
+        "https://deepwiki.com/mlc-ai/xgrammar/5.2-supported-json-schema-features"
+      ],
+      "rationale": "Broader compile surface remains plausible; route blocked by fail-closed policy mismatch, not by claiming full-schema compile impossible.",
+      "stage_b_required": false
+    },
+    {
+      "gate_id": "G2a",
+      "gate_name": "json_schema_oneof",
+      "classification": "UNCLEAR_REQUIRES_CONSTRUCTION_PROBE",
+      "requirement": "Exact XOR oneOf for ClosedSemanticQuery branches (text-only vs local_ref-only); reject both/neither.",
+      "evidence": "XGrammar 0.2.8 (PR #672): when oneOf branches are not proven pairwise disjoint, converter warns and recompiles via ParseAnyOf (anyOf semantics). Published disjointness proofs cover common required discriminator with finite disjoint const/enum, or simple type/finite arms — not our text-vs-local_ref object arms with overlapping kind enums. Native fail-closed oneOf handling is unavailable for this shape. Resulting anyOf language may still equal intended oneOf if additionalProperties:false is faithful (xor_both equivalence remains empirical), but that does not restore native oneOf fail-closed.",
+      "citation": [
+        "https://github.com/mlc-ai/xgrammar/pull/672",
+        "https://github.com/mlc-ai/xgrammar/blob/main/cpp/json_schema_converter.cc",
+        "https://deepwiki.com/mlc-ai/xgrammar/5.2-supported-json-schema-features"
+      ],
+      "rationale": "NATIVE_ONEOF_UNSUPPORTED_FOR_THIS_SHAPE; anyOf-equivalence of acceptance language remains empirically testable but is moot for Stage A progression after G9 UNSUPPORTED.",
+      "native_fail_closed_oneof": false,
+      "qualification": "NATIVE_ONEOF_UNSUPPORTED_FOR_THIS_SHAPE",
+      "stage_b_required": false
+    },
+    {
+      "gate_id": "G2b",
+      "gate_name": "json_schema_pattern_nonwhitespace",
+      "classification": "UNCLEAR_REQUIRES_CONSTRUCTION_PROBE",
+      "requirement": "pattern \".*\\\\S.*\" on text/local_ref matching Pydantic strip()!=\"\" (reject empty/whitespace including tab; accept surrounded whitespace).",
+      "evidence": "String pattern keyword is supported and converted via RegexConverter (ECMA-262 subset). Documented regex limits exclude backrefs, assertions, Unicode property escapes, {x,y} — not used by .*\\\\S.*. Exact tab/escape fidelity against JSON string encoding is unproven on paper.",
+      "citation": [
+        "https://deepwiki.com/mlc-ai/xgrammar/5.2-supported-json-schema-features",
+        "https://xgrammar.mlc.ai/docs/_modules/xgrammar/testing.html",
+        "https://github.com/mlc-ai/xgrammar/pull/106"
+      ],
+      "rationale": "pattern is not documented unsupported; moot for JSON-Schema Stage B after REJECT_BACKEND.",
+      "stage_b_required": false
+    },
+    {
+      "gate_id": "G2c",
+      "gate_name": "json_schema_additionalProperties_false",
+      "classification": "SUPPORTED",
+      "requirement": "additionalProperties:false enforced on closed objects (incl. XOR branches and ClosedModel surfaces).",
+      "evidence": "Object additionalProperties / unevaluatedProperties handled in converter; strict_mode default true enforces unevaluatedProperties/Items false. PR #594 tests additionalProperties:false with properties coexistence.",
+      "citation": [
+        "https://deepwiki.com/mlc-ai/xgrammar/5.2-supported-json-schema-features",
+        "https://xgrammar.mlc.ai/docs/latest/api/python/grammar_compiler.html",
+        "https://github.com/mlc-ai/xgrammar/pull/594"
+      ],
+      "rationale": "Documented first-class support with strict_mode default aligned to closed schemas.",
+      "stage_b_required": false
+    },
+    {
+      "gate_id": "G2d",
+      "gate_name": "json_schema_defs_ref",
+      "classification": "SUPPORTED",
+      "requirement": "$defs / $ref resolution for ClosedNormalizedProgram nested defs (e.g. #/$defs/ClosedSemanticQuery).",
+      "evidence": "Converter recognizes $defs and definitions; $ref via JSON Pointer with circular-ref handling documented.",
+      "citation": [
+        "https://deepwiki.com/mlc-ai/xgrammar/5.2-supported-json-schema-features",
+        "https://github.com/mlc-ai/xgrammar/blob/main/cpp/json_schema_converter.cc"
+      ],
+      "rationale": "Required reference mechanism is documented supported.",
+      "stage_b_required": false
+    },
+    {
+      "gate_id": "G3",
+      "gate_name": "correct_xor_semantics",
+      "classification": "UNCLEAR_REQUIRES_CONSTRUCTION_PROBE",
+      "requirement": "ACCEPT text-only / local_ref-only; REJECT both / neither (PREFLIGHT parity).",
+      "evidence": "Because the schema enters warn→anyOf for this oneOf shape, acceptance-language equivalence to exact oneOf depends on faithful per-branch additionalProperties:false under the union grammar. Not claimed false-accept of xor_both on paper; not proven either.",
+      "citation": [
+        "https://github.com/mlc-ai/xgrammar/pull/672",
+        "https://deepwiki.com/mlc-ai/xgrammar/5.2-supported-json-schema-features"
+      ],
+      "rationale": "Empirical residual only; does not override G9 UNSUPPORTED.",
+      "stage_b_required": false
+    },
+    {
+      "gate_id": "G4",
+      "gate_name": "correct_nonempty_nonwhitespace_semantics",
+      "classification": "UNCLEAR_REQUIRES_CONSTRUCTION_PROBE",
+      "requirement": "Reject empty/whitespace-only including tab; accept non-whitespace with optional surrounding spaces.",
+      "evidence": "Same as G2b; PREFLIGHT-01R showed Outlines false-accepted tab via JSON escape.",
+      "citation": [
+        "https://deepwiki.com/mlc-ai/xgrammar/5.2-supported-json-schema-features",
+        "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_preflight_01_parity.json"
+      ],
+      "rationale": "Empirical gate; moot for rejected JSON-Schema Stage B.",
+      "stage_b_required": false
+    },
+    {
+      "gate_id": "G5",
+      "gate_name": "pinned_qwen_tokenizer_compatibility",
+      "classification": "UNCLEAR_REQUIRES_CONSTRUCTION_PROBE",
+      "requirement": "Compatible with exact pinned local Qwen3-1.7B tokenizer (HF fast tokenizer path).",
+      "evidence": "TokenizerInfo.from_huggingface documented; supports HF fast/tiktoken/SentencePiece. Official tests use Qwen tokenizers. Vocab-size caveat: pass config.vocab_size when logits dim ≠ tokenizer vocab.",
+      "citation": [
+        "https://xgrammar.mlc.ai/docs/latest/start/workflow_of_xgrammar.html",
+        "https://github.com/mlc-ai/xgrammar/blob/main/tests/python/test_grammar_matcher_json_schema.py"
+      ],
+      "rationale": "In-principle HF/Qwen support remains; not used to authorize Stage B after REJECT_BACKEND.",
+      "stage_b_required": false
+    },
+    {
+      "gate_id": "G6",
+      "gate_name": "constructible_without_pathological_state_explosion",
+      "classification": "UNCLEAR_REQUIRES_CONSTRUCTION_PROBE",
+      "requirement": "compile_json_schema + matcher/logits-processor construction succeeds for full patched schema without DFA/state blow-up.",
+      "evidence": "XGrammar uses grammar compilation + adaptive token-mask cache (different engine than outlines_core Index). Unproven for our schema; moot after REJECT_BACKEND for JSON-Schema route.",
+      "citation": [
+        "https://xgrammar.mlc.ai/docs/latest/start/workflow_of_xgrammar.html",
+        "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_preflight_01_run_manifest.json"
+      ],
+      "rationale": "Empirical; not required after Stage A reject.",
+      "stage_b_required": false
+    },
+    {
+      "gate_id": "G7",
+      "gate_name": "no_semantic_repair_layer",
+      "classification": "SUPPORTED",
+      "requirement": "No semantic repair, soft validation-and-fix, or schema weakening in the constraint path.",
+      "evidence": "Documented mechanism is generative masking only. No XGrammar feature described as post-decode semantic normalization of operands/ops.",
+      "citation": [
+        "https://xgrammar.mlc.ai/docs/latest/start/constrained_decoding.md",
+        "https://deepwiki.com/mlc-ai/xgrammar/5.2-supported-json-schema-features"
+      ],
+      "rationale": "Architecture is preventative token masking; oneOf→anyOf is a compilation fallback policy issue (G9), not a post-decode repair API.",
+      "stage_b_required": false
+    },
+    {
+      "gate_id": "G8",
+      "gate_name": "deterministic_versioned_provenance",
+      "classification": "SUPPORTED",
+      "requirement": "Deterministic, pinnable artifact/version provenance for backend + compiled constraint.",
+      "evidence": "Released versions on GitHub/PyPI (docs tagged 0.2.8); compile_json_schema is a pure function of schema + TokenizerInfo + compile kwargs.",
+      "citation": [
+        "https://github.com/mlc-ai/xgrammar/releases",
+        "https://xgrammar.mlc.ai/docs/latest/api/python/grammar_compiler.html"
+      ],
+      "rationale": "Version pinning path exists on paper.",
+      "stage_b_required": false
+    },
+    {
+      "gate_id": "G9",
+      "gate_name": "fail_closed_behavior",
+      "classification": "UNSUPPORTED",
+      "requirement": "Unsupported/unsound constructs fail closed rather than silently weaken/fallback.",
+      "evidence": "XGrammar 0.2.8 includes PR #672 behavior: for oneOf branches not proven pairwise disjoint, converter logs a warning and deliberately recompiles as anyOf (ParseAnyOf). Our frozen XOR object-arm shape is outside the published disjointness proofs, so it enters that warn→anyOf path. Frozen G9 forbids silent weaken/fallback for unsupported/unsound constructs; this is documented opposite behavior.",
+      "citation": [
+        "https://github.com/mlc-ai/xgrammar/pull/672",
+        "https://github.com/mlc-ai/xgrammar/blob/main/cpp/json_schema_converter.cc",
+        "https://deepwiki.com/mlc-ai/xgrammar/5.2-supported-json-schema-features"
+      ],
+      "rationale": "Required gate UNSUPPORTED on paper → Stage A REJECT_BACKEND. Not rescued by possible anyOf≡oneOf acceptance equivalence for xor_both.",
+      "stage_b_required": false
+    }
+  ],
+  "unsupported_required_features": [
+    "G9_fail_closed_behavior"
+  ],
+  "known_necessary_schema_weakening": false,
+  "known_fail_open_compilation_fallback": {
+    "construct": "oneOf (non-provably-disjoint)",
+    "behavior": "WARNING → ParseAnyOf (anyOf)",
+    "applies_to_frozen_xor_shape": true
+  },
+  "residual_risks": [
+    "REJECT_BACKEND closes the XGrammar JSON-Schema route for Stage A; does not evaluate CFG/EBNF representation",
+    "anyOf acceptance equivalence to oneOf for xor_both remains untested and is not used to proceed",
+    "pattern .*\\S.* tab/JSON-escape fidelity remains unproven (moot for this route)",
+    "XGrammar may still be considered later as an EBNF/grammar engine under a separate design AUTH"
+  ],
+  "xgrammar_stage_a": "REJECT_BACKEND",
+  "stage_a_disposition_meaning": "Required G9 is UNSUPPORTED for the frozen JSON-Schema+oneOf route under XGrammar 0.2.8. Does NOT authorize install, Stage B, CFG/EBNF redesign, or PILOT-01.",
+  "next_not_authorized_by_this_rework": [
+    "DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PROBE-01",
+    "CFG/EBNF redesign",
+    "XGrammar install",
+    "DECOMPOSER-PILOT-01"
+  ]
+}

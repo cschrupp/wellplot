@@ -1,0 +1,51 @@
+{
+  "api_key_presence": {
+    "OPENROUTER_API_KEY_PRESENT": false,
+    "env_var": "OPENROUTER_API_KEY"
+  },
+  "authority": "WP-DC02-03-EXECUTION-PREPARATION-AUTH-001",
+  "billable_openrouter_calls": 0,
+  "candidate_sha": "d2951ad06ef3a8568f4d893e3f5f9ae3931b1a54",
+  "cost_card_path": "c02_03_execution_prep/execution_cost_card.json",
+  "design_accepted_tip": "fc8bd36dd638ff065e562a60cb8c9fabbd491470",
+  "design_authority": "WP-DC02-03-GEMINI-CEILING-DESIGN-AUTH-001",
+  "design_blockers_addressed_in_prep": [
+    "B2",
+    "B3",
+    "B4"
+  ],
+  "explicit_non_authorizations": [
+    "live_gemini_inference",
+    "billable_openrouter_chat_completions",
+    "prompt_modification",
+    "benchmark_changes",
+    "dataset_expansion",
+    "C02-04_onward"
+  ],
+  "implemented": [
+    "request_side_provider_pin_allow_fallbacks_false",
+    "raw_usage_retained_on_parse_normalize_provider_mismatch",
+    "separate_logical_transport_cost_budgets",
+    "cost_card_from_c02_02_snapshot_without_inference",
+    "env_api_key_presence_inspection_without_secret_export",
+    "transport_retry_eligible_errors_only_max_2",
+    "mocked_tests_for_mismatch_retry_parse_partial_usage"
+  ],
+  "inference_authorized": false,
+  "live_inference_calls": 0,
+  "parent_sha": "fc8bd36dd638ff065e562a60cb8c9fabbd491470",
+  "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
+  "provider_pin": {
+    "allow_fallbacks": false,
+    "order": [
+      "Google AI Studio"
+    ],
+    "silent_fallback": "FORBIDDEN"
+  },
+  "slice": "C02-03-EXECUTION-PREPARATION",
+  "still_blocking_for_scientific_run": [
+    "B1_separate_six_case_execution_authority",
+    "B5_api_key_must_be_present_in_execution_environment"
+  ],
+  "tip_sha": "387f92fc219523cb0631cbd18685af15f349ffb8"
+}

@@ -1,0 +1,39 @@
+{
+  "additional_api_calls_authorized_by_this_prep": 0,
+  "not_proven_sufficient": true,
+  "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+  "original_smoke_observation": "RETAINED_IMMUTABLE",
+  "proposed_request_overrides": {
+    "include_reasoning": false,
+    "max_tokens": 4096,
+    "reasoning": {
+      "effort": "low"
+    },
+    "response_format": {
+      "type": "json_object"
+    },
+    "temperature": 0.0
+  },
+  "provider_pin": "Morph",
+  "rationale": "Original smoke used max_tokens=1024; Morph returned reasoning_tokens=1024 and empty content. 4096 is a proposed operational accommodation pending one authorized corrective smoke. reasoning.effort=low is supported per Morph endpoint snapshot; not a semantic prompt change.",
+  "supported_parameters_from_c02_02_snapshot": [
+    "reasoning",
+    "include_reasoning",
+    "max_tokens",
+    "temperature",
+    "stop",
+    "top_p",
+    "top_k",
+    "min_p",
+    "frequency_penalty",
+    "presence_penalty",
+    "repetition_penalty",
+    "seed",
+    "logit_bias",
+    "tools",
+    "tool_choice",
+    "structured_outputs",
+    "response_format",
+    "reasoning_effort"
+  ]
+}

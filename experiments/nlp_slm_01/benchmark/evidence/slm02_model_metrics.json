@@ -1,0 +1,184 @@
+{
+  "adapter": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/adapters/slm02_qwenv17_qlora",
+  "base": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/modelscope_cache/models/Qwen--Qwen3-1.7B/snapshots/master",
+  "best_prompt_arm": "Q1",
+  "best_semantic_correctness": 0.8245614035087719,
+  "delta_vs_untuned": 0.4035087719298246,
+  "n_held_out": 70,
+  "prompt_arms": {
+    "Q1": {
+      "envelope_confusion": {
+        "ambiguous": {
+          "ambiguous": 0,
+          "invalid": 0,
+          "ok": 5,
+          "unsupported": 0
+        },
+        "invalid": {
+          "ambiguous": 0,
+          "invalid": 0,
+          "ok": 2,
+          "unsupported": 0
+        },
+        "ok": {
+          "ambiguous": 0,
+          "invalid": 1,
+          "ok": 56,
+          "unsupported": 0
+        },
+        "unsupported": {
+          "ambiguous": 0,
+          "invalid": 0,
+          "ok": 6,
+          "unsupported": 0
+        }
+      },
+      "envelope_macro_f1": 0.22222222222222224,
+      "false_ok_on_ambiguous": 5,
+      "family_stats": {
+        "ambiguity_unsupported": {
+          "correct": 0,
+          "n": 13,
+          "rate": 0.0
+        },
+        "composition": {
+          "correct": 5,
+          "n": 13,
+          "rate": 0.38461538461538464
+        },
+        "curve_placement": {
+          "correct": 9,
+          "n": 9,
+          "rate": 1.0
+        },
+        "display_configuration": {
+          "correct": 3,
+          "n": 4,
+          "rate": 0.75
+        },
+        "fills": {
+          "correct": 10,
+          "n": 10,
+          "rate": 1.0
+        },
+        "intervals": {
+          "correct": 9,
+          "n": 9,
+          "rate": 1.0
+        },
+        "relational_targeting": {
+          "correct": 11,
+          "n": 12,
+          "rate": 0.9166666666666666
+        }
+      },
+      "n": 70,
+      "n_executable": 57,
+      "overall_correctness": 0.6714285714285714,
+      "schema_validity_rate": 0.9857142857142858,
+      "semantic_correctness_executable": 0.8245614035087719,
+      "taxonomy": {
+        "confirmed_model_semantic_n": 21,
+        "counts": {
+          "composition": 8,
+          "envelope_misuse": 13,
+          "other": 1,
+          "syntax_or_schema": 1
+        },
+        "ir_limitation_share_of_all_failures": 0.0,
+        "learnable_share_of_confirmed": 1.0,
+        "model_semantic_labels_seen": [
+          "composition",
+          "envelope_misuse"
+        ]
+      }
+    },
+    "Q2": {
+      "envelope_confusion": {
+        "ambiguous": {
+          "ambiguous": 0,
+          "invalid": 5,
+          "ok": 0,
+          "unsupported": 0
+        },
+        "invalid": {
+          "ambiguous": 0,
+          "invalid": 2,
+          "ok": 0,
+          "unsupported": 0
+        },
+        "ok": {
+          "ambiguous": 0,
+          "invalid": 57,
+          "ok": 0,
+          "unsupported": 0
+        },
+        "unsupported": {
+          "ambiguous": 0,
+          "invalid": 4,
+          "ok": 2,
+          "unsupported": 0
+        }
+      },
+      "envelope_macro_f1": 0.014285714285714287,
+      "false_ok_on_ambiguous": 0,
+      "family_stats": {
+        "ambiguity_unsupported": {
+          "correct": 0,
+          "n": 13,
+          "rate": 0.0
+        },
+        "composition": {
+          "correct": 0,
+          "n": 13,
+          "rate": 0.0
+        },
+        "curve_placement": {
+          "correct": 0,
+          "n": 9,
+          "rate": 0.0
+        },
+        "display_configuration": {
+          "correct": 0,
+          "n": 4,
+          "rate": 0.0
+        },
+        "fills": {
+          "correct": 0,
+          "n": 10,
+          "rate": 0.0
+        },
+        "intervals": {
+          "correct": 0,
+          "n": 9,
+          "rate": 0.0
+        },
+        "relational_targeting": {
+          "correct": 0,
+          "n": 12,
+          "rate": 0.0
+        }
+      },
+      "n": 70,
+      "n_executable": 57,
+      "overall_correctness": 0.0,
+      "schema_validity_rate": 0.02857142857142857,
+      "semantic_correctness_executable": 0.0,
+      "taxonomy": {
+        "confirmed_model_semantic_n": 2,
+        "counts": {
+          "envelope_misuse": 2,
+          "other": 67,
+          "syntax_or_schema": 1
+        },
+        "ir_limitation_share_of_all_failures": 0.0,
+        "learnable_share_of_confirmed": 1.0,
+        "model_semantic_labels_seen": [
+          "envelope_misuse"
+        ]
+      }
+    }
+  },
+  "schema_sha256": "4a91a325d9dd38db154bb38f4b997be81ff3047f0c663ec65c4349e4c2e21c5b",
+  "untuned_qwen_q2_reference": 0.42105263157894735
+}

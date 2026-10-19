@@ -1,0 +1,350 @@
+{
+  "authority": "WP-DC02-00-BASELINE-RECOVERY-AUTH-001",
+  "baseline": {
+    "accepted_remote_head": "6f772b59a758915306c0be4981bbb0816eb65d22",
+    "accepted_tip": "6f772b59a758915306c0be4981bbb0816eb65d22",
+    "authorized_calls": "6/6",
+    "classification_correction_candidate": "96bbbbf7f6105f03ef9fc559d506e40cb364a5e2",
+    "execution_validity": "VALID",
+    "experiment": "DECOMPOSER-PILOT-01",
+    "human_acceptance_commit": "b451d9ca431c235e5779340f9dcc188764cb1446",
+    "human_review": "ACCEPTED",
+    "mechanical_verdict": "INCONCLUSIVE",
+    "model_id": "Qwen/Qwen3-1.7B",
+    "original_run_candidate": "32edc35af3824b7f62e60c6d8fa572051e135580",
+    "reached_freeze": "5/6",
+    "run": "RUN 1",
+    "runtime": "CPU / FP32",
+    "semantic_equivalents_among_frozen": "0/5"
+  },
+  "candidate_sha": "3f42c9a2449f932ff4d4fd4abc2ba5ae0cca11e9",
+  "case_verification": [
+    {
+      "all_pass": true,
+      "case_id": "D5GAP-0085",
+      "checks": {
+        "decomposer_input_sha256_matches_preflight": true,
+        "has_generated_token_ids": true,
+        "has_raw_output": true,
+        "has_raw_output_sha256": true,
+        "result_input_hashes_match_preflight_decomposer": true,
+        "result_utterance_sha_match": true,
+        "result_workspace_sha_match": true,
+        "utterance_sha256_matches_preflight": true,
+        "workspace_sha256_matches_preflight": true
+      }
+    },
+    {
+      "all_pass": true,
+      "case_id": "D5GAP-0089",
+      "checks": {
+        "decomposer_input_sha256_matches_preflight": true,
+        "has_generated_token_ids": true,
+        "has_raw_output": true,
+        "has_raw_output_sha256": true,
+        "result_input_hashes_match_preflight_decomposer": true,
+        "result_utterance_sha_match": true,
+        "result_workspace_sha_match": true,
+        "utterance_sha256_matches_preflight": true,
+        "workspace_sha256_matches_preflight": true
+      }
+    },
+    {
+      "all_pass": true,
+      "case_id": "D5GAP-0117",
+      "checks": {
+        "decomposer_input_sha256_matches_preflight": true,
+        "has_generated_token_ids": true,
+        "has_raw_output": true,
+        "has_raw_output_sha256": true,
+        "result_input_hashes_match_preflight_decomposer": true,
+        "result_utterance_sha_match": true,
+        "result_workspace_sha_match": true,
+        "utterance_sha256_matches_preflight": true,
+        "workspace_sha256_matches_preflight": true
+      }
+    },
+    {
+      "all_pass": true,
+      "case_id": "D5GAP-0096",
+      "checks": {
+        "decomposer_input_sha256_matches_preflight": true,
+        "has_generated_token_ids": true,
+        "has_raw_output": true,
+        "has_raw_output_sha256": true,
+        "result_input_hashes_match_preflight_decomposer": true,
+        "result_utterance_sha_match": true,
+        "result_workspace_sha_match": true,
+        "utterance_sha256_matches_preflight": true,
+        "workspace_sha256_matches_preflight": true
+      }
+    },
+    {
+      "all_pass": true,
+      "case_id": "D5GAP-0101",
+      "checks": {
+        "decomposer_input_sha256_matches_preflight": true,
+        "has_generated_token_ids": true,
+        "has_raw_output": true,
+        "has_raw_output_sha256": true,
+        "result_input_hashes_match_preflight_decomposer": true,
+        "result_utterance_sha_match": true,
+        "result_workspace_sha_match": true,
+        "utterance_sha256_matches_preflight": true,
+        "workspace_sha256_matches_preflight": true
+      }
+    },
+    {
+      "all_pass": true,
+      "case_id": "SEED-cm-9643c020e2e02463",
+      "checks": {
+        "decomposer_input_sha256_matches_preflight": true,
+        "has_generated_token_ids": true,
+        "has_raw_output": true,
+        "has_raw_output_sha256": true,
+        "result_input_hashes_match_preflight_decomposer": true,
+        "result_utterance_sha_match": true,
+        "result_workspace_sha_match": true,
+        "utterance_sha256_matches_preflight": true,
+        "workspace_sha256_matches_preflight": true
+      }
+    }
+  ],
+  "evidence_file_digests": {
+    "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_01.md": {
+      "exists": true,
+      "sha256": "ee72975b01389f84a2a0174cb799cda5ea660f5eb89ab38d901199c9df3d1829",
+      "size_bytes": 2502
+    },
+    "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_01_authorization.json": {
+      "exists": true,
+      "sha256": "52f999a3059b2da9f4d136602da4699b900c72b25e240b03b315c1c4bd1ab6b4",
+      "size_bytes": 11930
+    },
+    "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_01_authorization.md": {
+      "exists": true,
+      "sha256": "2e11e3840b8b016fb1fc03a348d9f36d36fe59bcd4079130089d2d5554a429fd",
+      "size_bytes": 5171
+    },
+    "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_01_human_acceptance.json": {
+      "exists": true,
+      "sha256": "0ee8b41f9294250d96fe7899e4dda8d779b7440cbc2192c451b6b4c9bd431ac7",
+      "size_bytes": 1541
+    },
+    "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_01_human_acceptance.md": {
+      "exists": true,
+      "sha256": "990d0c5538de6596d7b5dffc7cd3590ea61858dc58b53b4e9780769a257f5176",
+      "size_bytes": 1580
+    },
+    "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_01_results.jsonl": {
+      "exists": true,
+      "sha256": "db985f79c24b8a8ccf56d974234ed4886733dff896d6127ba7bc1a805631a45f",
+      "size_bytes": 38884
+    },
+    "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_01_run_manifest.json": {
+      "exists": true,
+      "sha256": "d76f58b3c878b462367775200c774b4972b69de162545e133ac2144cfa444e0a",
+      "size_bytes": 10570
+    },
+    "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_01_summary.json": {
+      "exists": true,
+      "sha256": "6a86a90187ac3330284cc84ee8beeab0339a282d27bc4a76d313df0e663b7ba1",
+      "size_bytes": 4825
+    },
+    "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_constraint_cfg_engine_bakeoff_01_xgrammar.ebnf": {
+      "exists": true,
+      "sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
+      "size_bytes": 1226434
+    },
+    "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_constraint_cfg_generator_01.well_ebnf1": {
+      "exists": true,
+      "sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
+      "size_bytes": 1244110
+    },
+    "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_constraint_xgrammar_preflight_01_adapter.json": {
+      "exists": true,
+      "sha256": "eb51f49a3f981c92d3c1f1c60d2185d2ae5dfab7ae0c7f57002cafcdf83daf76",
+      "size_bytes": 1162
+    },
+    "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_constraint_xgrammar_preflight_01_case_hashes.json": {
+      "exists": true,
+      "sha256": "8f124635572b95675897cecbcae4a43f18b72943c9968c3c07080dbf4000180a",
+      "size_bytes": 6800
+    },
+    "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_design_01.json": {
+      "exists": true,
+      "sha256": "e3fcbad8182cbec608786959a569d895629398d7df5430257f3316d63ecd3ba4",
+      "size_bytes": 19031
+    },
+    "experiments/nlp_gate_modernbert/evidence/decomposer_pilot_design_01.md": {
+      "exists": true,
+      "sha256": "cedb01a9803915b4f031709b06b2ac0e5c5865d3f02086c998d8342d5d4564db",
+      "size_bytes": 3564
+    }
+  },
+  "expected_frozen_pins": {
+    "inference_config_sha256": "6daab17278547241563d1bc6bec92fcdd882ed48c8de3e18db81e737c732b54b",
+    "prompt_system_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+    "prompt_user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+    "serializer_implementation_sha256": "95514c73fc1a25c5c52d784a3c2126543dfd8845f8f21aabafd103642a152740",
+    "well_ebnf1_sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
+    "xgrammar_native_grammar_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89"
+  },
+  "grammar_file_checks": {
+    "well_ebnf1_file_exists": true,
+    "well_ebnf1_sha256_matches_constant": true,
+    "xgrammar_ebnf_file_exists": true,
+    "xgrammar_ebnf_sha256_matches_constant": true
+  },
+  "invocation_order": [
+    "D5GAP-0085",
+    "D5GAP-0089",
+    "D5GAP-0117",
+    "D5GAP-0096",
+    "D5GAP-0101",
+    "SEED-cm-9643c020e2e02463"
+  ],
+  "live_pin_digests": {
+    "inference_config_sha256": "6daab17278547241563d1bc6bec92fcdd882ed48c8de3e18db81e737c732b54b",
+    "prompt_system_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+    "prompt_user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+    "serializer_implementation_sha256": "95514c73fc1a25c5c52d784a3c2126543dfd8845f8f21aabafd103642a152740",
+    "well_ebnf1_sha256_constant": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
+    "xgrammar_native_grammar_sha256_constant": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89"
+  },
+  "model_calls": 0,
+  "model_weights_loaded": false,
+  "openrouter_calls": 0,
+  "phase0_design_acceptance": "WP-DC02-PHASE0-DESIGN-ACCEPT-001",
+  "pin_live_match": {
+    "inference_config": true,
+    "prompt_system": true,
+    "prompt_user_template": true,
+    "serializer": true,
+    "well_ebnf1_constant": true,
+    "xgrammar_native_constant": true
+  },
+  "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
+  "recovered_at_utc": "2026-10-19T17:31:43.731424+00:00",
+  "recovered_cases": [
+    {
+      "archive_paths": {
+        "input": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0085/recovered_input.json",
+        "output": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0085/run1_output.json",
+        "tokens": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0085/run1_generated_token_ids.json"
+      },
+      "call_index": 1,
+      "case_id": "D5GAP-0085",
+      "decomposer_input_sha256": "91622db600dd94d48881adbdad694188bb34c4117f6f9ee9f9ce557cfd70ac4f",
+      "failure_labels": [
+        "MISSING_TASK",
+        "WRONG_ORDER"
+      ],
+      "n_generated_tokens": 10,
+      "raw_output_sha256": "b5f82fa3440e9cbe139790569cdf73264a32f20a10fe8d71e04e25dc077956b6",
+      "reached_freeze": true,
+      "semantically_equivalent": false,
+      "status": "EVALUATED"
+    },
+    {
+      "archive_paths": {
+        "input": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0089/recovered_input.json",
+        "output": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0089/run1_output.json",
+        "tokens": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0089/run1_generated_token_ids.json"
+      },
+      "call_index": 2,
+      "case_id": "D5GAP-0089",
+      "decomposer_input_sha256": "79f1f37a0a44a7c6fcc81afe0bcaf517952c52954a483fce0b336b8665e948de",
+      "failure_labels": [
+        "RUNTIME_TERMINAL_MISMATCH"
+      ],
+      "n_generated_tokens": 293,
+      "raw_output_sha256": "8ada802546769205ec16d37f369c5660bafd7567e9172272754970e85a0110dc",
+      "reached_freeze": true,
+      "semantically_equivalent": false,
+      "status": "EVALUATED"
+    },
+    {
+      "archive_paths": {
+        "input": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0117/recovered_input.json",
+        "output": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0117/run1_output.json",
+        "tokens": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0117/run1_generated_token_ids.json"
+      },
+      "call_index": 3,
+      "case_id": "D5GAP-0117",
+      "decomposer_input_sha256": "797fcb9e1d42e8a1bca212c15d13d110b5c043a78602dc7938893580771eccbd",
+      "failure_labels": [
+        "RUNTIME_TERMINAL_MISMATCH"
+      ],
+      "n_generated_tokens": 346,
+      "raw_output_sha256": "09744ccb61fecf57eae33ee99f429fd6461641e70dfe05ba72b5d9720d6c1f68",
+      "reached_freeze": true,
+      "semantically_equivalent": false,
+      "status": "EVALUATED"
+    },
+    {
+      "archive_paths": {
+        "input": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0096/recovered_input.json",
+        "output": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0096/run1_output.json",
+        "tokens": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0096/run1_generated_token_ids.json"
+      },
+      "call_index": 4,
+      "case_id": "D5GAP-0096",
+      "decomposer_input_sha256": "2b3245908efd22b40301b9adebd93226f2323766bfd5b77b0e56dcce96fa7620",
+      "failure_labels": [
+        "WRONG_BINDING",
+        "WRONG_OPERATION"
+      ],
+      "n_generated_tokens": 92,
+      "raw_output_sha256": "e87f766ba8f6cffcc3a1ca42a5a5d1bd2a1db5ffd2054fab1c1f54f962a1a52f",
+      "reached_freeze": true,
+      "semantically_equivalent": false,
+      "status": "EVALUATED"
+    },
+    {
+      "archive_paths": {
+        "input": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0101/recovered_input.json",
+        "output": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0101/run1_output.json",
+        "tokens": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0101/run1_generated_token_ids.json"
+      },
+      "call_index": 5,
+      "case_id": "D5GAP-0101",
+      "decomposer_input_sha256": "11327486a44838c9be9505ae71945d1ba6539a5ed7500b0002637c4d55f3b085",
+      "failure_labels": [
+        "DECOMPOSITION_DECODE_FAILURE"
+      ],
+      "n_generated_tokens": 1024,
+      "raw_output_sha256": "e8ddb2150e96d506d24e4e329b104e89d2336db64b37afbf3ce350d92f1afc16",
+      "reached_freeze": false,
+      "semantically_equivalent": false,
+      "status": "DECOMPOSITION_DECODE_FAILURE"
+    },
+    {
+      "archive_paths": {
+        "input": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/SEED-cm-9643c020e2e02463/recovered_input.json",
+        "output": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/SEED-cm-9643c020e2e02463/run1_output.json",
+        "tokens": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/SEED-cm-9643c020e2e02463/run1_generated_token_ids.json"
+      },
+      "call_index": 6,
+      "case_id": "SEED-cm-9643c020e2e02463",
+      "decomposer_input_sha256": "42aacf3d5392d64841e02dd96ed318b8a3e377b77a7237635ebe14bc33a4c7a0",
+      "failure_labels": [
+        "RUNTIME_TERMINAL_MISMATCH"
+      ],
+      "n_generated_tokens": 125,
+      "raw_output_sha256": "59a0e90e0c22c8cbef876924c53263436c9c18f7cfbc32b5dd7f897e46458924",
+      "reached_freeze": true,
+      "semantically_equivalent": false,
+      "status": "EVALUATED"
+    }
+  ],
+  "rendered_model_input_reverification": {
+    "reason": "requires tokenizer load; frozen preflight digests retained; model weights not loaded",
+    "status": "NOT_REVERIFIED_IN_C02_00"
+  },
+  "slice": "C02-00",
+  "slice_title": "Experimental provenance and baseline recovery",
+  "starting_repository_tip": "b451d9ca431c235e5779340f9dcc188764cb1446",
+  "status": "EXECUTED_AWAITING_INDEPENDENT_REVIEW",
+  "synthetic_recreation": false
+}

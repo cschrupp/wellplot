@@ -1,0 +1,23 @@
+{
+  "authority": "WP-DC02-G0-PHASE0-READINESS-REVIEW-AUTH-001",
+  "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
+  "slice": "G0",
+  "mode": "REVIEW_ONLY_PHASE0_READINESS_GATE",
+  "human_authorized": true,
+  "starting_tip": "a11c99c4691899d82ee33c9b150e487c688f2036",
+  "live_inference_authorized": false,
+  "billable_openrouter_authorized": false,
+  "c02_03_authorized": false,
+  "authorized_actions": [
+    "record_c02_02_acceptance",
+    "produce_phase0_readiness_decision",
+    "authorize_preparation_of_next_experimental_design_only_if_decision_supports_it"
+  ],
+  "forbidden_actions": [
+    "gemini_inference",
+    "deepseek_inference",
+    "local_qwen_inference",
+    "fine_tuning",
+    "silent_authorization_of_C02_03_execution"
+  ]
+}

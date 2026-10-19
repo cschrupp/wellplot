@@ -1,6 +1,6 @@
 # wellplot Decision Log
 
-Last updated: 2026-03-20
+Last updated: 2026-10-18
 
 ## Purpose
 
@@ -180,6 +180,99 @@ This file records project decisions that should remain stable unless explicitly 
 
 - Package metadata currently states Python `>=3.11`.
 - CI validates 3.11, 3.12, 3.13, and 3.14.
+
+## Natural-Language Authoring Runtime Decisions (2026-10-18)
+
+These decisions govern the experimental NLP runtime unless explicitly revised.
+
+- Natural-language editing is layered over the existing deterministic WellPlot model:
+  - raw utterance + permitted projected workspace
+  - learned decomposer
+  - typed `ScopeNormalizedProgram`
+  - deterministic resolution / validation / projected effects
+  - canonical WellPlot intent and existing renderers
+- The learned model interprets language; it is not the semantic authority for WellPlot.
+- Persistent host identities are allocated deterministically by the host. Models do not generate
+  persistent WellPlot IDs.
+- `ScopeNormalizedProgram` is an ordered composition of atomic semantic tasks. Dependencies and
+  local binds are explicit rather than inferred from execution side effects.
+- Candidate programs must be frozen before oracle-side evaluation material becomes accessible.
+- Evaluation distinguishes schema/decode failure, runtime-terminal behavior, and semantic
+  equivalence instead of collapsing them into one accuracy number.
+- Deterministic semantic adjudication remains authoritative wherever the contract can express the
+  decision. The MB-01R / MB-02R work found no remaining learned semantic-gate requirement for the
+  studied runtime slice.
+- The current decomposer experiment uses `Qwen/Qwen3-1.7B`, thinking disabled, as a zero-shot
+  structured decomposer. This is an experiment configuration, not a product commitment.
+- No capability claim is made for that model until the complete constrained-decoding path passes
+  preflight and the frozen pilot is actually executed.
+- Hard structural constraints derive mechanically from the frozen patched
+  `ClosedNormalizedProgram` contract.
+- The canonical engine-neutral grammar representation is `WELL-EBNF-1`.
+- Canonical `WELL-EBNF-1` bytes are mechanically generated from the pinned patched schema; hand
+  edits and semantic patch layers are forbidden.
+- Canonical rule ordering is `START` first, then remaining identifiers by UTF-8 byte sequence.
+- The accepted schema→grammar generator artifact currently has:
+  - grammar SHA-256:
+    `f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3`
+- The Outlines constrained JSON-Schema path and XGrammar JSON-Schema route were rejected for this
+  experiment. That does not reject XGrammar grammar mode.
+- The hard-constraint engine selected by the accepted bakeoff is **XGrammar 0.2.8 / native EBNF**.
+- llguidance 1.9.1 is rejected for this accepted grammar because matcher construction exceeds its
+  u16 grammar-symbol-table bound; the accepted grammar is not weakened to accommodate it.
+- The selected-backend constrained-decoding preflight is now Human/SOL accepted and closed as
+  `DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R2` with P1–P9 PASS.
+- The accepted preflight freezes the exact pilot infrastructure: accepted WELL-EBNF-1 → XGrammar
+  0.2.8 native EBNF → pinned Qwen3-1.7B tokenizer → frozen HF hard-mask adapter.
+- The preflight executed zero model calls, loaded no model weights, and independently exercised
+  fail-closed model-load/invocation/generate/download guards.
+- The frozen six-call `DECOMPOSER-PILOT-01` is now explicitly Human-authorized under
+  `WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-01-AUTH-001`.
+- That authority permits exactly one constrained generation attempt for each of the six frozen
+  cases, in frozen order, using the accepted local Qwen3-1.7B / XGrammar path; retries, repair,
+  downloads, model substitution, and broader follow-up experiments remain forbidden.
+- The pilot must stop after publishing immutable run evidence for independent scientific review.
+
+## Agentic Development Operating Decisions (2026-10-18)
+
+Repository-wide durable operating rules live in the root `AGENTS.md`; active slice state and
+temporary authorization do not.
+
+Stable role split:
+
+- Human:
+  - product direction
+  - material scope/cost/risk/dependency tradeoffs
+  - explicit authorization and major acceptance gates
+- SOL / technical architect:
+  - architecture
+  - semantic contracts
+  - experimental methodology
+  - high-stakes technical decisions
+  - independent semantic review
+- implementation agent:
+  - bounded implementation
+  - routine local engineering choices that do not alter accepted contracts
+- deterministic tooling:
+  - mechanical evidence such as topology, hashes, path bounds, tests, counters, and manifests
+
+Operational rules:
+
+- proceed by default inside an authorized frozen slice
+- do not turn routine implementation into a serial Human/SOL questionnaire
+- batch genuine contract-level blockers into one SOL handoff
+- escalate to the Human only when the decision crosses a Human-owned boundary
+- prefer deterministic gates for mechanically computable governance facts
+- treat implementation reports as handoffs, not proof
+- keep accepted design, observed evidence, acceptance, and downstream authorization as distinct
+  states
+
+- Once SOL acceptance exists and the Human explicitly states acceptance/closure in the same
+  conversation, record the durable closure artifacts automatically. Do not ask for another
+  confirmation merely to perform acceptance bookkeeping.
+- Human acceptance of an upstream slice authorizes closure bookkeeping for that slice only. It does
+  not implicitly authorize the next governed slice; downstream execution still requires whatever
+  explicit authority its contract requires.
 
 ## Revision Rule
 

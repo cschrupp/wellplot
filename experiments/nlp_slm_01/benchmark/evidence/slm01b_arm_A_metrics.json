@@ -1,0 +1,206 @@
+{
+  "best_prompt_arm": "Q2",
+  "best_semantic_correctness": 0.2807017543859649,
+  "model_arm": "A",
+  "n_held_out_evaluated": 70,
+  "prompt_arms": {
+    "Q1": {
+      "envelope_confusion": {
+        "ambiguous": {
+          "ambiguous": 0,
+          "invalid": 0,
+          "ok": 5,
+          "unsupported": 0
+        },
+        "invalid": {
+          "ambiguous": 0,
+          "invalid": 2,
+          "ok": 0,
+          "unsupported": 0
+        },
+        "ok": {
+          "ambiguous": 0,
+          "invalid": 40,
+          "ok": 17,
+          "unsupported": 0
+        },
+        "unsupported": {
+          "ambiguous": 0,
+          "invalid": 1,
+          "ok": 5,
+          "unsupported": 0
+        }
+      },
+      "envelope_macro_f1": 0.12341269841269842,
+      "false_ok_on_ambiguous": 5,
+      "family_stats": {
+        "ambiguity_unsupported": {
+          "correct": 0,
+          "n": 13,
+          "rate": 0.0
+        },
+        "composition": {
+          "correct": 0,
+          "n": 13,
+          "rate": 0.0
+        },
+        "curve_placement": {
+          "correct": 3,
+          "n": 9,
+          "rate": 0.3333333333333333
+        },
+        "display_configuration": {
+          "correct": 1,
+          "n": 4,
+          "rate": 0.25
+        },
+        "fills": {
+          "correct": 0,
+          "n": 10,
+          "rate": 0.0
+        },
+        "intervals": {
+          "correct": 0,
+          "n": 9,
+          "rate": 0.0
+        },
+        "relational_targeting": {
+          "correct": 3,
+          "n": 12,
+          "rate": 0.25
+        }
+      },
+      "n": 70,
+      "n_executable": 57,
+      "overall_correctness": 0.1,
+      "schema_validity_rate": 0.38571428571428573,
+      "semantic_correctness_executable": 0.12280701754385964,
+      "taxonomy": {
+        "confirmed_model_semantic_n": 19,
+        "counts": {
+          "composition": 5,
+          "deictic": 2,
+          "envelope_misuse": 10,
+          "other": 1,
+          "relation": 2,
+          "syntax_or_schema": 43
+        },
+        "ir_limitation_share_of_all_failures": 0.0,
+        "learnable_share_of_confirmed": 1.0,
+        "model_semantic_labels_seen": [
+          "composition",
+          "deictic",
+          "envelope_misuse",
+          "relation"
+        ]
+      }
+    },
+    "Q2": {
+      "envelope_confusion": {
+        "ambiguous": {
+          "ambiguous": 0,
+          "invalid": 2,
+          "ok": 3,
+          "unsupported": 0
+        },
+        "invalid": {
+          "ambiguous": 0,
+          "invalid": 2,
+          "ok": 0,
+          "unsupported": 0
+        },
+        "ok": {
+          "ambiguous": 3,
+          "invalid": 17,
+          "ok": 37,
+          "unsupported": 0
+        },
+        "unsupported": {
+          "ambiguous": 0,
+          "invalid": 0,
+          "ok": 4,
+          "unsupported": 2
+        }
+      },
+      "envelope_macro_f1": 0.35164657770124835,
+      "false_ok_on_ambiguous": 3,
+      "family_stats": {
+        "ambiguity_unsupported": {
+          "correct": 2,
+          "n": 13,
+          "rate": 0.15384615384615385
+        },
+        "composition": {
+          "correct": 5,
+          "n": 13,
+          "rate": 0.38461538461538464
+        },
+        "curve_placement": {
+          "correct": 3,
+          "n": 9,
+          "rate": 0.3333333333333333
+        },
+        "display_configuration": {
+          "correct": 0,
+          "n": 4,
+          "rate": 0.0
+        },
+        "fills": {
+          "correct": 0,
+          "n": 10,
+          "rate": 0.0
+        },
+        "intervals": {
+          "correct": 5,
+          "n": 9,
+          "rate": 0.5555555555555556
+        },
+        "relational_targeting": {
+          "correct": 3,
+          "n": 12,
+          "rate": 0.25
+        }
+      },
+      "n": 70,
+      "n_executable": 57,
+      "overall_correctness": 0.2571428571428571,
+      "schema_validity_rate": 0.7,
+      "semantic_correctness_executable": 0.2807017543859649,
+      "taxonomy": {
+        "confirmed_model_semantic_n": 25,
+        "counts": {
+          "composition": 7,
+          "envelope_misuse": 10,
+          "other": 6,
+          "relation": 4,
+          "syntax_or_schema": 21,
+          "units": 4
+        },
+        "ir_limitation_share_of_all_failures": 0.0,
+        "learnable_share_of_confirmed": 1.0,
+        "model_semantic_labels_seen": [
+          "composition",
+          "envelope_misuse",
+          "relation",
+          "units"
+        ]
+      }
+    }
+  },
+  "schema_sha256": "4a91a325d9dd38db154bb38f4b997be81ff3047f0c663ec65c4349e4c2e21c5b",
+  "spec": {
+    "backend": "hf",
+    "label": "smollm3_bf16_hf",
+    "model_id": "unsloth/SmolLM3-3B",
+    "model_path": "/home/user/.cache/huggingface/hub/models--unsloth--SmolLM3-3B/snapshots/ece25bbbd9b7e0a36ed15b4e26ee1ad37654b3dd",
+    "offload": {
+      "device_map": "auto",
+      "dtype": "bfloat16",
+      "max_memory": {
+        "0": 4294967296,
+        "cpu": 30064771072
+      }
+    },
+    "quant": "bf16_offload"
+  }
+}

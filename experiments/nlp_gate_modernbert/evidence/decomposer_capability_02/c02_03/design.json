@@ -1,0 +1,276 @@
+{
+  "authority": "WP-DC02-03-GEMINI-CEILING-DESIGN-AUTH-001",
+  "candidate_sha": "8225f5d8da629927bc240ac79177c3d75457d0ba",
+  "cases": {
+    "benchmark_id": "DECOMPOSER-PILOT-01-SIX-CASE-PROBE",
+    "case_id_in_model_input": false,
+    "gold_immutable": true,
+    "invocation_order": [
+      "D5GAP-0085",
+      "D5GAP-0089",
+      "D5GAP-0117",
+      "D5GAP-0096",
+      "D5GAP-0101",
+      "SEED-cm-9643c020e2e02463"
+    ],
+    "n_logical_cases": 6,
+    "source_benchmark_manifest": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_01/benchmark_manifest.json",
+    "source_oracle_refs": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_01/oracle_refs/"
+  },
+  "code_execution_authorized": false,
+  "comparability_report_template": {
+    "required_sections": [
+      "decoding_regime_pilot_vs_gemini",
+      "provider_pin_and_observed_provider",
+      "per_case_table_with_pilot_run1_labels_side_by_side",
+      "layer0_layer1_layer2",
+      "cost_and_token_ledger",
+      "limitations_and_non_claims"
+    ]
+  },
+  "decoding_regime": {
+    "c02_03_gemini": {
+      "equivalence_to_pilot": "NOT_CLAIMED",
+      "hard_xgrammar_mask": false,
+      "json_schema_strict": false,
+      "mode": "openrouter_response_format_json_object_plus_freeze_candidate",
+      "post_hoc_gate": "freeze_candidate()",
+      "response_format": {
+        "type": "json_object"
+      }
+    },
+    "comparability_reporting_required": {
+      "forbidden_claims": [
+        "identical decoding conditions to Pilot Run 1",
+        "XGrammar parity achieved",
+        "failure proves representation defective solely from constraint mismatch without analysis"
+      ],
+      "informative_without_identity": true,
+      "must_state": [
+        "Pilot decoding: XGrammar hard mask",
+        "Gemini decoding: json_object response_format + freeze_candidate",
+        "Scores are capability-under-disclosed-decoding, not matched-constraint bakeoff"
+      ],
+      "rationale": "A frontier success under softer structure still supports representation tractability. A frontier failure remains informative but cannot attribute cause to representation alone without separating decode/transport defects."
+    },
+    "pilot_run_1": {
+      "artifact_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
+      "backend": "xgrammar 0.2.8 native EBNF",
+      "mode": "XGrammar_hard_mask"
+    }
+  },
+  "downstream_governance": {
+    "after_design_acceptance": "separate EXECUTION authority required before any Gemini call",
+    "c02_04_onward": "PROPOSED_NOT_AUTHORIZED"
+  },
+  "epistemic_claim": "C02-03 freezes the Gemini frontier-ceiling execution protocol. It provides no evidence of model performance because no inference is authorized or performed.",
+  "execution_protocol": {
+    "calls_per_case": 1,
+    "high_level_model_calls_authorized_when_executed": 6,
+    "model_loads": "N/A_hosted",
+    "no_seventh_call": true,
+    "order": [
+      "D5GAP-0085",
+      "D5GAP-0089",
+      "D5GAP-0117",
+      "D5GAP-0096",
+      "D5GAP-0101",
+      "SEED-cm-9643c020e2e02463"
+    ],
+    "per_case_pipeline": [
+      "build SemanticDecomposerRequest from frozen case input",
+      "OpenRouter chat.completions with pinned model+provider+json_object",
+      "record raw request/response including usage even on failure",
+      "normalize final_answer_text (no repair)",
+      "freeze_candidate",
+      "if frozen: evaluate_frozen via harness",
+      "emit immutable per-case evidence row"
+    ],
+    "pre_run_gates": [
+      "parent_SHA_matches_authorized_execution_authority",
+      "openrouter_model_id_exact_google/gemini-4-argon",
+      "provider_pin_present_in_request",
+      "prompt_sha_match",
+      "benchmark_manifest_sha_match",
+      "budget_remaining_ge_6",
+      "live_transport_explicitly_enabled_by_execution_authority_only"
+    ],
+    "stop_on_budget": true
+  },
+  "explicit_non_authorizations": [
+    "live_gemini_inference",
+    "live_openrouter_calls",
+    "live_provider_probing",
+    "deepseek_run",
+    "local_qwen_run",
+    "dataset_expansion",
+    "fine_tuning",
+    "C02-04_onward_implementation",
+    "production_changes"
+  ],
+  "live_provider_probing": false,
+  "model": {
+    "alias_migration": "FORBIDDEN \u2014 pin exact id; do not accept silent alias swap",
+    "display_name": "Gemini 4 Argon",
+    "include_reasoning": false,
+    "max_tokens": 1024,
+    "note_seed": "If OpenRouter/Gemini ignores seed, record as unsupported rather than inventing determinism",
+    "openrouter_model_id": "google/gemini-4-argon",
+    "provider_pin_policy": {
+      "fallback": "Google (Vertex) only if primary unavailable and predeclared in run manifest",
+      "insufficient": "response.provider alone without request pin",
+      "mechanism": "OpenRouter provider routing object in request (order and/or allowlist)",
+      "preferred_primary": "Google AI Studio",
+      "record_fields": [
+        "requested_provider_order",
+        "response.provider",
+        "response.model",
+        "generation_id"
+      ],
+      "required": true
+    },
+    "providers_allowed": [
+      "Google AI Studio",
+      "Google"
+    ],
+    "reasoning_effort": "FORBIDDEN_FOR_THIS_RUN",
+    "role": "frontier_capability_ceiling",
+    "seed": null,
+    "temperature": 0.0
+  },
+  "model_calls": 0,
+  "openrouter_calls": 0,
+  "oracle_preservation": {
+    "failure_taxonomy": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_01/failure_taxonomy.json",
+    "freeze_before_oracle": true,
+    "gemini_as_oracle": "FORBIDDEN",
+    "judge": "nlp_gate_modernbert.nl_program_eval",
+    "scoring_contract": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_01/semantic_scoring_contract.json"
+  },
+  "phase0_closed_tip": "2db64aa96549e96161ff8cb2e7df2f03c885be55",
+  "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
+  "prompt_preservation": {
+    "bytes": "EXACT_FROZEN_PILOT_PROMPT_CONTRACT",
+    "exemplars": 0,
+    "forbidden": [
+      "prompt repair after seeing failures",
+      "case-specific prompt edits",
+      "oracle hints",
+      "exemplars",
+      "self-critique loops"
+    ],
+    "regime": "zero-shot",
+    "system_prompt_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+    "user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb"
+  },
+  "retry_policy": {
+    "best_of_n": 0,
+    "prompt_repair_retries": 0,
+    "semantic_retries": 0,
+    "transport_retries": {
+      "accounting": "every attempt consumes budget_attempt_counter and must retain usage if present",
+      "allowed": true,
+      "eligible_errors_only": [
+        "HTTP 408/429/500/502/503/504",
+        "timeout",
+        "connection_reset"
+      ],
+      "ineligible": [
+        "parse_error",
+        "freeze_failure",
+        "semantic_failure",
+        "empty_choices_with_200",
+        "model_refusal_content"
+      ],
+      "max_attempts_per_case": 2,
+      "scientific_call_counting": "Layer-0 scientific call = one logical case attempt that reaches model generation; transport retries do not create additional logical cases but must be ledgered"
+    }
+  },
+  "runtime_failure_classification": {
+    "DECOMPOSITION_DECODE_FAILURE": "max_tokens truncation or incomplete object before legal freeze (align with pilot design meaning)",
+    "DECOMPOSITION_SCHEMA_INVALID": "freeze_candidate rejects complete-looking payload",
+    "EMPTY_GENERATION": "no choices / empty content",
+    "EVALUATED": "freeze succeeded; harness labels apply",
+    "PARSE_NORMALIZE_FAILURE": "could not extract JSON object from content (pre-freeze)",
+    "PROVIDER_ERROR": "OpenRouter/upstream error object",
+    "TRANSPORT_ERROR": "network/HTTP failure before usable body",
+    "note": "Do not collapse transport failures into semantic failures"
+  },
+  "scientific_question": "Under the frozen zero-shot prompt, projected workspace, freeze_candidate-before-oracle scoring, and OpenRouter-hosted Gemini 4 Argon with disclosed non-XGrammar decoding, can google/gemini-4-argon produce semantically equivalent ScopeNormalizedProgram outputs on the six frozen pilot cases?",
+  "scoring_and_decision_rule": {
+    "explicit": [
+      "Six cases are a diagnostic probe, not a production accuracy estimate",
+      "Gemini success does not authorize local model promotion by itself",
+      "Gemini failure does not by itself prove representation defective"
+    ],
+    "interpretation_categories": {
+      "CEILING_PASS": "credible semantic competence on the six-case probe under disclosed decoding (strong evidence representation is tractable on these cases)",
+      "INCONCLUSIVE": "Layer 0 incomplete or evidence cannot distinguish explanations",
+      "PROTOCOL_DEFECT": "transport/accounting/decoding/evaluation contract invalidates scientific comparison",
+      "REPRESENTATION_SUSPECT": "semantic failures dominate after successful freezes; investigate representation/prompt/task \u2014 not automatic proof of defect"
+    },
+    "layer0": "reached_freeze / 6; decode/schema failures counted separately",
+    "layer1": "semantically_equivalent among frozen and overall",
+    "layer2": "mechanism attribution map from pilot constants (unchanged)",
+    "mechanical_decision": "reuse pilot mechanical_decision function",
+    "reuse_pilot_layers": true
+  },
+  "slice": "C02-03",
+  "slice_title": "Gemini 4 Argon frozen-protocol capability ceiling \u2014 DESIGN ONLY",
+  "starting_sha": "2db64aa96549e96161ff8cb2e7df2f03c885be55",
+  "tip_sha": "07825ac43d3e7f1a5db619b126ef7825c7f86721",
+  "token_cost_accounting": {
+    "charge_attempted_calls_on_parse_or_freeze_failure": true,
+    "cost_snapshot": "freeze provider rate card into run manifest at execution start from C02-02 snapshot + re-fetch under execution auth only",
+    "fields_required": [
+      "prompt_tokens",
+      "completion_tokens",
+      "reasoning_tokens_if_any",
+      "total_tokens",
+      "provider",
+      "model",
+      "generation_id",
+      "latency_seconds",
+      "estimated_usd_using_pinned_provider_rate_from_run_manifest_snapshot"
+    ],
+    "no_silent_drop_of_usage_on_normalize_failure": true,
+    "retain_raw_usage_always": true
+  },
+  "unresolved_execution_blockers": [
+    {
+      "detail": "No live OpenRouter/Gemini execution authority exists; C02-03 is design-only",
+      "id": "B1_EXECUTION_AUTHORITY",
+      "status": "BLOCKING"
+    },
+    {
+      "detail": "Adapter must send OpenRouter provider routing pin; C02-02 mock path does not yet emit provider pin field",
+      "id": "B2_PROVIDER_PIN_IMPLEMENTATION",
+      "status": "BLOCKING_FOR_LIVE_RUN"
+    },
+    {
+      "detail": "Normalize path must retain raw usage when JSON extract fails",
+      "id": "B3_USAGE_ON_PARSE_FAILURE",
+      "status": "BLOCKING_FOR_LIVE_RUN"
+    },
+    {
+      "detail": "Execution slice must freeze provider rate card into run manifest before calls",
+      "id": "B4_RUN_MANIFEST_COST_CARD",
+      "status": "BLOCKING_FOR_LIVE_RUN"
+    },
+    {
+      "detail": "Key must be supplied via env/secret store under execution auth; never committed",
+      "id": "B5_OPENROUTER_API_KEY_HANDLING",
+      "status": "BLOCKING_FOR_LIVE_RUN"
+    },
+    {
+      "detail": "Tokenizer-based rendered_model_input rehash still outstanding from C02-00",
+      "id": "D1_RENDERED_INPUT_LIVE_REHASH",
+      "status": "DEFERRED_NON_BLOCKING_FOR_DESIGN"
+    },
+    {
+      "detail": "Hard-mask equivalence cannot be achieved on this hosted path; disclose rather than pretend",
+      "id": "D2_XGRAMMAR_PARITY",
+      "status": "ACCEPTED_NON_EQUIVALENCE"
+    }
+  ]
+}

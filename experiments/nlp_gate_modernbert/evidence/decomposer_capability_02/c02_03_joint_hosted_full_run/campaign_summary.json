@@ -1,0 +1,437 @@
+{
+  "authority": "WP-DC02-03-JOINT-HOSTED-FULL-RUN-AUTH-001",
+  "candidate_sha": "54d3b96a29b3ee434265c30cce0ffcea89333893",
+  "case_1_rerun": false,
+  "completed_utc": "2026-10-19T23:34:52.178307+00:00",
+  "decoding_limitation": "Hosted arms use response_format=json_object plus deterministic freeze_candidate. This is NOT equivalent to Pilot Run 1 XGrammar hard structural masking.",
+  "deepseek": {
+    "arm": "deepseek",
+    "cases": [
+      {
+        "case_id": "D5GAP-0085",
+        "completion_tokens": 1329,
+        "error": null,
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "finish_reason": "stop",
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "latency_seconds": 8.395442895998713,
+        "observed_provider": "Morph",
+        "prompt_tokens": 575,
+        "provider_reported_usd": 0.00082615,
+        "reasoning_tokens": 1240,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "imported_case1_smoke"
+      },
+      {
+        "case_id": "D5GAP-0089",
+        "completion_tokens": 1329,
+        "error": null,
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "finish_reason": "stop",
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "latency_seconds": 10.106108960986603,
+        "observed_provider": "Morph",
+        "prompt_tokens": 581,
+        "provider_reported_usd": 0.000825869,
+        "reasoning_tokens": 1277,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      },
+      {
+        "case_id": "D5GAP-0117",
+        "completion_tokens": 1038,
+        "error": null,
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "finish_reason": "stop",
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "latency_seconds": 9.549233803991228,
+        "observed_provider": "Morph",
+        "prompt_tokens": 934,
+        "provider_reported_usd": 0.000668566,
+        "reasoning_tokens": 967,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      },
+      {
+        "case_id": "D5GAP-0096",
+        "completion_tokens": 1247,
+        "error": null,
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "finish_reason": "stop",
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "latency_seconds": 9.894575767975766,
+        "observed_provider": "Morph",
+        "prompt_tokens": 933,
+        "provider_reported_usd": 0.000793917,
+        "reasoning_tokens": 1094,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      },
+      {
+        "case_id": "D5GAP-0101",
+        "completion_tokens": 784,
+        "error": null,
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "finish_reason": "stop",
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "latency_seconds": 7.268508471985115,
+        "observed_provider": "Morph",
+        "prompt_tokens": 731,
+        "provider_reported_usd": 0.000506219,
+        "reasoning_tokens": 658,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      },
+      {
+        "case_id": "SEED-cm-9643c020e2e02463",
+        "completion_tokens": 1924,
+        "error": null,
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "finish_reason": "stop",
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "latency_seconds": 20.802995270001702,
+        "observed_provider": "Morph",
+        "prompt_tokens": 550,
+        "provider_reported_usd": 0.00118135,
+        "reasoning_tokens": 1673,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      }
+    ],
+    "completion_tokens_total": 7651,
+    "failure_label_distribution": {
+      "DECOMPOSITION_SCHEMA_INVALID": 6
+    },
+    "latency_seconds_total": 66.01686517093913,
+    "n_cases": 6,
+    "prompt_tokens_total": 4304,
+    "provider_reported_usd_total": 0.004802071,
+    "reached_freeze_count": 0,
+    "reasoning_tokens_total": 6909,
+    "schema_valid_count": 0,
+    "semantic_equivalent_among_frozen": 0,
+    "semantic_equivalent_among_frozen_denominator": 0,
+    "semantic_equivalent_overall": 0
+  },
+  "gemini": {
+    "arm": "gemini",
+    "cases": [
+      {
+        "case_id": "D5GAP-0085",
+        "completion_tokens": 615,
+        "error": null,
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "finish_reason": "stop",
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "latency_seconds": 31.96245547401486,
+        "observed_provider": "Google AI Studio",
+        "prompt_tokens": 614,
+        "provider_reported_usd": 0.007378,
+        "reasoning_tokens": 0,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "imported_case1_smoke"
+      },
+      {
+        "case_id": "D5GAP-0089",
+        "completion_tokens": 265,
+        "error": null,
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "finish_reason": "stop",
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "latency_seconds": 6.014072981022764,
+        "observed_provider": "Google AI Studio",
+        "prompt_tokens": 620,
+        "provider_reported_usd": 0.00389,
+        "reasoning_tokens": 0,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      },
+      {
+        "case_id": "D5GAP-0117",
+        "completion_tokens": 149,
+        "error": null,
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "finish_reason": "stop",
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "latency_seconds": 4.529399232007563,
+        "observed_provider": "Google AI Studio",
+        "prompt_tokens": 947,
+        "provider_reported_usd": 0.003384,
+        "reasoning_tokens": 0,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      },
+      {
+        "case_id": "D5GAP-0096",
+        "completion_tokens": 328,
+        "error": null,
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "finish_reason": "stop",
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "latency_seconds": 17.25994858701597,
+        "observed_provider": "Google AI Studio",
+        "prompt_tokens": 947,
+        "provider_reported_usd": 0.005174,
+        "reasoning_tokens": 0,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      },
+      {
+        "case_id": "D5GAP-0101",
+        "completion_tokens": 167,
+        "error": null,
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "finish_reason": "stop",
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "latency_seconds": 5.31515207697521,
+        "observed_provider": "Google AI Studio",
+        "prompt_tokens": 753,
+        "provider_reported_usd": 0.003176,
+        "reasoning_tokens": 0,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      },
+      {
+        "case_id": "SEED-cm-9643c020e2e02463",
+        "completion_tokens": 590,
+        "error": null,
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "finish_reason": "stop",
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "latency_seconds": 10.967552618007176,
+        "observed_provider": "Google AI Studio",
+        "prompt_tokens": 574,
+        "provider_reported_usd": 0.007048,
+        "reasoning_tokens": 0,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      }
+    ],
+    "completion_tokens_total": 2114,
+    "failure_label_distribution": {
+      "DECOMPOSITION_SCHEMA_INVALID": 6
+    },
+    "latency_seconds_total": 76.04858096904354,
+    "n_cases": 6,
+    "prompt_tokens_total": 4455,
+    "provider_reported_usd_total": 0.03005,
+    "reached_freeze_count": 0,
+    "reasoning_tokens_total": 0,
+    "schema_valid_count": 0,
+    "semantic_equivalent_among_frozen": 0,
+    "semantic_equivalent_among_frozen_denominator": 0,
+    "semantic_equivalent_overall": 0
+  },
+  "logical_calls_new": 10,
+  "n_hosted_benchmark_observations": 12,
+  "original_failed_deepseek_smoke": {
+    "counted_as_benchmark_observation": false,
+    "path": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_03_joint_hosted_smoke/deepseek",
+    "role": "operational_qualification_history_only"
+  },
+  "parent_sha": "27db77a3ca913b4298afef291f09064d9d1931d2",
+  "provider_reported_usd_total_both_arms": 0.034852071,
+  "side_by_side": [
+    {
+      "case_id": "D5GAP-0085",
+      "deepseek": {
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "provider_reported_usd": 0.00082615,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "imported_case1_smoke"
+      },
+      "gemini": {
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "provider_reported_usd": 0.007378,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "imported_case1_smoke"
+      }
+    },
+    {
+      "case_id": "D5GAP-0089",
+      "deepseek": {
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "provider_reported_usd": 0.000825869,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      },
+      "gemini": {
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "provider_reported_usd": 0.00389,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      }
+    },
+    {
+      "case_id": "D5GAP-0117",
+      "deepseek": {
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "provider_reported_usd": 0.000668566,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      },
+      "gemini": {
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "provider_reported_usd": 0.003384,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      }
+    },
+    {
+      "case_id": "D5GAP-0096",
+      "deepseek": {
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "provider_reported_usd": 0.000793917,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      },
+      "gemini": {
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "provider_reported_usd": 0.005174,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      }
+    },
+    {
+      "case_id": "D5GAP-0101",
+      "deepseek": {
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "provider_reported_usd": 0.000506219,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      },
+      "gemini": {
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "provider_reported_usd": 0.003176,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      }
+    },
+    {
+      "case_id": "SEED-cm-9643c020e2e02463",
+      "deepseek": {
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "provider_reported_usd": 0.00118135,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      },
+      "gemini": {
+        "failure_labels": [
+          "DECOMPOSITION_SCHEMA_INVALID"
+        ],
+        "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+        "provider_reported_usd": 0.007048,
+        "schema_valid": false,
+        "semantic_equivalent": false,
+        "semantic_layer1_completed": false,
+        "source": "live_full_run"
+      }
+    }
+  ],
+  "status": "STOP_FOR_INDEPENDENT_HOSTED_SCREENING_REVIEW",
+  "tip_sha": "413547f4721fb461ba429c3b5cc433e424c4b973",
+  "transport_attempts_new": 10
+}

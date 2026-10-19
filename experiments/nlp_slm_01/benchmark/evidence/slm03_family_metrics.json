@@ -1,0 +1,30 @@
+{
+  "families": {
+    "ambiguity_unsupported": {
+      "correct": 0,
+      "n": 10,
+      "rate": 0.0
+    },
+    "composition": {
+      "correct": 3,
+      "n": 3,
+      "rate": 1.0
+    },
+    "display_configuration": {
+      "correct": 2,
+      "n": 4,
+      "rate": 0.5
+    },
+    "fills": {
+      "correct": 3,
+      "n": 7,
+      "rate": 0.42857142857142855
+    },
+    "track_creation": {
+      "correct": 1,
+      "n": 2,
+      "rate": 0.5
+    }
+  },
+  "scope": "d5_executable_floor"
+}

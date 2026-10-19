@@ -1,0 +1,119 @@
+{
+  "cases": [
+    {
+      "case_id": "D5GAP-0085",
+      "case_id_in_model_input": false,
+      "constraint_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
+      "decomposer_input_sha256": "91622db600dd94d48881adbdad694188bb34c4117f6f9ee9f9ce557cfd70ac4f",
+      "inference_config_sha256": "6daab17278547241563d1bc6bec92fcdd882ed48c8de3e18db81e737c732b54b",
+      "model_input_keys": [
+        "utterance",
+        "projected_workspace"
+      ],
+      "prompt_system_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+      "prompt_user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+      "rendered_model_input_sha256": "c1f427a451073235879c4a52923661f300e97a5bcf7ca62b8a885185d1f00273",
+      "serializer_implementation_sha256": "95514c73fc1a25c5c52d784a3c2126543dfd8845f8f21aabafd103642a152740",
+      "utterance_sha256": "6546ed8a15574fc6b8fbd6b3b68e349c3dad8aa78f8a6574467c66b260cb5044",
+      "workspace_sha256": "e7b4c11947d8682bbdd5ee2a65973d6c02ae008fadb0f9d499e7791e12fb4e69"
+    },
+    {
+      "case_id": "D5GAP-0089",
+      "case_id_in_model_input": false,
+      "constraint_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
+      "decomposer_input_sha256": "79f1f37a0a44a7c6fcc81afe0bcaf517952c52954a483fce0b336b8665e948de",
+      "inference_config_sha256": "6daab17278547241563d1bc6bec92fcdd882ed48c8de3e18db81e737c732b54b",
+      "model_input_keys": [
+        "utterance",
+        "projected_workspace"
+      ],
+      "prompt_system_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+      "prompt_user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+      "rendered_model_input_sha256": "bd5779214245b1412d1dda02a29c5eec20f835ed4abb20f8d28d90566b8ef7cb",
+      "serializer_implementation_sha256": "95514c73fc1a25c5c52d784a3c2126543dfd8845f8f21aabafd103642a152740",
+      "utterance_sha256": "e1c8c1008c080e980c51272f95a9ac220e1a33993228d867245ba366a393fecf",
+      "workspace_sha256": "e7b4c11947d8682bbdd5ee2a65973d6c02ae008fadb0f9d499e7791e12fb4e69"
+    },
+    {
+      "case_id": "D5GAP-0117",
+      "case_id_in_model_input": false,
+      "constraint_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
+      "decomposer_input_sha256": "797fcb9e1d42e8a1bca212c15d13d110b5c043a78602dc7938893580771eccbd",
+      "inference_config_sha256": "6daab17278547241563d1bc6bec92fcdd882ed48c8de3e18db81e737c732b54b",
+      "model_input_keys": [
+        "utterance",
+        "projected_workspace"
+      ],
+      "prompt_system_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+      "prompt_user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+      "rendered_model_input_sha256": "c159b5c3bc5b3e612c72309fd741bedffbe484883bdb841c228fa99dc939418c",
+      "serializer_implementation_sha256": "95514c73fc1a25c5c52d784a3c2126543dfd8845f8f21aabafd103642a152740",
+      "utterance_sha256": "cf1995f4db09c8ecb71878ad05121e63f1a2272338c1b9ba800a777fef92fb7e",
+      "workspace_sha256": "0d6d0be53d9002844553eb65d836f2e8efec7c75f76e30e2b93f379e3647e74c"
+    },
+    {
+      "case_id": "D5GAP-0096",
+      "case_id_in_model_input": false,
+      "constraint_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
+      "decomposer_input_sha256": "2b3245908efd22b40301b9adebd93226f2323766bfd5b77b0e56dcce96fa7620",
+      "inference_config_sha256": "6daab17278547241563d1bc6bec92fcdd882ed48c8de3e18db81e737c732b54b",
+      "model_input_keys": [
+        "utterance",
+        "projected_workspace"
+      ],
+      "prompt_system_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+      "prompt_user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+      "rendered_model_input_sha256": "1ea94eb5ea30ee4e3d5f981a699ce2dd3dd6b369e9b2c7e8623b2aad9d8d36d0",
+      "serializer_implementation_sha256": "95514c73fc1a25c5c52d784a3c2126543dfd8845f8f21aabafd103642a152740",
+      "utterance_sha256": "55727bdba29f25aca4182344eaa91a2f93852010cb5b3737040cbbd8ef7d5f4a",
+      "workspace_sha256": "0d6d0be53d9002844553eb65d836f2e8efec7c75f76e30e2b93f379e3647e74c"
+    },
+    {
+      "case_id": "D5GAP-0101",
+      "case_id_in_model_input": false,
+      "constraint_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
+      "decomposer_input_sha256": "11327486a44838c9be9505ae71945d1ba6539a5ed7500b0002637c4d55f3b085",
+      "inference_config_sha256": "6daab17278547241563d1bc6bec92fcdd882ed48c8de3e18db81e737c732b54b",
+      "model_input_keys": [
+        "utterance",
+        "projected_workspace"
+      ],
+      "prompt_system_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+      "prompt_user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+      "rendered_model_input_sha256": "7faec79d184c48f191cd1d399b0c61f272dbf68a4e6fa0ed3725f8c19eacd544",
+      "serializer_implementation_sha256": "95514c73fc1a25c5c52d784a3c2126543dfd8845f8f21aabafd103642a152740",
+      "utterance_sha256": "d65c70f7a7e3f7edb106dd467a8978374e123879b5a79352ce2e264d77452f51",
+      "workspace_sha256": "1d4bcec6f36f33095a5fc7365f58b917dc8a3ddbf5cb9f1c935bcafa2645c57d"
+    },
+    {
+      "case_id": "SEED-cm-9643c020e2e02463",
+      "case_id_in_model_input": false,
+      "constraint_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
+      "decomposer_input_sha256": "42aacf3d5392d64841e02dd96ed318b8a3e377b77a7237635ebe14bc33a4c7a0",
+      "inference_config_sha256": "6daab17278547241563d1bc6bec92fcdd882ed48c8de3e18db81e737c732b54b",
+      "model_input_keys": [
+        "utterance",
+        "projected_workspace"
+      ],
+      "prompt_system_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+      "prompt_user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+      "rendered_model_input_sha256": "5ec3ed544217814c42e85ad274ba4403bf36bfbc6efd212264ebe1fa3e0658a3",
+      "serializer_implementation_sha256": "95514c73fc1a25c5c52d784a3c2126543dfd8845f8f21aabafd103642a152740",
+      "utterance_sha256": "9364dd86a0faacd47a0bfe9f511596b8024f3463146b95e47519df14145d30f8",
+      "workspace_sha256": "6859b9f991b2a78611dae5e0b85bbe82ef3647d4eae4d7c6d87f48c5cc403103"
+    }
+  ],
+  "contamination_failures": [],
+  "identical_prompt_constraint_serializer_inference": true,
+  "invocation_order": [
+    "D5GAP-0085",
+    "D5GAP-0089",
+    "D5GAP-0117",
+    "D5GAP-0096",
+    "D5GAP-0101",
+    "SEED-cm-9643c020e2e02463"
+  ],
+  "order_match": true,
+  "pass": true,
+  "persist_raw_utterance_or_workspace": false
+}

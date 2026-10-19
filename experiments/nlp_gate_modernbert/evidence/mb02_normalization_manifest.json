@@ -1,0 +1,14 @@
+{
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-MB02-DETERMINISTIC-RESOLVER-FACT-PROJECTOR-AUTH-001",
+  "frontier_model_calls": 0,
+  "gold_available_during_generation": false,
+  "method_counts": {
+    "MANUAL_NORMALIZATION": 8,
+    "RULE_BUILDER": 292
+  },
+  "n_records": 300,
+  "path": "/home/user/projects/wellplot/experiments/nlp_gate_modernbert/evidence/mb02/mb02_normalized_requests.jsonl",
+  "schema_valid": 300,
+  "source_reviewed": 300,
+  "unresolved_normalizations": 0
+}

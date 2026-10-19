@@ -1,0 +1,64 @@
+{
+  "OPENROUTER_API_KEY_PRESENT": true,
+  "authority": "WP-DC02-03-JOINT-HOSTED-SMOKE-AUTH-001",
+  "budgets": {
+    "estimated_usd_cap": 2.0,
+    "logical_calls_authorized": 2,
+    "transport_attempts_authorized": 4
+  },
+  "cases_2_through_6_authorized": false,
+  "decoding_note": "json_object + freeze_candidate; XGrammar hard-mask equivalence NOT claimed",
+  "deepseek": {
+    "cost_card": {
+      "billable_inference_calls": 0,
+      "catalog_completion_usd_per_1m": 0.6,
+      "catalog_prompt_usd_per_1m": 0.15,
+      "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+      "pinned_provider": "Morph",
+      "rate": {
+        "completion_usd_per_1m": 0.6,
+        "prompt_usd_per_1m": 0.04,
+        "provider_name": "Morph",
+        "tag": "morph/fp8"
+      },
+      "snapshot_utc": "2026-10-19T23:09:17.586722+00:00",
+      "source_path": "/home/user/projects/wellplot/experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_02/provider_price_routing_snapshot.json"
+    },
+    "model": "deepseek/deepseek-v4.1-flash-1017",
+    "provider_order": [
+      "Morph"
+    ],
+    "provider_selection_rationale": "Morph from C02-02 DeepSeek endpoint snapshot: has_response_format + has_structured_outputs; no fallback"
+  },
+  "expected_prompt_system_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+  "expected_prompt_user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+  "gemini": {
+    "cost_card": {
+      "billable_inference_calls": 0,
+      "catalog_completion_usd_per_1m": 10.0,
+      "catalog_prompt_usd_per_1m": 2.0,
+      "openrouter_model_id": "google/gemini-4-argon",
+      "pinned_provider": "Google AI Studio",
+      "rate": {
+        "completion_usd_per_1m": 5.0,
+        "prompt_usd_per_1m": 1.0,
+        "provider_name": "Google AI Studio",
+        "tag": "google-ai-studio/flex"
+      },
+      "snapshot_utc": "2026-10-19T23:09:17.586604+00:00",
+      "source_path": "/home/user/projects/wellplot/experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_02/provider_price_routing_snapshot.json"
+    },
+    "model": "google/gemini-4-argon",
+    "provider_order": [
+      "Google AI Studio"
+    ]
+  },
+  "parent_is_ancestor_or_equal": true,
+  "parent_sha": "ab6fcd29f4545e0128afaefb2c1b032df8f30bc7",
+  "preflight_utc": "2026-10-19T23:09:17.587807+00:00",
+  "prompt_match": true,
+  "prompt_system_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+  "prompt_user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+  "smoke_case_id": "D5GAP-0085",
+  "starting_head": "ab6fcd29f4545e0128afaefb2c1b032df8f30bc7"
+}

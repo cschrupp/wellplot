@@ -1,0 +1,92 @@
+{
+  "authority": "WP-DC02-03-HOSTED-SMOKE-CORRECTIVE-PREP-AUTH-001",
+  "billable_openrouter_calls": 0,
+  "candidate_sha": "8dd74b0f5871ff6b0e9a052bd2ba305ba4811925",
+  "completed_utc": "2026-10-19T23:17:42.920017+00:00",
+  "corrective_deepseek_smoke_authorized": false,
+  "cost_reconciliation": {
+    "deepseek": {
+      "accounting_rule": "Use provider_reported_usd as the observed charge for cost-effectiveness. Retain estimated_usd_from_pre_run_cost_card for comparison only. Do not overwrite historical smoke rows.",
+      "cost_card_rates_usd_per_1m": {
+        "completion": 0.6,
+        "prompt": 0.04,
+        "provider": "Morph",
+        "tag": "morph/fp8"
+      },
+      "estimated_usd_from_pre_run_cost_card": 0.0006374,
+      "provider_reported_usd": 0.00064315,
+      "reported_over_estimate_ratio": 1.0090210229055538
+    },
+    "gemini": {
+      "accounting_rule": "Use provider_reported_usd as the observed charge for cost-effectiveness. Retain estimated_usd_from_pre_run_cost_card for comparison only. Do not overwrite historical smoke rows.",
+      "cost_card_rates_usd_per_1m": {
+        "completion": 5.0,
+        "prompt": 1.0,
+        "provider": "Google AI Studio",
+        "tag": "google-ai-studio/flex"
+      },
+      "estimated_usd_from_pre_run_cost_card": 0.003689,
+      "provider_reported_usd": 0.007378,
+      "reported_over_estimate_ratio": 2.0
+    },
+    "gemini_2x_diagnosis": "Pre-run cost card used Google AI Studio flex tagged rates at $1/$5 per 1M (50% intro discount in C02-02 snapshot). OpenRouter usage.cost equals catalog-equivalent $2/$10 per 1M on the same token counts (exact 2\u00d7). Observed charge = provider_reported_usd.",
+    "historical_smoke_unchanged": true,
+    "totals": {
+      "estimated_usd_sum": 0.0043264,
+      "provider_reported_usd_sum": 0.00802115
+    }
+  },
+  "deepseek_corrective_config": {
+    "additional_api_calls_authorized_by_this_prep": 0,
+    "not_proven_sufficient": true,
+    "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+    "original_smoke_observation": "RETAINED_IMMUTABLE",
+    "proposed_request_overrides": {
+      "include_reasoning": false,
+      "max_tokens": 4096,
+      "reasoning": {
+        "effort": "low"
+      },
+      "response_format": {
+        "type": "json_object"
+      },
+      "temperature": 0.0
+    },
+    "provider_pin": "Morph",
+    "rationale": "Original smoke used max_tokens=1024; Morph returned reasoning_tokens=1024 and empty content. 4096 is a proposed operational accommodation pending one authorized corrective smoke. reasoning.effort=low is supported per Morph endpoint snapshot; not a semantic prompt change.",
+    "supported_parameters_from_c02_02_snapshot": [
+      "reasoning",
+      "include_reasoning",
+      "max_tokens",
+      "temperature",
+      "stop",
+      "top_p",
+      "top_k",
+      "min_p",
+      "frequency_penalty",
+      "presence_penalty",
+      "repetition_penalty",
+      "seed",
+      "logit_bias",
+      "tools",
+      "tool_choice",
+      "structured_outputs",
+      "response_format",
+      "reasoning_effort"
+    ]
+  },
+  "full_run_authorized": false,
+  "gemini": {
+    "archived_failure_label": "DECOMPOSITION_SCHEMA_INVALID",
+    "detail_prefix": "13 validation errors for ClosedNormalizedProgram",
+    "interpretation": "Structural freeze failed. semantically_equivalent=false must NOT be read as a completed Layer-1 semantic comparison; it is the harness default under freeze failure.",
+    "offline_reverification": "CONFIRMED",
+    "reached_freeze": false,
+    "schema_valid": false,
+    "semantically_equivalent_field": false
+  },
+  "live_inference_calls": 0,
+  "next_recommended_authority": "Separate auth for exactly one DeepSeek corrective smoke on D5GAP-0085 with pinned max_tokens=4096 and reasoning.effort=low; Gemini retest not automatic",
+  "parent_sha": "ace0e46b72801b243da9ce5f684ccfbf0f43a506",
+  "tip_sha": "6d2c3a2aef90911e6ee40444bc2c0aaaef8d2dd3"
+}

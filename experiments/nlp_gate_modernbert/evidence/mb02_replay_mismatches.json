@@ -1,0 +1,143 @@
+[
+  {
+    "case_id": "GOLD-0061",
+    "gold_detail": null,
+    "gold_reason": null,
+    "gold_status": "ok",
+    "kind": "status",
+    "mb01_authority": "DETERMINISTIC_PRECONDITION",
+    "pred_detail": "between_fill_requires_same_track",
+    "pred_reason": "capability_not_available",
+    "pred_status": "unsupported",
+    "selected_authority": "DETERMINISTIC_PRECONDITION",
+    "suppressed": []
+  },
+  {
+    "case_id": "GOLD-0062",
+    "gold_detail": null,
+    "gold_reason": null,
+    "gold_status": "ok",
+    "kind": "status",
+    "mb01_authority": "DETERMINISTIC_PRECONDITION",
+    "pred_detail": "between_fill_requires_same_track",
+    "pred_reason": "capability_not_available",
+    "pred_status": "unsupported",
+    "selected_authority": "DETERMINISTIC_PRECONDITION",
+    "suppressed": []
+  },
+  {
+    "case_id": "GOLD-0063",
+    "gold_detail": null,
+    "gold_reason": null,
+    "gold_status": "ok",
+    "kind": "status",
+    "mb01_authority": "DETERMINISTIC_PRECONDITION",
+    "pred_detail": "between_fill_requires_same_track",
+    "pred_reason": "capability_not_available",
+    "pred_status": "unsupported",
+    "selected_authority": "DETERMINISTIC_PRECONDITION",
+    "suppressed": []
+  },
+  {
+    "case_id": "SEED-cm-9643c020e2e02463",
+    "gold_detail": null,
+    "gold_reason": null,
+    "gold_status": "ok",
+    "kind": "status",
+    "mb01_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+    "pred_detail": null,
+    "pred_reason": "invalid_log_scale_bounds",
+    "pred_status": "invalid",
+    "selected_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+    "suppressed": []
+  },
+  {
+    "case_id": "D5GAP-0085",
+    "gold_detail": null,
+    "gold_reason": null,
+    "gold_status": "ok",
+    "kind": "status",
+    "mb01_authority": "DETERMINISTIC_PRECONDITION",
+    "pred_detail": "unknown_request_kind",
+    "pred_reason": "operation_not_supported",
+    "pred_status": "unsupported",
+    "selected_authority": "STATIC_CAPABILITY_BOUNDARY",
+    "suppressed": []
+  },
+  {
+    "case_id": "D5GAP-0089",
+    "gold_detail": null,
+    "gold_reason": null,
+    "gold_status": "ok",
+    "kind": "status",
+    "mb01_authority": "DETERMINISTIC_PRECONDITION",
+    "pred_detail": null,
+    "pred_reason": "reference_not_found",
+    "pred_status": "unsupported",
+    "selected_authority": "DETERMINISTIC_NOT_FOUND",
+    "suppressed": []
+  },
+  {
+    "case_id": "D5GAP-0096",
+    "gold_detail": null,
+    "gold_reason": null,
+    "gold_status": "ok",
+    "kind": "status",
+    "mb01_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+    "pred_detail": null,
+    "pred_reason": "invalid_log_scale_bounds",
+    "pred_status": "invalid",
+    "selected_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+    "suppressed": []
+  },
+  {
+    "case_id": "D5GAP-0101",
+    "gold_detail": null,
+    "gold_reason": null,
+    "gold_status": "ok",
+    "kind": "status",
+    "mb01_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+    "pred_detail": null,
+    "pred_reason": "reference_not_found",
+    "pred_status": "unsupported",
+    "selected_authority": "DETERMINISTIC_NOT_FOUND",
+    "suppressed": []
+  },
+  {
+    "case_id": "D5GAP-0117",
+    "gold_detail": null,
+    "gold_reason": null,
+    "gold_status": "ok",
+    "kind": "status",
+    "mb01_authority": "DETERMINISTIC_SCHEMA_DOMAIN",
+    "pred_detail": null,
+    "pred_reason": "reference_not_found",
+    "pred_status": "unsupported",
+    "selected_authority": "DETERMINISTIC_NOT_FOUND",
+    "suppressed": []
+  },
+  {
+    "case_id": "D5GAP-0125",
+    "gold_detail": null,
+    "gold_reason": null,
+    "gold_status": "ambiguous",
+    "kind": "status",
+    "mb01_authority": "DETERMINISTIC_CARDINALITY",
+    "pred_detail": null,
+    "pred_reason": "reference_not_found",
+    "pred_status": "unsupported",
+    "selected_authority": "DETERMINISTIC_NOT_FOUND",
+    "suppressed": [
+      "DETERMINISTIC_CARDINALITY"
+    ]
+  },
+  {
+    "case_id": "D5GAP-0125",
+    "gold_status": "ambiguous",
+    "kind": "authority",
+    "mb01_authority": "DETERMINISTIC_CARDINALITY",
+    "pred_reason": "reference_not_found",
+    "pred_status": "unsupported",
+    "selected_authority": "DETERMINISTIC_NOT_FOUND"
+  }
+]

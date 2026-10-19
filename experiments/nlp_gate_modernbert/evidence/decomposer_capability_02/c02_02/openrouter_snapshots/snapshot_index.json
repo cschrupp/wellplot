@@ -1,0 +1,23 @@
+{
+  "source": "openrouter_public_catalog_and_endpoints",
+  "live_inference_calls": 0,
+  "files": {
+    "deepseek_v4_1_flash_1017_endpoints.json": {
+      "sha256": "144929e1efd9b2662099d2a666c8ce5b4ec3fed69b7d19fd3fe0977efdc6f594",
+      "size_bytes": 21521
+    },
+    "deepseek_v4_1_flash_1017_model.json": {
+      "sha256": "294f424395dee922a34d2c94ab82b35cf0b0bac7d10482a957842189c4d9975f",
+      "size_bytes": 3169
+    },
+    "gemini_4_argon_endpoints.json": {
+      "sha256": "398a4a2980d8dea94da496ecb1694f756b2348bb267de91a4d8a67c794be917f",
+      "size_bytes": 7828
+    },
+    "gemini_4_argon_model.json": {
+      "sha256": "942008450339d24337be04c48741dd671f592fc17bfe887e7be74a131bd59915",
+      "size_bytes": 1348
+    }
+  },
+  "captured_utc": "2026-10-19T17:47:39.411772+00:00"
+}

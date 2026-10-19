@@ -1,0 +1,29 @@
+{
+  "case_id": "D5GAP-0101",
+  "classification_correction": {
+    "from": "DECOMPOSITION_SCHEMA_INVALID",
+    "model_calls_added": 0,
+    "reason": "frozen_design_max_token_termination_before_complete_legal_object",
+    "to": "DECOMPOSITION_DECODE_FAILURE"
+  },
+  "failure_labels": [
+    "DECOMPOSITION_DECODE_FAILURE"
+  ],
+  "freeze_status": "DECOMPOSITION_DECODE_FAILURE",
+  "latency_seconds": 314.5926402529876,
+  "n_generated_tokens": 1024,
+  "n_payload_tokens": 1024,
+  "raw_output_sha256": "e8ddb2150e96d506d24e4e329b104e89d2336db64b37afbf3ce350d92f1afc16",
+  "raw_output_utf8": "{\"tasks\":[{\"depends_on\":[\"depth\"],\"produces_binds\":{\",\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"track\",\"type\":\"track\",\"id\":\"track\",\"ref\":\"track\",\"title\":\"",
+  "reached_freeze": false,
+  "semantically_equivalent": false,
+  "source_results_line_sha256": "0fedb856497d4c3c4f14f9619b375de98b4a8219850249e002686b3e9c9feac5",
+  "status": "DECOMPOSITION_DECODE_FAILURE",
+  "termination": {
+    "ended_with_stop_stripped": false,
+    "generated_tokens": 1024,
+    "hit_max_new_tokens": true,
+    "max_new_tokens": 1024,
+    "reason": "max_new_tokens"
+  }
+}

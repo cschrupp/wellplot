@@ -1,0 +1,10 @@
+{
+  "accepted_tip": "27db77a3ca913b4298afef291f09064d9d1931d2",
+  "additional_inference_authorized_by_this_review": false,
+  "execution_status": "CLOSED_ACCEPTED_OPERATIONAL_SMOKE_PASSED",
+  "follow_up_authority": "WP-DC02-03-JOINT-HOSTED-FULL-RUN-AUTH-001",
+  "operational_smoke": "PASS",
+  "review_authority": "WP-DC02-03-DEEPSEEK-CORRECTIVE-SMOKE-REVIEW-ACCEPT-001",
+  "review_disposition": "ACCEPTED_OPERATIONAL_SMOKE_PASSED",
+  "slice": "C02-03-DEEPSEEK-CORRECTIVE-SMOKE"
+}

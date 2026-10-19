@@ -1,0 +1,11 @@
+{
+  "authority": "WP-DC02-02-PROVIDER-HARNESS-QUALIFICATION-AUTH-001",
+  "billable_openrouter_authorized": false,
+  "c02_03_authorized": false,
+  "human_authorized": true,
+  "live_inference_authorized": false,
+  "mode": "MOCKED_PROVIDER_HARNESS_QUALIFICATION_ONLY",
+  "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
+  "slice": "C02-02",
+  "starting_sha": "9025ecbb6c2ceaf4a2ee89da53a1242eb96d7f67"
+}

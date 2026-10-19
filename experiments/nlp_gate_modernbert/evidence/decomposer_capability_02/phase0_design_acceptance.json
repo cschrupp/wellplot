@@ -1,0 +1,34 @@
+{
+  "decision": "WP-DC02-PHASE0-DESIGN-ACCEPT-001",
+  "disposition": "PHASE-0-NARROW-FREEZE APPROVED",
+  "execution_authorized_by_this_acceptance": false,
+  "frontier_ceiling": {
+    "display_name": "Gemini 4 Argon",
+    "openrouter_model_id": "google/gemini-4-argon",
+    "openrouter_model_id_status": "RESOLVED_C02_02",
+    "provider": "OpenRouter"
+  },
+  "frozen_phase0_slices": [
+    "C02-00",
+    "C02-01",
+    "C02-02",
+    "G0"
+  ],
+  "historical_slm_02_03": "CONTEXTUAL_ONLY_NOT_COMBINED_WITH_PILOT_VERDICT",
+  "local_candidates": [
+    "Qwen3-4B-Instruct-2507",
+    "Qwen3-4B-Thinking-2507"
+  ],
+  "next_eligible_implementation_authority": "WP-DC02-00-BASELINE-RECOVERY-AUTH-001",
+  "not_frozen": [
+    "C02-03_through_C02_17",
+    "dataset_sizes_and_partitions",
+    "quantitative_acceptance_thresholds",
+    "qlora_hyperparameters",
+    "whether_both_qwen_variants_fine_tune",
+    "phase_3_through_5_design"
+  ],
+  "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
+  "rq1_through_rq5": "FROZEN_WITH_GEMINI_SUBSTITUTED_FOR_SONNET",
+  "scientific_baseline": "DECOMPOSER-PILOT-01"
+}

@@ -1,0 +1,11 @@
+{
+  "authority": "WP-DC02-01-BENCHMARK-ORACLE-AUTH-001",
+  "c02_02_authorized": false,
+  "dataset_expansion_authorized": false,
+  "human_authorized": true,
+  "model_calls_authorized": 0,
+  "openrouter_calls_authorized": 0,
+  "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
+  "slice": "C02-01",
+  "starting_sha": "a8ced8a69ee8c65e0bf292a6952d77b6ef9e2392"
+}

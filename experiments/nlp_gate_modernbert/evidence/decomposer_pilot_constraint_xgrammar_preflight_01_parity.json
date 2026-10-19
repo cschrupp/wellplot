@@ -1,0 +1,293 @@
+{
+  "compile_seconds": 0.839969108987134,
+  "native_grammar_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
+  "oracle_backend_agreement": {
+    "mismatches": [],
+    "pass": true
+  },
+  "pass": true,
+  "source_oracle": {
+    "negative_pass": true,
+    "pass": true,
+    "positive_pass": true
+  },
+  "text_parity": {
+    "negative_pass": true,
+    "pass": true,
+    "positive_pass": true
+  },
+  "token_replay": {
+    "cases": [
+      {
+        "any_stop_allowed": true,
+        "completed": true,
+        "detail": "ok",
+        "label": "empty_tasks",
+        "n_tokens": 4,
+        "pass": true,
+        "rejection_index": null
+      },
+      {
+        "any_stop_allowed": true,
+        "completed": true,
+        "detail": "ok",
+        "label": "version_null",
+        "n_tokens": 8,
+        "pass": true,
+        "rejection_index": null
+      },
+      {
+        "any_stop_allowed": true,
+        "completed": true,
+        "detail": "ok",
+        "label": "version_str",
+        "n_tokens": 9,
+        "pass": true,
+        "rejection_index": null
+      },
+      {
+        "any_stop_allowed": true,
+        "completed": true,
+        "detail": "ok",
+        "label": "text_only",
+        "n_tokens": 29,
+        "pass": true,
+        "rejection_index": null
+      },
+      {
+        "any_stop_allowed": true,
+        "completed": true,
+        "detail": "ok",
+        "label": "local_ref_only",
+        "n_tokens": 31,
+        "pass": true,
+        "rejection_index": null
+      },
+      {
+        "any_stop_allowed": true,
+        "completed": true,
+        "detail": "ok",
+        "label": "unicode_only_non_ws",
+        "n_tokens": 39,
+        "pass": true,
+        "rejection_index": null
+      },
+      {
+        "any_stop_allowed": true,
+        "completed": true,
+        "detail": "ok",
+        "label": "optionals_absent",
+        "n_tokens": 19,
+        "pass": true,
+        "rejection_index": null
+      },
+      {
+        "any_stop_allowed": true,
+        "completed": true,
+        "detail": "ok",
+        "label": "nullable_alpha_null",
+        "n_tokens": 23,
+        "pass": true,
+        "rejection_index": null
+      },
+      {
+        "any_stop_allowed": true,
+        "completed": true,
+        "detail": "ok",
+        "label": "produces_binds_empty",
+        "n_tokens": 26,
+        "pass": true,
+        "rejection_index": null
+      },
+      {
+        "any_stop_allowed": true,
+        "completed": true,
+        "detail": "ok",
+        "label": "produces_binds_entry",
+        "n_tokens": 30,
+        "pass": true,
+        "rejection_index": null
+      },
+      {
+        "any_stop_allowed": true,
+        "completed": true,
+        "detail": "ok",
+        "label": "number_forms",
+        "n_tokens": 23,
+        "pass": true,
+        "rejection_index": null
+      },
+      {
+        "any_stop_allowed": true,
+        "completed": true,
+        "detail": "ok",
+        "label": "number_frac_exp",
+        "n_tokens": 28,
+        "pass": true,
+        "rejection_index": null
+      },
+      {
+        "any_stop_allowed": true,
+        "completed": true,
+        "detail": "ok",
+        "label": "valid_surrogate_pair_in_task_id",
+        "n_tokens": 26,
+        "pass": true,
+        "rejection_index": null
+      },
+      {
+        "any_stop_allowed": false,
+        "completed": false,
+        "detail": "blocked_token:2198",
+        "label": "both_text_and_ref",
+        "n_tokens": 34,
+        "pass": true,
+        "rejection_index": 14
+      },
+      {
+        "any_stop_allowed": false,
+        "completed": false,
+        "detail": "blocked_token:58640",
+        "label": "neither_text_nor_ref",
+        "n_tokens": 25,
+        "pass": true,
+        "rejection_index": 10
+      },
+      {
+        "any_stop_allowed": false,
+        "completed": false,
+        "detail": "blocked_token:62366",
+        "label": "empty_text",
+        "n_tokens": 28,
+        "pass": true,
+        "rejection_index": 12
+      },
+      {
+        "any_stop_allowed": false,
+        "completed": false,
+        "detail": "blocked_token:330",
+        "label": "spaces_text",
+        "n_tokens": 30,
+        "pass": true,
+        "rejection_index": 14
+      },
+      {
+        "any_stop_allowed": false,
+        "completed": false,
+        "detail": "blocked_token:58640",
+        "label": "tab_escape",
+        "n_tokens": 30,
+        "pass": true,
+        "rejection_index": 15
+      },
+      {
+        "any_stop_allowed": false,
+        "completed": false,
+        "detail": "blocked_token:58640",
+        "label": "u0009",
+        "n_tokens": 34,
+        "pass": true,
+        "rejection_index": 19
+      },
+      {
+        "any_stop_allowed": false,
+        "completed": false,
+        "detail": "blocked_token:1631",
+        "label": "reordered_closed_keys",
+        "n_tokens": 30,
+        "pass": true,
+        "rejection_index": 12
+      },
+      {
+        "any_stop_allowed": false,
+        "completed": false,
+        "detail": "blocked_token:15460",
+        "label": "extra_property",
+        "n_tokens": 8,
+        "pass": true,
+        "rejection_index": 4
+      },
+      {
+        "any_stop_allowed": false,
+        "completed": false,
+        "detail": "blocked_token:50051",
+        "label": "wrong_bind_value",
+        "n_tokens": 28,
+        "pass": true,
+        "rejection_index": 10
+      },
+      {
+        "any_stop_allowed": false,
+        "completed": false,
+        "detail": "blocked_token:22831",
+        "label": "nan",
+        "n_tokens": 23,
+        "pass": true,
+        "rejection_index": 7
+      },
+      {
+        "any_stop_allowed": false,
+        "completed": false,
+        "detail": "blocked_token:45090",
+        "label": "infinity",
+        "n_tokens": 23,
+        "pass": true,
+        "rejection_index": 7
+      },
+      {
+        "any_stop_allowed": false,
+        "completed": false,
+        "detail": "blocked_token:45090",
+        "label": "neg_infinity",
+        "n_tokens": 23,
+        "pass": true,
+        "rejection_index": 7
+      },
+      {
+        "any_stop_allowed": false,
+        "completed": false,
+        "detail": "blocked_token:3056",
+        "label": "structural_space",
+        "n_tokens": 5,
+        "pass": true,
+        "rejection_index": 3
+      },
+      {
+        "any_stop_allowed": false,
+        "completed": false,
+        "detail": "blocked_token:198",
+        "label": "structural_newline",
+        "n_tokens": 5,
+        "pass": true,
+        "rejection_index": 3
+      },
+      {
+        "any_stop_allowed": false,
+        "completed": false,
+        "detail": "blocked_token:9207",
+        "label": "lone_high_surrogate",
+        "n_tokens": 22,
+        "pass": true,
+        "rejection_index": 20
+      },
+      {
+        "any_stop_allowed": false,
+        "completed": false,
+        "detail": "blocked_token:5626",
+        "label": "lone_low_surrogate",
+        "n_tokens": 22,
+        "pass": true,
+        "rejection_index": 17
+      }
+    ],
+    "mask_step_latency_seconds": {
+      "max": 0.10571329898084514,
+      "mean": 0.010560529985148477,
+      "min": 1.2399978004395962e-06,
+      "n": 514
+    },
+    "negative_pass": true,
+    "pass": true,
+    "positive_pass": true
+  }
+}

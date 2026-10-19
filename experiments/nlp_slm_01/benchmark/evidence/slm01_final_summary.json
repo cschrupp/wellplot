@@ -1,0 +1,21 @@
+{
+  "best_arm": "Q2",
+  "best_semantic_correctness": 0.42105263157894735,
+  "checks": {
+    "baselines_complete": true,
+    "family_breadth": false,
+    "gold_frozen": true,
+    "ir_frozen": true,
+    "ir_limit_lt_15": true,
+    "learnable_ge_70": true,
+    "lowerer_100": true,
+    "no_leakage": true,
+    "non_goals": true,
+    "semantic_floor_50": false,
+    "split_frozen": true,
+    "taxonomy_complete": true
+  },
+  "gate_decision": "MODEL-SIZE-FAIL",
+  "n_gold_held_out_run": 70,
+  "outlines_status": "DEFERRED_WITH_EVIDENCE:AttributeError:module 'outlines' has no attribute 'generate'"
+}

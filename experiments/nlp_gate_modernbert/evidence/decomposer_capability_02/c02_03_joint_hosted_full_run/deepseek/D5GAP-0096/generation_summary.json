@@ -1,0 +1,93 @@
+{
+  "arm": "deepseek",
+  "case_id": "D5GAP-0096",
+  "completion_tokens": 1247,
+  "dual_cost": {
+    "accounting_rule": "Use provider_reported_usd as the observed charge for cost-effectiveness. Retain estimated_usd_from_pre_run_cost_card for comparison only. Do not overwrite historical smoke rows.",
+    "cost_card_rates_usd_per_1m": {
+      "completion": 0.6,
+      "prompt": 0.049,
+      "provider": "Morph",
+      "tag": "morph/fp8"
+    },
+    "estimated_usd_from_pre_run_cost_card": 0.0007939169999999999,
+    "provider_reported_usd": 0.000793917,
+    "reported_over_estimate_ratio": 1.0000000000000002
+  },
+  "error": null,
+  "estimated_usd_from_live_rate_card": 0.0007939169999999999,
+  "evaluation": {
+    "candidate_digest": null,
+    "canonicalization_version": null,
+    "case_id": "D5GAP-0096",
+    "decomposer_input_keys": [
+      "projected_workspace",
+      "utterance"
+    ],
+    "diagnostics": [],
+    "failure_labels": [
+      "DECOMPOSITION_SCHEMA_INVALID"
+    ],
+    "freeze_detail": "2 validation errors for ClosedNormalizedProgram\ntasks\n  Field required [type=missing, input_value={'operations': [{'local_r...0.0, 'scale_min': 0.2}]}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\noperations\n  Extra inputs are not permitted [type=extra_forbidden, input_value=[{'local_ref': 'petrophys...00.0, 'scale_min': 0.2}], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden",
+    "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+    "oracle_access_before_freeze": false,
+    "oracle_access_enabled_after_freeze": false,
+    "q3_comparison": {},
+    "runtime_gate": {},
+    "schema_valid": false,
+    "semantically_equivalent": false
+  },
+  "failure_labels": [
+    "DECOMPOSITION_SCHEMA_INVALID"
+  ],
+  "final_answer_sha256": "ebce191afbd1b8f5c36c384131d5f39332517183bb8c75e26c619ba71535fdaf",
+  "finish_reason": "stop",
+  "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+  "generation_id": "gen-1792452854-QWY3HVFrl57Go43qkkGy",
+  "latency_seconds": 9.894575767975766,
+  "model_path": "deepseek-v4.1-flash-1017",
+  "observed_provider": "Morph",
+  "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+  "pipeline_exercised": true,
+  "prompt_tokens": 933,
+  "provider_reported_usd": 0.000793917,
+  "raw_output_sha256": "1a55b86ff22d7ee5ac7f235d027df8d9d0fa58807a250e05730ed46daf0297c8",
+  "raw_usage": {
+    "completion_tokens": 1247,
+    "completion_tokens_details": {
+      "audio_tokens": 0,
+      "image_tokens": 0,
+      "reasoning_tokens": 1094
+    },
+    "cost": 0.000793917,
+    "cost_details": {
+      "upstream_inference_completions_cost": 0.0007482,
+      "upstream_inference_cost": 0.000793917,
+      "upstream_inference_prompt_cost": 4.5717e-05
+    },
+    "is_byok": false,
+    "prompt_tokens": 933,
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "video_tokens": 0
+    },
+    "total_tokens": 2180
+  },
+  "reached_freeze": false,
+  "reasoning_tokens": 1094,
+  "request_max_tokens": 4096,
+  "request_reasoning": {
+    "effort": "low"
+  },
+  "requested_provider_order": [
+    "Morph"
+  ],
+  "schema_valid": false,
+  "semantic_equivalent": false,
+  "semantic_layer1_completed": false,
+  "source": "live_full_run",
+  "total_tokens": 2180,
+  "transport_attempts": 1
+}

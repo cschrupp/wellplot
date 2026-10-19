@@ -1,0 +1,21 @@
+{
+  "confirmed_model_semantic_n": 22,
+  "counts": {
+    "composition": 5,
+    "deictic": 1,
+    "envelope_misuse": 8,
+    "other": 9,
+    "relation": 7,
+    "syntax_or_schema": 30,
+    "units": 1
+  },
+  "ir_limitation_share_of_all_failures": 0.0,
+  "learnable_share_of_confirmed": 1.0,
+  "model_semantic_labels_seen": [
+    "composition",
+    "deictic",
+    "envelope_misuse",
+    "relation",
+    "units"
+  ]
+}

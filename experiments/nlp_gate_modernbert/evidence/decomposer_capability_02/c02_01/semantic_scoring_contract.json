@@ -1,0 +1,23 @@
+{
+  "cost_effectiveness_metrics_planned_not_frozen": [
+    "semantic_correctness_per_dollar",
+    "cost_per_completely_correct_request_including_retries"
+  ],
+  "oracle_is_wellplot_spec_not_frontier_model": true,
+  "primary_judge": "nlp_gate_modernbert.nl_program_eval (freeze_candidate before oracle)",
+  "primary_metric": {
+    "canonical_equivalence": "as defined by compare_programs / harness Q3",
+    "definition": "semantically_equivalent == True after freeze + Q3 compare against accepted oracle",
+    "name": "complete_semantic_correctness",
+    "not": "literal JSON equality"
+  },
+  "secondary_metrics": [
+    "freeze_status / schema_valid",
+    "failure_labels taxonomy",
+    "runtime_gate terminal match",
+    "coverage atoms (required_atom_ids)",
+    "Layer-0 reached_freeze rate",
+    "Layer-2 mechanism attribution (pilot map)"
+  ],
+  "slice": "C02-01"
+}

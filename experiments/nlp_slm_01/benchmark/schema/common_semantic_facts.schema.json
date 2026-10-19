@@ -1,0 +1,29 @@
+{
+  "$id": "wellplot.slm01.common_semantic_facts.v1",
+  "title": "CommonSemanticFacts",
+  "type": "object",
+  "required": [
+    "requested_curves",
+    "placements",
+    "track_relationships",
+    "scales",
+    "scale_directions",
+    "depth_interval",
+    "fills",
+    "envelope_state"
+  ],
+  "properties": {
+    "requested_curves": { "type": "array" },
+    "placements": { "type": "array" },
+    "track_relationships": { "type": "array" },
+    "scales": { "type": "array" },
+    "scale_directions": { "type": "array" },
+    "depth_interval": { "type": ["object", "null"] },
+    "fills": { "type": "array" },
+    "envelope_state": {
+      "type": ["string", "null"],
+      "enum": ["ok", "ambiguous", "unsupported", "invalid", null]
+    }
+  },
+  "additionalProperties": false
+}

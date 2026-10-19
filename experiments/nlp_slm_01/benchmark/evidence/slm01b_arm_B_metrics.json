@@ -1,0 +1,115 @@
+{
+  "best_prompt_arm": "Q1",
+  "best_semantic_correctness": 0.15789473684210525,
+  "model_arm": "B",
+  "n_held_out_evaluated": 70,
+  "prompt_arms": {
+    "Q1": {
+      "envelope_confusion": {
+        "ambiguous": {
+          "ambiguous": 0,
+          "invalid": 1,
+          "ok": 4,
+          "unsupported": 0
+        },
+        "invalid": {
+          "ambiguous": 0,
+          "invalid": 2,
+          "ok": 0,
+          "unsupported": 0
+        },
+        "ok": {
+          "ambiguous": 0,
+          "invalid": 25,
+          "ok": 32,
+          "unsupported": 0
+        },
+        "unsupported": {
+          "ambiguous": 0,
+          "invalid": 2,
+          "ok": 4,
+          "unsupported": 0
+        }
+      },
+      "envelope_macro_f1": 0.19619845360824742,
+      "false_ok_on_ambiguous": 4,
+      "family_stats": {
+        "ambiguity_unsupported": {
+          "correct": 0,
+          "n": 13,
+          "rate": 0.0
+        },
+        "composition": {
+          "correct": 0,
+          "n": 13,
+          "rate": 0.0
+        },
+        "curve_placement": {
+          "correct": 6,
+          "n": 9,
+          "rate": 0.6666666666666666
+        },
+        "display_configuration": {
+          "correct": 0,
+          "n": 4,
+          "rate": 0.0
+        },
+        "fills": {
+          "correct": 0,
+          "n": 10,
+          "rate": 0.0
+        },
+        "intervals": {
+          "correct": 1,
+          "n": 9,
+          "rate": 0.1111111111111111
+        },
+        "relational_targeting": {
+          "correct": 2,
+          "n": 12,
+          "rate": 0.16666666666666666
+        }
+      },
+      "n": 70,
+      "n_executable": 57,
+      "overall_correctness": 0.12857142857142856,
+      "schema_validity_rate": 0.5714285714285714,
+      "semantic_correctness_executable": 0.15789473684210525,
+      "taxonomy": {
+        "confirmed_model_semantic_n": 22,
+        "counts": {
+          "composition": 5,
+          "deictic": 1,
+          "envelope_misuse": 8,
+          "other": 9,
+          "relation": 7,
+          "syntax_or_schema": 30,
+          "units": 1
+        },
+        "ir_limitation_share_of_all_failures": 0.0,
+        "learnable_share_of_confirmed": 1.0,
+        "model_semantic_labels_seen": [
+          "composition",
+          "deictic",
+          "envelope_misuse",
+          "relation",
+          "units"
+        ]
+      }
+    }
+  },
+  "schema_sha256": "4a91a325d9dd38db154bb38f4b997be81ff3047f0c663ec65c4349e4c2e21c5b",
+  "spec": {
+    "backend": "hf",
+    "label": "phi4mini_bf16_hf",
+    "model_id": "unsloth/Phi-4-mini-instruct",
+    "model_path": "/home/user/.cache/huggingface/hub/models--unsloth--Phi-4-mini-instruct/snapshots/75becc471c56fc34761ec998615ca6f8535c5a61",
+    "offload": {
+      "device_map": "auto",
+      "dtype": "bfloat16"
+    },
+    "q2_progress_at_abort": "30/70 correct=0",
+    "quant": "bf16_offload",
+    "status": "Q1_complete_Q2_aborted_user"
+  }
+}

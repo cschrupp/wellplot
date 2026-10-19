@@ -1,0 +1,382 @@
+{
+  "data": {
+    "architecture": {
+      "input_modalities": [
+        "audio",
+        "file",
+        "image",
+        "text",
+        "video"
+      ],
+      "instruct_type": null,
+      "modality": "text+image+file+audio+video->text",
+      "output_modalities": [
+        "text"
+      ],
+      "tokenizer": "Gemini"
+    },
+    "created": 1791907477,
+    "description": "Gemini 4 Argon is Google's flagship reasoning model, built for complex software engineering, deep mathematical and scientific problem solving, and autonomous multi-step agents. Google trained it to keep context across...",
+    "endpoints": [
+      {
+        "context_length": 1048576,
+        "latency_last_30m": null,
+        "max_completion_tokens": 943718,
+        "max_prompt_tokens": null,
+        "model_id": "google/gemini-4-argon",
+        "model_name": "Google: Gemini 4 Argon",
+        "name": "Google AI Studio | google/gemini-4-argon-20261013",
+        "native_tools": {
+          "openrouter:web_search": {
+            "type": "google_search"
+          }
+        },
+        "pricing": {
+          "audio": "0.000001",
+          "completion": "0.000005",
+          "discount": 0.5,
+          "image": "0.000001",
+          "input_audio_cache": "0.00000005",
+          "input_cache_read": "0.00000005",
+          "input_cache_write": "0.00000009375",
+          "internal_reasoning": "0.000005",
+          "prompt": "0.000001",
+          "web_search": "0.014"
+        },
+        "provider_name": "Google AI Studio",
+        "quantization": "unknown",
+        "service_tier": "flex",
+        "status": 0,
+        "supported_parameters": [
+          "reasoning",
+          "include_reasoning",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "seed",
+          "response_format",
+          "tools",
+          "tool_choice",
+          "structured_outputs",
+          "reasoning_effort"
+        ],
+        "supports_diarization": false,
+        "supports_image_reference": false,
+        "supports_implicit_caching": false,
+        "supports_multiple_audio_references": false,
+        "supports_tool_choice": {
+          "auto": true,
+          "function": true,
+          "none": true,
+          "required": true
+        },
+        "supports_voice_cloning": false,
+        "tag": "google-ai-studio/flex",
+        "throughput_last_30m": null,
+        "uptime_last_1d": 100,
+        "uptime_last_30m": 100,
+        "uptime_last_5m": 100
+      },
+      {
+        "context_length": 1048576,
+        "latency_last_30m": null,
+        "max_completion_tokens": 943718,
+        "max_prompt_tokens": null,
+        "model_id": "google/gemini-4-argon",
+        "model_name": "Google: Gemini 4 Argon",
+        "name": "Google | google/gemini-4-argon-20261013",
+        "native_tools": {
+          "openrouter:web_search": {
+            "type": "google_search"
+          }
+        },
+        "pricing": {
+          "audio": "0.000002",
+          "completion": "0.00001",
+          "discount": 0.5,
+          "image": "0.000002",
+          "input_audio_cache": "0.0000001",
+          "input_cache_read": "0.0000001",
+          "input_cache_write": "0.0000001875",
+          "internal_reasoning": "0.00001",
+          "prompt": "0.000002",
+          "web_search": "0.014"
+        },
+        "provider_name": "Google",
+        "quantization": "unknown",
+        "service_tier": null,
+        "status": 0,
+        "supported_parameters": [
+          "reasoning",
+          "include_reasoning",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "seed",
+          "response_format",
+          "tools",
+          "tool_choice",
+          "stop",
+          "structured_outputs",
+          "reasoning_effort"
+        ],
+        "supports_diarization": false,
+        "supports_image_reference": false,
+        "supports_implicit_caching": false,
+        "supports_multiple_audio_references": false,
+        "supports_tool_choice": {
+          "auto": true,
+          "function": true,
+          "none": true,
+          "required": true
+        },
+        "supports_voice_cloning": false,
+        "tag": "google-vertex/global",
+        "throughput_last_30m": null,
+        "uptime_last_1d": 98.61111111111111,
+        "uptime_last_30m": 100,
+        "uptime_last_5m": 100
+      },
+      {
+        "context_length": 1048576,
+        "latency_last_30m": null,
+        "max_completion_tokens": 943718,
+        "max_prompt_tokens": null,
+        "model_id": "google/gemini-4-argon",
+        "model_name": "Google: Gemini 4 Argon",
+        "name": "Google AI Studio | google/gemini-4-argon-20261013",
+        "native_tools": {
+          "openrouter:web_search": {
+            "type": "google_search"
+          }
+        },
+        "pricing": {
+          "audio": "0.000002",
+          "completion": "0.00001",
+          "discount": 0.5,
+          "image": "0.000002",
+          "input_audio_cache": "0.0000001",
+          "input_cache_read": "0.0000001",
+          "input_cache_write": "0.0000001875",
+          "internal_reasoning": "0.00001",
+          "prompt": "0.000002",
+          "web_search": "0.014"
+        },
+        "provider_name": "Google AI Studio",
+        "quantization": "unknown",
+        "service_tier": null,
+        "status": -2,
+        "supported_parameters": [
+          "reasoning",
+          "include_reasoning",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "seed",
+          "response_format",
+          "tools",
+          "tool_choice",
+          "structured_outputs",
+          "reasoning_effort"
+        ],
+        "supports_diarization": false,
+        "supports_image_reference": false,
+        "supports_implicit_caching": false,
+        "supports_multiple_audio_references": false,
+        "supports_tool_choice": {
+          "auto": true,
+          "function": true,
+          "none": true,
+          "required": true
+        },
+        "supports_voice_cloning": false,
+        "tag": "google-ai-studio",
+        "throughput_last_30m": null,
+        "uptime_last_1d": 97.01181375955524,
+        "uptime_last_30m": 96.66666666666667,
+        "uptime_last_5m": 100
+      },
+      {
+        "context_length": 1048576,
+        "latency_last_30m": null,
+        "max_completion_tokens": 65536,
+        "max_prompt_tokens": null,
+        "model_id": "google/gemini-4-argon",
+        "model_name": "Google: Gemini 4 Argon",
+        "name": "Google | google/gemini-4-argon-20261013",
+        "native_tools": {
+          "openrouter:web_search": {
+            "type": "google_search"
+          }
+        },
+        "pricing": {
+          "audio": "0.0000022",
+          "completion": "0.000011",
+          "discount": 0.5,
+          "image": "0.0000022",
+          "input_audio_cache": "0.00000011",
+          "input_cache_read": "0.00000011",
+          "input_cache_write": "0.0000001875",
+          "internal_reasoning": "0.000011",
+          "prompt": "0.0000022",
+          "web_search": "0.014"
+        },
+        "provider_name": "Google",
+        "quantization": "unknown",
+        "service_tier": null,
+        "status": 0,
+        "supported_parameters": [
+          "reasoning",
+          "include_reasoning",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "seed",
+          "response_format",
+          "tools",
+          "tool_choice",
+          "stop",
+          "structured_outputs",
+          "reasoning_effort"
+        ],
+        "supports_diarization": false,
+        "supports_image_reference": false,
+        "supports_implicit_caching": false,
+        "supports_multiple_audio_references": false,
+        "supports_tool_choice": {
+          "auto": true,
+          "function": true,
+          "none": true,
+          "required": true
+        },
+        "supports_voice_cloning": false,
+        "tag": "google-vertex/us",
+        "throughput_last_30m": null,
+        "uptime_last_1d": 100,
+        "uptime_last_30m": null,
+        "uptime_last_5m": null
+      },
+      {
+        "context_length": 1048576,
+        "latency_last_30m": null,
+        "max_completion_tokens": 943718,
+        "max_prompt_tokens": null,
+        "model_id": "google/gemini-4-argon",
+        "model_name": "Google: Gemini 4 Argon",
+        "name": "Google | google/gemini-4-argon-20261013",
+        "native_tools": {
+          "openrouter:web_search": {
+            "type": "google_search"
+          }
+        },
+        "pricing": {
+          "audio": "0.0000036",
+          "completion": "0.000018",
+          "discount": 0.5,
+          "image": "0.0000036",
+          "input_audio_cache": "0.00000018",
+          "input_cache_read": "0.00000018",
+          "input_cache_write": "0.0000003375",
+          "internal_reasoning": "0.000018",
+          "prompt": "0.0000036",
+          "web_search": "0.014"
+        },
+        "provider_name": "Google",
+        "quantization": "unknown",
+        "service_tier": "priority",
+        "status": 0,
+        "supported_parameters": [
+          "reasoning",
+          "include_reasoning",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "seed",
+          "response_format",
+          "tools",
+          "tool_choice",
+          "stop",
+          "structured_outputs",
+          "reasoning_effort"
+        ],
+        "supports_diarization": false,
+        "supports_image_reference": false,
+        "supports_implicit_caching": false,
+        "supports_multiple_audio_references": false,
+        "supports_tool_choice": {
+          "auto": true,
+          "function": true,
+          "none": true,
+          "required": true
+        },
+        "supports_voice_cloning": false,
+        "tag": "google-vertex/global/priority",
+        "throughput_last_30m": null,
+        "uptime_last_1d": 99.27007299270073,
+        "uptime_last_30m": null,
+        "uptime_last_5m": null
+      },
+      {
+        "context_length": 1048576,
+        "latency_last_30m": null,
+        "max_completion_tokens": 943718,
+        "max_prompt_tokens": null,
+        "model_id": "google/gemini-4-argon",
+        "model_name": "Google: Gemini 4 Argon",
+        "name": "Google AI Studio | google/gemini-4-argon-20261013",
+        "native_tools": {
+          "openrouter:web_search": {
+            "type": "google_search"
+          }
+        },
+        "pricing": {
+          "audio": "0.0000036",
+          "completion": "0.000018",
+          "discount": 0.5,
+          "image": "0.0000036",
+          "input_audio_cache": "0.00000018",
+          "input_cache_read": "0.00000018",
+          "input_cache_write": "0.0000003375",
+          "internal_reasoning": "0.000018",
+          "prompt": "0.0000036",
+          "web_search": "0.014"
+        },
+        "provider_name": "Google AI Studio",
+        "quantization": "unknown",
+        "service_tier": "priority",
+        "status": 0,
+        "supported_parameters": [
+          "reasoning",
+          "include_reasoning",
+          "max_tokens",
+          "temperature",
+          "top_p",
+          "seed",
+          "response_format",
+          "tools",
+          "tool_choice",
+          "structured_outputs",
+          "reasoning_effort"
+        ],
+        "supports_diarization": false,
+        "supports_image_reference": false,
+        "supports_implicit_caching": false,
+        "supports_multiple_audio_references": false,
+        "supports_tool_choice": {
+          "auto": true,
+          "function": true,
+          "none": true,
+          "required": true
+        },
+        "supports_voice_cloning": false,
+        "tag": "google-ai-studio/priority",
+        "throughput_last_30m": null,
+        "uptime_last_1d": 97.70114942528735,
+        "uptime_last_30m": null,
+        "uptime_last_5m": null
+      }
+    ],
+    "id": "google/gemini-4-argon",
+    "name": "Google: Gemini 4 Argon"
+  }
+}

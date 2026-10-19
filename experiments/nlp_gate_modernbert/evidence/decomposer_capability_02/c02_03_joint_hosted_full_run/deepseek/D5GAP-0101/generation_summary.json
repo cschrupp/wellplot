@@ -1,0 +1,93 @@
+{
+  "arm": "deepseek",
+  "case_id": "D5GAP-0101",
+  "completion_tokens": 784,
+  "dual_cost": {
+    "accounting_rule": "Use provider_reported_usd as the observed charge for cost-effectiveness. Retain estimated_usd_from_pre_run_cost_card for comparison only. Do not overwrite historical smoke rows.",
+    "cost_card_rates_usd_per_1m": {
+      "completion": 0.6,
+      "prompt": 0.049,
+      "provider": "Morph",
+      "tag": "morph/fp8"
+    },
+    "estimated_usd_from_pre_run_cost_card": 0.000506219,
+    "provider_reported_usd": 0.000506219,
+    "reported_over_estimate_ratio": 1.0
+  },
+  "error": null,
+  "estimated_usd_from_live_rate_card": 0.000506219,
+  "evaluation": {
+    "candidate_digest": null,
+    "canonicalization_version": null,
+    "case_id": "D5GAP-0101",
+    "decomposer_input_keys": [
+      "projected_workspace",
+      "utterance"
+    ],
+    "diagnostics": [],
+    "failure_labels": [
+      "DECOMPOSITION_SCHEMA_INVALID"
+    ],
+    "freeze_detail": "2 validation errors for ClosedNormalizedProgram\ntasks\n  Field required [type=missing, input_value={'operations': [{'local_r...': 'track_caliper_qc'}]}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\noperations\n  Extra inputs are not permitted [type=extra_forbidden, input_value=[{'local_ref': 'track_cal...f': 'track_caliper_qc'}], input_type=list]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden",
+    "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+    "oracle_access_before_freeze": false,
+    "oracle_access_enabled_after_freeze": false,
+    "q3_comparison": {},
+    "runtime_gate": {},
+    "schema_valid": false,
+    "semantically_equivalent": false
+  },
+  "failure_labels": [
+    "DECOMPOSITION_SCHEMA_INVALID"
+  ],
+  "final_answer_sha256": "c2ef9078a473329349fd292b6ee645a3de367b24339691beb411ebfaae05c1f9",
+  "finish_reason": "stop",
+  "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+  "generation_id": "gen-1792452864-ySXanVZKDA9yrOCOi3wz",
+  "latency_seconds": 7.268508471985115,
+  "model_path": "deepseek-v4.1-flash-1017",
+  "observed_provider": "Morph",
+  "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+  "pipeline_exercised": true,
+  "prompt_tokens": 731,
+  "provider_reported_usd": 0.000506219,
+  "raw_output_sha256": "f5158c07c6199090438f80e2e67659093fe61782fb7182b426763987bdd1c600",
+  "raw_usage": {
+    "completion_tokens": 784,
+    "completion_tokens_details": {
+      "audio_tokens": 0,
+      "image_tokens": 0,
+      "reasoning_tokens": 658
+    },
+    "cost": 0.000506219,
+    "cost_details": {
+      "upstream_inference_completions_cost": 0.0004704,
+      "upstream_inference_cost": 0.000506219,
+      "upstream_inference_prompt_cost": 3.5819e-05
+    },
+    "is_byok": false,
+    "prompt_tokens": 731,
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "video_tokens": 0
+    },
+    "total_tokens": 1515
+  },
+  "reached_freeze": false,
+  "reasoning_tokens": 658,
+  "request_max_tokens": 4096,
+  "request_reasoning": {
+    "effort": "low"
+  },
+  "requested_provider_order": [
+    "Morph"
+  ],
+  "schema_valid": false,
+  "semantic_equivalent": false,
+  "semantic_layer1_completed": false,
+  "source": "live_full_run",
+  "total_tokens": 1515,
+  "transport_attempts": 1
+}

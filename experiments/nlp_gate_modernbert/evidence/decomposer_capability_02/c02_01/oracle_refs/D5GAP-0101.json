@@ -1,0 +1,69 @@
+{
+  "case_id": "D5GAP-0101",
+  "cleaned_normalized_program": {
+    "tasks": [
+      {
+        "depends_on": [],
+        "produces_binds": {
+          "$track1": "track"
+        },
+        "request": {
+          "requested_operation": "CREATE_TRACK",
+          "track_title": "Caliper QC",
+          "track_width_mm": 24.0
+        },
+        "task_id": "t1"
+      },
+      {
+        "depends_on": [
+          "t1"
+        ],
+        "produces_binds": {},
+        "request": {
+          "query": {
+            "kind": "curve",
+            "local_ref": null,
+            "text": "CALI"
+          },
+          "requested_operation": "PLACE_CURVE",
+          "target": {
+            "kind": "track",
+            "local_ref": "$track1",
+            "text": null
+          }
+        },
+        "task_id": "t2"
+      },
+      {
+        "depends_on": [
+          "t2"
+        ],
+        "produces_binds": {},
+        "request": {
+          "query": {
+            "kind": "curve",
+            "local_ref": null,
+            "text": "CALI"
+          },
+          "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+          "scale_bounds": {
+            "kind": "linear",
+            "maximum": 12.0,
+            "minimum": 6.0
+          }
+        },
+        "task_id": "t3"
+      }
+    ],
+    "version": "scope-design-01r"
+  },
+  "cleaned_program_sha256": "4e8073da85cc9b8268a283e550ac5fe6d2ff4d0cffddcd0e5e2c80047364e473",
+  "frozen_candidate_sha256": "80f442bab67dd8831d1e2b61759ffe144ac58a8dadc9eed4c36ff18274721706",
+  "oracle_witness_id": "D5GAP-0101",
+  "self_evaluation": {
+    "failure_labels": [],
+    "freeze_status": "FROZEN",
+    "semantically_equivalent": true
+  },
+  "witness_source": "experiments/nlp_gate_modernbert/evidence/scope_contract_design_01.json"
+}

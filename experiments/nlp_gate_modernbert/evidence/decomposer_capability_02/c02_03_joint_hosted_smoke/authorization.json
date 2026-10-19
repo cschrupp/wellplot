@@ -1,0 +1,13 @@
+{
+  "authority": "WP-DC02-03-JOINT-HOSTED-SMOKE-AUTH-001",
+  "parent_sha": "ab6fcd29f4545e0128afaefb2c1b032df8f30bc7",
+  "mode": "JOINT_HOSTED_SMOKE_TWO_LOGICAL_CALLS",
+  "smoke_case_id": "D5GAP-0085",
+  "models": ["google/gemini-4-argon", "deepseek/deepseek-v4.1-flash-1017"],
+  "logical_calls_authorized": 2,
+  "transport_attempts_authorized": 4,
+  "cases_2_through_6_authorized": false,
+  "supersedes_unexecuted": "WP-DC02-03-GEMINI-CEILING-EXECUTION-AUTH-001",
+  "deepseek_provider_pin": "Morph",
+  "gemini_provider_pin": "Google AI Studio"
+}

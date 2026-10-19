@@ -1,0 +1,117 @@
+{
+  "adapter_capabilities": {
+    "deepseek-v4.1-flash-1017": {
+      "hard_xgrammar_mask": false,
+      "hf_model_id": null,
+      "notes": [
+        "Budget-capability reference; not the frontier ceiling",
+        "Provider pricing varies; see endpoints snapshot",
+        "JSON-schema enforcement may vary by provider"
+      ],
+      "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+      "reasoning_handling": "optional_reasoning_field_and_tag_strip; grade_final_answer_only",
+      "structured_output_mode": "response_format.json_object_plus_freeze_candidate",
+      "transport": "openrouter_openai_compatible"
+    },
+    "gemini-4-argon": {
+      "hard_xgrammar_mask": false,
+      "hf_model_id": null,
+      "notes": [
+        "Not identical to Pilot Run 1 XGrammar hard mask",
+        "Providers: Google AI Studio, Google Vertex (see endpoints snapshot)"
+      ],
+      "openrouter_model_id": "google/gemini-4-argon",
+      "reasoning_handling": "optional_include_reasoning_field_and_tag_strip; grade_final_answer_only",
+      "structured_output_mode": "response_format.json_object_plus_freeze_candidate",
+      "transport": "openrouter_openai_compatible"
+    },
+    "qwen3-4b-instruct-2507": {
+      "hard_xgrammar_mask": false,
+      "hf_model_id": "Qwen/Qwen3-4B-Instruct-2507",
+      "notes": [
+        "Non-thinking Instruct-2507 variant",
+        "Local weights not loaded in C02-02; checkpoint presence deferred",
+        "Tokenizer-specific XGrammar adapter requires separate future validation"
+      ],
+      "openrouter_model_id": null,
+      "reasoning_handling": "thinking_disabled",
+      "structured_output_mode": "prompted_json_plus_optional_future_constraint_adapter",
+      "transport": "local_hf_transformers_contract"
+    },
+    "qwen3-4b-thinking-2507": {
+      "hard_xgrammar_mask": false,
+      "hf_model_id": "Qwen/Qwen3-4B-Thinking-2507",
+      "notes": [
+        "Thinking-only 2507 variant; not a prompt mode of Instruct",
+        "Local weights not loaded in C02-02; checkpoint presence deferred"
+      ],
+      "openrouter_model_id": null,
+      "reasoning_handling": "thinking_enabled_final_answer_only_for_grading",
+      "structured_output_mode": "prompted_json_plus_optional_future_constraint_adapter",
+      "transport": "local_hf_transformers_contract"
+    }
+  },
+  "authority": "WP-DC02-02-PROVIDER-HARNESS-QUALIFICATION-AUTH-001",
+  "benchmark_oracle_unchanged": true,
+  "billable_openrouter_calls": 0,
+  "c02_03_authorized": false,
+  "candidate_sha": "5e2261dc197bbc36b6d9440bff61019c0925ba21",
+  "deepseek_endpoint_status": "RESOLVED",
+  "deepseek_openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+  "deferred": [
+    {
+      "item": "local_qwen3_4b_checkpoint_presence_and_hashes",
+      "reason": "C02-02 prohibits downloads/weight loads; HF ids pinned by contract only",
+      "status": "DEFERRED"
+    },
+    {
+      "item": "tokenizer_specific_xgrammar_adapters_for_4b_models",
+      "reason": "hard_xgrammar_mask=false for all four paths until separately validated",
+      "status": "UNSUPPORTED_IN_C02_02"
+    },
+    {
+      "item": "rendered_model_input_sha256_live_reverification",
+      "reason": "carried from C02-00; requires tokenizer load",
+      "status": "DEFERRED"
+    },
+    {
+      "item": "live_openrouter_routing_pinning_at_execution_time",
+      "reason": "provider routing must be pinned/recorded in authorized inference slices",
+      "status": "DEFERRED"
+    }
+  ],
+  "g0_authorized": false,
+  "gemini_endpoint_status": "RESOLVED",
+  "gemini_openrouter_model_id": "google/gemini-4-argon",
+  "live_inference_calls": 0,
+  "model_weights_loaded": false,
+  "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
+  "qualified_adapter_paths": [
+    "gemini-4-argon",
+    "deepseek-v4.1-flash-1017",
+    "qwen3-4b-instruct-2507",
+    "qwen3-4b-thinking-2507"
+  ],
+  "slice": "C02-02",
+  "starting_sha": "9025ecbb6c2ceaf4a2ee89da53a1242eb96d7f67",
+  "tip_sha": "a85d840bd219ff818e468edb48ec0000c0a818ec",
+  "unsupported": [
+    "identical_hard_xgrammar_mask_parity_with_pilot_run_1",
+    "using_frontier_or_budget_model_as_semantic_oracle"
+  ],
+  "verified": [
+    "gemini_openrouter_id_google/gemini-4-argon",
+    "deepseek_openrouter_id_deepseek/deepseek-v4.1-flash-1017",
+    "shared_semantic_request_contract",
+    "frozen_prompt_contract_bytes_in_request_builder",
+    "json_object_response_format_request_flag",
+    "response_normalization_and_json_extraction",
+    "reasoning_strip_final_answer_only",
+    "token_usage_normalization",
+    "provider_error_and_parse_error_paths",
+    "call_budget_enforcement",
+    "live_transport_fail_closed",
+    "local_instruct_vs_thinking_flags",
+    "provider_price_routing_snapshot_from_public_endpoints"
+  ]
+}

@@ -1,0 +1,81 @@
+{
+  "version": "scope-design-01r",
+  "tasks": [
+    {
+      "task_id": "t1",
+      "depends_on": [],
+      "produces_binds": {},
+      "request": {
+        "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+        "query": {
+          "kind": "curve",
+          "text": "wide CBL",
+          "local_ref": null
+        },
+        "scale_bounds": {
+          "kind": "linear",
+          "minimum": 0.0,
+          "maximum": 100.0
+        }
+      }
+    },
+    {
+      "task_id": "t1b",
+      "depends_on": [
+        "t1"
+      ],
+      "produces_binds": {},
+      "request": {
+        "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+        "query": {
+          "kind": "curve",
+          "text": "CBL Amplitude wide",
+          "local_ref": null
+        },
+        "scale_bounds": {
+          "kind": "linear",
+          "minimum": 0.0,
+          "maximum": 100.0
+        }
+      }
+    },
+    {
+      "task_id": "t2",
+      "depends_on": [
+        "t1b"
+      ],
+      "produces_binds": {},
+      "request": {
+        "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+        "query": {
+          "kind": "curve",
+          "text": "narrow CBL",
+          "local_ref": null
+        },
+        "scale_bounds": {
+          "kind": "linear",
+          "minimum": 0.0,
+          "maximum": 100.0
+        }
+      }
+    },
+    {
+      "task_id": "t3",
+      "depends_on": [
+        "t2"
+      ],
+      "produces_binds": {},
+      "request": {
+        "requested_operation": "DEFINE_FILL",
+        "fill": {
+          "mode": "BETWEEN_INSTANCES",
+          "primary_query": "first CBL",
+          "predicate": {
+            "kind": "BETWEEN_CURVES",
+            "secondary_query": "second CBL"
+          }
+        }
+      }
+    }
+  ]
+}

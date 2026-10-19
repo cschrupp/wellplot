@@ -1,0 +1,23 @@
+{
+  "version": "scope-design-01r",
+  "tasks": [
+    {
+      "task_id": "t1",
+      "depends_on": [],
+      "produces_binds": {},
+      "request": {
+        "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+        "query": {
+          "kind": "curve",
+          "text": "narrow CBL",
+          "local_ref": null
+        },
+        "scale_bounds": {
+          "kind": "linear",
+          "minimum": 0.0,
+          "maximum": 100.0
+        }
+      }
+    }
+  ]
+}

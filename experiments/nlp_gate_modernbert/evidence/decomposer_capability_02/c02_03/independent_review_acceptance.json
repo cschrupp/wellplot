@@ -1,0 +1,11 @@
+{
+  "accepted_candidate": "8225f5d8da629927bc240ac79177c3d75457d0ba",
+  "accepted_tip": "fc8bd36dd638ff065e562a60cb8c9fabbd491470",
+  "human_review": "ACCEPTED",
+  "inference_authorized": false,
+  "next_authorized": "WP-DC02-03-EXECUTION-PREPARATION-AUTH-001",
+  "review_authority": "WP-DC02-03-DESIGN-REVIEW-ACCEPT-001",
+  "slice": "C02-03",
+  "sol_review": "ACCEPTED",
+  "status": "CLOSED"
+}

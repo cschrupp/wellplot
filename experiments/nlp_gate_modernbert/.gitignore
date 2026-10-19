@@ -1,0 +1,14 @@
+artifacts/**
+!artifacts/.gitkeep
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Local secrets — never commit
+.env
+.env.local
+.env.*.local

@@ -1,0 +1,23 @@
+{
+  "case_id": "D5GAP-0117",
+  "classification_correction": null,
+  "failure_labels": [
+    "RUNTIME_TERMINAL_MISMATCH"
+  ],
+  "freeze_status": "FROZEN",
+  "latency_seconds": 95.853488216002,
+  "n_generated_tokens": 346,
+  "n_payload_tokens": 345,
+  "raw_output_sha256": "09744ccb61fecf57eae33ee99f429fd6461641e70dfe05ba72b5d9720d6c1f68",
+  "raw_output_utf8": "{\"tasks\":[{\"depends_on\":[],\"produces_binds\":{},\"request\":{\"interval_bounds\":{},\"requested_operation\":\"SET_PAGE_ORIENTATION\",\"requested_unit\":null,\"target\":null},\"task_id\":\"SET_PAGE_ORIENTATION\"},{\"depends_on\":[],\"produces_binds\":{},\"request\":{\"interval_bounds\":{},\"requested_operation\":\"SET_PAGE_ORIENTATION\",\"requested_unit\":null,\"target\":null},\"task_id\":\"SET_PAGE_ORIENTATION\"},{\"depends_on\":[],\"produces_binds\":{},\"request\":{\"interval_bounds\":{},\"requested_operation\":\"SET_PAGE_ORIENTATION\",\"requested_unit\":null,\"target\":null},\"task_id\":\"SET_PAGE_ORIENTATION\"},{\"depends_on\":[],\"produces_binds\":{},\"request\":{\"interval_bounds\":{},\"requested_operation\":\"SET_PAGE_ORIENTATION\",\"requested_unit\":null,\"target\":null},\"task_id\":\"SET_PAGE_ORIENTATION\"},{\"depends_on\":[],\"produces_binds\":{},\"request\":{\"interval_bounds\":{},\"requested_operation\":\"SET_PAGE_ORIENTATION\",\"requested_unit\":null,\"target\":null},\"task_id\":\"SET_PAGE_ORIENTATION\"}]}",
+  "reached_freeze": true,
+  "semantically_equivalent": false,
+  "source_results_line_sha256": "e47357eb52652b03dd4fe991428977ed301f60eec5e1858621e4b8e0d54c80fe",
+  "status": "EVALUATED",
+  "termination": {
+    "ended_with_stop_stripped": true,
+    "stop_ids": [
+      151645
+    ]
+  }
+}

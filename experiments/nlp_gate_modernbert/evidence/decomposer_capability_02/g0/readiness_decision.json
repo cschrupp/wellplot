@@ -1,0 +1,106 @@
+{
+  "assessments": {
+    "adapter_qualification": {
+      "summary": "Four paths mock-qualified; Gemini google/gemini-4-argon and DeepSeek deepseek/deepseek-v4.1-flash-1017 resolved via public OpenRouter catalog; live transport remains fail-closed.",
+      "verdict": "PASS"
+    },
+    "baseline_integrity": {
+      "summary": "DECOMPOSER-PILOT-01 Run 1 recovered with six-case input digests matched to preflight/Run 1; raw outputs archived; no synthetic recreation.",
+      "verdict": "PASS"
+    },
+    "comparability_limitations": {
+      "items": [
+        {
+          "current": "Hosted/local Capability-02 paths use prompted JSON / response_format json_object + freeze_candidate",
+          "id": "decoding_parity",
+          "required_action": "Freeze and disclose decoding regime in next experiment design before any inference",
+          "risk": "Score differences may reflect constraint stack, not semantic capability alone",
+          "severity": "Pilot Run 1 used XGrammar hard-constrained decode"
+        },
+        {
+          "id": "provider_routing_unpinning",
+          "required_action": "Pin provider routing in request; do not rely on response identity alone",
+          "status": "MUST_RESOLVE_BEFORE_LIVE_EXECUTION"
+        },
+        {
+          "id": "parse_failure_usage_accounting",
+          "required_action": "Preserve raw usage and charge attempted calls even when parse/freeze fails",
+          "status": "MUST_RESOLVE_BEFORE_LIVE_EXECUTION"
+        },
+        {
+          "id": "rendered_model_input_live_rehash",
+          "required_action": "Tokenizer-based verification still outstanding from C02-00",
+          "status": "DEFERRED"
+        },
+        {
+          "id": "local_4b_checkpoint_presence",
+          "required_action": "HF ids pinned; local weight hashes not verified in Phase 0",
+          "status": "DEFERRED"
+        }
+      ],
+      "verdict": "MATERIAL_AND_EXPLICIT"
+    },
+    "readiness_to_design_frontier_ceiling_run": {
+      "summary": "Phase 0 evidence is sufficient to design the first Gemini frontier-ceiling protocol (proposed C02-03 family). Exact protocol, decoding disclosure, routing pins, and accounting rules must be frozen in that design before execution authority.",
+      "verdict": "PASS_FOR_DESIGN_PREPARATION"
+    },
+    "semantic_oracle_validity": {
+      "summary": "Immutable six-case gold and oracle refs frozen; primary metric is nl_program_eval semantically_equivalent after freeze_candidate; frontier models are not judges.",
+      "verdict": "PASS"
+    }
+  },
+  "authority": "WP-DC02-G0-PHASE0-READINESS-REVIEW-AUTH-001",
+  "candidate_sha": "0099508caccb039ee552a66506bf7364d240f861",
+  "decision_id": "WP-DC02-G0-READINESS-DECISION-001",
+  "explicit_non_authorizations": [
+    "google/gemini-4-argon inference",
+    "deepseek/deepseek-v4.1-flash-1017 inference",
+    "Qwen3-4B local inference",
+    "fine-tuning",
+    "dataset expansion",
+    "production / WELL-IR contract changes",
+    "silent promotion of provisional C02-03..C02-17 inventory to authorized execution"
+  ],
+  "gate_disposition": {
+    "authorize_C02_03_execution": false,
+    "authorize_C02_03_through_C02_17": false,
+    "authorize_inference": false,
+    "authorize_preparation_of_next_experimental_design": true,
+    "next_recommended_work": "Separately authorize and freeze the frontier-ceiling experiment design (Gemini six-case protocol) before any OpenRouter calls",
+    "phase0": "CLOSED_TECHNICALLY_READY",
+    "proposed_next_design_subject": "Gemini 4 Argon frozen-protocol capability ceiling run design (provisional C02-03 design gate)"
+  },
+  "model_calls": 0,
+  "openrouter_calls": 0,
+  "phase0_slices": {
+    "C02-00": {
+      "accepted_tip": "a8ced8a69ee8c65e0bf292a6952d77b6ef9e2392",
+      "status": "CLOSED_ACCEPTED",
+      "subject": "baseline_integrity"
+    },
+    "C02-01": {
+      "accepted_tip": "9025ecbb6c2ceaf4a2ee89da53a1242eb96d7f67",
+      "status": "CLOSED_ACCEPTED",
+      "subject": "semantic_oracle_and_benchmark"
+    },
+    "C02-02": {
+      "accepted_tip": "a11c99c4691899d82ee33c9b150e487c688f2036",
+      "status": "CLOSED_ACCEPTED",
+      "subject": "adapter_qualification"
+    }
+  },
+  "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
+  "readiness_levels": {
+    "live_scientific_execution_readiness": {
+      "meaning": "Decoding parity with Pilot Run 1 is not claimed; provider pinning, runtime accounting, and the next experiment's exact protocol are not frozen; no inference authorized.",
+      "status": "NOT_ESTABLISHED"
+    },
+    "phase0_technical_readiness": {
+      "meaning": "C02-00/01/02 accepted; baseline, oracle, and mocked adapters are in place for Phase 0 closure.",
+      "status": "READY"
+    }
+  },
+  "slice": "G0",
+  "starting_tip": "a11c99c4691899d82ee33c9b150e487c688f2036",
+  "tip_sha": "95a157e8680898197b07f0ba42f12c995c5e28a9"
+}

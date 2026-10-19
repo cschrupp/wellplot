@@ -1,0 +1,27 @@
+{
+  "OPENROUTER_API_KEY_PRESENT": true,
+  "authority": "WP-DC02-03-ENV-CONFIG-AUTH-001",
+  "billable_openrouter_calls": 0,
+  "candidate_sha": "4a2124ee1410e68a3e0d475ada9da5e81755a657",
+  "dotenv_autoload": true,
+  "dotenv_override_explicit_env": false,
+  "env_example_path": "experiments/nlp_gate_modernbert/.env.example",
+  "env_gitignored": true,
+  "explicit_non_authorizations": [
+    "live_inference",
+    "api_validation_requests",
+    "six_case_gemini_execution"
+  ],
+  "inference_authorized": false,
+  "live_inference_calls": 0,
+  "parent_sha": "7d7160b42c0eeea5cb4ae8a7d1fa6ad50b6de7a2",
+  "post_acceptance_presence_verified": true,
+  "presence_report_fields": [
+    "OPENROUTER_API_KEY_PRESENT",
+    "env_var"
+  ],
+  "setup_doc": "experiments/nlp_gate_modernbert/ENV_SETUP.md",
+  "slice": "C02-03-ENV-CONFIG",
+  "status": "CLOSED_ACCEPTED",
+  "tip_sha": "d56e8e74662fc910ed1f224f5231ff6ec853e749"
+}

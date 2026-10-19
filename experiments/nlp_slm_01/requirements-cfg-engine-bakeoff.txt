@@ -1,0 +1,5 @@
+# Experimental-only pins for CFG-ENGINE-BAKEOFF-01.
+# Install into experiments/nlp_slm_01/.venv only.
+# Do NOT add these to the public wellplot runtime dependency set.
+xgrammar==0.2.8
+llguidance==1.9.1

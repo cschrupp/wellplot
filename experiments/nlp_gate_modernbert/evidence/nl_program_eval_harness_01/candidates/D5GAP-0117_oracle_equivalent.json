@@ -1,0 +1,50 @@
+{
+  "version": "scope-design-01r",
+  "tasks": [
+    {
+      "task_id": "t1",
+      "depends_on": [],
+      "produces_binds": {},
+      "request": {
+        "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+        "query": {
+          "kind": "curve",
+          "text": "RHOB",
+          "local_ref": null
+        },
+        "scale_bounds": {
+          "kind": "linear",
+          "minimum": 1.95,
+          "maximum": 2.95
+        },
+        "scale_direction_claims": [
+          "decreasing"
+        ]
+      }
+    },
+    {
+      "task_id": "t2",
+      "depends_on": [
+        "t1"
+      ],
+      "produces_binds": {},
+      "request": {
+        "requested_operation": "DEFINE_FILL",
+        "query": {
+          "kind": "curve",
+          "text": "RHOB",
+          "local_ref": null
+        },
+        "fill": {
+          "mode": "BASELINE_SPLIT",
+          "primary_query": "RHOB",
+          "baseline_value": 2.45,
+          "predicate": {
+            "kind": "BASELINE_SPLIT",
+            "value": 2.45
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "authority": "WP-DC02-03-DEEPSEEK-CORRECTIVE-SMOKE-AUTH-001",
+  "cases_2_through_6_authorized": false,
+  "gemini_retest_authorized": false,
+  "logical_calls_authorized": 1,
+  "parent_sha": "f0459470e448bf06525024d6141822e7859057b7",
+  "transport_attempts_authorized": 2
+}

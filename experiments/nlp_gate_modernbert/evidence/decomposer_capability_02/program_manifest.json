@@ -1,0 +1,152 @@
+{
+  "OPENROUTER_API_KEY_PRESENT": true,
+  "c02_03": {
+    "accepted_tip": "fc8bd36dd638ff065e562a60cb8c9fabbd491470",
+    "authority": "WP-DC02-03-GEMINI-CEILING-DESIGN-AUTH-001",
+    "execution_status": "DESIGN_CLOSED_ACCEPTED",
+    "inference_authorized": false,
+    "title": "Gemini 4 Argon frozen-protocol capability ceiling design"
+  },
+  "c02_03_deepseek_corrective_smoke": {
+    "accepted_tip": "27db77a3ca913b4298afef291f09064d9d1931d2",
+    "authority": "WP-DC02-03-DEEPSEEK-CORRECTIVE-SMOKE-AUTH-001",
+    "execution_status": "CLOSED_ACCEPTED_OPERATIONAL_SMOKE_PASSED",
+    "inference_authorized": false,
+    "logical_calls": 1,
+    "operational_smoke_pass": true,
+    "review_authority": "WP-DC02-03-DEEPSEEK-CORRECTIVE-SMOKE-REVIEW-ACCEPT-001"
+  },
+  "c02_03_env_config": {
+    "accepted_tip": "580c5c87dbd8200d1a8b54ffe66a11a54d58ca35",
+    "authority": "WP-DC02-03-ENV-CONFIG-AUTH-001",
+    "execution_status": "CLOSED_ACCEPTED",
+    "inference_authorized": false
+  },
+  "c02_03_execution_prep": {
+    "authority": "WP-DC02-03-EXECUTION-PREPARATION-AUTH-001",
+    "execution_status": "CLOSED_ACCEPTED_WITH_ENV_FOLLOW_UP",
+    "inference_authorized": false
+  },
+  "c02_03_hosted_smoke_corrective_prep": {
+    "accepted_tip": "f0459470e448bf06525024d6141822e7859057b7",
+    "authority": "WP-DC02-03-HOSTED-SMOKE-CORRECTIVE-PREP-AUTH-001",
+    "execution_status": "CLOSED_ACCEPTED",
+    "inference_authorized": false,
+    "review_authority": "WP-DC02-03-HOSTED-SMOKE-CORRECTIVE-PREP-REVIEW-ACCEPT-001"
+  },
+  "c02_03_joint_hosted_full_run": {
+    "authority": "WP-DC02-03-JOINT-HOSTED-FULL-RUN-AUTH-001",
+    "case_1_rerun": false,
+    "deepseek_schema_valid": 0,
+    "execution_status": "EXECUTED_AWAITING_REVIEW",
+    "gemini_schema_valid": 0,
+    "inference_authorized": false,
+    "logical_calls_new": 10,
+    "n_hosted_benchmark_observations": 12,
+    "parent_sha": "27db77a3ca913b4298afef291f09064d9d1931d2"
+  },
+  "c02_03_joint_hosted_smoke": {
+    "authority": "WP-DC02-03-JOINT-HOSTED-SMOKE-AUTH-001",
+    "both_operational_pass": false,
+    "cases_2_through_6_authorized": false,
+    "execution_status": "REVIEWED_FULL_RUN_BLOCKED",
+    "logical_calls": 2
+  },
+  "candidate_sha": "54d3b96a29b3ee434265c30cce0ffcea89333893",
+  "gemini_six_case_execution_authorized": false,
+  "inference_authorized": false,
+  "live_scientific_execution_readiness": "NOT_ESTABLISHED",
+  "model_calls_authorized": 0,
+  "model_inventory_amendment": "WP-DC02-MODEL-INVENTORY-AMEND-001",
+  "models": [
+    {
+      "display_name": "Gemini 4 Argon",
+      "id": "gemini-4-argon",
+      "openrouter_model_id": "google/gemini-4-argon",
+      "openrouter_model_id_status": "RESOLVED_C02_02",
+      "provider": "OpenRouter",
+      "role": "frontier_capability_ceiling",
+      "training_eligible": false
+    },
+    {
+      "display_name": "Qwen3-4B-Instruct-2507",
+      "id": "qwen3-4b-instruct-2507",
+      "provider": "local",
+      "role": "local_candidate_A",
+      "training_eligible": true
+    },
+    {
+      "display_name": "Qwen3-4B-Thinking-2507",
+      "id": "qwen3-4b-thinking-2507",
+      "provider": "local",
+      "role": "local_candidate_B",
+      "training_eligible": true
+    },
+    {
+      "display_name": "DeepSeek V4.1 Flash 1017",
+      "id": "deepseek-v4.1-flash-1017",
+      "notes": [
+        "Not the frontier ceiling",
+        "Same semantic inputs and scoring contract as other models",
+        "Structured-output / JSON-schema enforcement may vary by provider; disclose differences",
+        "Cost-effectiveness metrics (correctness per dollar; cost per completely correct request including retries) planned for later phases"
+      ],
+      "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+      "openrouter_model_id_status": "RESOLVED_C02_02",
+      "provider": "OpenRouter",
+      "provider_price_snapshot": "c02_02/provider_price_routing_snapshot.json",
+      "released": "2026-10-17",
+      "role": "budget_capability_reference",
+      "training_eligible": false
+    },
+    {
+      "baseline_experiment": "DECOMPOSER-PILOT-01 / RUN 1",
+      "display_name": "Qwen/Qwen3-1.7B",
+      "id": "qwen3-1.7b",
+      "provider": "local",
+      "role": "frozen_historical_baseline",
+      "training_eligible": false
+    }
+  ],
+  "openrouter_calls_authorized": 0,
+  "phase0": {
+    "C02-00": {
+      "accepted_tip": "a8ced8a69ee8c65e0bf292a6952d77b6ef9e2392",
+      "authority": "WP-DC02-00-BASELINE-RECOVERY-AUTH-001",
+      "design_status": "FROZEN",
+      "execution_status": "CLOSED_ACCEPTED",
+      "title": "Experimental provenance and baseline recovery"
+    },
+    "C02-01": {
+      "accepted_tip": "9025ecbb6c2ceaf4a2ee89da53a1242eb96d7f67",
+      "authority": "WP-DC02-01-BENCHMARK-ORACLE-AUTH-001",
+      "design_status": "FROZEN_AS_PHASE0_INVENTORY",
+      "execution_status": "CLOSED_ACCEPTED",
+      "title": "Frozen benchmark and semantic oracle"
+    },
+    "C02-02": {
+      "accepted_tip": "a11c99c4691899d82ee33c9b150e487c688f2036",
+      "authority": "WP-DC02-02-PROVIDER-HARNESS-QUALIFICATION-AUTH-001",
+      "blocker": null,
+      "design_status": "FROZEN_AS_PHASE0_INVENTORY",
+      "execution_status": "CLOSED_ACCEPTED",
+      "title": "Model/provider harness qualification"
+    },
+    "G0": {
+      "accepted_tip": "2db64aa96549e96161ff8cb2e7df2f03c885be55",
+      "authority": "WP-DC02-G0-PHASE0-READINESS-REVIEW-AUTH-001",
+      "decision_id": "WP-DC02-G0-READINESS-DECISION-001",
+      "design_status": "FROZEN",
+      "execution_status": "CLOSED_ACCEPTED",
+      "title": "Phase 0 readiness review"
+    }
+  },
+  "phase0_design_acceptance": "WP-DC02-PHASE0-DESIGN-ACCEPT-001",
+  "phase0_status": "CLOSED",
+  "phase0_technical_readiness": "READY",
+  "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
+  "provisional_later_phases": "C02-03_through_C02-17_PROPOSED_NOT_FROZEN",
+  "repository_home": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02",
+  "reuse_note": "Reuse accepted nlp_gate_modernbert harness/grammar/eval; do not fork production WELL-IR runtime.",
+  "tip_sha": "413547f4721fb461ba429c3b5cc433e424c4b973"
+}

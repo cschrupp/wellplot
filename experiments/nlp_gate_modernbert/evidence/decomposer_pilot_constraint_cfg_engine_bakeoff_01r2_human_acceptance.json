@@ -1,0 +1,24 @@
+{
+  "slice": "DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01R2",
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-CFG-ENGINE-BAKEOFF-01-AUTH-001",
+  "sol_review": "ACCEPTED",
+  "human_review": "ACCEPTED",
+  "status": "CLOSED",
+  "accepted_candidate": "d680a315b5cf11ef7c89c70cf6222dd1d62b9a84",
+  "accepted_tip": "ef26b39981a9a1595bd71da62a6107dab9653f73",
+  "accepted_remote_head": "9469c677b445f6c4df834b1f63220fd404770033",
+  "selected_backend": {
+    "name": "xgrammar",
+    "version": "0.2.8",
+    "route": "native EBNF"
+  },
+  "rejected_backend": {
+    "name": "llguidance",
+    "version": "1.9.1",
+    "gate": "G7",
+    "reason": "grammar symbol-table overflow / u16 limit"
+  },
+  "model_calls": 0,
+  "model_weights_loaded": false,
+  "downstream_authority": "NONE"
+}

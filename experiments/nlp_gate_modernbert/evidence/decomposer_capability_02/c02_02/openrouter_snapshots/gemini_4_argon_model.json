@@ -1,0 +1,56 @@
+{
+  "architecture": {
+    "input_modalities": [
+      "audio",
+      "file",
+      "image",
+      "text",
+      "video"
+    ],
+    "instruct_type": null,
+    "modality": "text+image+file+audio+video->text",
+    "output_modalities": [
+      "text"
+    ],
+    "tokenizer": "Gemini"
+  },
+  "canonical_slug": "google/gemini-4-argon-20261013",
+  "catalog_snapshot_note": "OpenRouter GET /api/v1/models public catalog; not an inference call",
+  "context_length": 1048576,
+  "created": 1791907477,
+  "hugging_face_id": null,
+  "id": "google/gemini-4-argon",
+  "name": "Google: Gemini 4 Argon",
+  "per_request_limits": null,
+  "pricing": {
+    "audio": "0.000002",
+    "completion": "0.00001",
+    "image": "0.000002",
+    "input_audio_cache": "0.0000001",
+    "input_cache_read": "0.0000001",
+    "input_cache_write": "0.0000001875",
+    "internal_reasoning": "0.00001",
+    "prompt": "0.000002",
+    "web_search": "0.014"
+  },
+  "snapshot_utc": "2026-10-19T17:47:39.410946+00:00",
+  "supported_parameters": [
+    "include_reasoning",
+    "max_tokens",
+    "reasoning",
+    "reasoning_effort",
+    "response_format",
+    "seed",
+    "stop",
+    "structured_outputs",
+    "temperature",
+    "tool_choice",
+    "tools",
+    "top_p"
+  ],
+  "top_provider": {
+    "context_length": 1048576,
+    "is_moderated": false,
+    "max_completion_tokens": 943718
+  }
+}

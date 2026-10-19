@@ -1,0 +1,1 @@
+{"operations":[{"op":"CREATE_TRACK","local_ref":"track_caliper_qc","title":"Caliper QC","width_mm":24},{"op":"PLACE_CURVE","curve_ref":"curve-3","track_ref":"track_caliper_qc","depends_on":["track_caliper_qc"]},{"op":"CONFIGURE_CURVE_DISPLAY","curve_ref":"curve-3","track_ref":"track_caliper_qc","scale_min":6.0,"scale_max":12.0,"depends_on":["track_caliper_qc"]}]}

@@ -1,0 +1,91 @@
+{
+  "arm": "gemini",
+  "case_id": "D5GAP-0096",
+  "completion_tokens": 328,
+  "dual_cost": {
+    "accounting_rule": "Use provider_reported_usd as the observed charge for cost-effectiveness. Retain estimated_usd_from_pre_run_cost_card for comparison only. Do not overwrite historical smoke rows.",
+    "cost_card_rates_usd_per_1m": {
+      "completion": 5.0,
+      "prompt": 1.0,
+      "provider": "Google AI Studio",
+      "tag": "google-ai-studio/flex"
+    },
+    "estimated_usd_from_pre_run_cost_card": 0.002587,
+    "provider_reported_usd": 0.005174,
+    "reported_over_estimate_ratio": 2.0
+  },
+  "error": null,
+  "estimated_usd_from_live_rate_card": 0.002587,
+  "evaluation": {
+    "candidate_digest": null,
+    "canonicalization_version": null,
+    "case_id": "D5GAP-0096",
+    "decomposer_input_keys": [
+      "projected_workspace",
+      "utterance"
+    ],
+    "diagnostics": [],
+    "failure_labels": [
+      "DECOMPOSITION_SCHEMA_INVALID"
+    ],
+    "freeze_detail": "21 validation errors for ClosedNormalizedProgram\ntasks.0.request\n  Field required [type=missing, input_value={'arguments': {'title': '...sics'}, 'task_id': 't1'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.0.arguments\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'title': 'Petrophysics'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.0.operation\n  Extra inputs are not permitted [type=extra_forbidden, input_value='CREATE_TRACK', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.0.target\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'entity_kind': 'track', ...'title': 'Petrophysics'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.request\n  Field required [type=missing, input_value={'arguments': {'track_tar...nnel'}, 'task_id': 't2'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.1.arguments\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'track_target': {'entity...ref_kind': 'local_ref'}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.operation\n  Extra inputs are not permitted [type=extra_forbidden, input_value='PLACE_CURVE', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.1.target\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'channel': 'GR', 'entity..., 'ref_kind': 'channel'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.2.request\n  Field required [type=missing, input_value={'arguments': {'scale': {..._ref'}, 'task_id': 't3'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.2.arguments\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'scale': {'max': 150.0, 'min': 0.0}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.2.operation\n  Extra inputs are not permitted [type=extra_forbidden, input_value='CONFIGURE_CURVE_DISPLAY', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.2.target\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'entity_kind': 'curve', ...'ref_kind': 'local_ref'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.3.request\n  Field required [type=missing, input_value={'arguments': {'track_tar...nnel'}, 'task_id': 't4'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.3.arguments\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'track_target': {'entity...ref_kind': 'local_ref'}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.3.operation\n  Extra inputs are not permitted [type=extra_forbidden, input_value='PLACE_CURVE', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.3.target\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'channel': 'RT', 'entity..., 'ref_kind': 'channel'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.4.request\n  Field required [type=missing, input_value={'arguments': {'scale': {..._ref'}, 'task_id': 't5'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/missing\ntasks.4.arguments\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'scale': {'kind': 'log',...x': 2000.0, 'min': 0.2}}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.4.operation\n  Extra inputs are not permitted [type=extra_forbidden, input_value='CONFIGURE_CURVE_DISPLAY', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\ntasks.4.target\n  Extra inputs are not permitted [type=extra_forbidden, input_value={'entity_kind': 'curve', ...'ref_kind': 'local_ref'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden\nschema_version\n  Extra inputs are not permitted [type=extra_forbidden, input_value='1.0', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.14/v/extra_forbidden",
+    "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+    "oracle_access_before_freeze": false,
+    "oracle_access_enabled_after_freeze": false,
+    "q3_comparison": {},
+    "runtime_gate": {},
+    "schema_valid": false,
+    "semantically_equivalent": false
+  },
+  "failure_labels": [
+    "DECOMPOSITION_SCHEMA_INVALID"
+  ],
+  "final_answer_sha256": "447fcfa56db3ab13b4dae0dcd4a7ff96dd399f2b81e907d697cc7a12c6cf21e4",
+  "finish_reason": "stop",
+  "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+  "generation_id": "gen-1792452800-6eDOiiYypoiQY42h5GK0",
+  "latency_seconds": 17.25994858701597,
+  "model_path": "gemini-4-argon",
+  "observed_provider": "Google AI Studio",
+  "openrouter_model_id": "google/gemini-4-argon",
+  "pipeline_exercised": true,
+  "prompt_tokens": 947,
+  "provider_reported_usd": 0.005174,
+  "raw_output_sha256": "b805a4417e7965a70556cd04e1a8a4c307f0777863050451cfa6292379e21d6f",
+  "raw_usage": {
+    "completion_tokens": 328,
+    "completion_tokens_details": {
+      "audio_tokens": 0,
+      "image_tokens": 0,
+      "reasoning_tokens": 0
+    },
+    "cost": 0.005174,
+    "cost_details": {
+      "upstream_inference_completions_cost": 0.00328,
+      "upstream_inference_cost": 0.005174,
+      "upstream_inference_prompt_cost": 0.001894
+    },
+    "is_byok": false,
+    "prompt_tokens": 947,
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cache_write_tokens": 0,
+      "cached_tokens": 0,
+      "video_tokens": 0
+    },
+    "total_tokens": 1275
+  },
+  "reached_freeze": false,
+  "reasoning_tokens": 0,
+  "request_max_tokens": 1024,
+  "request_reasoning": null,
+  "requested_provider_order": [
+    "Google AI Studio"
+  ],
+  "schema_valid": false,
+  "semantic_equivalent": false,
+  "semantic_layer1_completed": false,
+  "source": "live_full_run",
+  "total_tokens": 1275,
+  "transport_attempts": 1
+}

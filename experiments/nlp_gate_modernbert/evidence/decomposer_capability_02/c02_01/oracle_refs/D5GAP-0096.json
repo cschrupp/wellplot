@@ -1,0 +1,108 @@
+{
+  "case_id": "D5GAP-0096",
+  "cleaned_normalized_program": {
+    "tasks": [
+      {
+        "depends_on": [],
+        "produces_binds": {
+          "$track1": "track"
+        },
+        "request": {
+          "requested_operation": "CREATE_TRACK",
+          "track_title": "Petrophysics"
+        },
+        "task_id": "t1"
+      },
+      {
+        "depends_on": [
+          "t1"
+        ],
+        "produces_binds": {},
+        "request": {
+          "query": {
+            "kind": "curve",
+            "local_ref": null,
+            "text": "GR"
+          },
+          "requested_operation": "PLACE_CURVE",
+          "target": {
+            "kind": "track",
+            "local_ref": "$track1",
+            "text": null
+          }
+        },
+        "task_id": "t2"
+      },
+      {
+        "depends_on": [
+          "t2"
+        ],
+        "produces_binds": {},
+        "request": {
+          "query": {
+            "kind": "curve",
+            "local_ref": null,
+            "text": "GR"
+          },
+          "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+          "scale_bounds": {
+            "kind": "linear",
+            "maximum": 150.0,
+            "minimum": 0.0
+          }
+        },
+        "task_id": "t3"
+      },
+      {
+        "depends_on": [
+          "t3"
+        ],
+        "produces_binds": {},
+        "request": {
+          "query": {
+            "kind": "curve",
+            "local_ref": null,
+            "text": "RT"
+          },
+          "requested_operation": "PLACE_CURVE",
+          "target": {
+            "kind": "track",
+            "local_ref": "$track1",
+            "text": null
+          }
+        },
+        "task_id": "t4"
+      },
+      {
+        "depends_on": [
+          "t4"
+        ],
+        "produces_binds": {},
+        "request": {
+          "query": {
+            "kind": "curve",
+            "local_ref": null,
+            "text": "RT"
+          },
+          "requested_operation": "CONFIGURE_CURVE_DISPLAY",
+          "scale_bounds": {
+            "kind": "log",
+            "maximum": 2000.0,
+            "minimum": 0.2
+          }
+        },
+        "task_id": "t5"
+      }
+    ],
+    "version": "scope-design-01r"
+  },
+  "cleaned_program_sha256": "0129f340bf1e7a3bd19999c92c8a47970fa226f30fad65aee37bddd94cb6dc53",
+  "frozen_candidate_sha256": "1b1a72f1827148dae0977228d1a5937d3190542e76012822fcee53164adb7560",
+  "oracle_witness_id": "D5GAP-0096",
+  "self_evaluation": {
+    "failure_labels": [],
+    "freeze_status": "FROZEN",
+    "semantically_equivalent": true
+  },
+  "witness_source": "experiments/nlp_gate_modernbert/evidence/scope_contract_design_01.json"
+}

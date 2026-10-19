@@ -1,0 +1,506 @@
+{
+  "eligible": 1,
+  "n": 70,
+  "rows": [
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0005",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0015",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0018",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0022",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0030",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0037",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0044",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0045",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0050",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0067",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0071",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0072",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0079",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0089",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0094",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0100",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0107",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0111",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0114",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0117",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0118",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0133",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0134",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0142",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0144",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0150",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0156",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0157",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0161",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0169",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0170",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0178",
+      "common_semantic_facts": {
+        "depth_interval": null,
+        "envelope_state": null,
+        "fills": [],
+        "placements": [],
+        "requested_curves": [],
+        "scale_directions": [],
+        "scales": [],
+        "track_relationships": []
+      },
+      "native_status": "NOT_EXECUTED_HARNESS_STUB",
+      "runner": "cm59a_system_reevaluation.py",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0183",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0191",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0194",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0201",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0203",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0205",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0209",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0217",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0219",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0221",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0232",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0233",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0238",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0254",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0259",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0270",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0273",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0281",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0287",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0298",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0300",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0311",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0314",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0320",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0321",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0323",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0331",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0332",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0341",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0342",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0343",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0344",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0345",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0347",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0355",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0357",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0359",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    },
+    {
+      "baseline": "historical_wellplot_nlp",
+      "case_id": "GOLD-0360",
+      "native_status": "SKIPPED",
+      "reason": "OUT_OF_SCOPE",
+      "source_sha": "d77649765dee81ebd0b8f460ac28515b244f70da"
+    }
+  ]
+}

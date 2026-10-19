@@ -1,0 +1,61 @@
+{
+  "amendment": "WP-DC02-MODEL-INVENTORY-AMEND-001",
+  "does_not_authorize": [
+    "C02-02_implementation",
+    "any_model_calls",
+    "deepseek_training",
+    "expansion_of_C02-01_beyond_benchmark_oracle"
+  ],
+  "models": [
+    {
+      "display_name": "Gemini 4 Argon",
+      "id": "gemini-4-argon",
+      "openrouter_model_id": "google/gemini-4-argon",
+      "openrouter_model_id_status": "RESOLVED_C02_02",
+      "provider": "OpenRouter",
+      "role": "frontier_capability_ceiling",
+      "training_eligible": false
+    },
+    {
+      "display_name": "Qwen3-4B-Instruct-2507",
+      "id": "qwen3-4b-instruct-2507",
+      "provider": "local",
+      "role": "local_candidate_A",
+      "training_eligible": true
+    },
+    {
+      "display_name": "Qwen3-4B-Thinking-2507",
+      "id": "qwen3-4b-thinking-2507",
+      "provider": "local",
+      "role": "local_candidate_B",
+      "training_eligible": true
+    },
+    {
+      "display_name": "DeepSeek V4.1 Flash 1017",
+      "id": "deepseek-v4.1-flash-1017",
+      "notes": [
+        "Not the frontier ceiling",
+        "Same semantic inputs and scoring contract as other models",
+        "Structured-output / JSON-schema enforcement may vary by provider; disclose differences",
+        "Cost-effectiveness metrics (correctness per dollar; cost per completely correct request including retries) planned for later phases"
+      ],
+      "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+      "openrouter_model_id_status": "RESOLVED_C02_02",
+      "provider": "OpenRouter",
+      "provider_price_snapshot": "c02_02/provider_price_routing_snapshot.json",
+      "released": "2026-10-17",
+      "role": "budget_capability_reference",
+      "training_eligible": false
+    },
+    {
+      "baseline_experiment": "DECOMPOSER-PILOT-01 / RUN 1",
+      "display_name": "Qwen/Qwen3-1.7B",
+      "id": "qwen3-1.7b",
+      "provider": "local",
+      "role": "frozen_historical_baseline",
+      "training_eligible": false
+    }
+  ],
+  "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
+  "recorded_during_slice": "C02-01"
+}

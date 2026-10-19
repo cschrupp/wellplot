@@ -1,0 +1,273 @@
+{
+  "pass": false,
+  "probe_count": 19,
+  "probes": [
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_accept",
+        "jsonschema_pass": true,
+        "outlines": "outlines_accept",
+        "outlines_pass": true
+      },
+      "expected": "ACCEPT",
+      "observed": "ACCEPT",
+      "observed_outlines": "ACCEPT",
+      "pass": true,
+      "probe_id": "xor_text_only",
+      "stage": "xor"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_accept",
+        "jsonschema_pass": true,
+        "outlines": "outlines_accept",
+        "outlines_pass": true
+      },
+      "expected": "ACCEPT",
+      "observed": "ACCEPT",
+      "observed_outlines": "ACCEPT",
+      "pass": true,
+      "probe_id": "xor_local_ref_only",
+      "stage": "xor"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:{'kind': 'curve', 'text': 'GR', 'local_ref': '$t'} is not valid under any of the given schemas",
+        "jsonschema_pass": true,
+        "outlines": "outlines_accept",
+        "outlines_pass": false
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "ACCEPT",
+      "pass": false,
+      "probe_id": "xor_both",
+      "stage": "xor"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:{'kind': 'curve'} is not valid under any of the given schemas",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "xor_neither",
+      "stage": "xor"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:'' does not match '.*\\\\S.*'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "xor_text_empty",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:' ' does not match '.*\\\\S.*'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "xor_text_whitespace_space",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:'   ' does not match '.*\\\\S.*'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "xor_text_whitespace_spaces",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:'\\t' does not match '.*\\\\S.*'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_accept",
+        "outlines_pass": false
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "ACCEPT",
+      "pass": false,
+      "probe_id": "xor_text_whitespace_tab",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:'' does not match '.*\\\\S.*'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "xor_local_ref_empty",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:' ' does not match '.*\\\\S.*'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "xor_local_ref_whitespace_space",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:'   ' does not match '.*\\\\S.*'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "xor_local_ref_whitespace_spaces",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:'\\t' does not match '.*\\\\S.*'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_accept",
+        "outlines_pass": false
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "ACCEPT",
+      "pass": false,
+      "probe_id": "xor_local_ref_whitespace_tab",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_accept",
+        "jsonschema_pass": true,
+        "outlines": "outlines_accept",
+        "outlines_pass": true
+      },
+      "expected": "ACCEPT",
+      "observed": "ACCEPT",
+      "observed_outlines": "ACCEPT",
+      "pass": true,
+      "probe_id": "xor_text_surrounded_whitespace",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_accept",
+        "jsonschema_pass": true,
+        "outlines": "outlines_accept",
+        "outlines_pass": true
+      },
+      "expected": "ACCEPT",
+      "observed": "ACCEPT",
+      "observed_outlines": "ACCEPT",
+      "pass": true,
+      "probe_id": "xor_local_ref_surrounded_whitespace",
+      "stage": "xor_nonempty"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:Additional properties are not allowed ('unexpected_top_level' was unexpected)",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "regression_unknown_field",
+      "stage": "regression"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:'NOT_A_REAL_OP' is not one of ['PLACE_CURVE', 'MOVE_CURVE', 'REMOVE_CURVE', 'CONFIGURE_CURVE_DISPLAY', 'SET_INTERVAL', 'CREATE_TRACK', 'DEFINE_FILL', 'REMOVE_FILL', 'RENAME_REPORT', 'SET_PAGE_ORIENTATION', 'ADD_ANNOTATION', 'INSTANTIATE_TEMPLATE', 'SELECT_SOURCE', 'COMPARE_WELLS', 'MULTI_SECTION_LAYOUT', 'RASTER_WAVEFORM', 'SECTION_TARGETED_SCALE', 'UNKNOWN']",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "regression_illegal_enum",
+      "stage": "regression"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:'not-a-number' is not valid under any of the given schemas",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "regression_wrong_primitive",
+      "stage": "regression"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_reject:'not-an-object' is not of type 'object'",
+        "jsonschema_pass": true,
+        "outlines": "outlines_reject:ValueError:Input should be in the language of the regular expression (\\{[ ]?\"tasks\"[ ]?:[ ]?\\[[ ]?((\\{([ ]?\"depends_on\"[ ]?:[ ]?\\[[ ]?((\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")(,[ ]?(\"([^\"\\\\\\x00-\\x1F\\x7F-\\x9F]|\\\\[\"\\\\/bfnrt])*\")){0,})?[ ]?\\][ ]?,)?…[truncated]",
+        "outlines_pass": true
+      },
+      "expected": "REJECT",
+      "observed": "REJECT",
+      "observed_outlines": "REJECT",
+      "pass": true,
+      "probe_id": "regression_malformed_nesting",
+      "stage": "regression"
+    },
+    {
+      "diagnostic": {
+        "jsonschema": "jsonschema_accept",
+        "jsonschema_pass": true,
+        "outlines": "outlines_accept",
+        "outlines_pass": true
+      },
+      "expected": "ACCEPT",
+      "observed": "ACCEPT",
+      "observed_outlines": "ACCEPT",
+      "pass": true,
+      "probe_id": "regression_valid_non_query_program",
+      "stage": "regression"
+    }
+  ],
+  "suite": "decomposer_pilot_preflight_01_parity"
+}

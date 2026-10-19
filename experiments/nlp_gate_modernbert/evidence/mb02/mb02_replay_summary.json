@@ -1,0 +1,77 @@
+{
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-MB02-DETERMINISTIC-RESOLVER-FACT-PROJECTOR-AUTH-001",
+  "authority_coverage": {
+    "DETERMINISTIC_CARDINALITY": {
+      "accounted": 66,
+      "total": 66
+    },
+    "DETERMINISTIC_NOT_FOUND": {
+      "accounted": 24,
+      "total": 24
+    },
+    "DETERMINISTIC_PRECONDITION": {
+      "accounted": 64,
+      "total": 64
+    },
+    "DETERMINISTIC_SCHEMA_DOMAIN": {
+      "accounted": 129,
+      "total": 129
+    },
+    "STATIC_CAPABILITY_BOUNDARY": {
+      "accounted": 17,
+      "total": 17
+    }
+  },
+  "claim": "MB-02 validates normalized semantic facts \u2192 deterministic envelope behavior only. It provides no evidence for raw natural-language \u2192 normalized semantic interpretation.",
+  "duplicated_production_rules": 0,
+  "learned_gate_required": "NO",
+  "learned_gate_status": "NO_LEARNED_GATE_REQUIRED",
+  "mb01_authority_counts": {
+    "DETERMINISTIC_CARDINALITY": 66,
+    "DETERMINISTIC_NOT_FOUND": 24,
+    "DETERMINISTIC_PRECONDITION": 64,
+    "DETERMINISTIC_SCHEMA_DOMAIN": 129,
+    "STATIC_CAPABILITY_BOUNDARY": 17
+  },
+  "n_cases": 300,
+  "n_mismatches_recorded": 11,
+  "n_unresolved_deterministic_cases": 10,
+  "non_ok_authority_match": 66,
+  "non_ok_authority_match_rate": 0.9850746268656716,
+  "non_ok_n": 67,
+  "public_status_match": 290,
+  "public_status_match_rate": 0.9666666666666667,
+  "rule_provenance_buckets": {
+    "adapted_canonical": 5,
+    "experimental_only": 300,
+    "reused_canonical": 16
+  },
+  "rule_provenance_counts": {
+    "adjudicate:derive_all_then_precedence": 300,
+    "capability:static_registry": 300,
+    "precondition:adapted_renderer_fill_axis_semantics": 5,
+    "resolve:experiment_matcher": 300,
+    "schema_domain:pass": 284,
+    "schema_domain:reuse_ScaleSpec": 16
+  },
+  "selected_authority_counts": {
+    "DETERMINISTIC_CARDINALITY": 6,
+    "DETERMINISTIC_NOT_FOUND": 28,
+    "DETERMINISTIC_PRECONDITION": 8,
+    "DETERMINISTIC_SCHEMA_DOMAIN": 16,
+    "OK": 224,
+    "STATIC_CAPABILITY_BOUNDARY": 18
+  },
+  "unresolved_deterministic_cases": [
+    "D5GAP-0085",
+    "D5GAP-0089",
+    "D5GAP-0096",
+    "D5GAP-0101",
+    "D5GAP-0117",
+    "D5GAP-0125",
+    "GOLD-0061",
+    "GOLD-0062",
+    "GOLD-0063",
+    "SEED-cm-9643c020e2e02463"
+  ]
+}

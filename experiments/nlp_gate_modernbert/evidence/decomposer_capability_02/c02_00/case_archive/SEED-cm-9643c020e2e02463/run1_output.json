@@ -1,0 +1,23 @@
+{
+  "case_id": "SEED-cm-9643c020e2e02463",
+  "classification_correction": null,
+  "failure_labels": [
+    "RUNTIME_TERMINAL_MISMATCH"
+  ],
+  "freeze_status": "FROZEN",
+  "latency_seconds": 35.11653508199379,
+  "n_generated_tokens": 125,
+  "n_payload_tokens": 124,
+  "raw_output_sha256": "59a0e90e0c22c8cbef876924c53263436c9c18f7cfbc32b5dd7f897e46458924",
+  "raw_output_utf8": "{\"tasks\":[{\"depends_on\":[\"track_1\"],\"produces_binds\":{\"track_2\":\"track\",\"track_3\":\"track\",\"track_4\":\"track\"},\"request\":{\"alpha\":0.0,\"deictic_reference\":false,\"fill\":null,\"line_width\":1.0,\"report_title\":null,\"requested_operation\":\"CREATE_TRACK\",\"track_title\":\"Petrophysics\",\"track_width_mm\":100.0},\"task_id\":\"task_1\"}],\"version\":\"1.0\"}",
+  "reached_freeze": true,
+  "semantically_equivalent": false,
+  "source_results_line_sha256": "ec1ed233d28427af936ab06d8e5acb5385073cfd5684b3961b9a766cc47da192",
+  "status": "EVALUATED",
+  "termination": {
+    "ended_with_stop_stripped": true,
+    "stop_ids": [
+      151645
+    ]
+  }
+}

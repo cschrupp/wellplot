@@ -1,0 +1,215 @@
+{
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01-AUTH-001",
+  "slice": "DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01",
+  "mode": "SELECTED_BACKEND_ZERO_MODEL_PREFLIGHT",
+  "starting_tip": "e04cf55a5efdbcc242b92f592c8861f1730de348",
+  "accepted_predecessors": {
+    "pilot_design_candidate": "1ad45677418cccdde7f7e432d8defc2fe2d28b3c",
+    "pilot_design_tip": "d180050eddee5bb8e4f1a9a370fe1a8c83ddd7bc",
+    "eval_harness_candidate": "a2dce439a9bcaddeb91f02fc44b9ff77467b77c8",
+    "cfg_generator_candidate": "f3607ff9d0733712ecd86742496620e4aa77d9a4",
+    "cfg_engine_bakeoff_candidate": "d680a315b5cf11ef7c89c70cf6222dd1d62b9a84",
+    "cfg_engine_bakeoff_status": "SOL_AND_HUMAN_ACCEPTED_CLOSED"
+  },
+  "objective": "Prove the exact selected-backend constrained-decoding infrastructure is ready for the frozen six-case pilot without loading model weights or performing model inference.",
+  "selected_path": {
+    "source_constraint": "ClosedNormalizedProgram / accepted patched schema lineage",
+    "well_ebnf1_sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
+    "xgrammar_lowerer_id": "well_ebnf1_to_xgrammar_ebnf.v1",
+    "xgrammar_lowerer_source_sha256": "216976a6e7b8a6838862198fa4d37168666fab602ec643c7369ca100179d377e",
+    "xgrammar_native_grammar_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89",
+    "backend": "xgrammar",
+    "backend_version": "0.2.8",
+    "route": "native EBNF"
+  },
+  "model": {
+    "model_id": "Qwen/Qwen3-1.7B",
+    "variant": "instruction/non-Base",
+    "source": "existing local ModelScope snapshot only",
+    "snapshot_revision": "master",
+    "adapters": "NONE",
+    "auto_download": false,
+    "fallback_model": "NONE",
+    "config_sha256": "1ddb5b89ebc90dcb417a45c213d818577e65976454d29385c8f6140771d95197",
+    "tokenizer_artifact_sha256": {
+      "tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+      "tokenizer_config.json": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+      "merges.txt": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+      "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    },
+    "expected_weight_manifest": [
+      {
+        "path": "model-00001-of-00002.safetensors",
+        "sha256": "169ad53ec313c3a34b06c0809216e4fc072cce444a5d4ff2b59690d064130ed5",
+        "size_bytes": 3441185608
+      },
+      {
+        "path": "model-00002-of-00002.safetensors",
+        "sha256": "912becff8d60672aa8628ef08c05898d9adf17c2ad4ae3caf99b065622fdeff9",
+        "size_bytes": 622329984
+      }
+    ],
+    "aggregate_weight_manifest_sha256": "005d20550c04f4e246e5b434448786b44a0196b47d758d0acc77aba279e5bbc5",
+    "preflight_rule": "Weight files may be existence/size/hash verified as bytes. They must not be deserialized, mmap-loaded as model tensors, or passed to any AutoModel/model loader."
+  },
+  "prompt": {
+    "regime": "zero-shot",
+    "exemplars": 0,
+    "system_prompt_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+    "user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+    "chat_template_text_sha256": "e255510bc9a300c02dda23801a72e4c6a5736d5a995768cb44791f9651727b03",
+    "chat_template_kwargs": {
+      "add_generation_prompt": true,
+      "enable_thinking": false
+    },
+    "same_prompt_all_six": true,
+    "changes": "FORBIDDEN"
+  },
+  "workspace_serialization": {
+    "version": "decomposer_pilot_preflight_01.workspace_serialize.v1",
+    "implementation_sha256": "95514c73fc1a25c5c52d784a3c2126543dfd8845f8f21aabafd103642a152740",
+    "json_dumps": {
+      "sort_keys": true,
+      "ensure_ascii": false,
+      "separators": [
+        ",",
+        ":"
+      ]
+    },
+    "exclude_none": true,
+    "omit_fields": [
+      "fixture_id"
+    ],
+    "changes": "FORBIDDEN"
+  },
+  "inference_config": {
+    "temperature": 0,
+    "do_sample": false,
+    "thinking_enabled": false,
+    "max_new_tokens": 1024,
+    "seed": 20261016,
+    "adapters": "NONE",
+    "retries": 0,
+    "repair_passes": 0,
+    "best_of_n": 0,
+    "model_calls": 0,
+    "note": "These values are frozen for manifest/integration readiness only; no inference occurs in this slice."
+  },
+  "invocation_order": [
+    "D5GAP-0085",
+    "D5GAP-0089",
+    "D5GAP-0117",
+    "D5GAP-0096",
+    "D5GAP-0101",
+    "SEED-cm-9643c020e2e02463"
+  ],
+  "authorized": [
+    "verify all immutable grammar/lowerer/backend/tokenizer/model-config/weight-file hashes locally",
+    "load local tokenizer and model config metadata only with local_files_only=true",
+    "compile accepted XGrammar grammar against the pinned tokenizer",
+    "implement/freeze the exact XGrammar-to-Transformers constrained-decode adapter intended for PILOT-01",
+    "exercise the adapter using synthetic logits/tensors only",
+    "verify token masks, stop/completion behavior, reset/clone behavior, and deterministic state transitions",
+    "rerun accepted fixed positive/negative grammar and token-mask parity suites",
+    "render and hash the frozen zero-shot prompt using a non-sealed dummy smoke input",
+    "mechanically prepare per-case pre-inference hashes for the frozen six using only utterance + ProjectedWorkspace; do not expose oracle/gold material to the model-input path",
+    "verify the six use one identical prompt template, constraint artifact, serializer, and inference configuration",
+    "produce the complete pilot run manifest required by Q6 before any future inference",
+    "record environment/runtime/device/library provenance and bounded preflight resource evidence",
+    "add guards/tests proving model load, model forward, model generate, autodownload, retries, repair, and oracle-derived model input cannot occur"
+  ],
+  "sealed_six_policy": {
+    "purpose": "manifest-only mechanical preparation; no model execution",
+    "permitted_current_case_material": [
+      "utterance",
+      "ProjectedWorkspace"
+    ],
+    "harness_side_only": [
+      "case_id"
+    ],
+    "forbidden_model_input": [
+      "case_id",
+      "fixture_id",
+      "oracle witness/program",
+      "accepted candidate fixture",
+      "coverage atoms/checkers",
+      "expected outcomes",
+      "runtime traces",
+      "prior evaluation results",
+      "gold operations",
+      "representability annotations",
+      "failure taxonomy"
+    ],
+    "no_case_specific_prompt": true,
+    "no_case_specific_grammar": true,
+    "no_prompt_tuning_after_inspection": true,
+    "persisted_per_case": [
+      "case_id",
+      "decomposer_input_sha256",
+      "utterance_sha256",
+      "workspace_sha256",
+      "rendered_model_input_sha256",
+      "constraint_sha256",
+      "inference_config_sha256"
+    ],
+    "persist_raw_utterance_or_workspace": "NO — hashes/provenance only in preflight evidence unless already part of existing frozen harness artifacts"
+  },
+  "synthetic_logits_integration": {
+    "requirement": "The exact future PILOT adapter must accept synthetic logits and apply the XGrammar hard mask without invoking a model.",
+    "prove": [
+      "allowed token logits remain available",
+      "disallowed token logits are masked to the backend/adapter's impossible value",
+      "matcher advances only on accepted token ids",
+      "completion enables only permitted stop behavior",
+      "invalid transition fails closed",
+      "fresh/reset matcher state is deterministic",
+      "no semantic repair or post-hoc JSON fixing exists in the adapter"
+    ]
+  },
+  "mandatory_gates": {
+    "P1_identity": "All frozen predecessor, grammar, lowerer, backend, tokenizer, config, and weight-file identities match.",
+    "P2_manifest": "Complete Q6 MODEL/CONSTRAINT/PROMPT/WORKSPACE_SERIALIZATION/INFERENCE manifest is materialized before any future inference.",
+    "P3_prompt": "Frozen zero-shot prompt/template hashes match; dummy chat-template/tokenization smoke passes; thinking disabled.",
+    "P4_constraint": "XGrammar 0.2.8 compiles the exact accepted native grammar against the pinned tokenizer; accepted parity/mask corpus remains 100%.",
+    "P5_adapter": "Exact intended pilot constraint adapter passes synthetic-logits hard-mask/completion/reset tests with no model.",
+    "P6_six_case_freeze": "All six pre-inference hash records exist in frozen order and prove identical prompt/constraint/serializer/inference config; no forbidden fields enter model input.",
+    "P7_fail_closed": "Pin/hash mismatch, backend error, adapter error, missing local artifact, or contamination check causes PREFLIGHT FAIL with model_calls=0.",
+    "P8_zero_model": "model_calls=0, model_weights_loaded=false, model_forward_calls=0, model_generate_calls=0, auto_download=false.",
+    "P9_resources": "Record compile/setup and synthetic-mask resource/latency evidence on the intended environment; no pathological failure."
+  },
+  "forbidden": [
+    "AutoModel.from_pretrained or any model-class weight loader",
+    "deserializing model safetensors into tensors",
+    "model forward",
+    "model generate",
+    "GenerationMixin.generate",
+    "real model logits",
+    "network/autodownload/substitution",
+    "prompt changes",
+    "workspace serializer changes",
+    "schema/WELL-EBNF/lowerer/backend-version changes",
+    "JSON-Schema constrained route",
+    "case-specific grammar or prompt specialization",
+    "few-shot examples",
+    "retry/repair/self-critique/best-of-N",
+    "oracle/gold/expected-result material in model input",
+    "PILOT-01",
+    "production WellPlot runtime changes"
+  ],
+  "result_policy": {
+    "pass": "All P1-P9 PASS. This establishes infrastructure readiness only and does not authorize PILOT-01.",
+    "fail": "Any mandatory gate fails => PREFLIGHT FAIL / STOP. Do not repair by changing frozen prompt, grammar, serializer, model, tokenizer, or backend.",
+    "next_if_pass": "Independent SOL review, then Human acceptance/closure, then a separate explicit DECOMPOSER-PILOT-01 authority."
+  },
+  "required_evidence": [
+    "decomposer_pilot_constraint_xgrammar_preflight_01_run_manifest.json",
+    "decomposer_pilot_constraint_xgrammar_preflight_01_parity.json",
+    "decomposer_pilot_constraint_xgrammar_preflight_01_adapter.json",
+    "decomposer_pilot_constraint_xgrammar_preflight_01_case_hashes.json",
+    "decomposer_pilot_constraint_xgrammar_preflight_01.json",
+    "decomposer_pilot_constraint_xgrammar_preflight_01.md"
+  ],
+  "model_calls": 0,
+  "model_weights_loaded": false,
+  "pilot_01": "NOT_AUTHORIZED"
+}

@@ -1,0 +1,712 @@
+{
+  "$defs": {
+    "AbsoluteTrackTarget": {
+      "properties": {
+        "mode": {
+          "const": "track",
+          "default": "track",
+          "title": "Mode",
+          "type": "string"
+        },
+        "reference": {
+          "$ref": "#/$defs/ResolvedRef"
+        }
+      },
+      "required": [
+        "reference"
+      ],
+      "title": "AbsoluteTrackTarget",
+      "type": "object"
+    },
+    "Ambiguity": {
+      "properties": {
+        "field": {
+          "title": "Field",
+          "type": "string"
+        },
+        "candidates": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "title": "Candidates",
+          "type": "array"
+        },
+        "query": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Query"
+        }
+      },
+      "required": [
+        "field",
+        "candidates"
+      ],
+      "title": "Ambiguity",
+      "type": "object"
+    },
+    "AmbiguousEnvelope": {
+      "properties": {
+        "status": {
+          "const": "ambiguous",
+          "default": "ambiguous",
+          "title": "Status",
+          "type": "string"
+        },
+        "well_ir_version": {
+          "default": "1.0",
+          "title": "Well Ir Version",
+          "type": "string"
+        },
+        "ambiguities": {
+          "items": {
+            "$ref": "#/$defs/Ambiguity"
+          },
+          "title": "Ambiguities",
+          "type": "array"
+        }
+      },
+      "required": [
+        "ambiguities"
+      ],
+      "title": "AmbiguousEnvelope",
+      "type": "object"
+    },
+    "ConfigureCurveDisplay": {
+      "properties": {
+        "op": {
+          "const": "configure_curve_display",
+          "default": "configure_curve_display",
+          "title": "Op",
+          "type": "string"
+        },
+        "curve": {
+          "$ref": "#/$defs/ResolvedRef"
+        },
+        "min": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min"
+        },
+        "max": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max"
+        },
+        "direction": {
+          "anyOf": [
+            {
+              "enum": [
+                "increasing",
+                "decreasing"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Direction"
+        },
+        "line_style": {
+          "anyOf": [
+            {
+              "enum": [
+                "solid",
+                "dashed",
+                "dotted"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Line Style"
+        }
+      },
+      "required": [
+        "curve"
+      ],
+      "title": "ConfigureCurveDisplay",
+      "type": "object"
+    },
+    "CreateTrack": {
+      "properties": {
+        "op": {
+          "const": "create_track",
+          "default": "create_track",
+          "title": "Op",
+          "type": "string"
+        },
+        "bind": {
+          "title": "Bind",
+          "type": "string"
+        },
+        "kind": {
+          "default": "normal",
+          "enum": [
+            "normal",
+            "reference"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "target": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "relative": "#/$defs/RelativeTarget",
+                  "track": "#/$defs/AbsoluteTrackTarget"
+                },
+                "propertyName": "mode"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/AbsoluteTrackTarget"
+                },
+                {
+                  "$ref": "#/$defs/RelativeTarget"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target"
+        }
+      },
+      "required": [
+        "bind"
+      ],
+      "title": "CreateTrack",
+      "type": "object"
+    },
+    "DefineFill": {
+      "properties": {
+        "op": {
+          "const": "define_fill",
+          "default": "define_fill",
+          "title": "Op",
+          "type": "string"
+        },
+        "bind": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bind"
+        },
+        "curve": {
+          "$ref": "#/$defs/ResolvedRef"
+        },
+        "mode": {
+          "enum": [
+            "to_upper_limit",
+            "to_lower_limit",
+            "baseline_split",
+            "between_curves"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "threshold": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Threshold"
+        },
+        "other_curve": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResolvedRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "baseline": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Baseline"
+        }
+      },
+      "required": [
+        "curve",
+        "mode"
+      ],
+      "title": "DefineFill",
+      "type": "object"
+    },
+    "InvalidEnvelope": {
+      "properties": {
+        "status": {
+          "const": "invalid",
+          "default": "invalid",
+          "title": "Status",
+          "type": "string"
+        },
+        "well_ir_version": {
+          "default": "1.0",
+          "title": "Well Ir Version",
+          "type": "string"
+        },
+        "detail": {
+          "title": "Detail",
+          "type": "string"
+        }
+      },
+      "required": [
+        "detail"
+      ],
+      "title": "InvalidEnvelope",
+      "type": "object"
+    },
+    "MoveCurve": {
+      "properties": {
+        "op": {
+          "const": "move_curve",
+          "default": "move_curve",
+          "title": "Op",
+          "type": "string"
+        },
+        "curve": {
+          "$ref": "#/$defs/ResolvedRef"
+        },
+        "target": {
+          "discriminator": {
+            "mapping": {
+              "relative": "#/$defs/RelativeTarget",
+              "track": "#/$defs/AbsoluteTrackTarget"
+            },
+            "propertyName": "mode"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AbsoluteTrackTarget"
+            },
+            {
+              "$ref": "#/$defs/RelativeTarget"
+            }
+          ],
+          "title": "Target"
+        }
+      },
+      "required": [
+        "curve",
+        "target"
+      ],
+      "title": "MoveCurve",
+      "type": "object"
+    },
+    "OkEnvelope": {
+      "properties": {
+        "status": {
+          "const": "ok",
+          "default": "ok",
+          "title": "Status",
+          "type": "string"
+        },
+        "well_ir_version": {
+          "default": "1.0",
+          "title": "Well Ir Version",
+          "type": "string"
+        },
+        "ops": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "configure_curve_display": "#/$defs/ConfigureCurveDisplay",
+                "create_track": "#/$defs/CreateTrack",
+                "define_fill": "#/$defs/DefineFill",
+                "move_curve": "#/$defs/MoveCurve",
+                "place_curve": "#/$defs/PlaceCurve",
+                "remove_curve": "#/$defs/RemoveCurve",
+                "remove_fill": "#/$defs/RemoveFill",
+                "set_interval": "#/$defs/SetInterval"
+              },
+              "propertyName": "op"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/PlaceCurve"
+              },
+              {
+                "$ref": "#/$defs/MoveCurve"
+              },
+              {
+                "$ref": "#/$defs/RemoveCurve"
+              },
+              {
+                "$ref": "#/$defs/ConfigureCurveDisplay"
+              },
+              {
+                "$ref": "#/$defs/SetInterval"
+              },
+              {
+                "$ref": "#/$defs/DefineFill"
+              },
+              {
+                "$ref": "#/$defs/RemoveFill"
+              },
+              {
+                "$ref": "#/$defs/CreateTrack"
+              }
+            ]
+          },
+          "title": "Ops",
+          "type": "array"
+        }
+      },
+      "required": [
+        "ops"
+      ],
+      "title": "OkEnvelope",
+      "type": "object"
+    },
+    "PlaceCurve": {
+      "properties": {
+        "op": {
+          "const": "place_curve",
+          "default": "place_curve",
+          "title": "Op",
+          "type": "string"
+        },
+        "curve": {
+          "$ref": "#/$defs/ResolvedRef"
+        },
+        "target": {
+          "discriminator": {
+            "mapping": {
+              "relative": "#/$defs/RelativeTarget",
+              "track": "#/$defs/AbsoluteTrackTarget"
+            },
+            "propertyName": "mode"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AbsoluteTrackTarget"
+            },
+            {
+              "$ref": "#/$defs/RelativeTarget"
+            }
+          ],
+          "title": "Target"
+        }
+      },
+      "required": [
+        "curve",
+        "target"
+      ],
+      "title": "PlaceCurve",
+      "type": "object"
+    },
+    "RelativeTarget": {
+      "properties": {
+        "mode": {
+          "const": "relative",
+          "default": "relative",
+          "title": "Mode",
+          "type": "string"
+        },
+        "relation": {
+          "enum": [
+            "with",
+            "beside"
+          ],
+          "title": "Relation",
+          "type": "string"
+        },
+        "reference": {
+          "$ref": "#/$defs/ResolvedRef"
+        }
+      },
+      "required": [
+        "relation",
+        "reference"
+      ],
+      "title": "RelativeTarget",
+      "type": "object"
+    },
+    "RemoveCurve": {
+      "properties": {
+        "op": {
+          "const": "remove_curve",
+          "default": "remove_curve",
+          "title": "Op",
+          "type": "string"
+        },
+        "curve": {
+          "$ref": "#/$defs/ResolvedRef"
+        }
+      },
+      "required": [
+        "curve"
+      ],
+      "title": "RemoveCurve",
+      "type": "object"
+    },
+    "RemoveFill": {
+      "properties": {
+        "op": {
+          "const": "remove_fill",
+          "default": "remove_fill",
+          "title": "Op",
+          "type": "string"
+        },
+        "fill": {
+          "$ref": "#/$defs/ResolvedRef"
+        }
+      },
+      "required": [
+        "fill"
+      ],
+      "title": "RemoveFill",
+      "type": "object"
+    },
+    "ResolvedRef": {
+      "description": "Uniquely bound workspace or program-local reference.",
+      "properties": {
+        "kind": {
+          "enum": [
+            "curve",
+            "track",
+            "fill"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ref"
+        },
+        "local_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Local Ref"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "title": "ResolvedRef",
+      "type": "object"
+    },
+    "SetInterval": {
+      "properties": {
+        "op": {
+          "const": "set_interval",
+          "default": "set_interval",
+          "title": "Op",
+          "type": "string"
+        },
+        "top": {
+          "title": "Top",
+          "type": "number"
+        },
+        "bottom": {
+          "title": "Bottom",
+          "type": "number"
+        },
+        "unit": {
+          "default": "m",
+          "enum": [
+            "m",
+            "ft"
+          ],
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "top",
+        "bottom"
+      ],
+      "title": "SetInterval",
+      "type": "object"
+    },
+    "UnresolvedQuery": {
+      "description": "Non-executable diagnostic query (envelope only; never inside ok ops).",
+      "properties": {
+        "kind": {
+          "enum": [
+            "curve",
+            "track",
+            "fill"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "query": {
+          "title": "Query",
+          "type": "string"
+        },
+        "family": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Family"
+        }
+      },
+      "required": [
+        "kind",
+        "query"
+      ],
+      "title": "UnresolvedQuery",
+      "type": "object"
+    },
+    "UnsupportedEnvelope": {
+      "properties": {
+        "status": {
+          "const": "unsupported",
+          "default": "unsupported",
+          "title": "Status",
+          "type": "string"
+        },
+        "well_ir_version": {
+          "default": "1.0",
+          "title": "Well Ir Version",
+          "type": "string"
+        },
+        "reason": {
+          "enum": [
+            "operation_not_supported",
+            "reference_not_found",
+            "capability_not_available"
+          ],
+          "title": "Reason",
+          "type": "string"
+        },
+        "reference": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/UnresolvedQuery"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "detail": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detail"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "title": "UnsupportedEnvelope",
+      "type": "object"
+    }
+  },
+  "discriminator": {
+    "mapping": {
+      "ambiguous": "#/$defs/AmbiguousEnvelope",
+      "invalid": "#/$defs/InvalidEnvelope",
+      "ok": "#/$defs/OkEnvelope",
+      "unsupported": "#/$defs/UnsupportedEnvelope"
+    },
+    "propertyName": "status"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/OkEnvelope"
+    },
+    {
+      "$ref": "#/$defs/AmbiguousEnvelope"
+    },
+    {
+      "$ref": "#/$defs/UnsupportedEnvelope"
+    },
+    {
+      "$ref": "#/$defs/InvalidEnvelope"
+    }
+  ],
+  "$id": "wellplot.well_ir.v1",
+  "title": "WELL-IR 1.0"
+}

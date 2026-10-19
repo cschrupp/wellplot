@@ -1,0 +1,9 @@
+{
+  "archived_failure_label": "DECOMPOSITION_SCHEMA_INVALID",
+  "detail_prefix": "13 validation errors for ClosedNormalizedProgram",
+  "interpretation": "Structural freeze failed. semantically_equivalent=false must NOT be read as a completed Layer-1 semantic comparison; it is the harness default under freeze failure.",
+  "offline_reverification": "CONFIRMED",
+  "reached_freeze": false,
+  "schema_valid": false,
+  "semantically_equivalent_field": false
+}

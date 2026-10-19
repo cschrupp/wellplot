@@ -1,0 +1,120 @@
+{
+  "arms": [
+    {
+      "arm": "gemini",
+      "case_id": "D5GAP-0085",
+      "completion_tokens": 615,
+      "error": null,
+      "estimated_usd": 0.003689,
+      "failure_labels": [
+        "DECOMPOSITION_SCHEMA_INVALID"
+      ],
+      "final_answer_sha256": "a4d2bdb643921686890369fe23304d89ea4ec38742f3a75158c25520816437ca",
+      "finish_reason": "stop",
+      "freeze_status": "DECOMPOSITION_SCHEMA_INVALID",
+      "generation_id": "gen-1792451358-WwSTPaWOVb0RbW0kndHJ",
+      "latency_seconds": 31.96245547401486,
+      "model_path": "gemini-4-argon",
+      "observed_provider": "Google AI Studio",
+      "openrouter_model_id": "google/gemini-4-argon",
+      "operational_smoke_pass": true,
+      "prompt_tokens": 614,
+      "raw_output_sha256": "8595e13b0ee0acf70315d87c42002dd3097017b5d644ed66ce9ab18952318917",
+      "raw_usage": {
+        "completion_tokens": 615,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 0
+        },
+        "cost": 0.007378,
+        "cost_details": {
+          "upstream_inference_completions_cost": 0.00615,
+          "upstream_inference_cost": 0.007378,
+          "upstream_inference_prompt_cost": 0.001228
+        },
+        "is_byok": false,
+        "prompt_tokens": 614,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 1229
+      },
+      "reasoning_tokens": 0,
+      "requested_provider_order": [
+        "Google AI Studio"
+      ],
+      "semantic_equivalent": false,
+      "total_tokens": 1229,
+      "transport_attempts": 1
+    },
+    {
+      "arm": "deepseek",
+      "case_id": "D5GAP-0085",
+      "completion_tokens": 1024,
+      "error": "parse_error:ValueError:empty_generation",
+      "estimated_usd": 0.0006374,
+      "failure_labels": [],
+      "final_answer_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "finish_reason": "length",
+      "freeze_status": "NOT_REACHED",
+      "generation_id": null,
+      "latency_seconds": 9.48840446700342,
+      "model_path": "deepseek-v4.1-flash-1017",
+      "observed_provider": "Morph",
+      "openrouter_model_id": "deepseek/deepseek-v4.1-flash-1017",
+      "operational_smoke_pass": false,
+      "prompt_tokens": 575,
+      "raw_output_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "raw_usage": {
+        "completion_tokens": 1024,
+        "completion_tokens_details": {
+          "audio_tokens": 0,
+          "image_tokens": 0,
+          "reasoning_tokens": 1024
+        },
+        "cost": 0.00064315,
+        "cost_details": {
+          "upstream_inference_completions_cost": 0.0006144,
+          "upstream_inference_cost": 0.00064315,
+          "upstream_inference_prompt_cost": 2.875e-05
+        },
+        "is_byok": false,
+        "prompt_tokens": 575,
+        "prompt_tokens_details": {
+          "audio_tokens": 0,
+          "cache_write_tokens": 0,
+          "cached_tokens": 0,
+          "video_tokens": 0
+        },
+        "total_tokens": 1599
+      },
+      "reasoning_tokens": 1024,
+      "requested_provider_order": [
+        "Morph"
+      ],
+      "semantic_equivalent": null,
+      "total_tokens": 1599,
+      "transport_attempts": 1
+    }
+  ],
+  "authority": "WP-DC02-03-JOINT-HOSTED-SMOKE-AUTH-001",
+  "both_operational_pass": false,
+  "candidate_sha": "e00475f262987d2a9113809f708324d73c084d50",
+  "cases_2_through_6_executed": false,
+  "completed_utc": "2026-10-19T23:09:59.043258+00:00",
+  "decoding_comparability": "NOT_XGRAMMAR_HARD_MASK",
+  "deepseek_operational_note": "Morph returned finish_reason=length with completion_tokens=1024 and empty message.content; normalization failed with empty_generation. Treated as operational smoke FAIL per authority. Gemini arm operational PASS (semantic_equivalent=false is allowed for smoke).",
+  "estimated_usd": 0.0043264,
+  "estimated_usd_cap": 2.0,
+  "joint_campaign_disposition": "STOP \u2014 one or both smoke arms failed operationally; cases 2\u20136 not authorized",
+  "logical_calls": 2,
+  "parent_sha": "ab6fcd29f4545e0128afaefb2c1b032df8f30bc7",
+  "smoke_case_id": "D5GAP-0085",
+  "status": "STOP_FOR_INDEPENDENT_SMOKE_REVIEW",
+  "tip_sha": "328dc7116dcd9a76e0fca384ce8189dc21c86d22",
+  "transport_attempts": 2
+}

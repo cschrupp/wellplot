@@ -1,0 +1,234 @@
+{
+  "authority": "WP-DC02-01-BENCHMARK-ORACLE-AUTH-001",
+  "benchmark_id": "DECOMPOSER-PILOT-01-SIX-CASE-PROBE",
+  "candidate_sha": "8965dfb3571f36f413359042238434dc7ee12a32",
+  "cases": [
+    {
+      "c02_00_archive_input": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0085/recovered_input.json",
+      "c02_00_archive_run1_output": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0085/run1_output.json",
+      "case_id": "D5GAP-0085",
+      "case_id_in_model_input": false,
+      "decomposer_input_sha256": "91622db600dd94d48881adbdad694188bb34c4117f6f9ee9f9ce557cfd70ac4f",
+      "expected_terminal": {
+        "authority": "OK",
+        "reason": null,
+        "status": "ok"
+      },
+      "fixture_id": "d5_duplicate_cbl",
+      "model_facing_keys_only": [
+        "utterance",
+        "projected_workspace"
+      ],
+      "observed_out_of_scope": [
+        "fill_styling_blue"
+      ],
+      "oracle_cleaned_program_sha256": "9181ee1d1d414870b59ca4d4946b3f0c0607d1d8e19388e099711e7cd15a164d",
+      "oracle_frozen_candidate_sha256": "54b7045da274250bc971588282bb5e441b74e96ca250ea76a699ea2e46b514bb",
+      "oracle_self_equivalent": true,
+      "oracle_witness_id": "D5GAP-0085",
+      "ordering_atom_ids": [
+        "SCALE_BEFORE_FILL"
+      ],
+      "preflight_decomposer_input_sha256": "91622db600dd94d48881adbdad694188bb34c4117f6f9ee9f9ce557cfd70ac4f",
+      "required_atom_ids": [
+        "BOTH_CBL_SCALE_0_100",
+        "SCALE_BEFORE_FILL",
+        "FILL_BETWEEN_CBL"
+      ],
+      "utterance": "Make both CBL views use 0–100, then fill between them in blue.",
+      "utterance_sha256": "6546ed8a15574fc6b8fbd6b3b68e349c3dad8aa78f8a6574467c66b260cb5044"
+    },
+    {
+      "c02_00_archive_input": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0089/recovered_input.json",
+      "c02_00_archive_run1_output": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0089/run1_output.json",
+      "case_id": "D5GAP-0089",
+      "case_id_in_model_input": false,
+      "decomposer_input_sha256": "79f1f37a0a44a7c6fcc81afe0bcaf517952c52954a483fce0b336b8665e948de",
+      "expected_terminal": {
+        "authority": "OK",
+        "reason": null,
+        "status": "ok"
+      },
+      "fixture_id": "d5_duplicate_cbl",
+      "model_facing_keys_only": [
+        "utterance",
+        "projected_workspace"
+      ],
+      "observed_out_of_scope": [],
+      "oracle_cleaned_program_sha256": "f766f41378bed40d6bd116312782200d61b9d83b5de1893da827185eb66fe374",
+      "oracle_frozen_candidate_sha256": "603b90832d0244bd6347dc87a259db3f637ef459c0ee42c771bef8a228515a7b",
+      "oracle_self_equivalent": true,
+      "oracle_witness_id": "D5GAP-0089",
+      "ordering_atom_ids": [
+        "SCALE_BEFORE_FILL"
+      ],
+      "preflight_decomposer_input_sha256": "79f1f37a0a44a7c6fcc81afe0bcaf517952c52954a483fce0b336b8665e948de",
+      "required_atom_ids": [
+        "NARROW_CBL_SCALE_0_100",
+        "SCALE_BEFORE_FILL",
+        "FILL_BETWEEN_CBL_INSTANCES"
+      ],
+      "utterance": "First change the narrow CBL view to 0–100, then fill between the first and second CBL instances.",
+      "utterance_sha256": "e1c8c1008c080e980c51272f95a9ac220e1a33993228d867245ba366a393fecf"
+    },
+    {
+      "c02_00_archive_input": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0117/recovered_input.json",
+      "c02_00_archive_run1_output": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0117/run1_output.json",
+      "case_id": "D5GAP-0117",
+      "case_id_in_model_input": false,
+      "decomposer_input_sha256": "797fcb9e1d42e8a1bca212c15d13d110b5c043a78602dc7938893580771eccbd",
+      "expected_terminal": {
+        "authority": "OK",
+        "reason": null,
+        "status": "ok"
+      },
+      "fixture_id": "d5_petrophysics",
+      "model_facing_keys_only": [
+        "utterance",
+        "projected_workspace"
+      ],
+      "observed_out_of_scope": [],
+      "oracle_cleaned_program_sha256": "2255a21cf3c4f60bf2a62f98cdc40597b2375b7238274eac7386fd7ead204f65",
+      "oracle_frozen_candidate_sha256": "da85a77a313ef8d6b13c7b34ae292774a6619fa623d2bbf082aed0dc347280c1",
+      "oracle_self_equivalent": true,
+      "oracle_witness_id": "D5GAP-0117",
+      "ordering_atom_ids": [],
+      "preflight_decomposer_input_sha256": "797fcb9e1d42e8a1bca212c15d13d110b5c043a78602dc7938893580771eccbd",
+      "required_atom_ids": [
+        "RHOB_RANGE_1_95_2_95",
+        "RHOB_REVERSED",
+        "RHOB_SPLIT_FILL",
+        "SPLIT_BASELINE_2_45"
+      ],
+      "utterance": "Set RHOB to 1.95–2.95 reversed and split-fill it at 2.45.",
+      "utterance_sha256": "cf1995f4db09c8ecb71878ad05121e63f1a2272338c1b9ba800a777fef92fb7e"
+    },
+    {
+      "c02_00_archive_input": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0096/recovered_input.json",
+      "c02_00_archive_run1_output": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0096/run1_output.json",
+      "case_id": "D5GAP-0096",
+      "case_id_in_model_input": false,
+      "decomposer_input_sha256": "2b3245908efd22b40301b9adebd93226f2323766bfd5b77b0e56dcce96fa7620",
+      "expected_terminal": {
+        "authority": "OK",
+        "reason": null,
+        "status": "ok"
+      },
+      "fixture_id": "d5_petrophysics",
+      "model_facing_keys_only": [
+        "utterance",
+        "projected_workspace"
+      ],
+      "observed_out_of_scope": [],
+      "oracle_cleaned_program_sha256": "0129f340bf1e7a3bd19999c92c8a47970fa226f30fad65aee37bddd94cb6dc53",
+      "oracle_frozen_candidate_sha256": "1b1a72f1827148dae0977228d1a5937d3190542e76012822fcee53164adb7560",
+      "oracle_self_equivalent": true,
+      "oracle_witness_id": "D5GAP-0096",
+      "ordering_atom_ids": [],
+      "preflight_decomposer_input_sha256": "2b3245908efd22b40301b9adebd93226f2323766bfd5b77b0e56dcce96fa7620",
+      "required_atom_ids": [
+        "NEW_TRACK",
+        "TRACK_TITLE_PETROPHYSICS",
+        "GR_ON_NEW_TRACK",
+        "GR_RANGE_0_150",
+        "RT_ON_NEW_TRACK",
+        "RT_LOG_0_2_2000"
+      ],
+      "utterance": "Add a Petrophysics track with GR 0–150 and RT logarithmic 0.2–2000.",
+      "utterance_sha256": "55727bdba29f25aca4182344eaa91a2f93852010cb5b3737040cbbd8ef7d5f4a"
+    },
+    {
+      "c02_00_archive_input": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0101/recovered_input.json",
+      "c02_00_archive_run1_output": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/D5GAP-0101/run1_output.json",
+      "case_id": "D5GAP-0101",
+      "case_id_in_model_input": false,
+      "decomposer_input_sha256": "11327486a44838c9be9505ae71945d1ba6539a5ed7500b0002637c4d55f3b085",
+      "expected_terminal": {
+        "authority": "OK",
+        "reason": null,
+        "status": "ok"
+      },
+      "fixture_id": "d5_main_las",
+      "model_facing_keys_only": [
+        "utterance",
+        "projected_workspace"
+      ],
+      "observed_out_of_scope": [],
+      "oracle_cleaned_program_sha256": "4e8073da85cc9b8268a283e550ac5fe6d2ff4d0cffddcd0e5e2c80047364e473",
+      "oracle_frozen_candidate_sha256": "80f442bab67dd8831d1e2b61759ffe144ac58a8dadc9eed4c36ff18274721706",
+      "oracle_self_equivalent": true,
+      "oracle_witness_id": "D5GAP-0101",
+      "ordering_atom_ids": [],
+      "preflight_decomposer_input_sha256": "11327486a44838c9be9505ae71945d1ba6539a5ed7500b0002637c4d55f3b085",
+      "required_atom_ids": [
+        "NEW_TRACK",
+        "TRACK_TITLE_CALIPER_QC",
+        "TRACK_WIDTH_24_MM",
+        "CALI_ON_NEW_TRACK",
+        "CALI_RANGE_6_12"
+      ],
+      "utterance": "Append a 24 mm Caliper QC track and plot CALI on it at 6–12.",
+      "utterance_sha256": "d65c70f7a7e3f7edb106dd467a8978374e123879b5a79352ce2e264d77452f51"
+    },
+    {
+      "c02_00_archive_input": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/SEED-cm-9643c020e2e02463/recovered_input.json",
+      "c02_00_archive_run1_output": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_00/case_archive/SEED-cm-9643c020e2e02463/run1_output.json",
+      "case_id": "SEED-cm-9643c020e2e02463",
+      "case_id_in_model_input": false,
+      "decomposer_input_sha256": "42aacf3d5392d64841e02dd96ed318b8a3e377b77a7237635ebe14bc33a4c7a0",
+      "expected_terminal": {
+        "authority": "OK",
+        "reason": null,
+        "status": "ok"
+      },
+      "fixture_id": "d0_base",
+      "model_facing_keys_only": [
+        "utterance",
+        "projected_workspace"
+      ],
+      "observed_out_of_scope": [],
+      "oracle_cleaned_program_sha256": "f852de326e85d6f56ca2476e61e31844116b0d0f2759a36f5e3ceddd163f783c",
+      "oracle_frozen_candidate_sha256": "a95cc7cc10de71f896265883ddf7089c650a9f38500d94f5a5a726c5ad750693",
+      "oracle_self_equivalent": true,
+      "oracle_witness_id": "SEED-cm-9643c020e2e02463",
+      "ordering_atom_ids": [
+        "GR_BEFORE_RT"
+      ],
+      "preflight_decomposer_input_sha256": "42aacf3d5392d64841e02dd96ed318b8a3e377b77a7237635ebe14bc33a4c7a0",
+      "required_atom_ids": [
+        "NEW_TRACK",
+        "TRACK_NORMAL_DEFAULT",
+        "TRACK_TITLE_PETROPHYSICS",
+        "GR_ON_NEW_TRACK",
+        "GR_LINEAR_M10_140",
+        "RT_ON_NEW_TRACK",
+        "RT_LOG_0_1_10000",
+        "GR_BEFORE_RT"
+      ],
+      "utterance": "Create one normal track named Petrophysics. First plot GR linearly from -10 to 140. Then plot RT logarithmically from 0.1 to 10000. Preserve that binding order.",
+      "utterance_sha256": "9364dd86a0faacd47a0bfe9f511596b8024f3463146b95e47519df14145d30f8"
+    }
+  ],
+  "gold_cases_unchanged_by_deepseek_amendment": true,
+  "immutability": "FROZEN",
+  "invocation_order": [
+    "D5GAP-0085",
+    "D5GAP-0089",
+    "D5GAP-0117",
+    "D5GAP-0096",
+    "D5GAP-0101",
+    "SEED-cm-9643c020e2e02463"
+  ],
+  "n_cases": 6,
+  "n_scored_semantic_when_frozen": 5,
+  "planned_model_matrix_roles": [
+    "frontier_capability_ceiling",
+    "local_candidate_A",
+    "local_candidate_B",
+    "budget_capability_reference",
+    "frozen_historical_baseline"
+  ],
+  "sixth_call_note": "D5GAP-0101 is a protocol call; Layer-0 decode failure in Run 1; not assumed to be an additional semantic success case",
+  "slice": "C02-01",
+  "tip_sha": "a994e0eb5dc5a0652106b55bf0d686865be2890a"
+}

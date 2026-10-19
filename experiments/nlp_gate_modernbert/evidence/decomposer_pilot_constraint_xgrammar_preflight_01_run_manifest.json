@@ -1,0 +1,205 @@
+{
+  "CONSTRAINT": {
+    "backend": "xgrammar",
+    "backend_version": "0.2.8",
+    "lowerer_id": "well_ebnf1_to_xgrammar_ebnf.v1",
+    "parity_pass": true,
+    "route": "native_ebnf",
+    "same_artifact_for_all_six": true,
+    "well_ebnf1_sha256": "f8cfd0c2b8a2cb2c708e464147080ebd7400e40e8060fa0426e423d70396d9d3",
+    "xgrammar_native_grammar_sha256": "506ccd08aceb6428e9ba7508afddc143a65adf2e7f959bd4419021c178f24c89"
+  },
+  "GOVERNANCE": {
+    "auto_download": false,
+    "guards": [
+      "GenerationMixin.generate_blocked",
+      "PreTrainedModel.from_pretrained_blocked",
+      "AutoModel.from_pretrained_blocked",
+      "AutoModelForCausalLM.from_pretrained_blocked",
+      "AutoModelForSeq2SeqLM.from_pretrained_blocked",
+      "PreTrainedModel.__call___blocked",
+      "AutoTokenizer_local_files_only_required",
+      "AutoConfig_local_files_only_required"
+    ],
+    "invocation_order": [
+      "D5GAP-0085",
+      "D5GAP-0089",
+      "D5GAP-0117",
+      "D5GAP-0096",
+      "D5GAP-0101",
+      "SEED-cm-9643c020e2e02463"
+    ],
+    "model_calls": 0,
+    "model_forward_calls": 0,
+    "model_generate_calls": 0,
+    "model_weights_loaded": false,
+    "no_download": true,
+    "no_model_forward": true,
+    "no_model_generate": true,
+    "p8_guard_evidence": {
+      "direct_concrete_model_load_blocked": true,
+      "generate_blocked": true,
+      "non_local_tokenizer_config_blocked": true,
+      "pass": true,
+      "probe_errors": [],
+      "subclass_model_invocation_blocked": true
+    },
+    "slm01_root": "/home/user/projects/wellplot/experiments/nlp_slm_01",
+    "template_smoke": {
+      "chat_template_match": true,
+      "chat_template_text_sha256": "e255510bc9a300c02dda23801a72e4c6a5736d5a995768cb44791f9651727b03",
+      "chat_template_text_sha256_expected": "e255510bc9a300c02dda23801a72e4c6a5736d5a995768cb44791f9651727b03",
+      "enable_thinking": false,
+      "input_ids_length": 254,
+      "input_ids_sha256": "3380b3e8905d78e762e9c56aafd8e6f1c5bbcb8a412de8b1ec46e08de840ec6d",
+      "local_files_only": true,
+      "messages_sha256": "337f66f8c2f2ca63519330ed147202551cd7e6ddefbe714258425f75f0d4ec12",
+      "model_weights_loaded": false,
+      "thinking_disabled": true,
+      "tokenizer_loaded_from": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/modelscope_cache/models/Qwen--Qwen3-1.7B/snapshots/master"
+    }
+  },
+  "INFERENCE": {
+    "adapters": "NONE",
+    "auto_download": false,
+    "best_of_n": 0,
+    "do_sample": false,
+    "fallback_model": "NONE",
+    "inference_config_sha256": "6daab17278547241563d1bc6bec92fcdd882ed48c8de3e18db81e737c732b54b",
+    "max_new_tokens": 1024,
+    "model_calls": 0,
+    "repair_passes": 0,
+    "retries": 0,
+    "rng_policy": "random.seed(SEED); numpy.random.seed(SEED); torch.manual_seed(SEED); torch.cuda.manual_seed_all(SEED) if cuda",
+    "runtime": {
+      "cuda_available": false,
+      "device": "cpu",
+      "device_policy": "cuda_if_available_else_cpu",
+      "dtype": "float32",
+      "dtype_policy": "float16_if_cuda_else_float32",
+      "torch_version": "2.14.1+cpu"
+    },
+    "seed": 20261016,
+    "temperature": 0.0,
+    "thinking_disable_mechanism": "apply_chat_template(..., enable_thinking=False)",
+    "thinking_enabled": false,
+    "version": "decomposer_pilot_preflight_01.inference.v1"
+  },
+  "MODEL": {
+    "adapters": "NONE",
+    "aggregate_weight_manifest_sha256": "005d20550c04f4e246e5b434448786b44a0196b47d758d0acc77aba279e5bbc5",
+    "auto_download": false,
+    "auto_model_invoked": false,
+    "config_sha256": "1ddb5b89ebc90dcb417a45c213d818577e65976454d29385c8f6140771d95197",
+    "fallback_model": "NONE",
+    "model_id": "Qwen/Qwen3-1.7B",
+    "snapshot_path": "/home/user/projects/wellplot/experiments/nlp_slm_01/artifacts/modelscope_cache/models/Qwen--Qwen3-1.7B/snapshots/master",
+    "snapshot_revision": "master",
+    "source": "existing local ModelScope snapshot",
+    "tokenizer_artifact_sha256": {
+      "merges.txt": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+      "tokenizer.json": "aeb13307a71acd8fe81861d94ad54ab689df773318809eed3cbe794b4492dae4",
+      "tokenizer_config.json": "d5d09f07b48c3086c508b30d1c9114bd1189145b74e982a265350c923acd8101",
+      "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+    },
+    "variant": "instruction/non-Base checkpoint",
+    "weight_file_manifest": [
+      {
+        "path": "model-00001-of-00002.safetensors",
+        "sha256": "169ad53ec313c3a34b06c0809216e4fc072cce444a5d4ff2b59690d064130ed5",
+        "size_bytes": 3441185608
+      },
+      {
+        "path": "model-00002-of-00002.safetensors",
+        "sha256": "912becff8d60672aa8628ef08c05898d9adf17c2ad4ae3caf99b065622fdeff9",
+        "size_bytes": 622329984
+      }
+    ],
+    "weights_deserialized_as_tensors": false
+  },
+  "P2_validation": {
+    "checked_sections": [
+      "MODEL",
+      "CONSTRAINT",
+      "PROMPT",
+      "WORKSPACE_SERIALIZATION",
+      "INFERENCE"
+    ],
+    "errors": [],
+    "pass": true,
+    "required_model_fields": [
+      "model_id",
+      "variant",
+      "source",
+      "snapshot_path",
+      "snapshot_revision",
+      "config_sha256",
+      "tokenizer_artifact_sha256",
+      "weight_file_manifest",
+      "aggregate_weight_manifest_sha256",
+      "adapters",
+      "auto_download",
+      "fallback_model"
+    ]
+  },
+  "PROMPT": {
+    "chat_template_kwargs": {
+      "add_generation_prompt": true,
+      "enable_thinking": false,
+      "tokenize": false
+    },
+    "chat_template_text_sha256": "e255510bc9a300c02dda23801a72e4c6a5736d5a995768cb44791f9651727b03",
+    "dummy_smoke": {
+      "note": "fixed dummy for template smoke only; not sealed-six material",
+      "utterance": "place the GR curve on track 1"
+    },
+    "exemplars": 0,
+    "input_ids_sha256": "3380b3e8905d78e762e9c56aafd8e6f1c5bbcb8a412de8b1ec46e08de840ec6d",
+    "messages_encoding_sha256": "337f66f8c2f2ca63519330ed147202551cd7e6ddefbe714258425f75f0d4ec12",
+    "regime": "zero-shot",
+    "system_prompt_sha256": "e617d84e535f72423285f8824014d52c67f40533aaae660783a7dbcb5988b8f4",
+    "thinking_disable_mechanism": "enable_thinking=False via apply_chat_template",
+    "user_template_sha256": "5662a961cf892c5aafc9448f5daa18ac2f93bc24efda0c07d3da19b5fb9aaddb",
+    "version": "decomposer_pilot_preflight_01.prompt.v1"
+  },
+  "SOFTWARE": {
+    "python": "3.13.11",
+    "required": {
+      "xgrammar": "0.2.8"
+    },
+    "torch": "2.14.1+cpu",
+    "transformers": "5.19.0",
+    "xgrammar": "0.2.8"
+  },
+  "WORKSPACE_SERIALIZATION": {
+    "exclude_none": true,
+    "implementation_sha256": "95514c73fc1a25c5c52d784a3c2126543dfd8845f8f21aabafd103642a152740",
+    "json_dumps": {
+      "ensure_ascii": false,
+      "separators": [
+        ",",
+        ":"
+      ],
+      "sort_keys": true
+    },
+    "omit_fields": [
+      "fixture_id"
+    ],
+    "preserve_nested_array_order": [
+      "aliases",
+      "TrackFact.curves",
+      "supported_depth_units"
+    ],
+    "sort_curves_by": "(id, handle-or-empty)",
+    "sort_fills_by": "ref",
+    "sort_tracks_by": "ref",
+    "version": "decomposer_pilot_preflight_01.workspace_serialize.v1"
+  },
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01-AUTH-001",
+  "pass_does_not_authorize_pilot_01": true,
+  "pilot_01": "NOT_AUTHORIZED",
+  "prior_candidate": "b0641eef502530aa841b3c5c6fa6cc60ca089dfb",
+  "prior_slice": "DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R",
+  "slice": "DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R2",
+  "starting_tip": "0905a6a7c05c97eee47fe10430cf7e418583eb7b"
+}

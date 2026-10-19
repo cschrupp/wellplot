@@ -1,0 +1,4 @@
+{
+  "benchmark_manifest_sha256_at_c02_02": "727ebd462e4fd32251b672496dfc86ffd936e4c8ce52ee53a934c2f4b7543998",
+  "note": "C02-02 must not modify gold cases; integrity checked in tests by content assertions"
+}

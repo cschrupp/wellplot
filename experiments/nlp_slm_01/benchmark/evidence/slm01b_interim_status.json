@@ -1,0 +1,41 @@
+{
+  "phase": "closed_user_abort_B_Q2",
+  "gate": "MODEL-SIZE-FAIL",
+  "best_model_arm": "A",
+  "best_semantic_correctness": 0.2807017543859649,
+  "qwen_1_7b_reference": 0.42105263157894735,
+  "arms": {
+    "A": {
+      "backend": "hf",
+      "best_prompt_arm": "Q2",
+      "family_breadth_ok": false,
+      "label": "smollm3_bf16_hf",
+      "quant": "bf16_offload",
+      "semantic_correctness_executable": 0.2807017543859649
+    },
+    "B": {
+      "backend": "hf",
+      "best_prompt_arm": "Q1",
+      "family_breadth_ok": false,
+      "label": "phi4mini_bf16_hf",
+      "quant": "bf16_offload",
+      "semantic_correctness_executable": 0.15789473684210525
+    },
+    "C": {
+      "backend": "gguf",
+      "best_prompt_arm": "Q2",
+      "family_breadth_ok": false,
+      "label": "smollm3_gguf_q4",
+      "quant": "UD-Q4_K_XL",
+      "semantic_correctness_executable": 0.21052631578947367
+    },
+    "D": {
+      "backend": "gguf",
+      "best_prompt_arm": "Q2",
+      "family_breadth_ok": false,
+      "label": "phi4mini_gguf_q4",
+      "quant": "Q4_K_M",
+      "semantic_correctness_executable": 0.21052631578947367
+    }
+  }
+}

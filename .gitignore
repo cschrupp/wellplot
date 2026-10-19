@@ -21,3 +21,21 @@ dist/
 
 # Legacy scratch workspace kept locally only
 splice-main/
+
+# SLM-01 experiment generated artifacts / model caches
+experiments/nlp_slm_01/artifacts/
+experiments/nlp_slm_01/.venv/
+experiments/nlp_slm_01/**/__pycache__/
+experiments/nlp_slm_01/unsloth_compiled_cache/
+experiments/nlp_slm_01/.pytest_cache/
+experiments/nlp_slm_01/*.egg-info/
+experiments/nlp_gate_modernbert/**/__pycache__/
+experiments/nlp_gate_modernbert/.pytest_cache/
+experiments/nlp_gate_modernbert/*.egg-info/
+experiments/nlp_gate_modernbert/.env
+experiments/nlp_gate_modernbert/.env.local
+experiments/nlp_gate_modernbert/.env.*.local
+*.gguf
+*.safetensors
+adapter_model.*
+**/model_cache/

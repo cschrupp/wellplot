@@ -1,0 +1,34 @@
+{
+  "all_six_case_input_output_checks_pass": true,
+  "failed_case_checks": [],
+  "gaps": [
+    {
+      "item": "standalone_request_response_transcript",
+      "mitigation": "Recovered from decomposer_pilot_01_results.jsonl raw_output_utf8 + recomputed inputs; not invented",
+      "status": "ABSENT_AS_SEPARATE_ARTIFACT"
+    },
+    {
+      "item": "gemini_4_argon_openrouter_model_id",
+      "note": "Must be exact OpenRouter model identifier; name alone is insufficient",
+      "required_by": "C02-02 acceptance",
+      "status": "NOT_RESOLVED"
+    },
+    {
+      "item": "rendered_model_input_sha256_live_reverification",
+      "reason": "Tokenizer load not performed in C02-00 (no model weight load). Preflight frozen digests present and result input hashes match decomposer/utterance/workspace.",
+      "status": "DEFERRED"
+    },
+    {
+      "item": "historical_phi_gemma_qwen_monolithic_comparisons",
+      "note": "Must be recovered separately if needed; must not mix into decomposer pilot verdict",
+      "status": "OUT_OF_SCOPE_FOR_C02_00_DECOMPOSER_BASELINE"
+    }
+  ],
+  "grammar_files_ok": true,
+  "notes": [
+    "No missing six-case inputs were invented. Inputs recomputed from accepted harness builders and verified against frozen preflight digests.",
+    "Run 1 outputs archived from decomposer_pilot_01_results.jsonl without modification of raw payloads.",
+    "Historical SLM-02/03 percentages intentionally excluded from this baseline manifest."
+  ],
+  "slice": "C02-00"
+}

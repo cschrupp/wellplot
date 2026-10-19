@@ -1,0 +1,288 @@
+{
+  "cloud": {
+    "detail": "Set SLM01_CLOUD_API_KEY or OPENAI_API_KEY to run Baseline B",
+    "status": "runner_unavailable"
+  },
+  "cloud_semantic_correctness": null,
+  "historical_native": "see slm01_historical_baseline.json",
+  "n_held_out_evaluated": 70,
+  "outlines_status": "DEFERRED_WITH_EVIDENCE:AttributeError:module 'outlines' has no attribute 'generate'",
+  "qwen_arms": {
+    "Q1": {
+      "envelope_confusion": {
+        "ambiguous": {
+          "ambiguous": 0,
+          "invalid": 2,
+          "ok": 3,
+          "unsupported": 0
+        },
+        "invalid": {
+          "ambiguous": 0,
+          "invalid": 2,
+          "ok": 0,
+          "unsupported": 0
+        },
+        "ok": {
+          "ambiguous": 0,
+          "invalid": 15,
+          "ok": 42,
+          "unsupported": 0
+        },
+        "unsupported": {
+          "ambiguous": 0,
+          "invalid": 0,
+          "ok": 6,
+          "unsupported": 0
+        }
+      },
+      "envelope_macro_f1": 0.24206349206349206,
+      "false_ok_on_ambiguous": 3,
+      "family_stats": {
+        "ambiguity_unsupported": {
+          "correct": 0,
+          "n": 13,
+          "rate": 0.0
+        },
+        "composition": {
+          "correct": 0,
+          "n": 13,
+          "rate": 0.0
+        },
+        "curve_placement": {
+          "correct": 9,
+          "n": 9,
+          "rate": 1.0
+        },
+        "display_configuration": {
+          "correct": 1,
+          "n": 4,
+          "rate": 0.25
+        },
+        "fills": {
+          "correct": 0,
+          "n": 10,
+          "rate": 0.0
+        },
+        "intervals": {
+          "correct": 0,
+          "n": 9,
+          "rate": 0.0
+        },
+        "relational_targeting": {
+          "correct": 2,
+          "n": 12,
+          "rate": 0.16666666666666666
+        }
+      },
+      "n": 70,
+      "n_executable": 57,
+      "overall_correctness": 0.17142857142857143,
+      "schema_validity_rate": 0.7285714285714285,
+      "semantic_correctness_executable": 0.21052631578947367,
+      "taxonomy": {
+        "confirmed_model_semantic_n": 30,
+        "counts": {
+          "composition": 10,
+          "envelope_misuse": 9,
+          "other": 9,
+          "relation": 10,
+          "syntax_or_schema": 19,
+          "units": 1
+        },
+        "ir_limitation_share_of_all_failures": 0.0,
+        "learnable_share_of_confirmed": 1.0,
+        "model_semantic_labels_seen": [
+          "composition",
+          "envelope_misuse",
+          "relation",
+          "units"
+        ]
+      }
+    },
+    "Q2": {
+      "envelope_confusion": {
+        "ambiguous": {
+          "ambiguous": 0,
+          "invalid": 1,
+          "ok": 4,
+          "unsupported": 0
+        },
+        "invalid": {
+          "ambiguous": 0,
+          "invalid": 0,
+          "ok": 2,
+          "unsupported": 0
+        },
+        "ok": {
+          "ambiguous": 0,
+          "invalid": 21,
+          "ok": 36,
+          "unsupported": 0
+        },
+        "unsupported": {
+          "ambiguous": 0,
+          "invalid": 0,
+          "ok": 4,
+          "unsupported": 2
+        }
+      },
+      "envelope_macro_f1": 0.2997572815533981,
+      "false_ok_on_ambiguous": 4,
+      "family_stats": {
+        "ambiguity_unsupported": {
+          "correct": 2,
+          "n": 13,
+          "rate": 0.15384615384615385
+        },
+        "composition": {
+          "correct": 3,
+          "n": 13,
+          "rate": 0.23076923076923078
+        },
+        "curve_placement": {
+          "correct": 9,
+          "n": 9,
+          "rate": 1.0
+        },
+        "display_configuration": {
+          "correct": 0,
+          "n": 4,
+          "rate": 0.0
+        },
+        "fills": {
+          "correct": 0,
+          "n": 10,
+          "rate": 0.0
+        },
+        "intervals": {
+          "correct": 8,
+          "n": 9,
+          "rate": 0.8888888888888888
+        },
+        "relational_targeting": {
+          "correct": 4,
+          "n": 12,
+          "rate": 0.3333333333333333
+        }
+      },
+      "n": 70,
+      "n_executable": 57,
+      "overall_correctness": 0.37142857142857144,
+      "schema_validity_rate": 0.6857142857142857,
+      "semantic_correctness_executable": 0.42105263157894735,
+      "taxonomy": {
+        "confirmed_model_semantic_n": 16,
+        "counts": {
+          "composition": 4,
+          "envelope_misuse": 10,
+          "other": 6,
+          "relation": 1,
+          "syntax_or_schema": 22,
+          "units": 1
+        },
+        "ir_limitation_share_of_all_failures": 0.0,
+        "learnable_share_of_confirmed": 1.0,
+        "model_semantic_labels_seen": [
+          "composition",
+          "envelope_misuse",
+          "relation",
+          "units"
+        ]
+      }
+    },
+    "Q3": {
+      "envelope_confusion": {
+        "ambiguous": {
+          "ambiguous": 0,
+          "invalid": 1,
+          "ok": 4,
+          "unsupported": 0
+        },
+        "invalid": {
+          "ambiguous": 0,
+          "invalid": 0,
+          "ok": 2,
+          "unsupported": 0
+        },
+        "ok": {
+          "ambiguous": 0,
+          "invalid": 21,
+          "ok": 36,
+          "unsupported": 0
+        },
+        "unsupported": {
+          "ambiguous": 0,
+          "invalid": 0,
+          "ok": 4,
+          "unsupported": 2
+        }
+      },
+      "envelope_macro_f1": 0.2997572815533981,
+      "false_ok_on_ambiguous": 4,
+      "family_stats": {
+        "ambiguity_unsupported": {
+          "correct": 2,
+          "n": 13,
+          "rate": 0.15384615384615385
+        },
+        "composition": {
+          "correct": 3,
+          "n": 13,
+          "rate": 0.23076923076923078
+        },
+        "curve_placement": {
+          "correct": 9,
+          "n": 9,
+          "rate": 1.0
+        },
+        "display_configuration": {
+          "correct": 0,
+          "n": 4,
+          "rate": 0.0
+        },
+        "fills": {
+          "correct": 0,
+          "n": 10,
+          "rate": 0.0
+        },
+        "intervals": {
+          "correct": 8,
+          "n": 9,
+          "rate": 0.8888888888888888
+        },
+        "relational_targeting": {
+          "correct": 4,
+          "n": 12,
+          "rate": 0.3333333333333333
+        }
+      },
+      "n": 70,
+      "n_executable": 57,
+      "overall_correctness": 0.37142857142857144,
+      "schema_validity_rate": 0.6857142857142857,
+      "semantic_correctness_executable": 0.42105263157894735,
+      "taxonomy": {
+        "confirmed_model_semantic_n": 16,
+        "counts": {
+          "composition": 4,
+          "envelope_misuse": 10,
+          "other": 6,
+          "relation": 1,
+          "syntax_or_schema": 22,
+          "units": 1
+        },
+        "ir_limitation_share_of_all_failures": 0.0,
+        "learnable_share_of_confirmed": 1.0,
+        "model_semantic_labels_seen": [
+          "composition",
+          "envelope_misuse",
+          "relation",
+          "units"
+        ]
+      }
+    }
+  },
+  "qwen_best_arm": "Q2",
+  "qwen_best_semantic_correctness": 0.42105263157894735,
+  "schema_sha256": "4a91a325d9dd38db154bb38f4b997be81ff3047f0c663ec65c4349e4c2e21c5b"
+}
