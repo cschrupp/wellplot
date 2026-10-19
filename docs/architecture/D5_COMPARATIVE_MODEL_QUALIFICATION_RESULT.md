@@ -99,17 +99,20 @@ runtime metadata remain lane observations. The acceptance object remains the
 same deterministic WellPlot outcome contract.
 
 The executable provider-free boundary also exercises lane-specific readiness
-with injected endpoint responses, existing provider-factory construction, the
-existing D5-4 live adapter with in-memory transport, and the shared
-`D5CampaignRunner` STARTED/terminal custody. Qwen performs the two llama.cpp
-identity observations; Luna performs only its OpenAI-compatible model-catalog
-observation. No provider or model request is sent.
+with injected endpoint responses, the existing provider factory, and the
+shared `D5CampaignRunner` STARTED/terminal custody. The live entrypoint is
+also tested with a provider-free adapter injection so the exact orchestration
+path is bounded without DLIS reprocessing or external calls. A separate
+boundary test constructs the existing D5-4 live adapter for both lanes with
+in-memory transport. Qwen performs the two llama.cpp identity observations;
+Luna performs only its OpenAI-compatible model-catalog observation. No
+provider or model request is sent.
 
 ## Validation Handoff
 
 ```yaml
-implementation_checkpoint: 24ab54603e23488c2d3cf19b8b786502fdee7afd
-parent: 1f347c854c2a8911b7776dd712c5ff9bf514d48a
+implementation_checkpoint: 14da4081c112c6752274225e9b07bb44a0219928
+parent: 7a247aa0acc5416207dd408a06639374ebb28654
 changed_files:
   - docs/architecture/D5_5_COMPARATIVE_MODEL_QUALIFICATION.md
   - scripts/d5_5_comparative_model_qualification.py
@@ -118,7 +121,8 @@ changed_files:
   - docs/architecture/D5_COMPARATIVE_MODEL_QUALIFICATION_RESULT.md
 provider_free_qwen_rehearsal: 9/9 PASS / 18 logical calls
 provider_free_luna_rehearsal: 9/9 PASS / 18 logical calls
-provider_free_lane_boundary: PASS / shared D5CampaignRunner / zero provider-model calls
+provider_free_lane_boundary: PASS / exact live orchestration and shared D5CampaignRunner / zero provider-model calls
+provider_free_live_entrypoint: PASS / Qwen and Luna static-preflight-to-terminal path
 single_engine_attestation: PASS
 provider_calls: 0
 model_calls: 0
