@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import hashlib
+import inspect
 import json
 import subprocess
 import sys
@@ -585,6 +586,150 @@ def verify_provider_free_contract(
     }
 
 
+def verify_lane_static_preflight(
+    repo_root: Path,
+    *,
+    lane: ComparativeLane,
+    authorization: d5.D5Authorization,
+    expected_artifact_root: Path | None = None,
+) -> dict[str, object]:
+    """Validate one authorized lane before any readiness request."""
+    config = load_project_config(repo_root)
+    current = _git(repo_root, "rev-parse", "HEAD")
+    if current != authorization.implementation_checkpoint:
+        raise d5.D5StaticPreflightError("implementation checkpoint mismatch")
+    if _git(repo_root, "status", "--porcelain"):
+        raise d5.D5StaticPreflightError("working tree is not clean")
+    if authorization.provider != lane.provider or authorization.model != lane.model:
+        raise d5.D5StaticPreflightError("lane provider/model identity mismatch")
+    if authorization.campaign_id != lane.campaign_id:
+        raise d5.D5StaticPreflightError("lane campaign identity mismatch")
+    if authorization.cases_sha256 != d4.FROZEN_CASES_SHA256:
+        raise d5.D5StaticPreflightError("case custody hash mismatch")
+    if authorization.gold_sha256 != d4.FROZEN_GOLD_SHA256:
+        raise d5.D5StaticPreflightError("gold custody hash mismatch")
+    if authorization.uv_lock_sha256 != d4.FROZEN_UV_LOCK_SHA256:
+        raise d5.D5StaticPreflightError("dependency custody hash mismatch")
+    if dict(authorization.source_sha256) != dict(d5.FROZEN_SOURCE_SHA256):
+        raise d5.D5StaticPreflightError("source custody manifest mismatch")
+    if authorization.sdk_max_retries != d5.EXPECTED_SDK_MAX_RETRIES:
+        raise d5.D5StaticPreflightError("SDK retry contract drifted")
+    if authorization.structured_output_contract != d5.EXPECTED_STRUCTURED_OUTPUT:
+        raise d5.D5StaticPreflightError("structured-output contract drifted")
+    if authorization.project_config_fingerprint_sha256 != config.fingerprint_sha256:
+        raise d5.D5StaticPreflightError("project configuration fingerprint mismatch")
+    expected_root = (repo_root / lane.artifact_root).resolve()
+    if expected_artifact_root is not None:
+        expected_root = expected_artifact_root.resolve()
+    artifact_root = d5._authorized_artifact_root(repo_root, authorization)
+    if artifact_root != expected_root:
+        raise d5.D5StaticPreflightError("lane artifact root mismatch")
+    paths = d5.EvidencePaths(artifact_root, authorization.campaign_id)
+    if any(path.exists() for path in paths.all_paths()):
+        raise d5.D5StaticPreflightError("campaign artifact collision")
+    contract = verify_provider_free_contract(
+        repo_root,
+        implementation_checkpoint=authorization.implementation_checkpoint,
+        run_attestation=True,
+    )
+    return {
+        "status": "PASS",
+        "lane_id": lane.lane_id,
+        "campaign_id": lane.campaign_id,
+        "artifact_root": lane.artifact_root,
+        "implementation_checkpoint": current,
+        "provider": lane.provider,
+        "model": lane.model,
+        "contract": contract,
+    }
+
+
+async def _close_lane_adapter(adapter: object) -> None:
+    """Close the AsyncOpenAI client created by the existing D5-4 adapter."""
+    try:
+        client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
+    except AttributeError:
+        return
+    close = getattr(client, "close", None)
+    if not callable(close):
+        return
+    result = close()
+    if inspect.isawaitable(result):
+        await result
+
+
+def execute_live_lane(
+    *,
+    repo_root: Path,
+    lane: ComparativeLane,
+    authorization: d5.D5Authorization,
+    endpoint_get: Callable[[str, str], object] = d5._credential_bearing_json_get,
+    api_key_loader: Callable[[], str] | None = None,
+    static_checker: Callable[[Path, ComparativeLane, d5.D5Authorization], dict[str, object]]
+    | None = None,
+    http_client_factory: Callable[[Callable[[object], Any]], object] | None = None,
+) -> dict[str, object]:
+    """Execute one explicitly authorized lane through shared D5 custody."""
+    config = load_project_config(repo_root)
+    artifact_root = d5._authorized_artifact_root(repo_root, authorization)
+    if static_checker is None:
+        static = verify_lane_static_preflight(
+            repo_root,
+            lane=lane,
+            authorization=authorization,
+        )
+    else:
+        static = static_checker(repo_root, lane, authorization)
+    load_key = api_key_loader or (lambda: load_lane_api_key(repo_root, lane))
+
+    def provider_factory(token: str) -> object:
+        return create_lane_live_adapter(
+            repo_root=repo_root,
+            artifact_root=artifact_root,
+            api_key=token,
+            lane=lane,
+            project_config=config,
+            http_client_factory=http_client_factory,
+        )
+
+    readiness = prepare_lane_readiness(
+        lane=lane,
+        authorization=authorization,
+        project_config=config,
+        api_key_loader=load_key,
+        endpoint_get=endpoint_get,
+        static_preflight=static,
+        provider_factory=provider_factory,
+    )
+    if readiness.adapter is None:
+        raise d5.D5ReadinessError("provider_construction_failed", len(readiness.endpoint_calls))
+    paths = d5.EvidencePaths(artifact_root, authorization.campaign_id)
+    runner = d5.D5CampaignRunner(
+        repo_root=repo_root,
+        authorization=authorization,
+        paths=paths,
+        readiness=readiness,
+        provenance={
+            "authorization_id": authorization.authorization_id,
+            "implementation_checkpoint": authorization.implementation_checkpoint,
+            "accepted_d5_engine_checkpoint": authorization.accepted_d5_engine_checkpoint,
+            "accepted_d5_design_checkpoint": authorization.accepted_d5_design_checkpoint,
+            "lane_id": lane.lane_id,
+        },
+    )
+    try:
+        result = asyncio.run(runner.run(readiness.adapter))
+    finally:
+        asyncio.run(_close_lane_adapter(readiness.adapter))
+    return {
+        "lane_id": lane.lane_id,
+        "campaign_id": authorization.campaign_id,
+        "static_preflight": static,
+        "readiness": readiness.projection.as_dict(),
+        "result": result,
+    }
+
+
 def d5_turn_ids() -> tuple[str, ...]:
     """Return the immutable D4/D5 nine-turn order."""
     return (
@@ -615,19 +760,47 @@ def _lane_dict(lane: ComparativeLane) -> dict[str, object]:
 
 
 def main() -> int:
-    """Run provider-free D5-5B contract and executable-boundary checks."""
+    """Run provider-free checks or one explicitly authorized live lane."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
-    parser.add_argument("--implementation-checkpoint", required=True)
+    parser.add_argument("--implementation-checkpoint")
+    parser.add_argument("--lane", choices=("qwen", "luna"))
+    parser.add_argument("--execute-live", action="store_true")
+    parser.add_argument("--authorization-json", type=Path)
     args = parser.parse_args()
-    result = verify_provider_free_contract(
-        args.repo_root.resolve(),
-        implementation_checkpoint=args.implementation_checkpoint,
-    )
-    result["executable_lane_boundary"] = verify_executable_lane_boundary(
-        args.repo_root.resolve(),
-        implementation_checkpoint=args.implementation_checkpoint,
-    )
+    repo_root = args.repo_root.resolve()
+    if args.execute_live:
+        if args.lane is None or args.authorization_json is None:
+            parser.error("--execute-live requires --lane and --authorization-json")
+        authorization = d5.D5Authorization.from_mapping(
+            json.loads(args.authorization_json.resolve().read_text(encoding="utf-8"))
+        )
+        config = load_project_config(repo_root)
+        lanes = {lane.lane_id: lane for lane in lane_configurations(config)}
+        lane = lanes[args.lane]
+        try:
+            result = execute_live_lane(
+                repo_root=repo_root,
+                lane=lane,
+                authorization=authorization,
+            )
+        except d5.D5ReadinessError as error:
+            print(json.dumps({"status": "NOT_READY", "reason": error.reason}, indent=2))
+            return 2
+        except d5.D5StaticPreflightError as error:
+            print(json.dumps({"status": "D5B_BLOCKED", "reason": str(error)}, indent=2))
+            return 2
+    else:
+        if args.implementation_checkpoint is None:
+            parser.error("provider-free mode requires --implementation-checkpoint")
+        result = verify_provider_free_contract(
+            repo_root,
+            implementation_checkpoint=args.implementation_checkpoint,
+        )
+        result["executable_lane_boundary"] = verify_executable_lane_boundary(
+            repo_root,
+            implementation_checkpoint=args.implementation_checkpoint,
+        )
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 

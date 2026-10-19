@@ -9,6 +9,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
+import httpx
 import pytest
 from scripts import d5_5_comparative_model_qualification as d5_5
 from scripts import nlp_d4_live_acceptance as d4
@@ -27,6 +28,18 @@ from tests.test_nlp_d5_live_semantic_qualification import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _failing_generation_handler(
+    requests: list[httpx.Request],
+) -> Callable[[httpx.Request], Any]:
+    """Return an in-memory transport handler that never contacts a provider."""
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(500, json={"error": {"message": "fixture"}}, request=request)
+
+    return handler
 
 
 def _run_revision_with_count(
@@ -274,6 +287,109 @@ def test_executable_lane_boundary_enters_shared_runner_without_provider_calls() 
     assert {item["live_adapter"] for item in result["lanes"]} == {"_ObservedLiveAdapter"}
     assert result["lanes"][0]["endpoint_calls"][-1].endswith("/props")
     assert result["lanes"][1]["endpoint_calls"] == ["https://openrouter.ai/api/v1/models"]
+
+
+def test_execute_live_lane_runs_static_readiness_adapter_and_shared_runner_provider_free(
+    tmp_path: Path,
+) -> None:
+    """The exact live entrypoint is exercised with only injected transports."""
+    import httpx
+
+    config = d5_5.load_project_config(REPO_ROOT)
+    current = d5_5._git(REPO_ROOT, "rev-parse", "HEAD")
+    for lane in d5_5.lane_configurations(config):
+        artifact_root = tmp_path / lane.lane_id
+        authorization = replace(
+            _authorization(),
+            implementation_checkpoint=current,
+            campaign_id=lane.campaign_id,
+            provider=lane.provider,
+            model=lane.model,
+            artifact_root=str(artifact_root),
+        )
+        sequence: list[str] = []
+        readiness_calls: list[str] = []
+
+        def endpoint_get(
+            url: str,
+            token: str,
+            *,
+            lane: d5_5.ComparativeLane = lane,
+            readiness_calls: list[str] = readiness_calls,
+        ) -> object:
+            assert token == "provider-free-token"
+            readiness_calls.append(url)
+            if lane.lane_id == "qwen":
+                if url == config.model_catalog_url:
+                    return {"data": [{"id": lane.model}]}
+                return {
+                    "model_path": "/srv/models/qwen3.6-35b-a3b.gguf",
+                    "default_generation_settings": {
+                        "n_ctx": 32768,
+                        "temperature": 0.0,
+                        "top_p": 1.0,
+                    },
+                    "build_info": "llama.cpp provider-free test build",
+                    "total_slots": 1,
+                    "chat_template": "qwen3",
+                    "gguf_byte_identity": "NOT_AVAILABLE",
+                }
+            return {"data": [{"id": lane.model}]}
+
+        clients: list[httpx.AsyncClient] = []
+        generation_requests: list[httpx.Request] = []
+
+        def client_factory(
+            observer: Callable[[object], Any],
+            *,
+            clients: list[httpx.AsyncClient] = clients,
+            generation_requests: list[httpx.Request] = generation_requests,
+        ) -> httpx.AsyncClient:
+            client = httpx.AsyncClient(
+                transport=httpx.MockTransport(_failing_generation_handler(generation_requests)),
+                event_hooks={"request": [observer]},
+            )
+            clients.append(client)
+            return client
+
+        def static_checker(
+            repo_root: Path,
+            checked_lane: d5_5.ComparativeLane,
+            checked_authorization: d5.D5Authorization,
+            *,
+            sequence: list[str] = sequence,
+            artifact_root: Path = artifact_root,
+        ) -> dict[str, object]:
+            sequence.append("static")
+            return d5_5.verify_lane_static_preflight(
+                repo_root,
+                lane=checked_lane,
+                authorization=checked_authorization,
+                expected_artifact_root=artifact_root,
+            )
+
+        result = d5_5.execute_live_lane(
+            repo_root=REPO_ROOT,
+            lane=lane,
+            authorization=authorization,
+            endpoint_get=endpoint_get,
+            api_key_loader=lambda: "provider-free-token",
+            static_checker=static_checker,
+            http_client_factory=client_factory,
+        )
+        sequence.append("runner")
+        assert result["static_preflight"]["status"] == "PASS"
+        assert result["result"]["decision"] == "INCONCLUSIVE"
+        assert result["result"]["completed_turns"] == 0
+        assert readiness_calls
+        assert sequence == ["static", "runner"]
+        assert len(generation_requests) >= 1
+        assert result["result"]["terminal"]["decision"] == "INCONCLUSIVE"
+        assert result["readiness"]["model_catalog"] == [lane.model]
+        if lane.lane_id == "luna":
+            assert config.props_url not in readiness_calls
+        for client in clients:
+            asyncio.run(client.aclose())
 
 
 def test_lane_custody_and_call_caps_are_independent_and_fail_closed(tmp_path: Path) -> None:
