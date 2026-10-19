@@ -1,0 +1,11 @@
+{
+  "accepted_tip": "ace0e46b72801b243da9ce5f684ccfbf0f43a506",
+  "additional_inference_authorized_by_this_review": false,
+  "cases_2_through_6_authorized": false,
+  "deepseek_operational_smoke": "FAIL",
+  "follow_up": "WP-DC02-03-HOSTED-SMOKE-CORRECTIVE-PREP-AUTH-001",
+  "full_run_authorized": false,
+  "gemini_operational_smoke": "PASS",
+  "review_disposition": "STOP_CONFIRMED_FULL_RUN_BLOCKED",
+  "slice": "C02-03-JOINT-HOSTED-SMOKE"
+}

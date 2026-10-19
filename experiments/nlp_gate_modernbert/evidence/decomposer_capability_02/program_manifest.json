@@ -18,11 +18,16 @@
     "execution_status": "CLOSED_ACCEPTED_WITH_ENV_FOLLOW_UP",
     "inference_authorized": false
   },
+  "c02_03_hosted_smoke_corrective_prep": {
+    "authority": "WP-DC02-03-HOSTED-SMOKE-CORRECTIVE-PREP-AUTH-001",
+    "execution_status": "EXECUTED_AWAITING_REVIEW",
+    "inference_authorized": false
+  },
   "c02_03_joint_hosted_smoke": {
     "authority": "WP-DC02-03-JOINT-HOSTED-SMOKE-AUTH-001",
     "both_operational_pass": false,
     "cases_2_through_6_authorized": false,
-    "execution_status": "EXECUTED_AWAITING_REVIEW",
+    "execution_status": "REVIEWED_FULL_RUN_BLOCKED",
     "logical_calls": 2
   },
   "candidate_sha": "e00475f262987d2a9113809f708324d73c084d50",
