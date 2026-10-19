@@ -30,14 +30,14 @@ from tests.test_nlp_d5_live_semantic_qualification import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def _failing_generation_handler(
+def _bounded_generation_handler(
     requests: list[httpx.Request],
 ) -> Callable[[httpx.Request], Any]:
-    """Return a fast in-memory generation failure without SDK retry backoff."""
+    """Return one immediate malformed completion without provider retry backoff."""
 
     async def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request)
-        return httpx.Response(400, json={"error": {"message": "fixture"}}, request=request)
+        return httpx.Response(200, json={}, request=request)
 
     return handler
 
@@ -354,7 +354,7 @@ def test_execute_live_lane_runs_static_readiness_adapter_and_shared_runner_provi
             generation_requests: list[httpx.Request] = generation_requests,
         ) -> httpx.AsyncClient:
             client = httpx.AsyncClient(
-                transport=httpx.MockTransport(_failing_generation_handler(generation_requests)),
+                    transport=httpx.MockTransport(_bounded_generation_handler(generation_requests)),
                 event_hooks={"request": [observer]},
             )
             clients.append(client)
