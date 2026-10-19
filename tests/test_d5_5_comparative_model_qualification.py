@@ -33,11 +33,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 def _failing_generation_handler(
     requests: list[httpx.Request],
 ) -> Callable[[httpx.Request], Any]:
-    """Return an in-memory transport handler that never contacts a provider."""
+    """Return a fast in-memory generation failure without SDK retry backoff."""
 
     async def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request)
-        return httpx.Response(500, json={"error": {"message": "fixture"}}, request=request)
+        return httpx.Response(400, json={"error": {"message": "fixture"}}, request=request)
 
     return handler
 
