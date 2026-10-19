@@ -1,6 +1,7 @@
 {
   "authority": "WP-DC02-03-HOSTED-SMOKE-CORRECTIVE-PREP-AUTH-001",
   "billable_openrouter_calls": 0,
+  "candidate_sha": "8dd74b0f5871ff6b0e9a052bd2ba305ba4811925",
   "completed_utc": "2026-10-19T23:17:42.920017+00:00",
   "corrective_deepseek_smoke_authorized": false,
   "cost_reconciliation": {
