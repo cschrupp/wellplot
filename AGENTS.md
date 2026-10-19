@@ -317,3 +317,53 @@ This `AGENTS.md` defines how to work.
 The active Relay / slice artifacts define what is currently allowed.
 
 Neither substitutes for the other.
+
+## 18. Acceptance and closure bookkeeping
+
+Do not create redundant approval loops around already-explicit acceptance.
+
+When all of the following are true:
+
+- the applicable independent/SOL review has already returned `ACCEPTED`;
+- the Human explicitly states `ACCEPTED`, `approved`, or equivalent closure language for that
+  same reviewed subject;
+- no ambiguity exists about the candidate / tip / subject being accepted;
+
+then record the durable Human-acceptance / closure artifacts and update ordinary status
+documentation without asking the Human for another confirmation.
+
+This automatic bookkeeping authority is narrow:
+
+- it records the acceptance already given;
+- it may update roadmap / decision-log state to reflect that accepted closure;
+- it must not create or infer authority for a new downstream slice;
+- it must not perform downstream execution, model calls, promotion, merge, release, or other
+  separately governed actions.
+
+A downstream action still requires its own explicit authority when the governing contract requires
+one.
+
+Prefer:
+
+```
+SOL ACCEPTED
+    ↓
+Human ACCEPTED
+    ↓
+automatic durable closure bookkeeping
+```
+
+over:
+
+```
+SOL ACCEPTED
+    ↓
+Human ACCEPTED
+    ↓
+ask whether to record Human acceptance
+    ↓
+Human confirms again
+```
+
+Acceptance and downstream authorization remain distinct states.
+
