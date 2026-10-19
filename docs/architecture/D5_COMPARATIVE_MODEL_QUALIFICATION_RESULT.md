@@ -108,14 +108,17 @@ observation. No provider or model request is sent.
 ## Validation Handoff
 
 ```yaml
-implementation_checkpoint: 1f347c854c2a8911b7776dd712c5ff9bf514d48a
-parent: d90b769782eaa864fe944fac3d277192da4e0b57
+implementation_checkpoint: 24ab54603e23488c2d3cf19b8b786502fdee7afd
+parent: 1f347c854c2a8911b7776dd712c5ff9bf514d48a
 changed_files:
+  - docs/architecture/D5_5_COMPARATIVE_MODEL_QUALIFICATION.md
   - scripts/d5_5_comparative_model_qualification.py
+  - scripts/nlp_d5_live_semantic_qualification.py
   - tests/test_d5_5_comparative_model_qualification.py
   - docs/architecture/D5_COMPARATIVE_MODEL_QUALIFICATION_RESULT.md
 provider_free_qwen_rehearsal: 9/9 PASS / 18 logical calls
 provider_free_luna_rehearsal: 9/9 PASS / 18 logical calls
+provider_free_lane_boundary: PASS / shared D5CampaignRunner / zero provider-model calls
 single_engine_attestation: PASS
 provider_calls: 0
 model_calls: 0
