@@ -298,7 +298,14 @@ def test_execute_live_lane_runs_static_readiness_adapter_and_shared_runner_provi
     config = d5_5.load_project_config(REPO_ROOT)
     current = d5_5._git(REPO_ROOT, "rev-parse", "HEAD")
     for lane in d5_5.lane_configurations(config):
-        artifact_root = tmp_path / lane.lane_id
+        artifact_root = (
+            REPO_ROOT
+            / "workspace"
+            / "evaluations"
+            / "d5-5-provider-free"
+            / tmp_path.name
+            / lane.lane_id
+        )
         authorization = replace(
             _authorization(),
             implementation_checkpoint=current,
