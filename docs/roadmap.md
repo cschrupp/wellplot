@@ -156,19 +156,24 @@ The accepted bakeoff established:
 - bounded compile/resource behavior
 - zero model calls / no model weights loaded
 
-### 2. Selected-backend constrained-decoding preflight — current
+### 2. Selected-backend constrained-decoding preflight — completed
 
-Using the accepted XGrammar path:
+Human/SOL accepted `DECOMPOSER-PILOT-CONSTRAINT-XGRAMMAR-PREFLIGHT-01R2` with P1–P9 PASS.
+The accepted preflight established:
 
-- construct the complete constraint path
-- verify the immutable grammar and pinned tokenizer together
-- verify hard-mask behavior
-- record resource/compile evidence
-- keep model calls at zero unless the later pilot is separately authorized
+- complete frozen Q6 pilot manifest
+- exact XGrammar 0.2.8 / native-EBNF constraint construction
+- hard-mask and completion parity on the pinned Qwen3-1.7B tokenizer
+- exact HF `LogitsProcessor` progressive synthetic replay
+- six-case pre-inference hash freeze with no sealed-case contamination
+- adversarial fail-closed evidence
+- concrete-model load / invocation / generate / non-local-download guards
+- zero model calls, zero model forward/generate calls, and no model weights loaded
 
-### 3. DECOMPOSER-PILOT-01
+### 3. DECOMPOSER-PILOT-01 — next scientific slice, not yet authorized
 
-Only after the constraint path passes preflight:
+The infrastructure is now ready for the frozen six-call pilot, but execution still requires a
+separate explicit pilot authority. Once authorized:
 
 - model: `Qwen/Qwen3-1.7B`
 - instruction checkpoint
@@ -291,8 +296,8 @@ Longer term:
 | Report composition | Functional; commercial-parity work remains |
 | Interactive viewer | Baseline / partial |
 | Deterministic semantic editing runtime | Strong experimental foundation |
-| English decomposer | Not yet cleanly evaluated |
-| Hard constrained decoding | Grammar solved; engine integration next |
+| English decomposer | Not yet cleanly evaluated; six-call pilot is next |
+| Hard constrained decoding | Preflight accepted; infrastructure ready |
 | QC platform | Future product layer |
 | Petrophysics platform | Future product layer |
 | Full graphical/web application | Longer term |
@@ -300,8 +305,8 @@ Longer term:
 ## Immediate Next Tasks
 
 1. Keep this roadmap and decision log synchronized with accepted runtime work.
-2. Run the selected-backend XGrammar constrained-decoding preflight as the current isolated experiment.
-3. Do not authorize model inference from a successful preflight alone.
+2. Keep `DECOMPOSER-PILOT-01` blocked until a separate explicit authority is issued.
+3. When authorized, run exactly the frozen six-call Qwen3-1.7B decomposer pilot with no retries or repair.
 4. Continue release/documentation maintenance without allowing it to dominate the active R&D track.
 5. Revisit renderer/report polish in parallel where it improves real user workflows.
 
