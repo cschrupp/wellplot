@@ -1,5 +1,7 @@
 {
   "candidate_sha": "5e2261dc197bbc36b6d9440bff61019c0925ba21",
+  "inference_authorized": false,
+  "live_scientific_execution_readiness": "NOT_ESTABLISHED",
   "model_calls_authorized": 0,
   "model_inventory_amendment": "WP-DC02-MODEL-INVENTORY-AMEND-001",
   "models": [
@@ -69,19 +71,23 @@
       "title": "Frozen benchmark and semantic oracle"
     },
     "C02-02": {
+      "accepted_tip": "a11c99c4691899d82ee33c9b150e487c688f2036",
       "authority": "WP-DC02-02-PROVIDER-HARNESS-QUALIFICATION-AUTH-001",
       "blocker": null,
       "design_status": "FROZEN_AS_PHASE0_INVENTORY",
-      "execution_status": "EXECUTED_AWAITING_REVIEW",
+      "execution_status": "CLOSED_ACCEPTED",
       "title": "Model/provider harness qualification"
     },
     "G0": {
+      "authority": "WP-DC02-G0-PHASE0-READINESS-REVIEW-AUTH-001",
+      "decision_id": "WP-DC02-G0-READINESS-DECISION-001",
       "design_status": "FROZEN",
-      "execution_status": "NOT_REACHED",
+      "execution_status": "EXECUTED_AWAITING_REVIEW",
       "title": "Phase 0 readiness review"
     }
   },
   "phase0_design_acceptance": "WP-DC02-PHASE0-DESIGN-ACCEPT-001",
+  "phase0_technical_readiness": "READY",
   "program": "WELLPLOT-DECOMPOSER-CAPABILITY-02",
   "provisional_later_phases": "C02-03_through_C02-17_PROPOSED_NOT_FROZEN",
   "repository_home": "experiments/nlp_gate_modernbert/evidence/decomposer_capability_02",
