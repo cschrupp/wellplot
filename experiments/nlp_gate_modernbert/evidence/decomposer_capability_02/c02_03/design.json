@@ -218,6 +218,7 @@
   "slice": "C02-03",
   "slice_title": "Gemini 4 Argon frozen-protocol capability ceiling \u2014 DESIGN ONLY",
   "starting_sha": "2db64aa96549e96161ff8cb2e7df2f03c885be55",
+  "tip_sha": "07825ac43d3e7f1a5db619b126ef7825c7f86721",
   "token_cost_accounting": {
     "charge_attempted_calls_on_parse_or_freeze_failure": true,
     "cost_snapshot": "freeze provider rate card into run manifest at execution start from C02-02 snapshot + re-fetch under execution auth only",
