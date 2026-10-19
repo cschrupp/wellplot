@@ -367,3 +367,27 @@ Human confirms again
 
 Acceptance and downstream authorization remain distinct states.
 
+## 19. Workflow continuity and authorization gates
+
+Keep the governed workflow moving.
+
+After completing, reviewing, or closing a slice:
+
+- continue automatically into the next step when that step is already authorized;
+- if the next step requires explicit Human authorization, request that authorization directly and
+  specifically instead of merely reporting that the step is unauthorized and stopping;
+- once the Human grants the requested authorization, record it durably and proceed without asking
+  for the same authorization again;
+- stop only for an actual review gate, a required Human-owned decision, or a frozen-contract
+  blocker.
+
+Do not manufacture extra authorization layers. Prefer one authority that covers the complete
+bounded implementation-and-execution step when the scientific/design contract is already frozen.
+
+Authorization requests must identify the concrete action being authorized, especially when it
+permits model inference, external side effects, promotion, release, destructive operations, or
+other previously blocked execution.
+
+A completed upstream gate never implies downstream authorization, but the agent is responsible for
+promptly requesting the required downstream authority rather than leaving the workflow idle.
+
