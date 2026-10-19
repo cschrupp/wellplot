@@ -13,6 +13,7 @@
   "correction_candidate_sha": "96bbbbf7f6105f03ef9fc559d506e40cb364a5e2",
   "correction_tip_sha": "a3bc8a0d088b95003e8c7ca9dfc5c1d2faa2e5b1",
   "decision": "INCONCLUSIVE",
+  "downstream_authority": "NONE",
   "evidence_corrections": [
     {
       "case_id": "D5GAP-0101",
@@ -25,12 +26,15 @@
   "execution_validity": "VALID",
   "high_level_model_calls": 6,
   "high_level_model_calls_authorized": 6,
+  "human_review": "ACCEPTED",
   "independent_review_disposition": {
     "classification_correction": "ACCEPTED",
     "execution": "VALID",
+    "human_review": "ACCEPTED",
     "mechanical_verdict": "INCONCLUSIVE",
-    "next": "deliberately designed follow-on experiment (not silent CUDA substitution)",
-    "run_1": "CLOSED"
+    "next": "DECOMPOSER-FOLLOWON-DESIGN-01 (design only; not authorized)",
+    "run_1": "CLOSED",
+    "sol_review": "ACCEPTED"
   },
   "layer0": {
     "decode_failures": 1,
@@ -148,11 +152,14 @@
       "termination_reason": null
     }
   ],
-  "run_1_status": "CLOSED",
+  "proposed_next_slice": "DECOMPOSER-FOLLOWON-DESIGN-01",
+  "proposed_next_slice_status": "PROPOSED_NOT_AUTHORIZED",
+  "run_1_status": "CLOSED_ACCEPTED",
   "run_id": "DECOMPOSER-PILOT-01 / RUN 1",
   "runtime": "CPU / FP32",
   "scientific_interpretation": "Strong negative evidence against the exact Qwen3-1.7B zero-shot hypothesis, but the frozen protocol prevents a formal family-failure decision because Layer 0 was not 6/6 (INCONCLUSIVE).",
   "slice": "DECOMPOSER-PILOT-01",
+  "sol_review": "ACCEPTED",
   "starting_tip": "bad4ad33f1dd6f0c6976e8213012f66e16f19ea9",
   "terminal_state": "RUN_COMPLETE_AWAITING_INDEPENDENT_SCIENTIFIC_REVIEW",
   "tip_sha": "fcfab82e0b1fec15550ed712a14caa9dce6ba64e"

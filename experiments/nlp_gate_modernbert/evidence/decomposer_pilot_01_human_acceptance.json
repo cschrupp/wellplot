@@ -1,0 +1,39 @@
+{
+  "slice": "DECOMPOSER-PILOT-01 / RUN 1",
+  "authority": "WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-01-AUTH-001",
+  "sol_review": "ACCEPTED",
+  "human_review": "ACCEPTED",
+  "status": "CLOSED",
+  "original_run_candidate": "32edc35af3824b7f62e60c6d8fa572051e135580",
+  "classification_correction_candidate": "96bbbbf7f6105f03ef9fc559d506e40cb364a5e2",
+  "accepted_tip": "6f772b59a758915306c0be4981bbb0816eb65d22",
+  "accepted_remote_head": "6f772b59a758915306c0be4981bbb0816eb65d22",
+  "execution_validity": "VALID",
+  "authorized_calls": "6/6",
+  "runtime": "CPU / FP32",
+  "layer0": {
+    "reached_freeze": 5,
+    "n": 6,
+    "decode_failures": 1,
+    "schema_invalid_failures": 0
+  },
+  "layer1": {
+    "semantically_equivalent_among_frozen": 0,
+    "frozen_count": 5
+  },
+  "mechanical_verdict": "INCONCLUSIVE",
+  "scientific_disposition": "strong_negative_evidence_against_exact_zeroshot_qwen3_1_7b_configuration_protocol_blocks_formal_family_failure",
+  "model_calls_added_by_correction": 0,
+  "forbidden_as_correction": [
+    "gpu_cuda_rerun_of_same_experiment",
+    "token_budget_increase_presented_as_run1_correction"
+  ],
+  "downstream_authority": "NONE",
+  "proposed_next_slice": "DECOMPOSER-FOLLOWON-DESIGN-01",
+  "proposed_next_slice_status": "PROPOSED_NOT_AUTHORIZED",
+  "followon_design_priorities": [
+    "capability_stronger_reference_model_under_accepted_semantic_contract",
+    "representation_attribution_capability_vs_prompting_vs_program_complexity",
+    "adaptation_fewshot_vs_task_specific_finetune_efficiency"
+  ]
+}
