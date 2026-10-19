@@ -1,9 +1,15 @@
 {
   "c02_03": {
+    "accepted_tip": "fc8bd36dd638ff065e562a60cb8c9fabbd491470",
     "authority": "WP-DC02-03-GEMINI-CEILING-DESIGN-AUTH-001",
-    "execution_status": "DESIGN_EXECUTED_AWAITING_REVIEW",
+    "execution_status": "DESIGN_CLOSED_ACCEPTED",
     "inference_authorized": false,
     "title": "Gemini 4 Argon frozen-protocol capability ceiling design"
+  },
+  "c02_03_execution_prep": {
+    "authority": "WP-DC02-03-EXECUTION-PREPARATION-AUTH-001",
+    "execution_status": "EXECUTED_AWAITING_REVIEW",
+    "inference_authorized": false
   },
   "candidate_sha": "8225f5d8da629927bc240ac79177c3d75457d0ba",
   "inference_authorized": false,

@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
-from nlp_gate_modernbert.decomposer_capability_02.budget import CallBudget
+from nlp_gate_modernbert.decomposer_capability_02.budget import CallBudget, ExecutionBudgets
 from nlp_gate_modernbert.decomposer_capability_02.contracts import (
     AdapterCapability,
     ModelPathId,
 )
+from nlp_gate_modernbert.decomposer_capability_02.cost_card import CostCard, load_cost_card
 from nlp_gate_modernbert.decomposer_capability_02.local_qwen_adapter import LocalQwenAdapter
 from nlp_gate_modernbert.decomposer_capability_02.openrouter_adapter import (
     ForbiddenLiveTransport,
     OpenRouterAdapter,
 )
+
+# C02-03 design: preferred Google AI Studio; no silent fallback.
+GEMINI_PROVIDER_ORDER = ("Google AI Studio",)
 
 # Verified via OpenRouter public catalog GET /api/v1/models (not inference).
 OPENROUTER_GEMINI_4_ARGON = "google/gemini-4-argon"
@@ -120,4 +124,30 @@ def default_live_forbidden_openrouter(
 ) -> OpenRouterAdapter:
     return build_mocked_openrouter_adapter(
         model_path, budget=budget, transport=ForbiddenLiveTransport()
+    )
+
+
+def build_gemini_ceiling_prep_adapter(
+    *,
+    budgets: ExecutionBudgets,
+    transport,
+    cost_card: CostCard | None = None,
+    provider_order: tuple[str, ...] = GEMINI_PROVIDER_ORDER,
+) -> OpenRouterAdapter:
+    """Pinned Gemini adapter for execution preparation / future authorized runs."""
+    card = cost_card or load_cost_card(
+        openrouter_model_id=OPENROUTER_GEMINI_4_ARGON,
+        pinned_provider=provider_order[0],
+    )
+    return OpenRouterAdapter(
+        model_path=ModelPathId.GEMINI_4_ARGON,
+        openrouter_model_id=OPENROUTER_GEMINI_4_ARGON,
+        budgets=budgets,
+        transport=transport,
+        include_reasoning=False,
+        provider_order=list(provider_order),
+        allow_fallbacks=False,
+        require_provider_pin=True,
+        max_transport_attempts_per_logical_call=2,
+        cost_card=card,
     )

@@ -1,0 +1,8 @@
+{
+  "authority": "WP-DC02-03-EXECUTION-PREPARATION-AUTH-001",
+  "billable_openrouter_authorized": false,
+  "inference_authorized": false,
+  "mode": "NON_INFERENCE_IMPLEMENTATION_AND_QUALIFICATION",
+  "parent_sha": "fc8bd36dd638ff065e562a60cb8c9fabbd491470",
+  "slice": "C02-03-EXECUTION-PREPARATION"
+}

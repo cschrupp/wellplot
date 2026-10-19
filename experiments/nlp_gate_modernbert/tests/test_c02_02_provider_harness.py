@@ -155,6 +155,7 @@ def test_live_transport_forbidden() -> None:
     )
     out = adapter.generate(_req())
     assert out.error and "live_openrouter_transport_forbidden" in out.error
+    assert "execution_authority" in out.error
 
 
 def test_local_qwen_paths_mock_thinking_separation() -> None:

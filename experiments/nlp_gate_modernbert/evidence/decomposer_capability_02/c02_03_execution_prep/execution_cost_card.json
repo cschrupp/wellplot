@@ -1,0 +1,15 @@
+{
+  "billable_inference_calls": 0,
+  "catalog_completion_usd_per_1m": 10.0,
+  "catalog_prompt_usd_per_1m": 2.0,
+  "openrouter_model_id": "google/gemini-4-argon",
+  "pinned_provider": "Google AI Studio",
+  "rate": {
+    "completion_usd_per_1m": 5.0,
+    "prompt_usd_per_1m": 1.0,
+    "provider_name": "Google AI Studio",
+    "tag": "google-ai-studio/flex"
+  },
+  "snapshot_utc": "2026-10-19T20:31:21.449138+00:00",
+  "source_path": "/home/user/projects/wellplot/experiments/nlp_gate_modernbert/evidence/decomposer_capability_02/c02_02/provider_price_routing_snapshot.json"
+}
