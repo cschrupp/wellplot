@@ -303,6 +303,7 @@ def test_execute_live_lane_runs_static_readiness_adapter_and_shared_runner_provi
             / "workspace"
             / "evaluations"
             / "d5-5-provider-free"
+            / tmp_path.parent.name
             / tmp_path.name
             / lane.lane_id
         )
