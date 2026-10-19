@@ -101,5 +101,6 @@
     }
   },
   "slice": "G0",
-  "starting_tip": "a11c99c4691899d82ee33c9b150e487c688f2036"
+  "starting_tip": "a11c99c4691899d82ee33c9b150e487c688f2036",
+  "tip_sha": "95a157e8680898197b07f0ba42f12c995c5e28a9"
 }
