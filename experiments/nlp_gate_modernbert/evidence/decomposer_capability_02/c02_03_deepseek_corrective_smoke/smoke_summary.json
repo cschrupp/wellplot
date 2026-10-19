@@ -96,5 +96,6 @@
   "semantic_layer1_completed": false,
   "smoke_case_id": "D5GAP-0085",
   "status": "STOP_FOR_INDEPENDENT_CORRECTIVE_SMOKE_REVIEW",
+  "tip_sha": "8abf52b865a9d68ecea27832b4f730363dd424f6",
   "transport_attempts": 1
 }
