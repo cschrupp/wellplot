@@ -87,5 +87,6 @@
   },
   "live_inference_calls": 0,
   "next_recommended_authority": "Separate auth for exactly one DeepSeek corrective smoke on D5GAP-0085 with pinned max_tokens=4096 and reasoning.effort=low; Gemini retest not automatic",
-  "parent_sha": "ace0e46b72801b243da9ce5f684ccfbf0f43a506"
+  "parent_sha": "ace0e46b72801b243da9ce5f684ccfbf0f43a506",
+  "tip_sha": "6d2c3a2aef90911e6ee40444bc2c0aaaef8d2dd3"
 }
