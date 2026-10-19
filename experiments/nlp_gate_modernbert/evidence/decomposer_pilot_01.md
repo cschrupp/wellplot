@@ -14,7 +14,7 @@ AUTHORITY REMOTE HEAD:
 9fbfb74cac97773519171a6b30fa6865e6201b8e
 
 CANDIDATE SHA:
-(pending commit)
+32edc35af3824b7f62e60c6d8fa572051e135580
 
 TIP:
 (pending SHA-record commit)
