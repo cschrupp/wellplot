@@ -1,61 +1,89 @@
-# DECOMPOSER-PILOT-01 — Run closeout
+# DECOMPOSER-PILOT-01 / RUN 1 — Closed
 
 ```
 SLICE:
-DECOMPOSER-PILOT-01
+DECOMPOSER-PILOT-01 / RUN 1
 
 AUTHORITY:
 WELLPLOT-NLP-RUNTIME-V2-DECOMPOSER-PILOT-01-AUTH-001
 
-STARTING TIP:
-bad4ad33f1dd6f0c6976e8213012f66e16f19ea9
+EXECUTION VALIDITY:
+VALID
 
-AUTHORITY REMOTE HEAD:
-9fbfb74cac97773519171a6b30fa6865e6201b8e
+AUTHORIZED CALLS:
+6/6
 
-CANDIDATE SHA:
-32edc35af3824b7f62e60c6d8fa572051e135580
+RUNTIME:
+CPU / FP32
 
-TIP:
-fcfab82e0b1fec15550ed712a14caa9dce6ba64e
+MODEL CALLS ADDED BY CORRECTION:
+0
 
-HIGH-LEVEL MODEL CALLS:
-6 / 6
+FROZEN CANDIDATES:
+5/6
 
-MODEL LOADS:
-1
+DECODE FAILURE:
+1/6
 
-DECISION:
+SCHEMA INVALID:
+0/6
+
+SEMANTIC EQUIVALENTS:
+0/5 frozen (0/6 overall)
+
+FROZEN MECHANICAL VERDICT:
 INCONCLUSIVE
 ```
+
+## Evidence correction
+
+D5GAP-0101 terminated at exactly `max_new_tokens=1024` without a complete legal
+object. Per frozen design, that is `DECOMPOSITION_DECODE_FAILURE`, not
+`DECOMPOSITION_SCHEMA_INVALID`. Raw tokens and payload bytes are unchanged.
+No model calls were added.
 
 ## Layer 0 / 1 / 2
 
 | Layer | Result |
 |-------|--------|
 | 0 reached_freeze | 5/6 |
-| 0 decode failures | 0 |
-| 0 schema-invalid | 1 |
+| 0 decode failures | 1 |
+| 0 schema-invalid | 0 |
 | 1 semantically_equivalent | 0/6 |
 | 2 veto A | False [] |
 | 2 veto B | False [] |
 
 ## Per-case
 
-| Case | Freeze | Equivalent | Labels | Latency s |
-|------|--------|------------|--------|-----------|
-| D5GAP-0085 | FROZEN | False | MISSING_TASK,WRONG_ORDER | 6.586548493010923 |
-| D5GAP-0089 | FROZEN | False | RUNTIME_TERMINAL_MISMATCH | 79.16190488499706 |
-| D5GAP-0117 | FROZEN | False | RUNTIME_TERMINAL_MISMATCH | 95.853488216002 |
-| D5GAP-0096 | FROZEN | False | WRONG_BINDING,WRONG_OPERATION | 29.97277096399921 |
-| D5GAP-0101 | DECOMPOSITION_SCHEMA_INVALID | False | DECOMPOSITION_SCHEMA_INVALID | 314.5926402529876 |
-| SEED-cm-9643c020e2e02463 | FROZEN | False | RUNTIME_TERMINAL_MISMATCH | 35.11653508199379 |
+| Case | Freeze | Equivalent | Labels | Termination |
+|------|--------|------------|--------|-------------|
+| D5GAP-0085 | FROZEN | False | MISSING_TASK,WRONG_ORDER | - |
+| D5GAP-0089 | FROZEN | False | RUNTIME_TERMINAL_MISMATCH | - |
+| D5GAP-0117 | FROZEN | False | RUNTIME_TERMINAL_MISMATCH | - |
+| D5GAP-0096 | FROZEN | False | WRONG_BINDING,WRONG_OPERATION | - |
+| D5GAP-0101 | DECOMPOSITION_DECODE_FAILURE | False | DECOMPOSITION_DECODE_FAILURE | max_new_tokens |
+| SEED-cm-9643c020e2e02463 | FROZEN | False | RUNTIME_TERMINAL_MISMATCH | - |
 
-## Terminal state
+## Scientific interpretation
+
+Strong negative evidence against the exact Qwen3-1.7B zero-shot constrained-
+decomposition hypothesis on this six-case probe. The frozen protocol yields
+INCONCLUSIVE because Layer 0 was not 6/6; a formal ≤4/6 family-failure
+verdict is therefore not issued from this run.
+
+This CPU/FP32 run is retained permanently as Pilot Run 1. It is not invalidated
+by the classification correction. A GPU rerun of the same experiment is not a
+correction of this run.
+
+## Independent review disposition
 
 ```
-RUN_COMPLETE_AWAITING_INDEPENDENT_SCIENTIFIC_REVIEW
+EXECUTION: VALID
+CLASSIFICATION_CORRECTION: ACCEPTED (D5GAP-0101 → DECOMPOSITION_DECODE_FAILURE)
+MECHANICAL_VERDICT: INCONCLUSIVE
+RUN_1: CLOSED
+NEXT: deliberately designed follow-on experiment (not silent CUDA substitution)
 ```
 
 STATUS:
-STOP FOR INDEPENDENT SCIENTIFIC DECOMPOSER-PILOT-01 REVIEW
+DECOMPOSER-PILOT-01 RUN 1 CLOSED

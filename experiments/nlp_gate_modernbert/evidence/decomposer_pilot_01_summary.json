@@ -11,15 +11,34 @@
     "SEED-cm-9643c020e2e02463"
   ],
   "decision": "INCONCLUSIVE",
+  "evidence_corrections": [
+    {
+      "case_id": "D5GAP-0101",
+      "from": "DECOMPOSITION_SCHEMA_INVALID",
+      "model_calls_added": 0,
+      "reason": "max_new_tokens termination before complete legal object",
+      "to": "DECOMPOSITION_DECODE_FAILURE"
+    }
+  ],
+  "execution_validity": "VALID",
   "high_level_model_calls": 6,
   "high_level_model_calls_authorized": 6,
+  "independent_review_disposition": {
+    "classification_correction": "ACCEPTED",
+    "execution": "VALID",
+    "mechanical_verdict": "INCONCLUSIVE",
+    "next": "deliberately designed follow-on experiment (not silent CUDA substitution)",
+    "run_1": "CLOSED"
+  },
   "layer0": {
-    "decode_failures": 0,
+    "decode_failures": 1,
     "n": 6,
     "reached_freeze": 5,
-    "schema_invalid_failures": 1
+    "schema_invalid_failures": 0
   },
   "layer1": {
+    "equivalent_among_frozen": 0,
+    "frozen_count": 5,
     "n": 6,
     "semantically_equivalent": 0
   },
@@ -71,7 +90,8 @@
       ],
       "latency_seconds": 6.586548493010923,
       "reached_freeze": true,
-      "semantically_equivalent": false
+      "semantically_equivalent": false,
+      "termination_reason": null
     },
     {
       "case_id": "D5GAP-0089",
@@ -80,7 +100,8 @@
       ],
       "latency_seconds": 79.16190488499706,
       "reached_freeze": true,
-      "semantically_equivalent": false
+      "semantically_equivalent": false,
+      "termination_reason": null
     },
     {
       "case_id": "D5GAP-0117",
@@ -89,7 +110,8 @@
       ],
       "latency_seconds": 95.853488216002,
       "reached_freeze": true,
-      "semantically_equivalent": false
+      "semantically_equivalent": false,
+      "termination_reason": null
     },
     {
       "case_id": "D5GAP-0096",
@@ -99,16 +121,18 @@
       ],
       "latency_seconds": 29.97277096399921,
       "reached_freeze": true,
-      "semantically_equivalent": false
+      "semantically_equivalent": false,
+      "termination_reason": null
     },
     {
       "case_id": "D5GAP-0101",
       "failure_labels": [
-        "DECOMPOSITION_SCHEMA_INVALID"
+        "DECOMPOSITION_DECODE_FAILURE"
       ],
       "latency_seconds": 314.5926402529876,
       "reached_freeze": false,
-      "semantically_equivalent": false
+      "semantically_equivalent": false,
+      "termination_reason": "max_new_tokens"
     },
     {
       "case_id": "SEED-cm-9643c020e2e02463",
@@ -117,9 +141,14 @@
       ],
       "latency_seconds": 35.11653508199379,
       "reached_freeze": true,
-      "semantically_equivalent": false
+      "semantically_equivalent": false,
+      "termination_reason": null
     }
   ],
+  "run_1_status": "CLOSED",
+  "run_id": "DECOMPOSER-PILOT-01 / RUN 1",
+  "runtime": "CPU / FP32",
+  "scientific_interpretation": "Strong negative evidence against the exact Qwen3-1.7B zero-shot hypothesis, but the frozen protocol prevents a formal family-failure decision because Layer 0 was not 6/6 (INCONCLUSIVE).",
   "slice": "DECOMPOSER-PILOT-01",
   "starting_tip": "bad4ad33f1dd6f0c6976e8213012f66e16f19ea9",
   "terminal_state": "RUN_COMPLETE_AWAITING_INDEPENDENT_SCIENTIFIC_REVIEW",

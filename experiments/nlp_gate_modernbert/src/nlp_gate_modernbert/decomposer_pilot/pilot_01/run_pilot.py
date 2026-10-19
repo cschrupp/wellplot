@@ -64,6 +64,26 @@ def _sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def classify_incomplete_freeze_failure(
+    *,
+    freeze_failure: str,
+    freeze_detail: str,
+    n_generated_tokens: int,
+    max_new_tokens: int,
+) -> tuple[str, str]:
+    """Map freeze failure under incomplete generation to the frozen label.
+
+    Max-token termination before a complete legal object is
+    DECOMPOSITION_DECODE_FAILURE (not SCHEMA_INVALID).
+    """
+    if n_generated_tokens >= max_new_tokens:
+        return (
+            "DECOMPOSITION_DECODE_FAILURE",
+            f"max_new_tokens:{max_new_tokens};underlying_freeze:{freeze_failure}:{freeze_detail}",
+        )
+    return freeze_failure, freeze_detail
+
+
 def _write_json(path: Path, payload: Any) -> None:
     path.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
@@ -285,17 +305,24 @@ def run_one_case(
     payload_ids = _strip_trailing_stops(generated_ids, stop_ids)
     payload_bytes = _decode_payload(tokenizer, payload_ids)
     payload_sha = _sha256_bytes(payload_bytes)
+    hit_max_new_tokens = len(generated_ids) >= inference_pins.MAX_NEW_TOKENS
 
     # Freeze before oracle.
     frozen = freeze_candidate(payload_bytes)
     if isinstance(frozen, FreezeFailure):
+        failure, detail = classify_incomplete_freeze_failure(
+            freeze_failure=frozen.failure,
+            freeze_detail=frozen.detail,
+            n_generated_tokens=len(generated_ids),
+            max_new_tokens=inference_pins.MAX_NEW_TOKENS,
+        )
         return {
             "case_id": case_id,
             "call_index": call_index,
-            "status": frozen.failure,
-            "failure_labels": [frozen.failure],
-            "freeze_status": frozen.failure,
-            "freeze_detail": frozen.detail,
+            "status": failure,
+            "failure_labels": [failure],
+            "freeze_status": failure,
+            "freeze_detail": detail,
             "reached_freeze": False,
             "semantically_equivalent": False,
             "latency_seconds": latency,
@@ -307,6 +334,13 @@ def run_one_case(
             "raw_output_sha256": payload_sha,
             "n_generated_tokens": len(generated_ids),
             "n_payload_tokens": len(payload_ids),
+            "termination": {
+                "reason": "max_new_tokens" if hit_max_new_tokens else "incomplete_non_max",
+                "max_new_tokens": inference_pins.MAX_NEW_TOKENS,
+                "hit_max_new_tokens": hit_max_new_tokens,
+                "ended_with_stop_stripped": len(generated_ids) != len(payload_ids),
+                "stop_ids": sorted(stop_ids),
+            },
         }
 
     # Evaluate only after freeze (oracle unlocked by FrozenCandidate).
