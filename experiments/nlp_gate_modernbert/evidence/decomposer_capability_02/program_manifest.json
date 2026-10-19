@@ -1,4 +1,5 @@
 {
+  "OPENROUTER_API_KEY_PRESENT": true,
   "c02_03": {
     "accepted_tip": "fc8bd36dd638ff065e562a60cb8c9fabbd491470",
     "authority": "WP-DC02-03-GEMINI-CEILING-DESIGN-AUTH-001",
@@ -7,8 +8,9 @@
     "title": "Gemini 4 Argon frozen-protocol capability ceiling design"
   },
   "c02_03_env_config": {
+    "accepted_tip": "580c5c87dbd8200d1a8b54ffe66a11a54d58ca35",
     "authority": "WP-DC02-03-ENV-CONFIG-AUTH-001",
-    "execution_status": "EXECUTED_AWAITING_REVIEW",
+    "execution_status": "CLOSED_ACCEPTED",
     "inference_authorized": false
   },
   "c02_03_execution_prep": {
@@ -17,6 +19,7 @@
     "inference_authorized": false
   },
   "candidate_sha": "4a2124ee1410e68a3e0d475ada9da5e81755a657",
+  "gemini_six_case_execution_authorized": false,
   "inference_authorized": false,
   "live_scientific_execution_readiness": "NOT_ESTABLISHED",
   "model_calls_authorized": 0,
