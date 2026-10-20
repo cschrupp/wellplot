@@ -26,6 +26,7 @@ from wellplot.agent.code_mode.planner import (
     SemanticPlan,
     _correction_request,
     _planning_request,
+    validate_semantic_plan,
 )
 from wellplot.capabilities import create_builtin_registry
 from wellplot.project_config import load_project_config
@@ -61,6 +62,40 @@ INSPECTION_SECTIONS = (
     "resulting_semantics",
     "evaluation",
     "first_divergence",
+)
+IDENTITY_LIST_FIELDS = frozenset({"target_identity", "source_clue"})
+
+D5G_STUDY_CASES: tuple[dict[str, Any], ...] = (
+    {
+        "case_id": "D5-5G-A0",
+        "axis": "A",
+        "arm": "A0",
+        "contract": "optional_section_hint",
+    },
+    {
+        "case_id": "D5-5G-A1",
+        "axis": "A",
+        "arm": "A1",
+        "contract": "required_section_hint",
+    },
+    {
+        "case_id": "D5-5G-B0",
+        "axis": "B",
+        "arm": "B0",
+        "contract": "current_capability_contract",
+    },
+    {
+        "case_id": "D5-5G-B1",
+        "axis": "B",
+        "arm": "B1",
+        "contract": "capability_local_contract_examples",
+    },
+    {
+        "case_id": "D5-5G-C0",
+        "axis": "C",
+        "arm": "C0",
+        "contract": "existing_canonical_correction",
+    },
 )
 
 
@@ -150,10 +185,7 @@ def _request_controls(request: object) -> dict[str, Any]:
 def _planning_context(*, capability_contract: object | None = None) -> dict[str, Any]:
     """Build one fresh semantic input shared by all provider-facing arms."""
     context: dict[str, Any] = {
-        "request": (
-            "Revise one selected section and preserve the other available section. "
-            "Use the source identified by the request."
-        ),
+        "request": ("Revise Copper Ridge using source-ember; preserve Silver Meadow."),
         "mode": "revise",
         "current_document_summary": {
             "sections": [
@@ -161,6 +193,8 @@ def _planning_context(*, capability_contract: object | None = None) -> dict[str,
                 {"title": "Silver Meadow", "semantic_id": "section-silver-meadow"},
             ],
             "selected_source_candidates": ["source-ember", "source-flint"],
+            "grounded_target": "Copper Ridge",
+            "grounded_source": "source-ember",
         },
         "source_summary": {
             "candidates": [
@@ -256,10 +290,10 @@ def compare_requiredness_arms() -> dict[str, Any]:
     }
 
 
-def capability_contract(arm: str) -> dict[str, Any]:
+def capability_contract(arm: str) -> dict[str, Any] | None:
     """Return generic capability-local contracts for the two study families."""
     if arm == "B0":
-        return {"version": "d5-5g-capability-contract.v1", "mappings": []}
+        return None
     if arm == "B1":
         return {
             "version": "d5-5g-capability-contract.v1",
@@ -269,16 +303,16 @@ def capability_contract(arm: str) -> dict[str, Any]:
                     "semantic_field": "existing_section_hint",
                     "allowed_value_domain": "inspected section titles",
                     "language_patterns": ["revise the named section"],
-                    "positive_example": "Revise the Copper Ridge section",
-                    "negative_example": "Do not revise the Silver Meadow section",
+                    "positive_example": "Revise the Juniper Shelf section",
+                    "negative_example": "Do not revise the Granite Basin section",
                 },
                 {
                     "family": "source_channel_closure",
                     "semantic_field": "source_hints",
                     "allowed_value_domain": "inspected source identities",
                     "language_patterns": ["use the named source"],
-                    "positive_example": "Use source-ember for the selected section",
-                    "negative_example": "Do not use an uninspected source",
+                    "positive_example": "Use source-cedar for the selected section",
+                    "negative_example": "Do not use source-birch",
                 },
             ],
         }
@@ -289,9 +323,7 @@ def compare_capability_contract_arms() -> dict[str, Any]:
     """Materialize B0/B1 requests with one controlled contract difference."""
     b0 = capability_contract("B0")
     b1 = capability_contract("B1")
-    if b0["version"] != b1["version"]:
-        raise AssertionError("capability-contract arms changed contract version")
-    if b0["mappings"] or len(b1["mappings"]) != 2:
+    if b0 is not None or b1 is None or len(b1["mappings"]) != 2:
         raise AssertionError("capability-contract arm shape drifted")
     serialized = json.dumps(b1["mappings"], sort_keys=True).casefold()
     forbidden = ("formation integrity", "cbl", "las", "nphi", "d4-")
@@ -384,6 +416,9 @@ def classify_protected_subtrees(
         elif after[key] is None:
             result[key] = "DROPPED"
         elif isinstance(before[key], list) and isinstance(after[key], list):
+            if key not in IDENTITY_LIST_FIELDS:
+                result[key] = "CHANGED"
+                continue
             same_identity = evidence.get(key, {}).get("same_canonical_identity") is True
             result[key] = "RE_RESOLVED" if same_identity else "AMBIGUOUS"
         else:
@@ -517,7 +552,11 @@ def synthetic_inspection_artifact() -> dict[str, Any]:
     request = {
         "system_prompt": "canonical planner system contract",
         "user_payload": "synthetic provider-free request",
-        "response_schema": canonical_provider_schema(required_section_hint=True),
+        "response_schema": {
+            "canonical_model": f"{SemanticPlan.__module__}.{SemanticPlan.__name__}",
+            "required_section_hint": True,
+            "requiredness_path": "$.$defs.SectionTask.required",
+        },
         "controls": {"temperature": 0.0, "max_output_tokens": None},
     }
     record = inspection_record(
@@ -577,7 +616,7 @@ def future_live_authority_status(authorization: Mapping[str, Any]) -> dict[str, 
         raise PermissionError("D5-5G live authority is absent or not recognized")
     if authorization.get("live_execution") is not True:
         raise PermissionError("D5-5G live execution is not explicitly enabled")
-    required = ("implementation_checkpoint", "campaign_id", "artifact_root", "model")
+    required = ("implementation_checkpoint", "campaign_id", "artifact_root", "model", "lane")
     missing = [key for key in required if not authorization.get(key)]
     if missing:
         raise ValueError(f"future live authority is missing: {missing!r}")
@@ -587,7 +626,184 @@ def future_live_authority_status(authorization: Mapping[str, Any]) -> dict[str, 
         "campaign_id": str(authorization["campaign_id"]),
         "provider_boundary": "openai_compat",
         "model": str(authorization["model"]),
+        "lane": str(authorization["lane"]),
         "provider_model_calls": 0,
+    }
+
+
+def _study_case_request(case: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
+    """Return the frozen request and context for one D5-5G study case."""
+    context = _planning_context(
+        capability_contract=capability_contract(str(case["arm"]))
+        if str(case["axis"]) == "B"
+        else None
+    )
+    return str(context["request"]), context
+
+
+def _default_study_executor(
+    *,
+    dependencies: object,
+    case: Mapping[str, Any],
+) -> Mapping[str, Any]:
+    """Execute one arm through the existing canonical planner only."""
+    planner = dependencies.planner  # type: ignore[attr-defined]
+    request, context = _study_case_request(case)
+    plan = asyncio.run(
+        planner.plan(
+            request=request,
+            mode="revise",
+            current_document_summary=context["current_document_summary"],
+            source_summary=context["source_summary"],
+            timeout_seconds=900.0,
+            temperature=0.0,
+            max_output_tokens=None,
+        )
+    )
+    result: dict[str, Any] = {
+        "case_id": case["case_id"],
+        "axis": case["axis"],
+        "arm": case["arm"],
+        "canonical_plan_sha256": _sha256_json(plan.model_dump(mode="json")),
+        "first_divergence": None,
+    }
+    if str(case["axis"]) != "C":
+        return result
+
+    correction_request = _correction_request(
+        mode="revise",
+        request=request,
+        previous_plan=plan,
+        diagnostic=PlannerSemanticError(
+            "missing_section_capability",
+            "The selected section needs one registered section capability.",
+        ),
+        registry=planner.registry,
+        timeout_seconds=900.0,
+        temperature=None,
+        max_output_tokens=None,
+    )
+    corrected = asyncio.run(
+        planner.backend.generate_structured(
+            correction_request,
+            response_model=SemanticPlan,
+        )
+    )
+    corrected_plan = validate_semantic_plan(
+        SemanticPlan.model_validate(corrected.value),
+        planner.registry,
+        mode="revise",
+    )
+    result.update(
+        {
+            "canonical_correction_request": "existing_canonical_correction_request_builder",
+            "canonical_plan_sha256": _sha256_json(corrected_plan.model_dump(mode="json")),
+            "protected_subtrees": observe_canonical_correction_result(
+                plan,
+                corrected_plan,
+                resolution_evidence={},
+            )["protected_subtrees"],
+        }
+    )
+    return result
+
+
+class D5GStudyRunner:
+    """Run the finite D5-5G A/B/C cases through shared canonical dependencies."""
+
+    def __init__(
+        self,
+        *,
+        dependencies: object,
+        executor: Callable[..., Mapping[str, Any]] | None = None,
+        custody: object | None = None,
+    ) -> None:
+        """Retain the canonical dependencies and an optional test executor."""
+        self.dependencies = dependencies
+        self.executor = executor or _default_study_executor
+        self.custody = custody
+
+    def run(self) -> list[dict[str, Any]]:
+        """Execute exactly the frozen five-case study population."""
+        results: list[dict[str, Any]] = []
+        for case in D5G_STUDY_CASES:
+            if self.custody is not None:
+                self.custody.begin_turn(str(case["case_id"]))  # type: ignore[attr-defined]
+            result = self.executor(dependencies=self.dependencies, case=dict(case))
+            if not isinstance(result, Mapping):
+                raise TypeError("D5-5G study executor must return a mapping")
+            row = {**case, **dict(result)}
+            if self.custody is not None:
+                self.custody.append_turn(  # type: ignore[attr-defined]
+                    {
+                        "axis": case["axis"],
+                        "case_id": case["case_id"],
+                        "arm": case["arm"],
+                        "first_divergence": row.get("first_divergence"),
+                        "provider_model_calls": "CUSTODIED_BY_EXISTING_WIRE_OBSERVER",
+                    }
+                )
+            results.append(row)
+        return results
+
+
+def _build_live_study_dependencies(
+    repo_root: Path,
+    authorization: Mapping[str, Any],
+    *,
+    api_key: str,
+) -> object:
+    """Construct the accepted provider boundary and canonical composition root."""
+    from wellplot.agent.composition import create_canonical_dependencies, create_provider_backend
+
+    project_config = load_project_config(repo_root)
+    backend = create_provider_backend(
+        provider="openai_compat",
+        model=str(authorization["model"]),
+        server_root=repo_root,
+        api_key=api_key,
+        base_url=project_config.openai_compat_base_url,
+        timeout=float(project_config.provider.timeout_seconds),
+        request_options={"structured_output": project_config.runtime.structured_output},
+    )
+    return create_canonical_dependencies(backend=backend, server_root=repo_root)
+
+
+def run_authorized_live_study(
+    repo_root: Path,
+    authorization: Mapping[str, Any],
+    *,
+    dependencies: object | None = None,
+    executor: Callable[..., Mapping[str, Any]] | None = None,
+    api_key_loader: Callable[[], str] | None = None,
+) -> dict[str, Any]:
+    """Run the authorized D5-5G study cases, never the inherited D4 runner."""
+    future_live_authority_status(authorization)
+    current = _git(repo_root, "rev-parse", "HEAD")
+    if current != str(authorization["implementation_checkpoint"]):
+        raise ValueError("future live authority checkpoint does not match checkout")
+    if _committed_production_changes(repo_root, current):
+        raise ValueError("future live path cannot run with production-source changes")
+    project_config = load_project_config(repo_root)
+    expected_fingerprint = authorization.get("project_config_fingerprint_sha256")
+    if expected_fingerprint and expected_fingerprint != project_config.fingerprint_sha256:
+        raise ValueError("future live project configuration fingerprint does not match checkout")
+    load_key = api_key_loader or (lambda: d5.load_d4_api_key(repo_root))
+    live_dependencies = dependencies or _build_live_study_dependencies(
+        repo_root,
+        authorization,
+        api_key=load_key(),
+    )
+    results = D5GStudyRunner(dependencies=live_dependencies, executor=executor).run()
+    return {
+        "authority": str(authorization["authorization_id"]),
+        "campaign_id": str(authorization["campaign_id"]),
+        "implementation_checkpoint": current,
+        "study_cases": [case["case_id"] for case in D5G_STUDY_CASES],
+        "results": results,
+        "shared_canonical_engine": D5_5G_SINGLE_ENGINE_ENTRYPOINT,
+        "inherited_d4_nine_turn_runner": "NOT_USED",
+        "provider_model_calls": "LIVE_EXECUTION",
     }
 
 
@@ -597,23 +813,8 @@ def execute_authorized_live_revalidation(
     *,
     executor: Callable[..., object] | None = None,
 ) -> object:
-    """Enter the future live path only with explicit authority and shared D5 runner."""
-    future_live_authority_status(authorization)
-    current = _git(repo_root, "rev-parse", "HEAD")
-    if current != str(authorization["implementation_checkpoint"]):
-        raise ValueError("future live authority checkpoint does not match checkout")
-    if _committed_production_changes(repo_root, current):
-        raise ValueError("future live path cannot run with production-source changes")
-    runner = executor or d5.execute_live_campaign
-    d5_authorization = d5.D5Authorization.from_mapping(authorization)
-    artifact_root = Path(str(authorization["artifact_root"]))
-    if not artifact_root.is_absolute():
-        artifact_root = repo_root / artifact_root
-    return runner(
-        repo_root=repo_root,
-        authorization=d5_authorization,
-        artifact_root=artifact_root,
-    )
+    """Enter the future live path through the bounded D5-5G study runner."""
+    return run_authorized_live_study(repo_root, authorization, executor=executor)
 
 
 def _readiness() -> d5.D5ReadinessProjection:
@@ -749,6 +950,13 @@ def verify_provider_free(repo_root: Path) -> dict[str, Any]:
         inspection_path = Path(temporary) / "D5_5G_SYNTHETIC_INSPECTION_ARTIFACT.json"
         write_synthetic_inspection_artifact(inspection_path)
         inspection = json.loads(inspection_path.read_text(encoding="utf-8"))
+    study_results = D5GStudyRunner(
+        dependencies=object(),
+        executor=lambda *, dependencies, case: {
+            "first_divergence": None,
+            "canonical_engine": D5_5G_SINGLE_ENGINE_ENTRYPOINT,
+        },
+    ).run()
     divergence_proof = {
         boundary: classify_first_divergence(
             {
@@ -779,7 +987,15 @@ def verify_provider_free(repo_root: Path) -> dict[str, Any]:
             "implemented": True,
             "authority_gated": True,
             "disabled_in_provider_free_mode": True,
-            "shared_runner": "scripts.nlp_d5_live_semantic_qualification.execute_live_campaign",
+            "shared_runner": "scripts.d5_5g_historical_claim_revalidation.D5GStudyRunner",
+            "study_cases": [case["case_id"] for case in D5G_STUDY_CASES],
+            "inherited_d4_nine_turn_runner": "NOT_USED",
+        },
+        "study_population_wiring": {
+            "status": "PASS",
+            "case_ids": [row["case_id"] for row in study_results],
+            "canonical_engine": D5_5G_SINGLE_ENGINE_ENTRYPOINT,
+            "provider_model_calls": 0,
         },
         "canonical_engine": D5_5G_SINGLE_ENGINE_ENTRYPOINT,
         "provider_model_calls": PROVIDER_MODEL_CALLS,

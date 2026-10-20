@@ -1,6 +1,89 @@
 {
   "artifact": "D5-5G provider-free synthetic inspection",
   "provider_model_calls": 0,
+  "records": [
+    {
+      "attempt_index": 1,
+      "axis": "A",
+      "case_id": "D5-5G-SYNTHETIC-01",
+      "implementation_checkpoint": "FUTURE_AUTHORIZED_CHECKPOINT",
+      "input_hashes": {
+        "model_input": "0430e33f6fbf9c3ec36a8d00f878b1005eb91570f620f6d8e30ac96bd0e00b86"
+      },
+      "model": "FUTURE_AUTHORIZED_MODEL",
+      "model_calls": 0,
+      "prompt_hashes": {
+        "system": "abed5a5ff809116d7c62f292a95e171ad9f8b6ae44b60cdf36574279a62e6d28",
+        "user": "6e523ead59815dfcd9759f2ab267abaee2df67ca0e94997378cf7a8cada36db8"
+      },
+      "provider_boundary": "openai_compat",
+      "provider_calls": 0,
+      "response_hash": "672328d4892eb579ab7e18a37cd5cae6c89421c1f68c3703697e8ec4bb41f135",
+      "schema_hash": "bd939ddd23008dd990f539c0b5338a9b5f32fc998da28b0093ac67d1748a041f",
+      "sections": {
+        "canonical_wellplot_boundary": {
+          "source_resolution": "PASS",
+          "target_resolution": "PASS"
+        },
+        "case_expected_semantics": {
+          "case_id": "D5-5G-SYNTHETIC-01",
+          "expected": {
+            "source_identity": "source-ember",
+            "target_identity": "Copper Ridge"
+          }
+        },
+        "evaluation": {
+          "boundaries": {
+            "CAPABILITY_CLOSURE": "PASS",
+            "DETERMINISTIC_GRADING": "PASS",
+            "HARNESS": "PASS",
+            "HOST_SAFETY": "PASS",
+            "PLANNER_SHAPE": "PASS",
+            "PROVIDER_OR_STRUCTURED": "PASS",
+            "SEMANTIC_FIELD": "PASS",
+            "TARGET_OR_SOURCE_LINKING": "PASS"
+          },
+          "field_level_diff": []
+        },
+        "exact_model_facing_request": {
+          "controls": {
+            "max_output_tokens": null,
+            "temperature": 0.0
+          },
+          "response_schema": {
+            "canonical_model": "wellplot.agent.code_mode.planner.SemanticPlan",
+            "required_section_hint": true,
+            "requiredness_path": "$.$defs.SectionTask.required"
+          },
+          "system_prompt": "canonical planner system contract",
+          "user_payload": "synthetic provider-free request"
+        },
+        "exact_raw_model_response": {
+          "structured": "synthetic-only"
+        },
+        "first_divergence": null,
+        "model_input_state": {
+          "sources": [
+            "source-ember",
+            "source-flint"
+          ],
+          "targets": [
+            "Copper Ridge",
+            "Silver Meadow"
+          ]
+        },
+        "resulting_semantics": {
+          "source_identity": "source-ember",
+          "target_identity": "Copper Ridge"
+        },
+        "structured_output_boundary": {
+          "json_decode": "PASS",
+          "schema_validation": "PASS"
+        }
+      },
+      "terminal_status": "PROVIDER_FREE_SYNTHETIC"
+    }
+  ],
   "sections": [
     "case_expected_semantics",
     "model_input_state",
@@ -11,16 +94,5 @@
     "resulting_semantics",
     "evaluation",
     "first_divergence"
-  ],
-  "records": [
-    {
-      "axis": "A",
-      "case_id": "D5-5G-SYNTHETIC-01",
-      "attempt_index": 1,
-      "terminal_status": "PROVIDER_FREE_SYNTHETIC",
-      "first_divergence": null,
-      "provider_calls": 0,
-      "model_calls": 0
-    }
   ]
 }

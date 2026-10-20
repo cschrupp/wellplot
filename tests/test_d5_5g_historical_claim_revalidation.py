@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from scripts import d5_5g_historical_claim_revalidation as d5g
@@ -28,10 +30,16 @@ def test_axis_b_contract_is_generic_and_field_local() -> None:
     result = d5g.compare_capability_contract_arms()
     assert result["changed_surface"] == "capability_local_contract_text"
     assert result["synthetic_examples"] == "GENERIC"
-    assert d5g.capability_contract("B0")["mappings"] == []
+    assert d5g.capability_contract("B0") is None
     assert len(d5g.capability_contract("B1")["mappings"]) == 2
     assert result["families"] == ["revision_target_mapping", "source_channel_closure"]
     assert all(path.startswith("$.user_payload") for path in result["request_difference_paths"])
+    request = d5g._planning_context()["request"]
+    examples = json.dumps(d5g.capability_contract("B1"), sort_keys=True)
+    assert "Revise Copper Ridge" in request
+    assert "source-ember" in request
+    assert "Copper Ridge" not in examples
+    assert "source-ember" not in examples
 
 
 def test_axis_c_observes_only_canonical_correction_and_preserves_projection() -> None:
@@ -62,18 +70,39 @@ def test_classifier_does_not_infer_reresolution_from_equal_list_lengths() -> Non
     assert result == {
         "target_identity": "PRESERVED",
         "source_clue": "AMBIGUOUS",
-        "scale": "AMBIGUOUS",
-        "presentation": "AMBIGUOUS",
+        "scale": "CHANGED",
+        "presentation": "CHANGED",
     }
     evidence = {
         "source_clue": {"same_canonical_identity": True},
-        "scale": {"same_canonical_identity": True},
-        "presentation": {"same_canonical_identity": True},
     }
     assert (
         d5g.classify_protected_subtrees(before, after, resolution_evidence=evidence)["source_clue"]
         == "RE_RESOLVED"
     )
+
+
+def test_study_runner_executes_the_frozen_d5g_population() -> None:
+    """The future path enumerates A/B/C, not the inherited nine-turn campaign."""
+    seen: list[str] = []
+
+    def executor(*, dependencies: object, case: dict[str, object]) -> dict[str, object]:
+        assert dependencies is not None
+        seen.append(str(case["case_id"]))
+        return {"first_divergence": None, "canonical_plan_sha256": "synthetic"}
+
+    runner = d5g.D5GStudyRunner(
+        dependencies=SimpleNamespace(planner=object()),
+        executor=executor,
+    )
+    result = runner.run()
+    assert seen == [case["case_id"] for case in d5g.D5G_STUDY_CASES]
+    assert [row["axis"] for row in result] == ["A", "A", "B", "B", "C"]
+    assert all(row["case_id"] not in {"D4-C01", "D4-L01-T1"} for row in result)
+    assert "execute_live_campaign" not in inspect.getsource(
+        d5g.execute_authorized_live_revalidation
+    )
+    assert "_correction_request" in inspect.getsource(d5g._default_study_executor)
 
 
 def test_first_divergence_selects_only_the_earliest_failed_boundary() -> None:
@@ -115,6 +144,8 @@ def test_synthetic_inspection_artifact_has_all_ordered_sections(tmp_path: Path) 
     assert artifact["sections"] == list(d5g.INSPECTION_SECTIONS)
     assert len(artifact["records"]) == 1
     assert artifact["records"][0]["sections"]["first_divergence"] is None
+    committed = REPO_ROOT / "docs/architecture/D5_5G_SYNTHETIC_INSPECTION_ARTIFACT.json"
+    assert output.read_text(encoding="utf-8") == committed.read_text(encoding="utf-8")
 
 
 def test_model_io_custody_reuses_wire_observer_without_headers_or_credentials(
@@ -140,3 +171,10 @@ def test_provider_free_d5g_proof_is_zero_call_and_single_engine() -> None:
     assert result["axis_c"]["protected_subtrees"] == "NOT_OBSERVED_PROVIDER_FREE"
     assert result["future_live_harness"]["authority_gated"] is True
     assert result["inspection_artifact"]["status"] == "PASS"
+    assert result["study_population_wiring"]["case_ids"] == [
+        "D5-5G-A0",
+        "D5-5G-A1",
+        "D5-5G-B0",
+        "D5-5G-B1",
+        "D5-5G-C0",
+    ]

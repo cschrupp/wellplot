@@ -3,6 +3,7 @@
 ```yaml
 authority: WELLPLOT-D5-5G-INSPECTABLE-HISTORICAL-CLAIM-REVALIDATION-IMPLEMENTATION-AUTH-001
 rework_authority: WELLPLOT-D5-5G-PROVIDER-FREE-IMPLEMENTATION-REWORK-AUTH-001
+final_rework_authority: WELLPLOT-D5-5G-PROVIDER-FREE-FINAL-IMPLEMENTATION-REWORK-AUTH-001
 design_checkpoint: 5e530db90babf50c9992f3829d1a11d3cc79e433
 rework_parent_checkpoint: 57648f6a69e3c93f2dd1222a5b91216a1103d74b
 implementation_base_checkpoint: 29b63dbf54041cc70a9a62664a9d939a2ccea833
@@ -31,6 +32,7 @@ axis_a:
   plausible_target_count: 2
   downstream_canonical_model: wellplot.agent.code_mode.planner.SemanticPlan
   downstream_validation: SHARED
+  grounded_request: "Revise Copper Ridge using source-ember; preserve Silver Meadow."
 
 axis_b:
   status: PASS
@@ -41,6 +43,7 @@ axis_b:
     - source_channel_closure
   request_difference_scope: $.user_payload only
   synthetic_examples: GENERIC / NO QUALIFICATION ANSWERS
+  example_vocabulary: DISJOINT FROM COPPER-RIDGE / SILVER-MEADOW / SOURCE-EMBER
   schema_context_evaluator: SHARED
 
 axis_c:
@@ -56,8 +59,9 @@ preservation_classifier:
   equal_values: PRESERVED
   absent_or_null_after: DROPPED
   unequal_scalar: CHANGED
-  changed_container_without_identity_evidence: AMBIGUOUS
-  explicit_same_canonical_identity_evidence: RE_RESOLVED
+  changed_identity_list_without_identity_evidence: AMBIGUOUS
+  explicit_same_canonical_identity_evidence_for_target_or_source: RE_RESOLVED
+  changed_scale_or_presentation_list: CHANGED
 
 first_divergence:
   status: PASS
@@ -78,9 +82,12 @@ inspection_artifact:
   sections: 9
 
 future_live_harness:
-  status: IMPLEMENTED_BUT_DISABLED
+  status: IMPLEMENTED_BUT_NOT_AUTHORIZED
   authority_gate: WELLPLOT-D5-5G-LIVE-REVALIDATION-AUTH-*
-  shared_runner: scripts.nlp_d5_live_semantic_qualification.execute_live_campaign
+  shared_runner: scripts.d5_5g_historical_claim_revalidation.D5GStudyRunner
+  study_cases: D5-5G-A0 / D5-5G-A1 / D5-5G-B0 / D5-5G-B1 / D5-5G-C0
+  inherited_d4_nine_turn_runner: NOT_USED
+  canonical_correction_case: D5-5G-C0 / existing SemanticPlanner correction builder
 
 wire_custody:
   status: PASS
@@ -107,11 +114,12 @@ returned by the canonical correction path under a later live authority.
 ## Validation
 
 ```yaml
-focused_d5_5g_tests: 9 passed
+focused_d5_5g_tests: 10 passed
 model_io_custody_regression: 6 passed
 adversarial_classifier_and_inspection_tests: PASS
 comparative_provider_free_regression: 11 passed, 2 deselected
-d5_4_regression: 40 passed, 1 deselected
+d5_4_adjacent_regression: BOUNDED 180-SECOND TIMEOUT BEFORE COMPLETION
+  prior_accepted_result: 40 passed, 1 deselected
 provider_model_calls: 0
 endpoint_calls: 0
 committed_production_diff_from_design_checkpoint: 0
