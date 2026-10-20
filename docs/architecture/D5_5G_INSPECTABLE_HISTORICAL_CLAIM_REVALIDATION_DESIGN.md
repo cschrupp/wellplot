@@ -40,6 +40,11 @@ experiment_execution: NOT AUTHORIZED
 new_provider: FORBIDDEN
 new_adapter: FORBIDDEN
 new_worker: FORBIDDEN
+single_canonical_engine: REQUIRED
+new_engine_of_any_sort: FORBIDDEN
+shadow_experimental_semantic_engine: FORBIDDEN
+model_specific_semantic_path: FORBIDDEN
+duplicate_planner_worker_lowerer_compiler: FORBIDDEN
 ```
 
 ### Single-canonical-engine invariant
@@ -197,6 +202,46 @@ provider_calls:
 model_calls:
 ```
 
+### Model-I/O custody invariant
+
+D5-5G must reuse the accepted D5 wire-level Model-I/O custody mechanism. It
+must not merely reproduce the mechanism's output format.
+
+```text
+prompt evidence = actual HTTP request body passed through the existing transport
+response evidence = actual HTTP response body consumed by the existing canonical backend
+```
+
+The following are forbidden:
+
+* prompt reconstruction;
+* a duplicate prompt builder;
+* an independent provider client;
+* an independent response parser;
+* a competing syntax or schema validator;
+* copied or replayed provider responses;
+* an inspection-only provider client;
+* HTTP-header capture;
+* credential capture.
+
+The inspection renderer may display canonical validation results, but it must
+not independently decide whether a model response is valid. Every physical
+attempt remains bound to:
+
+```yaml
+case_id:
+axis:
+arm:
+attempt_index:
+turn_id:
+logical_call_index:
+role:
+physical_attempt:
+request_sha256:
+response_sha256:
+canonical_engine_result:
+```
+
 ## First-Divergence Taxonomy
 
 ```yaml
@@ -246,6 +291,15 @@ request, semantic task, available inventory, schema descriptions, request
 controls, canonical validator, deterministic grader, and attempt order. The
 semantic task must have two visibly distinct branches so omission is observable
 rather than silently defaultable.
+
+A0 and A1 must originate from one canonical semantic contract. The
+optional/defaulted versus explicitly-required provider representation is a
+deterministic controlled transformation of that one contract. Both arms must
+use the same downstream response-model validation, cross-field validation,
+target/source resolution, capability handling, lowering/reconciliation/
+execution, and evaluation. No experimental Pydantic model, duplicate planner
+model, alternate worker model, duplicate canonical validator, experimental
+compiler, or shadow semantic runtime may become an execution path.
 
 ### Frozen study design
 
@@ -360,45 +414,54 @@ should be measured directly, but does not authorize a repair architecture.
 
 ### Controlled variable
 
-Compare only correction behavior:
+Observe only the existing canonical correction behavior:
 
 ```yaml
 C0: existing whole-plan regeneration behavior
-C1: a study-only preservation condition whose output is compared against the
-    original valid semantic subtree before any production adoption
 ```
 
-C1 must be specified in a later implementation/design review. This document
-does not define or implement a second correction engine. If C1 requires a
-shadow semantic executor, it is disallowed; the study must instead observe the
-canonical correction boundary and stop.
+There is no C1 arm in D5-5G. D5-5G must not design, prototype, or execute an
+alternative preservation or correction mechanism. If a preservation repair is
+needed, its design belongs to D5-5H.
 
 ### Frozen study design
 
-Use a small set of synthetic plans with one deliberately missing field and at
-least three valid unrelated subtrees: target identity, source clue, and scale
-or presentation value. Use fresh wording and names. Four attempts per
-condition maximum during development.
+Use a small set of synthetic plans with one deliberately correction-triggering
+defect, a valid revision target, a valid source clue, and at least three valid
+unrelated subtrees: target identity, source clue, and scale or presentation
+value. Use fresh wording and names. Freeze and hash the protected semantic
+projection before the canonical correction call. There is one C0 observation
+condition, with four attempts maximum during development.
 
 ### Observables and decision rules
 
 Before correction, record a hash and field projection of every valid subtree.
-After correction, compare each subtree, the requested repair, diagnostics,
-mutation bytes, persistence, and render. Record whether correction retained,
-changed, dropped, or ambiguously re-resolved each valid subtree.
+Trigger one correction through the existing canonical path. Inspect the exact
+request and response through the accepted custody mechanism, then compare the
+before/after semantic projections, requested repair, diagnostics, mutation
+bytes, persistence, and render. Classify every protected subtree as exactly
+one of:
+
+```text
+PRESERVED
+DROPPED
+CHANGED
+RE_RESOLVED
+AMBIGUOUS
+```
 
 ```yaml
 confirm_current_d5_failure:
-  C0 drops or changes a valid unrelated subtree while addressing the missing
-  field, and first divergence is correction preservation.
+  C0 drops or changes a valid unrelated subtree while addressing the
+  correction-triggering defect, and first divergence is correction preservation.
 falsify_current_d5_failure:
   C0 preserves every predeclared valid subtree under the controlled case.
 inconclusive:
   the initial plan is not valid before correction, the correction target is
   ambiguous, or harness/grader defects prevent comparison.
 stop:
-  any attempt to add a parallel repair engine, replay a semantic plan through a
-  duplicate executor, or silently rewrite the expected result.
+  any attempt to add an alternative correction mechanism, replay a semantic
+  plan through a duplicate executor, or silently rewrite the expected result.
 ```
 
 The study must separately report preservation and final success. A final PASS
