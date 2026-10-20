@@ -81,6 +81,7 @@ JOURNAL_SUFFIX = ".journal.jsonl"
 TERMINAL_SUFFIX = ".terminal.json"
 SUMMARY_SUFFIX = ".summary.json"
 EVIDENCE_SUFFIX = ".evidence.jsonl"
+MODEL_IO_SUFFIX = ".model-io.jsonl"
 
 SECRET_KEYS = frozenset(
     {
@@ -458,7 +459,7 @@ def _default_static_checks(
 
 @dataclass(frozen=True, slots=True)
 class EvidencePaths:
-    """Fresh five-file custody namespace for one D5-4 campaign."""
+    """Fresh custody namespace for one D5-4 campaign."""
 
     root: Path
     campaign_id: str
@@ -488,9 +489,21 @@ class EvidencePaths:
         """Return the redacted per-turn evidence path."""
         return self.root / f"{self.campaign_id}{EVIDENCE_SUFFIX}"
 
+    @property
+    def model_io(self) -> Path:
+        """Return the optional exact model-I/O custody path."""
+        return self.root / f"{self.campaign_id}{MODEL_IO_SUFFIX}"
+
     def all_paths(self) -> tuple[Path, ...]:
         """Return all collision-sensitive paths in deterministic order."""
-        return (self.state, self.journal, self.terminal, self.summary, self.evidence)
+        return (
+            self.state,
+            self.journal,
+            self.terminal,
+            self.summary,
+            self.evidence,
+            self.model_io,
+        )
 
 
 def ensure_fresh_namespace(paths: EvidencePaths) -> None:
@@ -638,6 +651,7 @@ class D5CampaignCustody:
     endpoint_call_count: int = 2
     require_physical_observer: bool = False
     _active_logical_index: int | None = None
+    _active_turn_id: str | None = None
     _terminal_written: bool = False
 
     @classmethod
@@ -687,6 +701,7 @@ class D5CampaignCustody:
             },
             exclusive=True,
         )
+        paths.model_io.touch(exist_ok=False)
         return cls(
             paths=paths,
             campaign_id=paths.campaign_id,
@@ -772,6 +787,63 @@ class D5CampaignCustody:
             },
         )
 
+    def begin_turn(self, turn_id: str) -> None:
+        """Bind subsequent model-I/O observations to the active frozen turn."""
+        self._active_turn_id = str(turn_id)
+
+    def append_model_io(self, row: Mapping[str, Any]) -> None:
+        """Append exact request/response bodies without headers or credentials."""
+        forbidden = {"headers", "request_headers", "response_headers", "authorization"}
+        if forbidden.intersection(row) or _contains_forbidden_key(row, forbidden):
+            raise D5HarnessError("model-I/O custody cannot contain headers")
+        if row.get("campaign_id") != self.campaign_id:
+            raise D5HarnessError("model-I/O campaign identity mismatch")
+        with self.paths.model_io.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(dict(row), sort_keys=True, separators=(",", ":")) + "\n")
+
+    def record_model_io(self, row: Mapping[str, Any]) -> None:
+        """Append one observer event with the current turn and custody identity."""
+        if self._active_turn_id is None:
+            raise D5HarnessError("model-I/O observation has no active turn")
+        bounded = dict(row)
+        bounded.update(
+            {
+                "campaign_id": self.campaign_id,
+                "authorization_id": self.authorization_id,
+                "turn_id": self._active_turn_id,
+            }
+        )
+        self.append_model_io(bounded)
+
+    def record_logical_model_result(self, event: Mapping[str, Any]) -> None:
+        """Persist canonical parse/validation outcome after backend consumption."""
+        if self._active_turn_id is None:
+            raise D5HarnessError("logical model result has no active turn")
+        self.record_model_io(
+            {
+                "event": "logical_call_result",
+                "logical_call_index": event.get("index"),
+                "role": event.get("generation_role"),
+                "model": event.get("model"),
+                "engine_outcome": event.get("outcome"),
+                "failure_category": event.get("failure_category"),
+                "response_reason": event.get("response_reason"),
+                "validation_shape": event.get("validation_shape"),
+                "json_parse": (
+                    "PASS" if event.get("outcome") == "success" else event.get("response_reason")
+                ),
+                "response_model_validation": (
+                    "PASS"
+                    if event.get("outcome") == "success"
+                    else (
+                        "FAIL"
+                        if event.get("response_reason") == "schema_validation"
+                        else "NOT_ESTABLISHED"
+                    )
+                ),
+            }
+        )
+
     def append_turn(self, row: Mapping[str, Any]) -> None:
         """Append one redacted bounded turn result."""
         if not evidence_is_redacted(row):
@@ -823,6 +895,9 @@ class D5CampaignCustody:
         )
         journal_digest = _sha256_file(self.paths.journal)
         state_digest = _sha256_file(self.paths.state)
+        model_io_digest = (
+            _sha256_file(self.paths.model_io) if self.paths.model_io.exists() else None
+        )
         terminal = {
             "experiment_version": D5_EXPERIMENT_VERSION,
             "campaign_id": self.campaign_id,
@@ -839,6 +914,8 @@ class D5CampaignCustody:
             "journal_sha256": journal_digest,
             "evidence_sha256": evidence_digest,
         }
+        if model_io_digest is not None:
+            terminal["model_io_sha256"] = model_io_digest
         _atomic_json(self.paths.terminal, terminal, exclusive=True)
         summary = {
             "experiment_version": D5_EXPERIMENT_VERSION,
@@ -854,14 +931,16 @@ class D5CampaignCustody:
             "model_calls": self.ledger.logical_calls if self.live else 0,
             "terminal_sha256": _sha256_file(self.paths.terminal),
         }
+        if model_io_digest is not None:
+            summary["model_io_sha256"] = model_io_digest
         _atomic_json(self.paths.summary, summary, exclusive=True)
         self._terminal_written = True
         return terminal
 
 
 def verify_custody_artifacts(paths: EvidencePaths) -> dict[str, str]:
-    """Recompute the retained five-file custody chain without mutation."""
-    required = paths.all_paths()
+    """Recompute old five-file or new six-file custody without mutation."""
+    required = (paths.state, paths.journal, paths.terminal, paths.summary, paths.evidence)
     if not all(path.is_file() for path in required):
         raise D5HarnessError("custody artifact set is incomplete")
     state = json.loads(paths.state.read_text(encoding="utf-8"))
@@ -887,6 +966,12 @@ def verify_custody_artifacts(paths: EvidencePaths) -> dict[str, str]:
         "evidence_sha256": _sha256_file(paths.evidence),
         "terminal_sha256": _sha256_file(paths.terminal),
     }
+    if paths.model_io.exists():
+        digests["model_io_sha256"] = _sha256_file(paths.model_io)
+        if terminal.get("model_io_sha256") != digests["model_io_sha256"]:
+            raise D5HarnessError("terminal model-I/O digest mismatch")
+        if summary.get("model_io_sha256") != digests["model_io_sha256"]:
+            raise D5HarnessError("summary model-I/O digest mismatch")
     if terminal.get("state_snapshot_sha256") != digests["state_sha256"]:
         raise D5HarnessError("terminal state digest mismatch")
     if terminal.get("journal_sha256") != digests["journal_sha256"]:
@@ -1086,21 +1171,124 @@ def prepare_readiness(
 
 
 class _PhysicalAttemptObserver:
-    """Observe each Chat Completions HTTP send while one logical call is active."""
+    """Observe generation HTTP bodies while one logical call is active."""
 
     def __init__(self) -> None:
         self.active_logical_index: int | None = None
         self.callback: Callable[[int], None] | None = None
+        self.model_io_callback: Callable[[dict[str, Any]], None] | None = None
+        self.active_turn_id: str | None = None
+        self.active_role: str | None = None
+        self.active_model: str | None = None
+        self._attempts: dict[int, int] = {}
+        self._pending_responses: dict[int, dict[str, Any]] = {}
+
+    async def __call__(self, request: object) -> None:
+        """Remain compatible with existing injected request event hooks."""
+        await self.on_request(request)
 
     async def on_request(self, request: object) -> None:
-        """Count only generation requests, never readiness GETs."""
+        """Count and capture only generation requests, never readiness GETs."""
         url = getattr(request, "url", None)
         path = str(getattr(url, "path", ""))
         if not path.endswith("/chat/completions"):
             return
         if self.active_logical_index is None or self.callback is None:
             raise D5HarnessError("generation attempt has no active logical call")
-        self.callback(self.active_logical_index)
+        logical_index = self.active_logical_index
+        attempt = self._attempts.get(logical_index, 0) + 1
+        self.callback(logical_index)
+        self._attempts[logical_index] = attempt
+        body = bytes(getattr(request, "content", b""))
+        self._pending_responses[id(request)] = {
+            "event": "physical_request",
+            "turn_id": self.active_turn_id,
+            "logical_call_index": logical_index,
+            "role": self.active_role,
+            "model": self.active_model,
+            "physical_attempt": attempt,
+            "request_sha256": hashlib.sha256(body).hexdigest(),
+            "request_body": body.decode("utf-8", errors="replace"),
+            "request_json": _json_body(body),
+        }
+        if self.model_io_callback is not None:
+            self.model_io_callback(dict(self._pending_responses[id(request)]))
+
+    async def on_response(self, response: object) -> None:
+        """Capture the matching response body without headers."""
+        request = getattr(response, "request", None)
+        pending = self._pending_responses.pop(id(request), None)
+        if pending is None:
+            return
+        aread = getattr(response, "aread", None)
+        body = await aread() if callable(aread) else bytes(getattr(response, "content", b""))
+        response_row = {
+            key: value
+            for key, value in pending.items()
+            if key not in {"event", "request_body", "request_json"}
+        }
+        response_row.update(
+            {
+                "event": "physical_response",
+                "http_status": getattr(response, "status_code", None),
+                "response_sha256": hashlib.sha256(body).hexdigest(),
+                "response_body": body.decode("utf-8", errors="replace"),
+                "response_json": _json_body(body),
+            }
+        )
+        if self.model_io_callback is not None:
+            self.model_io_callback(response_row)
+
+    def set_active_turn(self, turn_id: str) -> None:
+        """Set the current frozen turn without entering the provider body."""
+        self.active_turn_id = str(turn_id)
+
+    def bind_model_io(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Bind append-only model-I/O custody."""
+        self.model_io_callback = callback
+
+    def logical_call_started(self, event: Mapping[str, Any]) -> None:
+        """Track role and model alongside the existing logical identity."""
+        self.active_logical_index = int(event["index"])
+        self.active_role = str(event.get("generation_role", ""))
+        self.active_model = str(event.get("model", ""))
+        self._attempts[self.active_logical_index] = 0
+
+    def logical_call_completed(self, event: Mapping[str, Any]) -> None:
+        """Persist the canonical backend parse/validation result."""
+        if self.model_io_callback is not None:
+            self.model_io_callback(
+                {
+                    "event": "logical_call_result",
+                    "logical_call_index": event.get("index"),
+                    "role": event.get("generation_role"),
+                    "model": event.get("model"),
+                    "engine_outcome": event.get("outcome"),
+                    "failure_category": event.get("failure_category"),
+                    "response_reason": event.get("response_reason"),
+                    "validation_shape": event.get("validation_shape"),
+                }
+            )
+
+
+def _json_body(body: bytes) -> object:
+    """Parse a captured JSON body without changing its separately hashed bytes."""
+    try:
+        return json.loads(body)
+    except (TypeError, ValueError):
+        return None
+
+
+def _contains_forbidden_key(value: object, forbidden: set[str]) -> bool:
+    """Reject header-like keys anywhere in structured model-I/O data."""
+    if isinstance(value, Mapping):
+        return any(
+            str(key).casefold() in forbidden or _contains_forbidden_key(item, forbidden)
+            for key, item in value.items()
+        )
+    if isinstance(value, list):
+        return any(_contains_forbidden_key(item, forbidden) for item in value)
+    return False
 
 
 class _ObservedLiveAdapter:
@@ -1116,18 +1304,31 @@ class _ObservedLiveAdapter:
         """Bind logical custody and select the active HTTP call."""
 
         def wrapped(event: dict[str, Any]) -> None:
-            self.observer.active_logical_index = int(event["index"])
+            self.observer.logical_call_started(event)
             callback(event)
 
         self.inner.bind_call_started(wrapped)
 
     def bind_call_completed(self, callback: Callable[[dict[str, Any]], None]) -> None:
         """Forward bounded logical completion custody."""
-        self.inner.bind_call_completed(callback)
+
+        def wrapped(event: dict[str, Any]) -> None:
+            self.observer.logical_call_completed(event)
+            callback(event)
+
+        self.inner.bind_call_completed(wrapped)
 
     def bind_physical_attempt(self, callback: Callable[[int], None]) -> None:
         """Bind the D5 ledger to each observed SDK transport attempt."""
         self.observer.callback = callback
+
+    def set_active_turn(self, turn_id: str) -> None:
+        """Bind model-I/O records to the current campaign turn."""
+        self.observer.set_active_turn(turn_id)
+
+    def bind_model_io(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Bind exact transport body capture to campaign custody."""
+        self.observer.bind_model_io(callback)
 
     @property
     def logical_call_count(self) -> int:
@@ -1164,9 +1365,11 @@ def create_live_adapter(
     _validate_project_config(project_config)
     observer = _PhysicalAttemptObserver()
     http_client = (
-        http_client_factory(observer.on_request)
+        http_client_factory(observer)
         if http_client_factory is not None
-        else httpx.AsyncClient(event_hooks={"request": [observer.on_request]})
+        else httpx.AsyncClient(
+            event_hooks={"request": [observer.on_request], "response": [observer.on_response]}
+        )
     )
     resolved_base_url = base_url or project_config.openai_compat_base_url
     resolved_model = model or project_config.provider.model
@@ -1497,6 +1700,8 @@ class D5CampaignRunner:
                 adapter.bind_call_completed(custody.record_call_completed)
             if callable(getattr(adapter, "bind_physical_attempt", None)):
                 adapter.bind_physical_attempt(custody.record_physical_attempt)
+            if callable(getattr(adapter, "bind_model_io", None)):
+                adapter.bind_model_io(custody.record_model_io)
             cases = d4.load_cases(self.repo_root)
             gold = {item["turn_id"]: item for item in d4.load_gold(self.repo_root)["cases"]}
             if tuple(item["turn_id"] for item in cases) != FROZEN_TURN_IDS:
@@ -1505,6 +1710,9 @@ class D5CampaignRunner:
             if not callable(execute_turn):
                 raise D5ProductionFailure("adapter has no canonical execute_turn")
             for execution_index, case in enumerate(cases, start=1):
+                custody.begin_turn(str(case["turn_id"]))
+                if callable(getattr(adapter, "set_active_turn", None)):
+                    adapter.set_active_turn(str(case["turn_id"]))
                 expected = gold[case["turn_id"]]
                 cursor = int(getattr(adapter, "logical_call_count", 0))
                 physical_cursor = custody.ledger.physical_attempts

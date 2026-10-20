@@ -383,6 +383,7 @@ class CountingBackend:
         outcome: str,
         category: str | None,
         metrics: ProviderMetrics | None,
+        diagnostic: Mapping[str, Any] | None = None,
     ) -> None:
         call = LogicalCall(
             index=index,
@@ -410,6 +411,16 @@ class CountingBackend:
                     "max_output_tokens": call.max_output_tokens,
                     "outcome": call.outcome,
                     "failure_category": call.category,
+                    "response_reason": (
+                        getattr(diagnostic.get("response_reason"), "value", None)
+                        if diagnostic
+                        else None
+                    ),
+                    "validation_shape": (
+                        diagnostic["validation_shape"].to_json()
+                        if diagnostic and diagnostic.get("validation_shape") is not None
+                        else None
+                    ),
                     **call.metrics,
                 }
             )
@@ -433,6 +444,10 @@ class CountingBackend:
                 response_model=response_model,
             )
         except ProviderRequestError as error:
+            diagnostic = {
+                "response_reason": getattr(error, "response_reason", None),
+                "validation_shape": getattr(error, "validation_shape", None),
+            }
             self._record(
                 index=index,
                 operation="structured",
@@ -441,6 +456,7 @@ class CountingBackend:
                 outcome="failure",
                 category=error.category.value,
                 metrics=None,
+                diagnostic=diagnostic,
             )
             raise
         except Exception:
@@ -452,6 +468,7 @@ class CountingBackend:
                 outcome="failure",
                 category=ProviderFailureCategory.INVALID_RESPONSE.value,
                 metrics=None,
+                diagnostic=None,
             )
             raise
         self._record(
@@ -462,6 +479,7 @@ class CountingBackend:
             outcome="success",
             category=None,
             metrics=result.metrics,
+            diagnostic=None,
         )
         return result
 
