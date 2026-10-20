@@ -6,6 +6,7 @@ rework_authority: WELLPLOT-D5-5G-PROVIDER-FREE-IMPLEMENTATION-REWORK-AUTH-001
 design_checkpoint: 5e530db90babf50c9992f3829d1a11d3cc79e433
 rework_parent_checkpoint: 57648f6a69e3c93f2dd1222a5b91216a1103d74b
 implementation_base_checkpoint: 29b63dbf54041cc70a9a62664a9d939a2ccea833
+final_candidate_checkpoint: 1d919ac5
 provider_model_calls: 0
 live_execution: NOT AUTHORIZED
 production_source_changes: 0
