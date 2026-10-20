@@ -110,6 +110,8 @@ returned by the canonical correction path under a later live authority.
 focused_d5_5g_tests: 9 passed
 model_io_custody_regression: 6 passed
 adversarial_classifier_and_inspection_tests: PASS
+comparative_provider_free_regression: 11 passed, 2 deselected
+d5_4_regression: 40 passed, 1 deselected
 provider_model_calls: 0
 endpoint_calls: 0
 committed_production_diff_from_design_checkpoint: 0
