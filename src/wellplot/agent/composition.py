@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Literal
 
@@ -25,6 +26,7 @@ def create_provider_backend(
     api_key: str | None,
     base_url: str | None,
     timeout: float | None,
+    request_options: Mapping[str, object] | None = None,
 ) -> object:
     """Construct the one provider-v2 backend used by all Code Mode adapters."""
     if provider == "openai":
@@ -82,6 +84,7 @@ def create_provider_backend(
             timeout=timeout,
         ),
         structured_output="json_schema",
+        request_options=request_options,
     )
 
 

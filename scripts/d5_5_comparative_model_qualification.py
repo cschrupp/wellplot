@@ -1,8 +1,9 @@
-"""Provider-free D5-5 comparative qualification boundary.
+"""D5-5 comparative qualification and provider-free live-boundary harness.
 
 This module defines two lane configurations for the existing provider boundary
 without adding a provider, semantic engine, or model-specific authoring path.
-Live execution is intentionally outside this D5-5B slice.
+Live execution is exposed only through an explicit lane and authorization;
+provider-free tests inject the transport and adapter boundary.
 """
 
 from __future__ import annotations
@@ -30,7 +31,14 @@ D5_5_AUTHORITY = "WELLPLOT-D5-5-COMPARATIVE-QUALIFICATION-DESIGN-AUTH-001"
 D5_5_BASELINE = "63aa1f9e0fecbfd15abefa20ab57e8e3d366a6a2"
 D5_5_EXPERIMENT = "d5-5-post-hardening-compare-001"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-LUNA_MODEL = "openai/gpt-6-luna"
+DEEPSEEK_MODEL = "deepseek/deepseek-v4.1-flash-1017"
+OPENROUTER_MORPH_ROUTE = {
+    "provider": {
+        "order": ["Morph"],
+        "allow_fallbacks": False,
+        "require_parameters": True,
+    }
+}
 MAX_LOGICAL_CALLS = 45
 MAX_PHYSICAL_ATTEMPTS = 135
 GENERATION_TIMEOUT_SECONDS = 900.0
@@ -53,6 +61,7 @@ class ComparativeLane:
     credential_file_names: tuple[str, ...]
     canonical_engine: str = CANONICAL_ENGINE_ENTRYPOINT
     provider: str = "openai_compat"
+    request_options: Mapping[str, object] | None = None
 
     def provider_arguments(self, repo_root: Path, api_key: str | None = None) -> dict[str, object]:
         """Return arguments for the existing provider factory only."""
@@ -63,6 +72,7 @@ class ComparativeLane:
             "api_key": api_key,
             "base_url": self.base_url,
             "timeout": GENERATION_TIMEOUT_SECONDS,
+            "request_options": self.request_options,
         }
 
 
@@ -105,14 +115,15 @@ def lane_configurations(project_config: ProjectConfig) -> tuple[ComparativeLane,
             ),
         ),
         ComparativeLane(
-            lane_id="luna",
-            model=LUNA_MODEL,
+            lane_id="deepseek",
+            model=DEEPSEEK_MODEL,
             base_url=OPENROUTER_BASE_URL,
             readiness="openai_compat",
-            campaign_id="d5-5-luna-001",
-            artifact_root="workspace/evaluations/d5-5/luna",
+            campaign_id="d5-5-deepseek-001",
+            artifact_root="workspace/evaluations/d5-5/deepseek",
             credential_env_names=("OPENROUTER_API_KEY", "OPENAI_API_KEY"),
             credential_file_names=("OPENROUTER_API_KEY.txt", "OPENAI_API_KEY.txt"),
+            request_options=OPENROUTER_MORPH_ROUTE,
         ),
     )
 
@@ -121,8 +132,8 @@ def validate_lane_configurations(
     lanes: tuple[ComparativeLane, ...],
 ) -> dict[str, object]:
     """Fail closed if lane identity or custody namespaces can collide."""
-    if tuple(lane.lane_id for lane in lanes) != ("qwen", "luna"):
-        raise ValueError("D5-5 requires exactly the ordered Qwen and Luna lanes")
+    if tuple(lane.lane_id for lane in lanes) != ("qwen", "deepseek"):
+        raise ValueError("D5-5 requires exactly the ordered Qwen and DeepSeek lanes")
     if len({lane.campaign_id for lane in lanes}) != len(lanes):
         raise ValueError("comparative campaign IDs must be distinct")
     if len({lane.artifact_root for lane in lanes}) != len(lanes):
@@ -284,6 +295,7 @@ def create_lane_live_adapter(
         base_url=lane.base_url,
         model=lane.model,
         provider_name=lane.provider,
+        request_options=lane.request_options,
     )
 
 
@@ -658,6 +670,17 @@ async def _close_lane_adapter(adapter: object) -> None:
         await result
 
 
+async def _run_campaign_and_close(
+    runner: d5.D5CampaignRunner,
+    adapter: object,
+) -> dict[str, object]:
+    """Run and close one adapter on the same event loop."""
+    try:
+        return await runner.run(adapter)
+    finally:
+        await _close_lane_adapter(adapter)
+
+
 def execute_live_lane(
     *,
     repo_root: Path,
@@ -720,10 +743,7 @@ def execute_live_lane(
             "lane_id": lane.lane_id,
         },
     )
-    try:
-        result = asyncio.run(runner.run(readiness.adapter))
-    finally:
-        asyncio.run(_close_lane_adapter(readiness.adapter))
+    result = asyncio.run(_run_campaign_and_close(runner, readiness.adapter))
     return {
         "lane_id": lane.lane_id,
         "campaign_id": authorization.campaign_id,
@@ -767,7 +787,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
     parser.add_argument("--implementation-checkpoint")
-    parser.add_argument("--lane", choices=("qwen", "luna"))
+    parser.add_argument("--lane", choices=("qwen", "deepseek"))
     parser.add_argument("--execute-live", action="store_true")
     parser.add_argument("--authorization-json", type=Path)
     args = parser.parse_args()

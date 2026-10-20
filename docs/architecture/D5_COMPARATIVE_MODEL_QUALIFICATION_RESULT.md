@@ -8,15 +8,17 @@ authority: WELLPLOT-D5-5-COMPARATIVE-QUALIFICATION-DESIGN-AUTH-001
 starting_checkpoint: 63aa1f9e0fecbfd15abefa20ab57e8e3d366a6a2
 branch: implementation/d5-5-comparative-model-qualification
 phase: HARNESS_REBIND_AND_PROVIDER_FREE_REHEARSAL
-live_model_calls: 0
+provider_model_calls: 0
+real_endpoint_calls: 0
 historical_campaign: d5-4-live-qwen-001
 historical_campaign_status: PRESERVED / TERMINAL FAIL / NOT REPLAYED
 status: COMPLETE / READY FOR INDEPENDENT REVIEW
 ```
 
-This artifact records the D5-5B harness boundary only. It does not authorize
-or perform Qwen or Luna endpoint activity. Live execution remains a separate
-Gate-B decision after independent review.
+This artifact records the D5-5B harness boundary and the provider-free
+DeepSeek replacement preparation. It does not authorize or perform Qwen,
+Luna, or DeepSeek endpoint activity. Live execution remains a separate Gate-B
+decision after independent review.
 
 The frozen design is repository-resident at
 `docs/architecture/D5_5_COMPARATIVE_MODEL_QUALIFICATION.md`.
@@ -45,17 +47,19 @@ qwen:
   campaign_id: d5-5-qwen-001
   artifact_root: workspace/evaluations/d5-5/qwen
 
-luna:
-  model: openai/gpt-6-luna
+deepseek:
+  model: deepseek/deepseek-v4.1-flash-1017
   base_url: https://openrouter.ai/api/v1
   readiness: openai_compat
-  campaign_id: d5-5-luna-001
-  artifact_root: workspace/evaluations/d5-5/luna
+  campaign_id: d5-5-deepseek-001
+  artifact_root: workspace/evaluations/d5-5/deepseek
+  provider_route: Morph / fallback false / require_parameters true
 ```
 
 No model-specific planner, worker, lowerer, schema, retry, or reconciliation
-path was added. Qwen local readiness and Luna OpenAI-compatible readiness are
-represented as lane metadata; neither readiness path runs in D5-5B.
+path was added. Qwen local readiness and DeepSeek OpenAI-compatible readiness are
+represented as lane metadata. Provider-free tests exercise both readiness
+contracts only with injected responses.
 
 ## Frozen Scientific Contract
 
@@ -105,14 +109,14 @@ also tested with a provider-free adapter injection so the exact orchestration
 path is bounded without DLIS reprocessing or external calls. A separate
 boundary test constructs the existing D5-4 live adapter for both lanes with
 in-memory transport. Qwen performs the two llama.cpp identity observations;
-Luna performs only its OpenAI-compatible model-catalog observation. No
+DeepSeek performs only its OpenAI-compatible model-catalog observation. No
 provider or model request is sent.
 
 ## Validation Handoff
 
 ```yaml
-implementation_checkpoint: 14da4081c112c6752274225e9b07bb44a0219928
-parent: 7a247aa0acc5416207dd408a06639374ebb28654
+implementation_checkpoint: final Git commit reported in the publication handoff
+parent: bcae7f532a54705ab83993f846f7b5f6a4e58664
 changed_files:
   - docs/architecture/D5_5_COMPARATIVE_MODEL_QUALIFICATION.md
   - scripts/d5_5_comparative_model_qualification.py
@@ -120,11 +124,12 @@ changed_files:
   - tests/test_d5_5_comparative_model_qualification.py
   - docs/architecture/D5_COMPARATIVE_MODEL_QUALIFICATION_RESULT.md
 provider_free_qwen_rehearsal: 9/9 PASS / 18 logical calls
-provider_free_luna_rehearsal: 9/9 PASS / 18 logical calls
+provider_free_deepseek_rehearsal: 9/9 PASS / 18 logical calls
 provider_free_lane_boundary: PASS / exact live orchestration and shared D5CampaignRunner / zero provider-model calls
-provider_free_live_entrypoint: PASS / Qwen and Luna static-preflight-to-terminal path
+provider_free_live_entrypoint: PASS / Qwen and DeepSeek static-preflight-to-terminal path
 single_engine_attestation: PASS
 provider_calls: 0
 model_calls: 0
 live_execution: NOT AUTHORIZED IN D5-5B
+sealed_luna_campaign: PRESERVED / INCONCLUSIVE / NOT REPLAYED
 ```

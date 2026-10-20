@@ -1153,6 +1153,7 @@ def create_live_adapter(
     base_url: str | None = None,
     model: str | None = None,
     provider_name: str | None = None,
+    request_options: Mapping[str, object] | None = None,
 ) -> _ObservedLiveAdapter:
     """Build the accepted canonical adapter with retry-visible HTTP transport."""
     import httpx
@@ -1181,6 +1182,7 @@ def create_live_adapter(
         model=resolved_model,
         client=client,
         structured_output=project_config.runtime.structured_output,
+        request_options=request_options,
     )
     calls: list[Any] = []
     ledger = d4.LogicalCallLedger()

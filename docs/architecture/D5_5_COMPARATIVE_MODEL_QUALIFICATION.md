@@ -18,8 +18,8 @@ explicit live authority and must not be inferred from D5-5B completion.
 
 ## Objective and Boundary
 
-Measure the same bounded WellPlot semantic workload through two provider
-lanes after D5 semantic hardening:
+Measure the same bounded WellPlot semantic workload through the Qwen lane and
+a replacement DeepSeek lane after D5 semantic hardening:
 
 ```text
 lane configuration
@@ -47,18 +47,23 @@ qwen:
   campaign_id: d5-5-qwen-001
   artifact_root: workspace/evaluations/d5-5/qwen
 
-luna:
+deepseek:
   provider: openai_compat
   runtime: OpenRouter OpenAI-compatible API
   endpoint: https://openrouter.ai/api/v1
-  model: openai/gpt-6-luna
+  model: deepseek/deepseek-v4.1-flash-1017
+  provider_route:
+    order: [Morph]
+    allow_fallbacks: false
+    require_parameters: true
   readiness: openai_compat
-  campaign_id: d5-5-luna-001
-  artifact_root: workspace/evaluations/d5-5/luna
+  campaign_id: d5-5-deepseek-001
+  artifact_root: workspace/evaluations/d5-5/deepseek
 ```
 
-The historical `d5-4-live-qwen-001` campaign and all of its artifacts remain
-untouched and cannot be reused by either lane.
+The earlier Luna campaign `d5-5-luna-001` is sealed historical evidence. It is
+not reused or replayed. The historical `d5-4-live-qwen-001` campaign and all of
+its artifacts remain untouched and cannot be reused by either lane.
 
 ## Scientific Population
 
@@ -95,12 +100,14 @@ credential-bearing `/v1/models`, credential-bearing `/props`, exact frozen
 llama.cpp identity and runtime checks, then construction of the existing
 provider boundary.
 
-Luna uses the existing OpenAI-compatible path with only provider-appropriate
+DeepSeek uses the existing OpenAI-compatible path with only provider-appropriate
 readiness: credential loading, credential-bearing `GET
 https://openrouter.ai/api/v1/models`, exact requested model identity, and
-construction of the existing provider boundary. Luna does not call `/props`
-and does not invent llama.cpp model-path, GGUF, slots, or thinking-mode
-identity fields.
+construction of the existing provider boundary. DeepSeek does not call
+`/props` and does not invent llama.cpp model-path, GGUF, slots, or
+thinking-mode identity fields. The existing provider boundary carries the
+OpenRouter Morph route with fallback disabled and parameter requirements
+enabled; no provider-specific adapter is added.
 
 Structured-output compatibility is established by the first scientific
 generation, not by an identity GET. A structured-output rejection is
@@ -133,7 +140,7 @@ D5-5B must prove without endpoint, provider, or model calls that:
 
 - the exact nine-turn population and all custody hashes remain unchanged;
 - both lane descriptors resolve to the same canonical engine;
-- Qwen selects llama.cpp readiness and Luna does not call `/props`;
+- Qwen selects llama.cpp readiness and DeepSeek does not call `/props`;
 - both lanes construct the existing provider factory and D5-4 live adapter
   with injected in-memory transport;
 - both lanes enter the shared `D5CampaignRunner` and shared STARTED/terminal

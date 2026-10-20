@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -25,6 +26,9 @@ from tests.test_nlp_d5_live_semantic_qualification import (
     _provenance,
     _ready,
 )
+
+from wellplot.agent.providers.base import StructuredGenerationRequest
+from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -139,12 +143,15 @@ def _run_exact_nine_turn_rehearsal(root: Path) -> dict[str, object]:
 
 
 def test_lane_descriptors_share_engine_and_have_independent_custody() -> None:
-    """Qwen and Luna vary only at provider configuration and artifact identity."""
+    """Qwen and DeepSeek vary only at provider configuration and artifact identity."""
     config = d5_5.load_project_config(REPO_ROOT)
     lanes = d5_5.lane_configurations(config)
     facts = d5_5.validate_lane_configurations(lanes)
     assert facts["canonical_engine"] == d5_5.CANONICAL_ENGINE_ENTRYPOINT
-    assert [lane.model for lane in lanes] == ["qwen3.6-35b-a3b", "openai/gpt-6-luna"]
+    assert [lane.model for lane in lanes] == [
+        "qwen3.6-35b-a3b",
+        "deepseek/deepseek-v4.1-flash-1017",
+    ]
     assert lanes[0].base_url == config.openai_compat_base_url
     assert lanes[1].base_url == "https://openrouter.ai/api/v1"
     assert lanes[0].campaign_id != lanes[1].campaign_id
@@ -160,14 +167,71 @@ def test_provider_factory_arguments_are_lane_local_and_share_boundary() -> None:
     assert [item["provider"] for item in arguments] == ["openai_compat", "openai_compat"]
     assert [item["model"] for item in arguments] == [
         "qwen3.6-35b-a3b",
-        "openai/gpt-6-luna",
+        "deepseek/deepseek-v4.1-flash-1017",
     ]
     assert arguments[0]["base_url"] != arguments[1]["base_url"]
     assert all(item["timeout"] == 900.0 for item in arguments)
+    assert arguments[0]["request_options"] is None
+    assert arguments[1]["request_options"] == d5_5.OPENROUTER_MORPH_ROUTE
+
+
+def test_openrouter_route_is_added_at_existing_provider_boundary() -> None:
+    """DeepSeek routing stays a generic OpenAI-compatible request option."""
+    backend = OpenAICompatibleBackendV2(
+        model=d5_5.DEEPSEEK_MODEL,
+        client=object(),
+        structured_output="json_schema",
+        request_options=d5_5.OPENROUTER_MORPH_ROUTE,
+    )
+    arguments = backend._request_arguments(
+        StructuredGenerationRequest(
+            system_prompt="system",
+            user_prompt="user",
+            timeout_seconds=900.0,
+        )
+    )
+    assert arguments["extra_body"] == d5_5.OPENROUTER_MORPH_ROUTE
+
+
+def test_campaign_and_adapter_close_share_event_loop() -> None:
+    """The provider client is closed before the campaign loop terminates."""
+
+    class LoopBoundClient:
+        def __init__(self) -> None:
+            self.run_loop: asyncio.AbstractEventLoop | None = None
+            self.closed = False
+
+        async def close(self) -> None:
+            assert self.run_loop is asyncio.get_running_loop()
+            self.closed = True
+
+    client = LoopBoundClient()
+    backend = SimpleNamespace(delegate=SimpleNamespace(client=client))
+    adapter = SimpleNamespace(
+        inner=SimpleNamespace(
+            session=SimpleNamespace(
+                session=SimpleNamespace(
+                    compiler=SimpleNamespace(
+                        dependencies=SimpleNamespace(planner=SimpleNamespace(backend=backend))
+                    )
+                )
+            )
+        )
+    )
+
+    class Runner:
+        async def run(self, checked_adapter: object) -> dict[str, object]:
+            assert checked_adapter is adapter
+            client.run_loop = asyncio.get_running_loop()
+            return {"decision": "PASS"}
+
+    result = asyncio.run(d5_5._run_campaign_and_close(Runner(), adapter))
+    assert result == {"decision": "PASS"}
+    assert client.closed
 
 
 def test_lane_readiness_uses_only_its_provider_contract() -> None:
-    """Qwen uses llama props while Luna uses only its model catalog."""
+    """Qwen uses llama props while DeepSeek uses only its model catalog."""
     config = d5_5.load_project_config(REPO_ROOT)
     calls_by_lane: dict[str, list[str]] = {}
     for lane in d5_5.lane_configurations(config):
@@ -186,6 +250,7 @@ def test_lane_readiness_uses_only_its_provider_contract() -> None:
             token: str,
             *,
             calls: list[str] = calls,
+            lane: d5_5.ComparativeLane = lane,
         ) -> object:
             del token
             calls.append(url)
@@ -204,7 +269,7 @@ def test_lane_readiness_uses_only_its_provider_contract() -> None:
                     "chat_template": "qwen3",
                     "gguf_byte_identity": "NOT_AVAILABLE",
                 }
-            return {"data": [{"id": "openai/gpt-6-luna"}]}
+            return {"data": [{"id": lane.model}]}
 
         readiness = d5_5.prepare_lane_readiness(
             lane=lane,
@@ -224,7 +289,7 @@ def test_lane_readiness_uses_only_its_provider_contract() -> None:
             assert "model_path_basename" not in readiness.projection.as_dict()
 
     assert calls_by_lane["qwen"][-1] == config.props_url
-    assert calls_by_lane["luna"] == ["https://openrouter.ai/api/v1/models"]
+    assert calls_by_lane["deepseek"] == ["https://openrouter.ai/api/v1/models"]
 
 
 def test_lane_live_adapters_use_existing_provider_path_without_requests() -> None:
@@ -376,7 +441,7 @@ def test_execute_live_lane_runs_static_readiness_adapter_and_shared_runner_provi
         assert result["result"]["logical_generation_calls"] == 1
         assert result["result"]["terminal"]["decision"] == "INCONCLUSIVE"
         assert result["readiness"]["model_catalog"] == [lane.model]
-        if lane.lane_id == "luna":
+        if lane.lane_id == "deepseek":
             assert config.props_url not in readiness_calls
 
 
@@ -387,13 +452,13 @@ def test_lane_custody_and_call_caps_are_independent_and_fail_closed(tmp_path: Pa
         model="qwen3.6-35b-a3b",
         artifact_root=str(tmp_path / "qwen"),
     )
-    luna = replace(
-        _authorization(campaign_id="d5-5-luna-001"),
-        model="openai/gpt-6-luna",
-        artifact_root=str(tmp_path / "luna"),
+    deepseek = replace(
+        _authorization(campaign_id="d5-5-deepseek-001"),
+        model="deepseek/deepseek-v4.1-flash-1017",
+        artifact_root=str(tmp_path / "deepseek"),
     )
     qwen_paths = d5.EvidencePaths(tmp_path / "qwen", qwen.campaign_id)
-    luna_paths = d5.EvidencePaths(tmp_path / "luna", luna.campaign_id)
+    deepseek_paths = d5.EvidencePaths(tmp_path / "deepseek", deepseek.campaign_id)
     qwen_custody = d5.D5CampaignCustody.start(
         qwen_paths,
         authorization=qwen,
@@ -403,12 +468,12 @@ def test_lane_custody_and_call_caps_are_independent_and_fail_closed(tmp_path: Pa
     qwen_custody.finish("INCONCLUSIVE", attribution="TEST", rows=[])
     with pytest.raises(d5.D5HarnessError, match="campaign path"):
         d5.D5CampaignCustody.start(
-            luna_paths,
+            deepseek_paths,
             authorization=qwen,
             provenance=_provenance(),
             readiness=_ready().projection,
         )
-    assert not any(path.exists() for path in luna_paths.all_paths())
+    assert not any(path.exists() for path in deepseek_paths.all_paths())
 
     ledger = d5.D5LogicalCallLedger()
     for _ in range(d5.MAX_LOGICAL_CALLS):
@@ -435,7 +500,7 @@ def test_provider_free_contract_rebinds_to_current_checkpoint_without_calls() ->
     assert result["provider_calls"] == result["model_calls"] == 0
 
 
-@pytest.mark.parametrize("lane_id", ["qwen", "luna"])
+@pytest.mark.parametrize("lane_id", ["qwen", "deepseek"])
 def test_each_lane_rehearses_the_exact_nine_turn_population(lane_id: str) -> None:
     """Each lane gets an independent 9/9 provider-free canonical rehearsal."""
     config = d5_5.load_project_config(REPO_ROOT)

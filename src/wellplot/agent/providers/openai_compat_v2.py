@@ -48,6 +48,7 @@ class OpenAICompatibleBackendV2:
     client: object
     structured_output: StructuredOutputCapability | None = None
     max_tokens_parameter: MaxTokensParameter = "max_completion_tokens"
+    request_options: Mapping[str, object] | None = None
 
     def __post_init__(self) -> None:
         """Validate explicit transport capabilities before provider dispatch."""
@@ -59,6 +60,8 @@ class OpenAICompatibleBackendV2:
             raise ValueError(
                 "max_tokens_parameter must be 'max_completion_tokens' or 'max_tokens'."
             )
+        if self.request_options is not None and not isinstance(self.request_options, Mapping):
+            raise ValueError("request_options must be a mapping or None.")
 
     async def generate_structured(
         self,
@@ -144,6 +147,8 @@ class OpenAICompatibleBackendV2:
             arguments["temperature"] = request.temperature
         if request.max_output_tokens is not None:
             arguments[self.max_tokens_parameter] = request.max_output_tokens
+        if self.request_options is not None:
+            arguments["extra_body"] = dict(self.request_options)
         return arguments
 
     async def _create(self, arguments: dict[str, object]) -> object:
