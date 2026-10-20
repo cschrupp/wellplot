@@ -22,19 +22,6 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
 
-def _safe_response(value: object) -> object:
-    """Remove reasoning fields before displaying a provider response."""
-    if isinstance(value, dict):
-        return {
-            key: _safe_response(item)
-            for key, item in value.items()
-            if "reasoning" not in str(key).casefold()
-        }
-    if isinstance(value, list):
-        return [_safe_response(item) for item in value]
-    return value
-
-
 def _pretty(value: object) -> str:
     """Format one bounded structure for a preformatted HTML block."""
     return json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False)
@@ -135,8 +122,8 @@ def render_report(repo_root: Path, campaign_dir: Path, output: Path) -> None:
                 f"{_block('USER PROMPT', user)}"
                 f"{_block('RESPONSE JSON SCHEMA', schema)}"
                 f"{_block('REQUEST CONTROLS', controls)}"
-                f"{_block('RAW ASSISTANT MESSAGE', _message_content(_safe_response(response)))}"
-                f"<details><summary>Raw provider response body</summary>{_block('RESPONSE', _safe_response(response))}</details>"
+                f"{_block('RAW ASSISTANT MESSAGE', _message_content(response))}"
+                f"<details><summary>Raw provider response body</summary>{_block('RESPONSE', response)}</details>"
                 f"<p class='digest'>Request SHA256: <code>{html.escape(str(call.get('request_sha256')))}</code><br>"
                 f"Response SHA256: <code>{html.escape(str(call.get('response_sha256')))}</code></p>"
                 "</article>"

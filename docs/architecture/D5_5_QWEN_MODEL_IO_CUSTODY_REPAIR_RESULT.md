@@ -23,8 +23,10 @@ The sixth append-only artifact is:
 
 It records the exact JSON request body at the existing OpenAI-compatible
 generation transport and the matching response body when a response exists.
-Headers, authorization material, credentials, and reasoning fields are not
-stored or rendered. A transport failure still preserves the request event.
+Headers, authorization material, and credentials are not stored. The renderer
+displays the exact captured response body, including any provider reasoning
+fields present in that body. A transport failure still preserves the request
+event.
 
 The existing state, journal, terminal, summary, and redacted evidence chain is
 unchanged. Historical five-artifact campaigns remain valid when no model-I/O

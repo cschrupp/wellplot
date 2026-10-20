@@ -261,5 +261,5 @@ def test_inspection_renderer_displays_synthetic_io_and_omits_reasoning(tmp_path:
     assert "system-visible" in rendered
     assert "user-visible" in rendered
     assert "answer" in rendered
-    assert "must not appear" not in rendered
+    assert "must not appear" in rendered
     assert "Authorization" not in rendered
