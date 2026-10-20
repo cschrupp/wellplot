@@ -1,0 +1,1266 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>D5-5 Comparative Inspection</title><style>
+:root{color-scheme:light;--ink:#172033;--muted:#5a6475;--line:#d8dee8;--panel:#f6f8fb;--pass:#18794e;--fail:#b42318;--accent:#174ea6}
+*{box-sizing:border-box}body{margin:0;color:var(--ink);font:15px/1.55 Georgia,serif;background:#fff}
+header{padding:42px max(24px,calc((100vw - 1180px)/2));background:linear-gradient(120deg,#eef5ff,#fff7ed);border-bottom:1px solid var(--line)}
+main{max-width:1180px;margin:0 auto;padding:28px 24px 80px;display:grid;grid-template-columns:220px 1fr;gap:30px}
+nav{position:sticky;top:18px;align-self:start;padding:14px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+nav a{display:block;color:var(--accent);text-decoration:none;margin:5px 0;font-size:13px}
+h1{margin:0 0 8px;font-size:32px}h2{margin-top:36px;border-bottom:2px solid var(--line);padding-bottom:7px}h3{margin-top:24px}
+.card{border:1px solid var(--line);border-radius:12px;margin:22px 0;padding:22px;background:#fff;box-shadow:0 3px 14px #1720330b}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{border:1px solid var(--line);padding:8px;vertical-align:top;text-align:left}th{background:var(--panel)}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#111827;color:#eef2f7;padding:14px;border-radius:8px;font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.status{font-weight:700}.pass{color:var(--pass)}.fail{color:var(--fail)}.note{color:var(--muted);font-style:italic}
+details{margin:12px 0;padding:8px 12px;background:var(--panel);border-radius:8px}summary{cursor:pointer;font-weight:700}
+@media(max-width:850px){main{display:block}nav{position:static;margin-bottom:24px}.grid{grid-template-columns:1fr}}
+</style></head><body>
+<header><h1>D5-5 Comparative Inspection Report</h1><div>Authority: <code>WELLPLOT-D5-5-COMPARATIVE-INSPECTION-REPORT-AUTH-001</code><br>Checkpoint: <code>492fe008d6fd84626b87a753270c3dc553809e2d</code><br>Read-only inspection; provider/model calls: <strong>0</strong></div></header><main><nav><strong>Contents</strong><a href="#comparison">Comparison</a><a href="#boundary">Evidence boundary</a><a href="#D4-C01-C01">D4-C01:C01</a><a href="#D4-L01-T1">D4-L01:T1</a><a href="#D4-L01-T2">D4-L01:T2</a><a href="#D4-L01-T3">D4-L01:T3</a><a href="#D4-L01-T4">D4-L01:T4</a><a href="#D4-L02-T1">D4-L02:T1</a><a href="#D4-L02-T2">D4-L02:T2</a><a href="#D4-L03-C01">D4-L03:C01</a><a href="#D4-L04-C01">D4-L04:C01</a><a href="#limits">Evidence limitations</a></nav><section id="content"><h2 id="comparison">Executive Comparison</h2><table><thead><tr><th>Turn</th><th>Intent</th><th>Qwen</th><th>DeepSeek</th><th>Expected</th><th>Main divergence</th></tr></thead><tbody><tr><td><code>D4-C01:C01</code></td><td>Complete supported CBL/VDL reconstruction</td><td class="status fail">FAIL</td><td class="status fail">FAIL</td><td>DIRECT_CORRECT</td><td>CBL verifier and persistence/render evidence incomplete</td></tr><tr><td><code>D4-L01:T1</code></td><td>Rename this report &quot;Formation Integrity Review&quot;. Do not alter the plotted sections.</td><td class="status fail">FAIL</td><td class="status pass">PASS</td><td>DIRECT_CORRECT</td><td>title remained unchanged; persistence/render not proven<br>PASS</td></tr><tr><td><code>D4-L01:T2</code></td><td>In Main Log, set the Gamma Ray curve to a linear 5–125 scale. Leave its label and styling unchanged.</td><td class="status pass">PASS</td><td class="status pass">PASS</td><td>DIRECT_CORRECT</td><td>PASS<br>PASS</td></tr><tr><td><code>D4-L01:T3</code></td><td>Append a 30 mm normal track named &quot;Resistivity QC&quot; to Main Log. Plot ILD on it as &quot;Resistivity QC&quot; with a logarithmic 0.2–2000 scale.</td><td class="status fail">FAIL</td><td class="status fail">FAIL</td><td>DIRECT_CORRECT</td><td>track and binding requirements failed<br>track/binding requirements passed; requested scale kind/min/max failed</td></tr><tr><td><code>D4-L01:T4</code></td><td>On Main Log's GR track, fill from the Gamma Ray curve to its lower scale boundary with #f2e8a0 at 20% opacity; preserve everything else.</td><td class="status pass">PASS</td><td class="status pass">PASS</td><td>DIRECT_CORRECT</td><td>PASS<br>PASS</td></tr><tr><td><code>D4-L02:T1</code></td><td>In Main Log, change the Gamma Ray curve to a linear 20–110 scale.</td><td class="status pass">PASS</td><td class="status fail">FAIL</td><td>SAFE_ACTIONABLE_FAILURE</td><td>PASS<br>artifact mutated; intent/persistence/render flags became true; no actionable diagnostic</td></tr><tr><td><code>D4-L02:T2</code></td><td>Apply that 20–110 linear Gamma Ray scale change only to Main Log – Upper.</td><td class="status pass">PASS</td><td class="status fail">FAIL</td><td>CORRECT_AFTER_CLARIFICATION</td><td>PASS<br>before/after preservation and required 20-110 contract failed; earliest divergence is inherited from T1 mutation</td></tr><tr><td><code>D4-L03:C01</code></td><td>In Main Log, add a 24 mm normal track titled &quot;Neutron QC&quot; and plot NPHI from missing_neutron.las on it with a linear 0–45 scale.</td><td class="status pass">PASS</td><td class="status pass">PASS</td><td>SAFE_ACTIONABLE_FAILURE</td><td>PASS<br>PASS</td></tr><tr><td><code>D4-L04:C01</code></td><td>In Main Log, add a 24 mm normal track titled &quot;Resistivity Alias QC&quot; and plot RT from &quot;30-23a-3 8117_d.las&quot; on it with a logarithmic 0.2–2000 scale.</td><td class="status pass">PASS</td><td class="status pass">PASS</td><td>SAFE_ACTIONABLE_FAILURE</td><td>PASS<br>PASS</td></tr></tbody></table><h2 id="boundary">Evidence Boundary</h2><p>The sealed artifacts preserve verifier rows, digests, outcomes, diagnostics, artifact hashes, timing, and call counts. They do <strong>not</strong> preserve raw structured model responses or exact model-facing system/user prompts.</p><ul><li>Qwen exact/persisted answers: <strong>0/9</strong>.</li><li>DeepSeek exact/persisted answers: <strong>0/9</strong>.</li><li>Exact prompts available or proven reconstructed: <strong>0/9</strong>.</li></ul><p class="note">No answer is reconstructed from verifier diagnostics.</p><h3>Artifact digests</h3><pre>Qwen evidence: 0bcd3c80c6af4c3f4f806541d6708aeea73e99cc00a37111246f7d2a795c03ac
+Qwen journal: 8bfd089cd8c378e240eaf567d62b7d41143d082fc0a2a51d36bec66e560cff99
+DeepSeek evidence: 85d3394fc1b562ad0df68864b8c4f095198e593b5511c4a2f0f999ef44740aae
+DeepSeek journal: 2cc4bcddd060afaba6bcd7cffd7998c472904f6516d8f1941f45bbc85e032b19</pre><article class="card" id="D4-C01-C01"><h2>D4-C01:C01</h2><p><strong>Workflow:</strong> <code>CBL-CONSTRUCT</code> &nbsp; <strong>Expected:</strong> <code>DIRECT_CORRECT</code></p><h3>1. User request</h3><pre>Using CBL_Main.dlis as the main-pass data and CBL_Repeat.dlis as the repeat-pass
+data, finish the supported cased-hole CBL/VDL report in the existing scaffold.
+Keep the existing section identities main_pass and repeat_pass and limit the
+report to the heading, remarks, those two strip sections, and the tail.
+
+Use these service titles, in order: &quot;Cement Bond Log&quot;, &quot;Variable Density Log&quot;,
+and &quot;Gamma Ray - CCL&quot;.
+
+Set the report metadata to:
+Company University of Utah; well FORGE 16B (78)-32; field Utah Forge; county
+Beaver; state Utah; section NWSW 32; township 26; range 9; footage
+972' FSL &amp; 523' FWL; latitude 38.501242; longitude -112.882661; logging date
+08-May-2023; KB 5445.50 ft; GL 5415.00 ft; DF 5445.00 ft; drilling and log
+datum Kelly Bushing; top interval 25.00 ft; bottom interval 4845.00 ft; fluid
+Fresh Water; run ONE; driller depth 4980.00 ft; logged depth TD Not Tag;
+density 8.4 lbm/gal; maximum temperature 177.2 degF; logged by
+D. May / D. Jones; witnessed by Leroy Swearingen.
+
+Include three remarks:
+1. Supported Reconstruction Scope — reconstruct only the supported heading,
+remarks, main pass, repeat pass, and tail; do not invent unsupported well
+diagrams, calibration reports, or vendor parameter tables.
+2. Data Sources — use the staged DLIS files for the main and repeat passes.
+3. Public Data and IP Notice — keep the WellPlot reproduction boundary explicit
+and do not recreate vendor disclaimer artwork.
+
+For each pass, use four tracks from left to right:
+combo = normal 50 mm; depth = reference 10 mm; cbl = normal 44 mm;
+vdl = array 48 mm.
+
+On combo:
+ECGR_STGC → &quot;Gamma Ray (ECGR_STGC) QTGC-B&quot;, linear 0..150,
+#16a34a, width 0.8.
+TT → &quot;Transit Time for CBL (TT) QSLT-B&quot;, linear 200..400 reversed,
+#2142ff, width 0.75.
+TENS → &quot;Cable Tension (TENS)&quot;, linear 5000..0, #111111 dashed,
+width 0.65.
+MTEM → &quot;Mud Temperature (MTEM) LEH-MT&quot;, linear 100..500,
+#111111, width 0.9.
+
+On depth:
+STIT → &quot;Stuck Tool Indicator, Total (STIT)&quot;, linear 0..50,
+#111111, width 0.65.
+TDSP → &quot;Cable Drag&quot;, linear 0..50, #92400e dotted, width 0.65.
+VSEC → &quot;Tool_Tot. Drag&quot;, linear 0..50, #1d4ed8 dashed, width 0.65.
+
+On cbl, plot CBL twice with two different binding identities. Both labels are
+&quot;CBL Amplitude (CBL) QSLT-B&quot;. The first is linear 0..100, #111111, width 0.75.
+The second is linear 0..10, #2563eb dashed, width 0.65.
+
+On vdl, plot VDL as a raster labelled
+&quot;VDL VariableDensity (VDL) QSLT-B&quot;. Use a linear track scale 200..1200,
+profile vdl, gray_r, colorbar enabled with label Amplitude in the header, and
+sample axis enabled in us from 200 to 1200 with 7 ticks, source origin 40 and
+step 10. Hide both vertical main and secondary grid lines.
+
+Use only channels actually present in the staged sources, preserve the full
+labels above, and keep the result restrained and readable.</pre><p>Request SHA256: <code>5ef3a1e528b2e539dcd895ec09767547151a7706eff911a99cc050c61d7d8f3c</code></p><h3>2. What WellPlot sent to the model</h3><p class="note"><strong>EXACT MODEL-FACING PROMPT NOT PRESERVED.</strong> No admissible system/user prompt pair is present; none is approximated.</p><div class="grid"><div><h4>Qwen source</h4><pre>source artifact: workspace/evaluations/d5-5/qwen/d5-5-qwen-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 0bcd3c80c6af4c3f4f806541d6708aeea73e99cc00a37111246f7d2a795c03ac</pre></div><div><h4>DeepSeek source</h4><pre>source artifact: workspace/evaluations/d5-5/deepseek/d5-5-deepseek-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 85d3394fc1b562ad0df68864b8c4f095198e593b5511c4a2f0f999ef44740aae</pre></div></div><div class="grid"><div><h3>3. Qwen answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div><div><h3>4. DeepSeek answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div></div><h3>5. Expected answer</h3><p>Complete the supported CBL/VDL report from the two staged DLIS inputs, preserving the named sections and using the requested metadata, remarks, tracks, bindings, scales, styles, and VDL raster settings.</p><details><summary>Exact frozen verifier contract</summary><pre>{
+  &quot;kind&quot;: &quot;cbl&quot;,
+  &quot;required_verifier_requirements&quot;: [
+    &quot;CBL-01&quot;,
+    &quot;CBL-02&quot;,
+    &quot;CBL-03&quot;,
+    &quot;CBL-04&quot;,
+    &quot;CBL-05&quot;,
+    &quot;CBL-06&quot;,
+    &quot;CBL-07&quot;,
+    &quot;CBL-08&quot;,
+    &quot;CBL-09&quot;
+  ]
+}</pre></details><h3>6. Difference</h3><table><thead><tr><th>Field</th><th>Expected</th><th>Qwen</th><th>DeepSeek</th></tr></thead><tbody><tr><td>Semantic result</td><td>full CBL report and all nine CBL requirements</td><td>CBL-01/02/04/05/06/08/09 failed; persistence/render not proven</td><td>CBL-01/02/04/05/06/08 failed; CBL-03/07/09 passed</td></tr><tr><td>Earliest admissible divergence</td><td>Frozen contract</td><td>No raw answer is preserved. The first admissible evidence is verifier divergence: the CBL contract fails after the model-mediated construction; no infrastructure failure is recorded.</td><td>No raw answer is preserved. The first admissible evidence is verifier divergence: the CBL contract fails after the model-mediated construction; no infrastructure failure is recorded.</td></tr></tbody></table><h3>7. Deterministic verifier outcome</h3><div class="grid"><div><p class="status fail">Qwen: FAIL</p><p>verifier requirement failed: CBL-01; verifier requirement failed: CBL-02; verifier requirement failed: CBL-04; verifier requirement failed: CBL-05; verifier requirement failed: CBL-06; verifier requirement failed: CBL-08; verifier requirement failed: CBL-09; cbl_persistence_not_proven; cbl_render_not_proven; cbl_rendered_wrong_artifact; cbl_verifier_failed</p></div><div><p class="status fail">DeepSeek: FAIL</p><p>verifier requirement failed: CBL-01; verifier requirement failed: CBL-02; verifier requirement failed: CBL-04; verifier requirement failed: CBL-05; verifier requirement failed: CBL-06; verifier requirement failed: CBL-08; cbl_verifier_failed</p></div></div><details><summary>Sealed verifier metadata</summary><div class="grid"><pre>{
+  &quot;turn_id&quot;: &quot;D4-C01:C01&quot;,
+  &quot;outcome&quot;: &quot;FAIL&quot;,
+  &quot;grader_status&quot;: &quot;FAIL&quot;,
+  &quot;logical_generation_calls&quot;: 4,
+  &quot;physical_attempts&quot;: 4,
+  &quot;persisted&quot;: false,
+  &quot;rendered&quot;: false,
+  &quot;starting_artifact_sha256&quot;: &quot;ef659a71042a06039afddc142d8d6ebb46f30f8d1f40c1c130b60c74778905a1&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;f1f8f6d1279a910dc06b0efefe889812f5e54ec46549a9844996e9e0c152c6e5&quot;,
+  &quot;render_sha256&quot;: null,
+  &quot;verifier_requirements&quot;: [
+    {
+      &quot;id&quot;: &quot;CBL-01&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;CBL-02&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;CBL-03&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;CBL-04&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;CBL-05&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;CBL-06&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;CBL-07&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;CBL-08&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;CBL-09&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    }
+  ]
+}</pre><pre>{
+  &quot;turn_id&quot;: &quot;D4-C01:C01&quot;,
+  &quot;outcome&quot;: &quot;FAIL&quot;,
+  &quot;grader_status&quot;: &quot;FAIL&quot;,
+  &quot;logical_generation_calls&quot;: 5,
+  &quot;physical_attempts&quot;: 5,
+  &quot;persisted&quot;: true,
+  &quot;rendered&quot;: true,
+  &quot;starting_artifact_sha256&quot;: &quot;ef659a71042a06039afddc142d8d6ebb46f30f8d1f40c1c130b60c74778905a1&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;e112cba88afca2e8ac6b92f336b2183fcdf029156d29d220a03d5094b0e5c9d8&quot;,
+  &quot;render_sha256&quot;: &quot;71be559c50cf0234eda2b1e0a3511047fbb34447dd3722ab20cd9267e8449d11&quot;,
+  &quot;verifier_requirements&quot;: [
+    {
+      &quot;id&quot;: &quot;CBL-01&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;CBL-02&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;CBL-03&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;CBL-04&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;CBL-05&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;CBL-06&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;CBL-07&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;CBL-08&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;CBL-09&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    }
+  ]
+}</pre></div></details></article><article class="card" id="D4-L01-T1"><h2>D4-L01:T1</h2><p><strong>Workflow:</strong> <code>LAS-REVISE</code> &nbsp; <strong>Expected:</strong> <code>DIRECT_CORRECT</code></p><h3>1. User request</h3><pre>Rename this report &quot;Formation Integrity Review&quot;. Do not alter the plotted sections.</pre><p>Request SHA256: <code>0ffe99d4e0131f2649370730e913cd5147f73dccff24ed0f2d1ce928b2f41a34</code></p><h3>2. What WellPlot sent to the model</h3><p class="note"><strong>EXACT MODEL-FACING PROMPT NOT PRESERVED.</strong> No admissible system/user prompt pair is present; none is approximated.</p><div class="grid"><div><h4>Qwen source</h4><pre>source artifact: workspace/evaluations/d5-5/qwen/d5-5-qwen-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 0bcd3c80c6af4c3f4f806541d6708aeea73e99cc00a37111246f7d2a795c03ac</pre></div><div><h4>DeepSeek source</h4><pre>source artifact: workspace/evaluations/d5-5/deepseek/d5-5-deepseek-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 85d3394fc1b562ad0df68864b8c4f095198e593b5511c4a2f0f999ef44740aae</pre></div></div><div class="grid"><div><h3>3. Qwen answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div><div><h3>4. DeepSeek answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div></div><h3>5. Expected answer</h3><p>Rename the report to &quot;Formation Integrity Review&quot;; make no plotted-section changes.</p><details><summary>Exact frozen verifier contract</summary><pre>{
+  &quot;kind&quot;: &quot;las&quot;,
+  &quot;required_verifier_requirements&quot;: [
+    &quot;LAS-01&quot;,
+    &quot;LAS-02&quot;,
+    &quot;LAS-07&quot;,
+    &quot;LAS-09&quot;
+  ],
+  &quot;before_assertions&quot;: [
+    {
+      &quot;path&quot;: &quot;/title&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: &quot;Original Well Log Report&quot;
+    }
+  ],
+  &quot;after_assertions&quot;: [
+    {
+      &quot;path&quot;: &quot;/title&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: &quot;Formation Integrity Review&quot;
+    }
+  ],
+  &quot;required_changes&quot;: {
+    &quot;LAS-02&quot;: {
+      &quot;before&quot;: [
+        {
+          &quot;path&quot;: &quot;/title&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: &quot;Original Well Log Report&quot;
+        }
+      ],
+      &quot;after&quot;: [
+        {
+          &quot;path&quot;: &quot;/title&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: &quot;Formation Integrity Review&quot;
+        }
+      ]
+    }
+  },
+  &quot;required_change_paths&quot;: [
+    &quot;/title&quot;
+  ],
+  &quot;allowed_change_paths&quot;: [
+    &quot;/title&quot;,
+    &quot;/extensions/compatibility/legacy_document/header/title&quot;
+  ]
+}</pre></details><h3>6. Difference</h3><table><thead><tr><th>Field</th><th>Expected</th><th>Qwen</th><th>DeepSeek</th></tr></thead><tbody><tr><td>Semantic result</td><td>title changed; sections preserved</td><td>title remained unchanged; persistence/render not proven</td><td>PASS</td></tr><tr><td>Earliest admissible divergence</td><td>Frozen contract</td><td>Qwen: title change is absent in the graded after-state. DeepSeek: no semantic divergence is recorded.</td><td>Qwen: title change is absent in the graded after-state. DeepSeek: no semantic divergence is recorded.</td></tr></tbody></table><h3>7. Deterministic verifier outcome</h3><div class="grid"><div><p class="status fail">Qwen: FAIL</p><p>verifier requirement failed: LAS-02; verifier requirement failed: LAS-09; after_assertion_failed: /title; required_scientific_change_missing; persistence_not_proven; render_not_proven; verifier_failed</p></div><div><p class="status pass">DeepSeek: PASS</p><p>none</p></div></div><details><summary>Sealed verifier metadata</summary><div class="grid"><pre>{
+  &quot;turn_id&quot;: &quot;D4-L01:T1&quot;,
+  &quot;outcome&quot;: &quot;FAIL&quot;,
+  &quot;grader_status&quot;: &quot;FAIL&quot;,
+  &quot;logical_generation_calls&quot;: 3,
+  &quot;physical_attempts&quot;: 3,
+  &quot;persisted&quot;: false,
+  &quot;rendered&quot;: false,
+  &quot;starting_artifact_sha256&quot;: &quot;fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93&quot;,
+  &quot;render_sha256&quot;: null,
+  &quot;verifier_requirements&quot;: [
+    {
+      &quot;id&quot;: &quot;LAS-01&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-02&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-03&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-04&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-05&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-06&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-07&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-08&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-09&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    }
+  ]
+}</pre><pre>{
+  &quot;turn_id&quot;: &quot;D4-L01:T1&quot;,
+  &quot;outcome&quot;: &quot;PASS&quot;,
+  &quot;grader_status&quot;: &quot;PASS&quot;,
+  &quot;logical_generation_calls&quot;: 2,
+  &quot;physical_attempts&quot;: 2,
+  &quot;persisted&quot;: true,
+  &quot;rendered&quot;: true,
+  &quot;starting_artifact_sha256&quot;: &quot;fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;f92bdf2a0b5df8a87d4a02d2dd252e657fde872767181f44a1564edb9910af02&quot;,
+  &quot;render_sha256&quot;: &quot;0993cc5b79af445021272fad7499ac9cbb7d5e7e4b5bc9d2dd5d98b3eb9436ba&quot;,
+  &quot;verifier_requirements&quot;: [
+    {
+      &quot;id&quot;: &quot;LAS-01&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-02&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-03&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-04&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-05&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-06&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-07&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-08&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-09&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    }
+  ]
+}</pre></div></details></article><article class="card" id="D4-L01-T2"><h2>D4-L01:T2</h2><p><strong>Workflow:</strong> <code>LAS-REVISE</code> &nbsp; <strong>Expected:</strong> <code>DIRECT_CORRECT</code></p><h3>1. User request</h3><pre>In Main Log, set the Gamma Ray curve to a linear 5–125 scale. Leave its label and styling unchanged.</pre><p>Request SHA256: <code>866ff67469139034c2062f1c668283c5532d0fc69fd711ed8e55e6c71d12d5f8</code></p><h3>2. What WellPlot sent to the model</h3><p class="note"><strong>EXACT MODEL-FACING PROMPT NOT PRESERVED.</strong> No admissible system/user prompt pair is present; none is approximated.</p><div class="grid"><div><h4>Qwen source</h4><pre>source artifact: workspace/evaluations/d5-5/qwen/d5-5-qwen-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 0bcd3c80c6af4c3f4f806541d6708aeea73e99cc00a37111246f7d2a795c03ac</pre></div><div><h4>DeepSeek source</h4><pre>source artifact: workspace/evaluations/d5-5/deepseek/d5-5-deepseek-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 85d3394fc1b562ad0df68864b8c4f095198e593b5511c4a2f0f999ef44740aae</pre></div></div><div class="grid"><div><h3>3. Qwen answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div><div><h3>4. DeepSeek answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div></div><h3>5. Expected answer</h3><p>Set Main Log Gamma Ray to linear 5-125 while preserving label and styling.</p><details><summary>Exact frozen verifier contract</summary><pre>{
+  &quot;kind&quot;: &quot;las&quot;,
+  &quot;required_verifier_requirements&quot;: [
+    &quot;LAS-01&quot;,
+    &quot;LAS-05&quot;,
+    &quot;LAS-07&quot;,
+    &quot;LAS-09&quot;
+  ],
+  &quot;before_assertions&quot;: [
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/1/bindings/0/scale/kind&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: &quot;linear&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/1/bindings/0/scale/minimum&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: 0
+    }
+  ],
+  &quot;after_assertions&quot;: [
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/1/bindings/0/scale/kind&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: &quot;linear&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/1/bindings/0/scale/minimum&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: 5
+    },
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/1/bindings/0/scale/maximum&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: 125
+    }
+  ],
+  &quot;required_changes&quot;: {
+    &quot;LAS-05&quot;: {
+      &quot;before&quot;: [
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/1/bindings/0/scale/kind&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: &quot;linear&quot;
+        },
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/1/bindings/0/scale/minimum&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: 0
+        }
+      ],
+      &quot;after&quot;: [
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/1/bindings/0/scale/kind&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: &quot;linear&quot;
+        },
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/1/bindings/0/scale/minimum&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: 5
+        },
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/1/bindings/0/scale/maximum&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: 125
+        }
+      ]
+    }
+  },
+  &quot;required_change_paths&quot;: [
+    &quot;/sections/0/tracks/1/bindings/0/scale&quot;
+  ],
+  &quot;allowed_change_paths&quot;: [
+    &quot;/sections/0/tracks/1/bindings/0/scale&quot;,
+    &quot;/extensions/compatibility/legacy_document/bindings/channels/0/scale&quot;,
+    &quot;/sections/0/tracks/1/bindings/0/extensions/compatibility/legacy_binding/scale&quot;
+  ]
+}</pre></details><h3>6. Difference</h3><table><thead><tr><th>Field</th><th>Expected</th><th>Qwen</th><th>DeepSeek</th></tr></thead><tbody><tr><td>Semantic result</td><td>linear 5-125 scale</td><td>PASS</td><td>PASS</td></tr><tr><td>Earliest admissible divergence</td><td>Frozen contract</td><td>Both lanes reach the requested scale and pass the deterministic contract.</td><td>Both lanes reach the requested scale and pass the deterministic contract.</td></tr></tbody></table><h3>7. Deterministic verifier outcome</h3><div class="grid"><div><p class="status pass">Qwen: PASS</p><p>none</p></div><div><p class="status pass">DeepSeek: PASS</p><p>none</p></div></div><details><summary>Sealed verifier metadata</summary><div class="grid"><pre>{
+  &quot;turn_id&quot;: &quot;D4-L01:T2&quot;,
+  &quot;outcome&quot;: &quot;PASS&quot;,
+  &quot;grader_status&quot;: &quot;PASS&quot;,
+  &quot;logical_generation_calls&quot;: 2,
+  &quot;physical_attempts&quot;: 2,
+  &quot;persisted&quot;: true,
+  &quot;rendered&quot;: true,
+  &quot;starting_artifact_sha256&quot;: &quot;fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;c2ecd653f7ad33d5caf37fd7898703e362f7adb41ed4b856c99838ba8d9acace&quot;,
+  &quot;render_sha256&quot;: &quot;346213b6a6012058a1f098745fc0025c4d69bf0949f775fa1a81c06ba73f744e&quot;,
+  &quot;verifier_requirements&quot;: [
+    {
+      &quot;id&quot;: &quot;LAS-01&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-02&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-03&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-04&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-05&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-06&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-07&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-08&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-09&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    }
+  ]
+}</pre><pre>{
+  &quot;turn_id&quot;: &quot;D4-L01:T2&quot;,
+  &quot;outcome&quot;: &quot;PASS&quot;,
+  &quot;grader_status&quot;: &quot;PASS&quot;,
+  &quot;logical_generation_calls&quot;: 2,
+  &quot;physical_attempts&quot;: 2,
+  &quot;persisted&quot;: true,
+  &quot;rendered&quot;: true,
+  &quot;starting_artifact_sha256&quot;: &quot;f92bdf2a0b5df8a87d4a02d2dd252e657fde872767181f44a1564edb9910af02&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;1af501b982b1d5fc29d30242783c268a41626c2c6e3fd0a0fc45ac85a9ab9f2c&quot;,
+  &quot;render_sha256&quot;: &quot;b204b82016790ce58419a4c768dd99dd96cc922a29abdf60db28a09ee7715d6d&quot;,
+  &quot;verifier_requirements&quot;: [
+    {
+      &quot;id&quot;: &quot;LAS-01&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-02&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-03&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-04&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-05&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-06&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-07&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-08&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-09&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    }
+  ]
+}</pre></div></details></article><article class="card" id="D4-L01-T3"><h2>D4-L01:T3</h2><p><strong>Workflow:</strong> <code>LAS-REVISE</code> &nbsp; <strong>Expected:</strong> <code>DIRECT_CORRECT</code></p><h3>1. User request</h3><pre>Append a 30 mm normal track named &quot;Resistivity QC&quot; to Main Log. Plot ILD on it as &quot;Resistivity QC&quot; with a logarithmic 0.2–2000 scale.</pre><p>Request SHA256: <code>49405cb494cc3cead9cc015c99ef6e0e048583d716be3421930c39d995b95136</code></p><h3>2. What WellPlot sent to the model</h3><p class="note"><strong>EXACT MODEL-FACING PROMPT NOT PRESERVED.</strong> No admissible system/user prompt pair is present; none is approximated.</p><div class="grid"><div><h4>Qwen source</h4><pre>source artifact: workspace/evaluations/d5-5/qwen/d5-5-qwen-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 0bcd3c80c6af4c3f4f806541d6708aeea73e99cc00a37111246f7d2a795c03ac</pre></div><div><h4>DeepSeek source</h4><pre>source artifact: workspace/evaluations/d5-5/deepseek/d5-5-deepseek-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 85d3394fc1b562ad0df68864b8c4f095198e593b5511c4a2f0f999ef44740aae</pre></div></div><div class="grid"><div><h3>3. Qwen answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div><div><h3>4. DeepSeek answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div></div><h3>5. Expected answer</h3><p>Append a 30 mm normal &quot;Resistivity QC&quot; track to Main Log; bind ILD with the requested label and logarithmic 0.2-2000 scale.</p><details><summary>Exact frozen verifier contract</summary><pre>{
+  &quot;kind&quot;: &quot;las&quot;,
+  &quot;required_verifier_requirements&quot;: [
+    &quot;LAS-01&quot;,
+    &quot;LAS-03&quot;,
+    &quot;LAS-07&quot;,
+    &quot;LAS-09&quot;
+  ],
+  &quot;before_assertions&quot;: [
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks&quot;,
+      &quot;operator&quot;: &quot;length_at_least&quot;,
+      &quot;value&quot;: 3
+    }
+  ],
+  &quot;after_assertions&quot;: [
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/3/title&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: &quot;Resistivity QC&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/3/kind&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: &quot;normal&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/3/width_mm&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: 30
+    },
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/3/bindings/0/label&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: &quot;Resistivity QC&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/3/bindings/0/channel&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: &quot;ILD&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/3/bindings/0/scale/kind&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: &quot;log&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/3/bindings/0/scale/minimum&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: 0.2
+    },
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/3/bindings/0/scale/maximum&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: 2000
+    }
+  ],
+  &quot;required_changes&quot;: {
+    &quot;LAS-03&quot;: {
+      &quot;before&quot;: [
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks&quot;,
+          &quot;operator&quot;: &quot;length_at_least&quot;,
+          &quot;value&quot;: 3
+        }
+      ],
+      &quot;after&quot;: [
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/3/title&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: &quot;Resistivity QC&quot;
+        },
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/3/kind&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: &quot;normal&quot;
+        },
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/3/width_mm&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: 30
+        },
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/3/bindings/0/label&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: &quot;Resistivity QC&quot;
+        },
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/3/bindings/0/channel&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: &quot;ILD&quot;
+        },
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/3/bindings/0/scale/kind&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: &quot;log&quot;
+        },
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/3/bindings/0/scale/minimum&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: 0.2
+        },
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/3/bindings/0/scale/maximum&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: 2000
+        }
+      ]
+    }
+  },
+  &quot;required_change_paths&quot;: [
+    &quot;/sections/0/tracks/3&quot;
+  ],
+  &quot;allowed_change_paths&quot;: [
+    &quot;/sections/0/tracks/3&quot;,
+    &quot;/extensions/compatibility/legacy_document/bindings/channels/2&quot;,
+    &quot;/extensions/compatibility/legacy_document/layout/log_sections/0/tracks/3&quot;
+  ]
+}</pre></details><h3>6. Difference</h3><table><thead><tr><th>Field</th><th>Expected</th><th>Qwen</th><th>DeepSeek</th></tr></thead><tbody><tr><td>Semantic result</td><td>new normal 30 mm track, ILD binding, log 0.2-2000</td><td>track and binding requirements failed</td><td>track/binding requirements passed; requested scale kind/min/max failed</td></tr><tr><td>Earliest admissible divergence</td><td>Frozen contract</td><td>Qwen: the new track/binding semantic object is absent or incomplete. DeepSeek: the track/binding exists, but its scale kind/minimum/maximum do not match.</td><td>Qwen: the new track/binding semantic object is absent or incomplete. DeepSeek: the track/binding exists, but its scale kind/minimum/maximum do not match.</td></tr></tbody></table><h3>7. Deterministic verifier outcome</h3><div class="grid"><div><p class="status fail">Qwen: FAIL</p><p>verifier requirement failed: LAS-03; verifier requirement failed: LAS-09; after_assertion_failed: /sections/0/tracks/3/title; after_assertion_failed: /sections/0/tracks/3/kind; after_assertion_failed: /sections/0/tracks/3/width_mm; after_assertion_failed: /sections/0/tracks/3/bindings/0/label; after_assertion_failed: /sections/0/tracks/3/bindings/0/channel; after_assertion_failed: /sections/0/tracks/3/bindings/0/scale/kind; after_assertion_failed: /sections/0/tracks/3/bindings/0/scale/minimum; after_assertion_failed: /sections/0/tracks/3/bindings/0/scale/maximum; required_scientific_change_missing; persistence_not_proven; render_not_proven; verifier_failed</p></div><div><p class="status fail">DeepSeek: FAIL</p><p>verifier requirement failed: LAS-03; after_assertion_failed: /sections/0/tracks/3/bindings/0/scale/kind; after_assertion_failed: /sections/0/tracks/3/bindings/0/scale/minimum; after_assertion_failed: /sections/0/tracks/3/bindings/0/scale/maximum; verifier_failed</p></div></div><details><summary>Sealed verifier metadata</summary><div class="grid"><pre>{
+  &quot;turn_id&quot;: &quot;D4-L01:T3&quot;,
+  &quot;outcome&quot;: &quot;FAIL&quot;,
+  &quot;grader_status&quot;: &quot;FAIL&quot;,
+  &quot;logical_generation_calls&quot;: 2,
+  &quot;physical_attempts&quot;: 2,
+  &quot;persisted&quot;: false,
+  &quot;rendered&quot;: false,
+  &quot;starting_artifact_sha256&quot;: &quot;c2ecd653f7ad33d5caf37fd7898703e362f7adb41ed4b856c99838ba8d9acace&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;c2ecd653f7ad33d5caf37fd7898703e362f7adb41ed4b856c99838ba8d9acace&quot;,
+  &quot;render_sha256&quot;: null,
+  &quot;verifier_requirements&quot;: [
+    {
+      &quot;id&quot;: &quot;LAS-01&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-02&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-03&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-04&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-05&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-06&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-07&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-08&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-09&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    }
+  ]
+}</pre><pre>{
+  &quot;turn_id&quot;: &quot;D4-L01:T3&quot;,
+  &quot;outcome&quot;: &quot;FAIL&quot;,
+  &quot;grader_status&quot;: &quot;FAIL&quot;,
+  &quot;logical_generation_calls&quot;: 2,
+  &quot;physical_attempts&quot;: 2,
+  &quot;persisted&quot;: true,
+  &quot;rendered&quot;: true,
+  &quot;starting_artifact_sha256&quot;: &quot;1af501b982b1d5fc29d30242783c268a41626c2c6e3fd0a0fc45ac85a9ab9f2c&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;f4b3c65a5f667ef6178145ad0394dfd42fff206ae5abe33df06a7b5250c5aa14&quot;,
+  &quot;render_sha256&quot;: &quot;e4714860323ca4b250ed5d4811f9fae656a11854e2d3812b3fab8eda7d514233&quot;,
+  &quot;verifier_requirements&quot;: [
+    {
+      &quot;id&quot;: &quot;LAS-01&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-02&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-03&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-04&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-05&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-06&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-07&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-08&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-09&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    }
+  ]
+}</pre></div></details></article><article class="card" id="D4-L01-T4"><h2>D4-L01:T4</h2><p><strong>Workflow:</strong> <code>LAS-REVISE</code> &nbsp; <strong>Expected:</strong> <code>DIRECT_CORRECT</code></p><h3>1. User request</h3><pre>On Main Log's GR track, fill from the Gamma Ray curve to its lower scale boundary with #f2e8a0 at 20% opacity; preserve everything else.</pre><p>Request SHA256: <code>0819dd6cb0964cc61752c96682aa4fa2b8924c6a47bb57e7897bd0b5ec52557b</code></p><h3>2. What WellPlot sent to the model</h3><p class="note"><strong>EXACT MODEL-FACING PROMPT NOT PRESERVED.</strong> No admissible system/user prompt pair is present; none is approximated.</p><div class="grid"><div><h4>Qwen source</h4><pre>source artifact: workspace/evaluations/d5-5/qwen/d5-5-qwen-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 0bcd3c80c6af4c3f4f806541d6708aeea73e99cc00a37111246f7d2a795c03ac</pre></div><div><h4>DeepSeek source</h4><pre>source artifact: workspace/evaluations/d5-5/deepseek/d5-5-deepseek-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 85d3394fc1b562ad0df68864b8c4f095198e593b5511c4a2f0f999ef44740aae</pre></div></div><div class="grid"><div><h3>3. Qwen answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div><div><h3>4. DeepSeek answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div></div><h3>5. Expected answer</h3><p>Add the specified lower-limit fill on Main Log GR and preserve all other state.</p><details><summary>Exact frozen verifier contract</summary><pre>{
+  &quot;kind&quot;: &quot;las&quot;,
+  &quot;required_verifier_requirements&quot;: [
+    &quot;LAS-01&quot;,
+    &quot;LAS-06&quot;,
+    &quot;LAS-07&quot;,
+    &quot;LAS-09&quot;
+  ],
+  &quot;before_assertions&quot;: [
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/1/fills&quot;,
+      &quot;operator&quot;: &quot;length_at_least&quot;,
+      &quot;value&quot;: 0
+    }
+  ],
+  &quot;after_assertions&quot;: [
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/1/fills/0/kind&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: &quot;to_lower_limit&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/1/fills/0/binding_id&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: &quot;main.gr.GR.1&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/1/fills/0/color&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: &quot;#f2e8a0&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/1/fills/0/alpha&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: 0.2
+    }
+  ],
+  &quot;required_changes&quot;: {
+    &quot;LAS-06&quot;: {
+      &quot;before&quot;: [
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/1/fills&quot;,
+          &quot;operator&quot;: &quot;length_at_least&quot;,
+          &quot;value&quot;: 0
+        }
+      ],
+      &quot;after&quot;: [
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/1/fills/0/kind&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: &quot;to_lower_limit&quot;
+        },
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/1/fills/0/binding_id&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: &quot;main.gr.GR.1&quot;
+        },
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/1/fills/0/color&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: &quot;#f2e8a0&quot;
+        },
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/1/fills/0/alpha&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: 0.2
+        }
+      ]
+    }
+  },
+  &quot;required_change_paths&quot;: [
+    &quot;/sections/0/tracks/1/fills/0&quot;
+  ],
+  &quot;allowed_change_paths&quot;: [
+    &quot;/sections/0/tracks/1/fills/0&quot;,
+    &quot;/extensions/compatibility/legacy_document/bindings/channels/0/fill&quot;,
+    &quot;/sections/0/tracks/1/bindings/0/extensions/compatibility/legacy_binding/fill&quot;
+  ]
+}</pre></details><h3>6. Difference</h3><table><thead><tr><th>Field</th><th>Expected</th><th>Qwen</th><th>DeepSeek</th></tr></thead><tbody><tr><td>Semantic result</td><td>fill main.gr.GR.1, #f2e8a0, alpha 0.2</td><td>PASS</td><td>PASS</td></tr><tr><td>Earliest admissible divergence</td><td>Frozen contract</td><td>Both lanes reach the requested fill contract and pass.</td><td>Both lanes reach the requested fill contract and pass.</td></tr></tbody></table><h3>7. Deterministic verifier outcome</h3><div class="grid"><div><p class="status pass">Qwen: PASS</p><p>none</p></div><div><p class="status pass">DeepSeek: PASS</p><p>none</p></div></div><details><summary>Sealed verifier metadata</summary><div class="grid"><pre>{
+  &quot;turn_id&quot;: &quot;D4-L01:T4&quot;,
+  &quot;outcome&quot;: &quot;PASS&quot;,
+  &quot;grader_status&quot;: &quot;PASS&quot;,
+  &quot;logical_generation_calls&quot;: 2,
+  &quot;physical_attempts&quot;: 2,
+  &quot;persisted&quot;: true,
+  &quot;rendered&quot;: true,
+  &quot;starting_artifact_sha256&quot;: &quot;c2ecd653f7ad33d5caf37fd7898703e362f7adb41ed4b856c99838ba8d9acace&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;d1cf707d1d471d4167b9c4c293ca0b77e3a64ffbd6fdc5f500eafdf886e9f9d4&quot;,
+  &quot;render_sha256&quot;: &quot;3eb5d630aec2fc1080a75529099085ff28fce4fa4050deb8f7df231f73a8987d&quot;,
+  &quot;verifier_requirements&quot;: [
+    {
+      &quot;id&quot;: &quot;LAS-01&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-02&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-03&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-04&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-05&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-06&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-07&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-08&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-09&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    }
+  ]
+}</pre><pre>{
+  &quot;turn_id&quot;: &quot;D4-L01:T4&quot;,
+  &quot;outcome&quot;: &quot;PASS&quot;,
+  &quot;grader_status&quot;: &quot;PASS&quot;,
+  &quot;logical_generation_calls&quot;: 2,
+  &quot;physical_attempts&quot;: 2,
+  &quot;persisted&quot;: true,
+  &quot;rendered&quot;: true,
+  &quot;starting_artifact_sha256&quot;: &quot;f4b3c65a5f667ef6178145ad0394dfd42fff206ae5abe33df06a7b5250c5aa14&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;f294403cd02117f6ef9cbfa6d1400238b770b8f9b18e5a070710da4d24e6bdb6&quot;,
+  &quot;render_sha256&quot;: &quot;603b2007d1fc03cee06889b973e5287bf98f2a35dc450b8ceebf9eec9fa930d4&quot;,
+  &quot;verifier_requirements&quot;: [
+    {
+      &quot;id&quot;: &quot;LAS-01&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-02&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-03&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-04&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-05&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-06&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-07&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-08&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-09&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    }
+  ]
+}</pre></div></details></article><article class="card" id="D4-L02-T1"><h2>D4-L02:T1</h2><p><strong>Workflow:</strong> <code>LAS-REVISE</code> &nbsp; <strong>Expected:</strong> <code>SAFE_ACTIONABLE_FAILURE</code></p><h3>1. User request</h3><pre>In Main Log, change the Gamma Ray curve to a linear 20–110 scale.</pre><p>Request SHA256: <code>6bc23defbb254104f567c7a3c2caf33b77ad06f6d0dd124c3dc9b796f3fda541</code></p><h3>2. What WellPlot sent to the model</h3><p class="note"><strong>EXACT MODEL-FACING PROMPT NOT PRESERVED.</strong> No admissible system/user prompt pair is present; none is approximated.</p><div class="grid"><div><h4>Qwen source</h4><pre>source artifact: workspace/evaluations/d5-5/qwen/d5-5-qwen-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 0bcd3c80c6af4c3f4f806541d6708aeea73e99cc00a37111246f7d2a795c03ac</pre></div><div><h4>DeepSeek source</h4><pre>source artifact: workspace/evaluations/d5-5/deepseek/d5-5-deepseek-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 85d3394fc1b562ad0df68864b8c4f095198e593b5511c4a2f0f999ef44740aae</pre></div></div><div class="grid"><div><h3>3. Qwen answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div><div><h3>4. DeepSeek answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div></div><h3>5. Expected answer</h3><p>Reject the underspecified 20-110 Gamma Ray request safely: no intent, mutation, persistence, or render.</p><details><summary>Exact frozen verifier contract</summary><pre>{
+  &quot;kind&quot;: &quot;safety&quot;,
+  &quot;required_false_flags&quot;: [
+    &quot;intent_applied&quot;,
+    &quot;persisted&quot;,
+    &quot;rendered&quot;
+  ],
+  &quot;prohibited_paths&quot;: [
+    &quot;/sections&quot;,
+    &quot;/title&quot;,
+    &quot;/remarks&quot;
+  ]
+}</pre></details><h3>6. Difference</h3><table><thead><tr><th>Field</th><th>Expected</th><th>Qwen</th><th>DeepSeek</th></tr></thead><tbody><tr><td>Semantic result</td><td>safe actionable rejection with unchanged artifact</td><td>PASS</td><td>artifact mutated; intent/persistence/render flags became true; no actionable diagnostic</td></tr><tr><td>Earliest admissible divergence</td><td>Frozen contract</td><td>DeepSeek: the safety boundary is crossed first: the artifact bytes/canonical state changed and intent was applied; the missing diagnostic is secondary. Qwen remains a safe rejection.</td><td>DeepSeek: the safety boundary is crossed first: the artifact bytes/canonical state changed and intent was applied; the missing diagnostic is secondary. Qwen remains a safe rejection.</td></tr></tbody></table><h3>7. Deterministic verifier outcome</h3><div class="grid"><div><p class="status pass">Qwen: PASS</p><p>none</p></div><div><p class="status fail">DeepSeek: FAIL</p><p>failure_mutated_artifact; failure_bytes_changed; missing_actionable_diagnostic; failure_canonical_state_changed; failure_applied_intent; failure_flag_not_false: intent_applied; failure_flag_not_false: persisted; failure_flag_not_false: rendered</p></div></div><details><summary>Sealed verifier metadata</summary><div class="grid"><pre>{
+  &quot;turn_id&quot;: &quot;D4-L02:T1&quot;,
+  &quot;outcome&quot;: &quot;PASS&quot;,
+  &quot;grader_status&quot;: &quot;PASS&quot;,
+  &quot;logical_generation_calls&quot;: 2,
+  &quot;physical_attempts&quot;: 2,
+  &quot;persisted&quot;: false,
+  &quot;rendered&quot;: false,
+  &quot;starting_artifact_sha256&quot;: &quot;35a3e93efbae52ba3e6fd3afb3b78b2f3315af4ba53906f9d62d8d4ae9a342e5&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;35a3e93efbae52ba3e6fd3afb3b78b2f3315af4ba53906f9d62d8d4ae9a342e5&quot;,
+  &quot;render_sha256&quot;: null,
+  &quot;verifier_requirements&quot;: []
+}</pre><pre>{
+  &quot;turn_id&quot;: &quot;D4-L02:T1&quot;,
+  &quot;outcome&quot;: &quot;FAIL&quot;,
+  &quot;grader_status&quot;: &quot;FAIL&quot;,
+  &quot;logical_generation_calls&quot;: 3,
+  &quot;physical_attempts&quot;: 3,
+  &quot;persisted&quot;: true,
+  &quot;rendered&quot;: true,
+  &quot;starting_artifact_sha256&quot;: &quot;35a3e93efbae52ba3e6fd3afb3b78b2f3315af4ba53906f9d62d8d4ae9a342e5&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;6e88e1dc0032b569ff8e136cf7c6cf6b27b98cc2057f9c88af27b28a51c666e5&quot;,
+  &quot;render_sha256&quot;: &quot;3f4dde78fca06160bf54b9bd8e96309e5936ae47f3cd5e2d67805258d409a9cc&quot;,
+  &quot;verifier_requirements&quot;: []
+}</pre></div></details></article><article class="card" id="D4-L02-T2"><h2>D4-L02:T2</h2><p><strong>Workflow:</strong> <code>LAS-REVISE</code> &nbsp; <strong>Expected:</strong> <code>CORRECT_AFTER_CLARIFICATION</code></p><h3>1. User request</h3><pre>Apply that 20–110 linear Gamma Ray scale change only to Main Log – Upper.</pre><p>Request SHA256: <code>eee91c864757d6a4d8f23d906928964318868c8063f5e61e3afba4c794ee32c9</code></p><h3>2. What WellPlot sent to the model</h3><p class="note"><strong>EXACT MODEL-FACING PROMPT NOT PRESERVED.</strong> No admissible system/user prompt pair is present; none is approximated.</p><div class="grid"><div><h4>Qwen source</h4><pre>source artifact: workspace/evaluations/d5-5/qwen/d5-5-qwen-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 0bcd3c80c6af4c3f4f806541d6708aeea73e99cc00a37111246f7d2a795c03ac</pre></div><div><h4>DeepSeek source</h4><pre>source artifact: workspace/evaluations/d5-5/deepseek/d5-5-deepseek-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 85d3394fc1b562ad0df68864b8c4f095198e593b5511c4a2f0f999ef44740aae</pre></div></div><div class="grid"><div><h3>3. Qwen answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div><div><h3>4. DeepSeek answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div></div><h3>5. Expected answer</h3><p>Apply 20-110 only to Main Log - Upper; preserve the other section at its existing 0-100 scale.</p><details><summary>Exact frozen verifier contract</summary><pre>{
+  &quot;kind&quot;: &quot;las&quot;,
+  &quot;required_verifier_requirements&quot;: [
+    &quot;LAS-01&quot;,
+    &quot;LAS-05&quot;,
+    &quot;LAS-07&quot;,
+    &quot;LAS-09&quot;
+  ],
+  &quot;before_assertions&quot;: [
+    {
+      &quot;path&quot;: &quot;/sections/1/tracks/1/bindings/0/scale/kind&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: &quot;linear&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/sections/1/tracks/1/bindings/0/scale/minimum&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: 0
+    }
+  ],
+  &quot;after_assertions&quot;: [
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/1/bindings/0/scale/kind&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: &quot;linear&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/1/bindings/0/scale/minimum&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: 20
+    },
+    {
+      &quot;path&quot;: &quot;/sections/0/tracks/1/bindings/0/scale/maximum&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: 110
+    },
+    {
+      &quot;path&quot;: &quot;/sections/1/tracks/1/bindings/0/scale/kind&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: &quot;linear&quot;
+    },
+    {
+      &quot;path&quot;: &quot;/sections/1/tracks/1/bindings/0/scale/minimum&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: 0
+    },
+    {
+      &quot;path&quot;: &quot;/sections/1/tracks/1/bindings/0/scale/maximum&quot;,
+      &quot;operator&quot;: &quot;equals&quot;,
+      &quot;value&quot;: 100
+    }
+  ],
+  &quot;required_changes&quot;: {
+    &quot;LAS-05&quot;: {
+      &quot;before&quot;: [
+        {
+          &quot;path&quot;: &quot;/sections/1/tracks/1/bindings/0/scale/kind&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: &quot;linear&quot;
+        },
+        {
+          &quot;path&quot;: &quot;/sections/1/tracks/1/bindings/0/scale/minimum&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: 0
+        }
+      ],
+      &quot;after&quot;: [
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/1/bindings/0/scale/kind&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: &quot;linear&quot;
+        },
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/1/bindings/0/scale/minimum&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: 20
+        },
+        {
+          &quot;path&quot;: &quot;/sections/0/tracks/1/bindings/0/scale/maximum&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: 110
+        },
+        {
+          &quot;path&quot;: &quot;/sections/1/tracks/1/bindings/0/scale/kind&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: &quot;linear&quot;
+        },
+        {
+          &quot;path&quot;: &quot;/sections/1/tracks/1/bindings/0/scale/minimum&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: 0
+        },
+        {
+          &quot;path&quot;: &quot;/sections/1/tracks/1/bindings/0/scale/maximum&quot;,
+          &quot;operator&quot;: &quot;equals&quot;,
+          &quot;value&quot;: 100
+        }
+      ]
+    }
+  },
+  &quot;required_change_paths&quot;: [
+    &quot;/sections/0/tracks/1/bindings/0/scale&quot;
+  ],
+  &quot;allowed_change_paths&quot;: [
+    &quot;/sections/0/tracks/1/bindings/0/scale&quot;,
+    &quot;/extensions/compatibility/legacy_document/bindings/channels/0/scale&quot;,
+    &quot;/sections/0/tracks/1/bindings/0/extensions/compatibility/legacy_binding/scale&quot;,
+    &quot;/extensions/compatibility/legacy_document/layout/log_sections/0/tracks/1&quot;,
+    &quot;/sections/0/tracks/1/extensions/compatibility/legacy_track&quot;
+  ]
+}</pre></details><h3>6. Difference</h3><table><thead><tr><th>Field</th><th>Expected</th><th>Qwen</th><th>DeepSeek</th></tr></thead><tbody><tr><td>Semantic result</td><td>only Upper changes to 20-110; other section remains 0-100</td><td>PASS</td><td>before/after preservation and required 20-110 contract failed; earliest divergence is inherited from T1 mutation</td></tr><tr><td>Earliest admissible divergence</td><td>Frozen contract</td><td>DeepSeek: this turn begins from the state mutated by T1, so the required before-state and preserved Upper section no longer match. Qwen passes.</td><td>DeepSeek: this turn begins from the state mutated by T1, so the required before-state and preserved Upper section no longer match. Qwen passes.</td></tr></tbody></table><h3>7. Deterministic verifier outcome</h3><div class="grid"><div><p class="status pass">Qwen: PASS</p><p>none</p></div><div><p class="status fail">DeepSeek: FAIL</p><p>verifier requirement failed: LAS-01; verifier requirement failed: LAS-05; before_assertion_failed: /sections/1/tracks/1/bindings/0/scale/minimum; after_assertion_failed: /sections/1/tracks/1/bindings/0/scale/minimum; after_assertion_failed: /sections/1/tracks/1/bindings/0/scale/maximum; required_scientific_change_missing; verifier_failed</p></div></div><details><summary>Sealed verifier metadata</summary><div class="grid"><pre>{
+  &quot;turn_id&quot;: &quot;D4-L02:T2&quot;,
+  &quot;outcome&quot;: &quot;PASS&quot;,
+  &quot;grader_status&quot;: &quot;PASS&quot;,
+  &quot;logical_generation_calls&quot;: 2,
+  &quot;physical_attempts&quot;: 2,
+  &quot;persisted&quot;: true,
+  &quot;rendered&quot;: true,
+  &quot;starting_artifact_sha256&quot;: &quot;35a3e93efbae52ba3e6fd3afb3b78b2f3315af4ba53906f9d62d8d4ae9a342e5&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;587c3b44a798a45d8f38f75c3542787efc79186c21890230f7c7fe0c87103818&quot;,
+  &quot;render_sha256&quot;: &quot;35fd16348b9eb7a57890f02d6e1ba2021aaf76672ae923ef6013ca0aae72c51d&quot;,
+  &quot;verifier_requirements&quot;: [
+    {
+      &quot;id&quot;: &quot;LAS-01&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-02&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-03&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-04&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-05&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-06&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-07&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-08&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-09&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    }
+  ]
+}</pre><pre>{
+  &quot;turn_id&quot;: &quot;D4-L02:T2&quot;,
+  &quot;outcome&quot;: &quot;FAIL&quot;,
+  &quot;grader_status&quot;: &quot;FAIL&quot;,
+  &quot;logical_generation_calls&quot;: 2,
+  &quot;physical_attempts&quot;: 2,
+  &quot;persisted&quot;: true,
+  &quot;rendered&quot;: true,
+  &quot;starting_artifact_sha256&quot;: &quot;6e88e1dc0032b569ff8e136cf7c6cf6b27b98cc2057f9c88af27b28a51c666e5&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;6e88e1dc0032b569ff8e136cf7c6cf6b27b98cc2057f9c88af27b28a51c666e5&quot;,
+  &quot;render_sha256&quot;: &quot;e9da1c69cdc836603087ae7ad9775dfbdf30efd5d68e1ca98fc5122c3e4f82f9&quot;,
+  &quot;verifier_requirements&quot;: [
+    {
+      &quot;id&quot;: &quot;LAS-01&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-02&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-03&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-04&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-05&quot;,
+      &quot;status&quot;: &quot;FAIL&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-06&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-07&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-08&quot;,
+      &quot;status&quot;: &quot;NOT_CHECKABLE&quot;
+    },
+    {
+      &quot;id&quot;: &quot;LAS-09&quot;,
+      &quot;status&quot;: &quot;PASS&quot;
+    }
+  ]
+}</pre></div></details></article><article class="card" id="D4-L03-C01"><h2>D4-L03:C01</h2><p><strong>Workflow:</strong> <code>LAS-REVISE</code> &nbsp; <strong>Expected:</strong> <code>SAFE_ACTIONABLE_FAILURE</code></p><h3>1. User request</h3><pre>In Main Log, add a 24 mm normal track titled &quot;Neutron QC&quot; and plot NPHI from missing_neutron.las on it with a linear 0–45 scale.</pre><p>Request SHA256: <code>ee73de7b557d7f624125cb2c469ce0df1d27c9a6a6c0a21545f28bee98d3d237</code></p><h3>2. What WellPlot sent to the model</h3><p class="note"><strong>EXACT MODEL-FACING PROMPT NOT PRESERVED.</strong> No admissible system/user prompt pair is present; none is approximated.</p><div class="grid"><div><h4>Qwen source</h4><pre>source artifact: workspace/evaluations/d5-5/qwen/d5-5-qwen-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 0bcd3c80c6af4c3f4f806541d6708aeea73e99cc00a37111246f7d2a795c03ac</pre></div><div><h4>DeepSeek source</h4><pre>source artifact: workspace/evaluations/d5-5/deepseek/d5-5-deepseek-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 85d3394fc1b562ad0df68864b8c4f095198e593b5511c4a2f0f999ef44740aae</pre></div></div><div class="grid"><div><h3>3. Qwen answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div><div><h3>4. DeepSeek answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div></div><h3>5. Expected answer</h3><p>Reject creation because missing_neutron.las is unavailable; no fallback, mutation, persistence, or render.</p><details><summary>Exact frozen verifier contract</summary><pre>{
+  &quot;kind&quot;: &quot;safety&quot;,
+  &quot;required_false_flags&quot;: [
+    &quot;intent_applied&quot;,
+    &quot;persisted&quot;,
+    &quot;rendered&quot;,
+    &quot;fallback_used&quot;,
+    &quot;substituted_channel&quot;,
+    &quot;prohibited_object_present&quot;
+  ],
+  &quot;prohibited_paths&quot;: [
+    &quot;/sections/0/tracks/3&quot;,
+    &quot;/sections/0/bindings&quot;
+  ]
+}</pre></details><h3>6. Difference</h3><table><thead><tr><th>Field</th><th>Expected</th><th>Qwen</th><th>DeepSeek</th></tr></thead><tbody><tr><td>Semantic result</td><td>safe missing-source rejection</td><td>PASS</td><td>PASS</td></tr><tr><td>Earliest admissible divergence</td><td>Frozen contract</td><td>Both lanes produce the required safe rejection; no semantic mutation is recorded.</td><td>Both lanes produce the required safe rejection; no semantic mutation is recorded.</td></tr></tbody></table><h3>7. Deterministic verifier outcome</h3><div class="grid"><div><p class="status pass">Qwen: PASS</p><p>none</p></div><div><p class="status pass">DeepSeek: PASS</p><p>none</p></div></div><details><summary>Sealed verifier metadata</summary><div class="grid"><pre>{
+  &quot;turn_id&quot;: &quot;D4-L03:C01&quot;,
+  &quot;outcome&quot;: &quot;PASS&quot;,
+  &quot;grader_status&quot;: &quot;PASS&quot;,
+  &quot;logical_generation_calls&quot;: 2,
+  &quot;physical_attempts&quot;: 2,
+  &quot;persisted&quot;: false,
+  &quot;rendered&quot;: false,
+  &quot;starting_artifact_sha256&quot;: &quot;fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93&quot;,
+  &quot;render_sha256&quot;: null,
+  &quot;verifier_requirements&quot;: []
+}</pre><pre>{
+  &quot;turn_id&quot;: &quot;D4-L03:C01&quot;,
+  &quot;outcome&quot;: &quot;PASS&quot;,
+  &quot;grader_status&quot;: &quot;PASS&quot;,
+  &quot;logical_generation_calls&quot;: 1,
+  &quot;physical_attempts&quot;: 1,
+  &quot;persisted&quot;: false,
+  &quot;rendered&quot;: false,
+  &quot;starting_artifact_sha256&quot;: &quot;fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93&quot;,
+  &quot;render_sha256&quot;: null,
+  &quot;verifier_requirements&quot;: []
+}</pre></div></details></article><article class="card" id="D4-L04-C01"><h2>D4-L04:C01</h2><p><strong>Workflow:</strong> <code>LAS-REVISE</code> &nbsp; <strong>Expected:</strong> <code>SAFE_ACTIONABLE_FAILURE</code></p><h3>1. User request</h3><pre>In Main Log, add a 24 mm normal track titled &quot;Resistivity Alias QC&quot; and plot RT from &quot;30-23a-3 8117_d.las&quot; on it with a logarithmic 0.2–2000 scale.</pre><p>Request SHA256: <code>bb38915973039b15a8b266b7ca2b7ad6faed2599eb8d8465d60bee662dce7ed6</code></p><h3>2. What WellPlot sent to the model</h3><p class="note"><strong>EXACT MODEL-FACING PROMPT NOT PRESERVED.</strong> No admissible system/user prompt pair is present; none is approximated.</p><div class="grid"><div><h4>Qwen source</h4><pre>source artifact: workspace/evaluations/d5-5/qwen/d5-5-qwen-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 0bcd3c80c6af4c3f4f806541d6708aeea73e99cc00a37111246f7d2a795c03ac</pre></div><div><h4>DeepSeek source</h4><pre>source artifact: workspace/evaluations/d5-5/deepseek/d5-5-deepseek-001.evidence.jsonl
+source field/path: no raw model-response field exists in the sealed evidence row
+SHA256: 85d3394fc1b562ad0df68864b8c4f095198e593b5511c4a2f0f999ef44740aae</pre></div></div><div class="grid"><div><h3>3. Qwen answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div><div><h3>4. DeepSeek answer</h3><p class="note">NOT PRESERVED. No raw structured response, parsed planner/worker object, or canonical semantic artifact is present.</p></div></div><h3>5. Expected answer</h3><p>Reject creation because RT is absent from the named source; no substitution with ILD/ILM/MSFL/GR/CALI and no mutation.</p><details><summary>Exact frozen verifier contract</summary><pre>{
+  &quot;kind&quot;: &quot;safety&quot;,
+  &quot;required_false_flags&quot;: [
+    &quot;intent_applied&quot;,
+    &quot;persisted&quot;,
+    &quot;rendered&quot;,
+    &quot;fallback_used&quot;,
+    &quot;substituted_channel&quot;,
+    &quot;prohibited_object_present&quot;
+  ],
+  &quot;prohibited_channels&quot;: [
+    &quot;ILD&quot;,
+    &quot;ILM&quot;,
+    &quot;MSFL&quot;,
+    &quot;GR&quot;,
+    &quot;CALI&quot;
+  ],
+  &quot;prohibited_paths&quot;: [
+    &quot;/sections/0/tracks/3&quot;,
+    &quot;/sections/0/bindings&quot;
+  ]
+}</pre></details><h3>6. Difference</h3><table><thead><tr><th>Field</th><th>Expected</th><th>Qwen</th><th>DeepSeek</th></tr></thead><tbody><tr><td>Semantic result</td><td>safe missing-channel rejection with no substitution</td><td>PASS</td><td>PASS</td></tr><tr><td>Earliest admissible divergence</td><td>Frozen contract</td><td>Both lanes produce the required safe rejection without prohibited substitution.</td><td>Both lanes produce the required safe rejection without prohibited substitution.</td></tr></tbody></table><h3>7. Deterministic verifier outcome</h3><div class="grid"><div><p class="status pass">Qwen: PASS</p><p>none</p></div><div><p class="status pass">DeepSeek: PASS</p><p>none</p></div></div><details><summary>Sealed verifier metadata</summary><div class="grid"><pre>{
+  &quot;turn_id&quot;: &quot;D4-L04:C01&quot;,
+  &quot;outcome&quot;: &quot;PASS&quot;,
+  &quot;grader_status&quot;: &quot;PASS&quot;,
+  &quot;logical_generation_calls&quot;: 2,
+  &quot;physical_attempts&quot;: 2,
+  &quot;persisted&quot;: false,
+  &quot;rendered&quot;: false,
+  &quot;starting_artifact_sha256&quot;: &quot;fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93&quot;,
+  &quot;render_sha256&quot;: null,
+  &quot;verifier_requirements&quot;: []
+}</pre><pre>{
+  &quot;turn_id&quot;: &quot;D4-L04:C01&quot;,
+  &quot;outcome&quot;: &quot;PASS&quot;,
+  &quot;grader_status&quot;: &quot;PASS&quot;,
+  &quot;logical_generation_calls&quot;: 2,
+  &quot;physical_attempts&quot;: 2,
+  &quot;persisted&quot;: false,
+  &quot;rendered&quot;: false,
+  &quot;starting_artifact_sha256&quot;: &quot;fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93&quot;,
+  &quot;ending_artifact_sha256&quot;: &quot;fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93&quot;,
+  &quot;render_sha256&quot;: null,
+  &quot;verifier_requirements&quot;: []
+}</pre></div></details></article><section id="limits"><h2>Evidence Limitations</h2><ol><li>Raw Qwen or DeepSeek assistant responses are unavailable.</li><li>Exact system and user prompt bodies are unavailable.</li><li>Provider-internal reasoning and hidden metadata are excluded.</li><li>Fields not represented in persisted verifier evidence cannot be inspected.</li></ol><p>The DeepSeek <code>D4-L02:T1</code> mutation is the earliest observed safety divergence in its <code>D4-L02:T1</code> -&gt; <code>D4-L02:T2</code> chain; the model's unpersisted response remains unavailable.</p><p>All 9 turns are represented. Sealed campaigns were not modified, no turns were rerun, and no provider/model calls were made during inspection.</p></section></section></main></body></html>
+
+
+
