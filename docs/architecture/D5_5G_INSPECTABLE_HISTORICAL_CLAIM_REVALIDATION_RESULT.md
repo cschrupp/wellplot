@@ -3,6 +3,7 @@
 ```yaml
 authority: WELLPLOT-D5-5G-INSPECTABLE-HISTORICAL-CLAIM-REVALIDATION-IMPLEMENTATION-AUTH-001
 design_checkpoint: 5e530db90babf50c9992f3829d1a11d3cc79e433
+implementation_checkpoint: 29b63dbf54041cc70a9a62664a9d939a2ccea833
 provider_model_calls: 0
 live_execution: NOT AUTHORIZED
 production_source_changes: 0
