@@ -1,0 +1,26 @@
+{
+  "artifact": "D5-5G provider-free synthetic inspection",
+  "provider_model_calls": 0,
+  "sections": [
+    "case_expected_semantics",
+    "model_input_state",
+    "exact_model_facing_request",
+    "exact_raw_model_response",
+    "structured_output_boundary",
+    "canonical_wellplot_boundary",
+    "resulting_semantics",
+    "evaluation",
+    "first_divergence"
+  ],
+  "records": [
+    {
+      "axis": "A",
+      "case_id": "D5-5G-SYNTHETIC-01",
+      "attempt_index": 1,
+      "terminal_status": "PROVIDER_FREE_SYNTHETIC",
+      "first_divergence": null,
+      "provider_calls": 0,
+      "model_calls": 0
+    }
+  ]
+}
