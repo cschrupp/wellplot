@@ -1,276 +1,327 @@
-# D5-5H Semantic-Contract Repair Design
+# D5-5H Baseline-Compliance Closure Design
 
 ```yaml
-authority: WELLPLOT-D5-5G-FORENSIC-CAUSAL-CORRECTION-AND-D5-5H-DESIGN-AUTH-001
-parent_checkpoint: ab9944e693eb530d9716263c2a951fb60bbb0e76
-design_basis: D5-5G sealed Qwen live evidence plus D5-5F historical reconciliation
+authority: WELLPLOT-D5-5H-BASELINE-COMPLIANCE-CLOSURE-DESIGN-AUTH-001
+parent_checkpoint: 9020db25ebe06db7f0f28654d63aabac4690fd7e
+design_basis: docs/agent-code-mode-current-baseline.md
 status: DESIGN ONLY / READY FOR INDEPENDENT REVIEW
 implementation: NOT AUTHORIZED
 provider_model_calls: 0
 endpoint_calls: 0
-live_execution: NOT AUTHORIZED
+experiment_execution: FORBIDDEN
 src_wellplot_changes: 0
 ```
 
-## Decision
+## 1. Scope and Applicability
 
-D5-5H is a bounded semantic-contract study to restore representation fidelity
-before any further model comparison. It does not repair the sealed
-`d5-5g-qwen-live-001` campaign and does not change the accepted canonical
-engine.
+D5-5H is a compliance-closure design for the accepted Agent/Code-Mode
+Current Active Baseline. It is not a new A/B/C experiment and does not reopen
+settled CM/TW questions. Its purpose is to bring the current canonical
+semantic boundary into compliance with requirements already answered by the
+baseline, then isolate only questions that remain genuinely unresolved.
 
-The study has two explicit defects to close:
-
-1. The provider-facing schema admitted a JSON object with `summary` and
-   `unresolved_requirements` but no `report_task` or `section_tasks`, while the
-   canonical `SemanticPlan.validate_work_units()` invariant rejects that object.
-2. The D5-5G experimental context used `current_document_summary.sections` and
-   `source_summary.candidates[].identity`, while the production workflow uses
-   `current_document_summary.existing_section_hints` and
-   `source_summary.sources[].labels`.
-
-The scientific variables remain the D5-5G A0/A1/B0/B1/C0 variables. The
-correction is to make their common scaffolding canonical and their provider
-contract structurally honest before any live rerun is considered.
-
-## Decision record
-
-### Project scope
-
-WellPlot uses one canonical semantic engine:
+The design applies to the existing path:
 
 ```text
-canonical composition
--> SemanticPlanner / SemanticPlan
--> deterministic safety and enrichment
--> canonical lowering, reconciliation, execution, verification
+shared composition root
+  -> SemanticPlanner
+  -> canonical report/section workers
+  -> deterministic lowering and reconciliation
+  -> AuthoringExecutor / AuthoringService
+  -> verification, persistence, and rendering
 ```
 
-D5-5H may add provider-free study fixtures, schema-contract checks, custody
-joins, and documentation. It may not add a planner, worker, validator,
-correction engine, compiler, executor, provider adapter, or shadow path.
+The design forbids a second planner, DTO, compiler, validator, repair engine,
+provider adapter, fallback engine, model-specific semantic path, or shadow
+executor. `src/wellplot/**` implementation is not authorized by this design.
 
-### External evidence
+## 2. Mandatory Bootstrap and Non-Rediscovery Preflight
 
-The design follows established schema practice rather than relying on prompt
-prose:
+The implementation/review sequence must read, in order:
 
-- JSON Schema defines `required`, `anyOf`, `oneOf`, `allOf`, and conditional
-  subschemas as structural validation mechanisms. See the [JSON Schema
-  combining](https://json-schema.org/understanding-json-schema/reference/combining)
-  and [conditional validation](https://json-schema.org/understanding-json-schema/reference/conditionals)
-  references.
-- OpenAI-compatible structured-output APIs document that `json_schema` strict
-  adherence is limited to the provider-supported JSON Schema subset; the
-  provider-facing contract must therefore be tested against that subset rather
-  than assumed from a Python model. See the [Chat Completions response-format
-  reference](https://platform.openai.com/docs/api-reference/chat/object).
-- Pydantic supports custom JSON Schema generation separately from runtime
-  validators. A runtime `model_validator` is not evidence that its invariant is
-  present in the generated provider schema. See [Pydantic custom JSON
-  schema](https://docs.pydantic.dev/2.12/errors/usage_errors/#custom-json-schema).
+1. `AGENTS.md`;
+2. `docs/agent-code-mode-current-baseline.md`;
+3. the canonical source and contracts relevant to the selected gap.
 
-These sources establish the general technique. They do not establish the
-WellPlot-specific schema encoding or provider compatibility; those remain
-bounded empirical questions.
+For every proposed H work item, record:
 
-### Historical evidence
+- applicable baseline item(s);
+- current implementation gap;
+- whether the action is deterministic repair or genuine empirical
+  uncertainty;
+- why existing source, contracts, baseline, and accepted evidence do not
+  already answer any remaining question; and
+- expected implementation and regression consequence.
 
-The D5-5F reconciliation and TW-07/TW-08 findings establish that requiredness
-and discriminator representation can materially change structured-generation
-outcomes. The applicable principle is:
+The baseline already answers the direction for G1-G6, G8, and G9. Those items
+are deterministic compliance repairs, not experiments. G7 remains an open
+preservation question only after its deterministic contract and regressions
+are defined.
+
+## 3. Gap Disposition
+
+Each known gap receives exactly one disposition:
+
+| Gap | Baseline basis | Disposition | Work type | Rationale |
+| --- | --- | --- | --- | --- |
+| G1 no-work-unit schema gap | R-02, R-04 | `IMPLEMENT` | deterministic repair | The canonical invariant is settled; the emitted provider contract must reject an empty work-unit plan before Python-only grading. |
+| G2 optional revision hint | R-03, R-05 | `IMPLEMENT` | deterministic repair | Revision target identity is already a settled requirement; omission must not be represented as an acceptable default. |
+| G3 hidden capability-parent closure | R-04 | `IMPLEMENT` | deterministic repair | The parent relationship must be represented structurally or by an explicit host-owned closure contract. |
+| G4 incomplete revision inventory | R-01, R-05 | `IMPLEMENT` | deterministic repair | The host must expose a bounded addressable target inventory; natural-language hints are not identifiers. |
+| G5 ambiguous source inventory state | R-01, R-05 | `IMPLEMENT` | deterministic repair | Inspected-empty, not-inspected, and unavailable are distinct host facts. |
+| G6 title/header-slot ambiguity | K-02, R-01 | `IMPLEMENT` | deterministic repair | Report-level title and host-owned layout slots require separate typed semantics and examples. |
+| G7 correction preservation | R-06 | `DEFER_OPEN` | deterministic contract first; bounded validation later | The requirement is settled, but the least-risk implementation and end-to-end preservation result are not yet established. |
+| G8 non-causal negative grading | R-07 | `IMPLEMENT` | deterministic repair | Expected diagnostic owner/class, immutability, and no-persistence checks are already required. |
+| G9 request/verifier mismatch | K-03, R-07 | `IMPLEMENT` | deterministic evaluation-contract repair | Request, gold, verifier, and examples must share semantics; production phrase rewriting is forbidden. |
+
+No gap is classified as `REGRESSION_ONLY` because each listed gap either
+describes a current contract defect or remains an explicit open question. No
+gap is classified as `SUPERSEDED` without a deterministic source audit showing
+that the current implementation no longer exhibits it.
+
+## 4. Baseline Compliance Work Items
+
+### H-01 Provider contract parity: G1 and G2
+
+Implement only in the existing canonical contract:
+
+- encode the report-or-section work-unit requirement in the provider-facing
+  representation where the supported schema subset permits it;
+- make revision target identity explicit and required when revise semantics
+  require it;
+- keep canonical `SemanticPlan` validation authoritative for semantic and
+  scientific constraints after structural acceptance; and
+- preserve one schema/model source rather than introducing a provider DTO.
+
+The compliance proof must use the exact emitted schema and canonical
+`SemanticPlan` validation. It must show:
+
+- summary-only/no-work-unit input is rejected at the provider-facing boundary;
+- minimal valid report and section work units pass both structural and
+  canonical validation; and
+- omission of a required revision target is rejected with a bounded diagnostic.
+
+**Why no experiment:** TW-07/TW-08 and current D5 evidence already answer the
+requiredness direction. The remaining work is contract implementation and
+regression proof, not an optional-vs-required live arm.
+
+### H-02 Explicit capability closure: G3
+
+Keep the canonical capability registry and hierarchy. Choose one deterministic
+contract implementation, to be justified during implementation review:
+
+- represent the required parent closure in the canonical structural contract;
+  or
+- expose a host-owned closure operation with explicit input/output semantics
+  before canonical validation.
+
+The provider must not infer hidden parents, and host closure must not become a
+second semantic planner.
+
+**Why no experiment:** the baseline already settles that hidden closure is an
+ownership/contract defect. The implementation decision is bounded and
+mechanically testable.
+
+### H-03 Revision inventory: G4
+
+Project the production revision context into one bounded, host-grounded
+inventory containing at least:
+
+- section title and stable host reference;
+- track identity/signature and relevant existing values;
+- binding identity/channel and relevant existing values; and
+- applicable fills, scales, and other addressable objects.
+
+Natural-language labels remain clues. Ambiguous, missing, or conflicting
+identity resolution must fail closed without mutation or substitution.
+
+**Why no experiment:** TW-02I and current D5 evidence already establish the
+input-sufficiency requirement. Compliance requires a source audit and
+regression cases, not a new model comparison.
+
+### H-04 Source inventory state: G5
+
+Extend the existing host projection, without creating a second source model,
+so every source declares whether its channels are:
 
 ```text
-type invariants must be represented in the type/schema boundary,
-not only in instructions or an after-the-fact host validator
+inspected
+not_inspected
+unavailable
 ```
 
-The historical result supports the constraint, not a claim that one old worker
-or schema should be restored. Historical mechanisms remain evidence, not
-production authority.
+When inspected, expose the bounded channel facts required by the worker. An
+empty inspected channel set must not be indistinguishable from missing
+inspection. Final source resolution remains host-owned.
 
-### Options considered
+**Why no experiment:** source ownership and provider-visible sufficiency are
+already settled by TW-02I and R-01.
 
-| Option | Treatment | Reason |
-| --- | --- | --- |
-| Keep the current optional work-unit fields and rely on the Pydantic after-validator | REJECTED | It repeats the demonstrated schema/runtime gap. |
-| Encode report-or-section presence directly with a provider-compatible `oneOf`/`anyOf` or equivalent required structure | STUDY CANDIDATE | It preserves `SemanticPlan` while making the no-work-unit class structurally inadmissible, subject to provider subset validation. |
-| Replace the canonical plan with a second provider DTO and translate it later | REJECTED | It creates a duplicate semantic contract and a second interpretation boundary. |
-| Add a model-specific repair or retry for empty plans | REJECTED | It changes execution semantics and obscures the first divergence. |
-| Reuse the production context builders and project their safe fields into D5-5H | SELECTED | It directly closes the observed context-fidelity defect without a new engine. |
+### H-05 Report title versus header slots: G6
 
-### Selected approach
+Keep report-level title semantics distinct from host-owned header-slot
+mutations. The canonical worker contract and examples must show:
 
-Use the existing production workflow/context builders as the single source for
-D5-5H planner inputs. Derive the provider-facing contract from the canonical
-`SemanticPlan` contract, then prove provider-schema/runtime equivalence for the
-specific no-work-unit invariant before live authority is considered.
+- when a document/report title is requested;
+- when a header-slot mutation is requested; and
+- that empty slot groups do not make a valid document title invalid.
 
-The exact schema encoding is not silently chosen here. D5-5H must select only
-an encoding that passes the provider-compatible structured-output contract
-checks and canonical Pydantic validation. If the provider subset cannot encode
-the invariant, the study must document that boundary and use a narrow,
-explicitly validated equivalent; it must not leave the gap implicit.
+Do not solve this by recognizing benchmark wording or by rewriting a title into
+another field.
 
-Evidence class: **ADAPTED** for the schema/context method, with
-WellPlot-specific compatibility results classified **EMPIRICALLY_SUPPORTED**.
+**Why no experiment:** the current D5 inspectable evidence identifies the
+contract ambiguity directly. The repair and its regression are deterministic.
 
-## Required design constraints
+### H-06 Causal negative grading: G8
 
-### A. Canonical context fidelity
+Update the existing grader/evidence contract so every negative case asserts:
 
-The D5-5H fixture factory must obtain or reproduce the production workflow's
-canonical safe summaries, then assert their shape before any provider-shaped
-request is built:
+- exact expected diagnostic code/class;
+- expected failure owner;
+- zero intent or execution where required;
+- unchanged canonical bytes/state;
+- zero persistence; and
+- no channel/source/target substitution.
 
-```yaml
-current_document_summary:
-  existing_section_hints:
-    - title
-    - subtitle
-source_summary:
-  version: <canonical version>
-  sources:
-    - labels: <canonical labels>
-      channels: <canonical channel records>
-```
+Planner-terminal failures must not pass as host safe rejections merely because
+an arbitrary diagnostic exists.
 
-`sections`, `selected_source_candidates`, `grounded_target`,
-`grounded_source`, `candidates[].identity`, and other D5-5G shortcut fields may
-remain test metadata, but they must not substitute for the canonical planner
-context. A provider-free equality/projection test must compare the D5 context
-with the production workflow output for the same synthetic document/source
-state.
+**Why no experiment:** the baseline already answers the acceptance rule. The
+remaining work is deterministic grader correction and regression coverage.
 
-Evidence class: **EMPIRICALLY_SUPPORTED**, because the mismatch was directly
-observed in the sealed campaign and source inspection.
+### H-07 Request/verifier contract: G9
 
-### B. Provider/runtime contract equivalence
+Reconcile the frozen request, gold, verifier, and examples around semantic
+meaning. If textual normalization is retained, it must be an explicitly
+documented contract operation that cannot weaken the scientific requirement.
+Do not add production phrase recognition or answer rewriting to make a frozen
+case pass. If the request and verifier cannot be reconciled without changing
+the scientific target, record the contradiction for architecture review rather
+than silently changing either side.
 
-The no-work-unit object must be impossible at the provider-facing contract.
-The provider-free study must prove all of the following:
+**Why no experiment:** this is a deterministic evaluation-contract mismatch
+already exposed by current evidence, not model-capability uncertainty.
 
-1. The exact wire schema is derived from the canonical `SemanticPlan` contract.
-2. A response with neither `report_task` nor `section_tasks` is rejected at the
-   provider-facing structural boundary.
-3. A minimal valid report-task response and a minimal valid section-task
-   response are accepted by both the provider-contract checker and canonical
-   `SemanticPlan` validation.
-4. Ordinary malformed field cases remain bounded structured failures.
-5. The selected encoding is compatible with the supported structured-output
-   subset; unsupported schema features fail the study rather than being
-   silently removed.
+### H-08 Correction preservation: G7
 
-This is a contract-equivalence proof, not a claim that every possible semantic
-rule can be delegated to JSON Schema. Canonical host validation remains
-authoritative for semantic and scientific constraints after structural
-acceptance.
+Define the deterministic preservation contract before implementation:
 
-Evidence class: **ADAPTED** from JSON Schema structural composition and
-**EMPIRICALLY_SUPPORTED** only after the finite WellPlot checks pass.
+- correction receives a typed invalid fragment and machine-readable violation;
+- valid unrelated subtrees remain addressable and are preserved;
+- legal replacement scope is explicit;
+- before/after projections identify every changed path; and
+- final canonical validation and grading remain authoritative.
 
-### C. Historical TW reconnection
+The exact end-to-end retention behavior remains `DEFER_OPEN`. Any later
+bounded validation must be finite, use contrasting wording/names, and measure
+preservation separately from semantic success. It must not introduce a second
+repair engine or unbounded retry loop.
 
-D5-5H must explicitly retain the D5-5F/TW record:
+**Why not implement a full answer now:** the baseline settles the required
+property but not which bounded implementation achieves it without unintended
+semantic loss. That is the only remaining implementation question in this
+design that may justify later empirical validation.
 
-```yaml
-TW-07/TW-08 lesson:
-required/discriminator representation changes structured-generation outcomes
+## 5. Provider-Visible Sufficiency Audit
 
-reconnected principle:
-type invariants belong at the schema/type boundary, not only in prompt prose
+The TW-02I-derived audit is a compliance check, not a scientific hypothesis.
+Before any dependent implementation is accepted, enumerate every scored
+model-owned fact and identify its deterministic input source, state, and
+provenance. The audit must fail if a required fact is supplied only by a hidden
+fixture, an ungrounded hint, or a post-hoc expected artifact.
 
-not authorized:
-restore historical typed-worker runtime or promote historical scores to proof
-```
+The audit must cover report title, section identity, track identity/kind,
+binding/channel identity, scale, fill, source/channel availability, revision
+target, and capability closure. Host-owned IDs, paths, rendering mechanics,
+mutation, and persistence are not model-owned facts.
 
-Axis A may continue to vary only the authorized provider-facing requiredness
-representation. The corrected common context and work-unit invariant must be
-identical across A0 and A1. Axis B may continue to vary only capability-local
-contract text. Axis C may observe the existing canonical correction path only.
+## 6. Regression and Provider-Free Acceptance Contract
 
-Evidence class: **HISTORICALLY_DEMONSTRATED** for the requiredness lesson;
-**ADAPTED** for its use in the current single-engine study.
+The implementation slice, when separately authorized, must prove without
+provider, endpoint, or model calls:
 
-### D. Single engine and custody
-
-The accepted `SemanticPlan`, canonical composition, existing provider boundary,
-wire observer, and custody joins remain the only execution surfaces. D5-5H may
-not reconstruct request/response bodies, add an observer, or create a shadow
-validator. Synthetic provider-free responses must use the existing custody
-interfaces and must never be mixed with sealed live artifacts.
-
-Evidence class: **ESTABLISHED** within the accepted D5 architecture.
-
-### E. G successor population
-
-The later G-successor rerun may use the same five labels:
-
-```text
-D5-5G-A0 / D5-5G-A1 / D5-5G-B0 / D5-5G-B1 / D5-5G-C0
-```
-
-The corrected scaffolding is not a new scientific variable. Before any live
-authority, provider-free proof must show:
-
-- canonical context equality/projection for all five cases;
-- no-work-unit rejection at the provider-facing boundary;
-- valid work-unit acceptance through canonical `SemanticPlan` validation;
-- A, B, and C request differences remain limited to their frozen variables;
-- C still makes at most one correction call and preserves protected state;
-- one shared canonical engine and one custody path;
-- no replay, selective rerun, or historical-artifact mutation.
-
-The live population, model, and call budget require a separate explicit
-authority after this design and its implementation are independently reviewed.
-
-## Finite provider-free acceptance matrix
-
-| Check | Required result |
+| Surface | Required proof |
 | --- | --- |
-| Production context projection | Exact canonical keys and values for the synthetic state |
-| Empty work-unit object | Rejected before canonical semantic grading |
-| Minimal report task | Provider-contract and `SemanticPlan` validation pass |
-| Minimal section task | Provider-contract and `SemanticPlan` validation pass |
-| A0/A1 | Only frozen requiredness representation differs |
-| B0/B1 | Only capability-local contract text differs |
-| C0 | Existing correction path, one bounded correction call maximum |
-| Custody | Existing wire observer and joins; no headers/credentials |
-| Architecture | `src/wellplot/**` unchanged; single-engine attestation passes |
-| Execution | Provider/model/endpoint calls = 0 |
+| G1/G2 | exact emitted schema, empty-plan rejection, required revision target, canonical validation |
+| G3 | explicit parent closure or explicit host closure operation; orphan rejection |
+| G4 | complete target inventory, reordered/ambiguous target rejection, no mutation |
+| G5 | inspected-empty versus not-inspected/unavailable source state |
+| G6 | title and header-slot semantic separation |
+| G8 | exact diagnostic owner/class, immutability, no persistence |
+| G9 | request/gold/verifier/example semantic consistency |
+| G7 | deterministic preservation projection contract; no claim of end-to-end success until separately validated |
+| Architecture | one canonical engine, no new planner/DTO/compiler/validator, production attestation/reachability pass |
+| Custody | existing accepted custody interfaces only; no synthetic replacement observer |
+| Source boundary | `src/wellplot/**` unchanged in this design slice; any later implementation must be separately authorized |
 
-Any failure in context equality or contract equivalence invalidates the study
-candidate. It must not be repaired with a prompt tweak, model-specific branch,
-or post-hoc response rewrite.
+Any failure in contract parity, source/target inventory, or causal grading
+blocks qualification. It must not be addressed with prompt tuning, model
+switching, fallback execution, or post-hoc rewriting.
 
-## Stop and revisit conditions
+## 7. Conditional Techniques and Explicit Non-Goals
 
-Revisit the design if:
+Capability-local contract text is eligible only for a named residual semantic
+mapping after H-01 through H-07 compliance. It is not a generic B0/B1 arm.
 
-- the provider's supported schema subset cannot express the work-unit
-  invariant;
-- the canonical production context cannot be projected without losing required
-  semantics;
-- the only passing route requires a second semantic model or execution path;
-- A/B/C variables cannot be isolated after canonical context correction; or
-- provider-free evidence still cannot distinguish structured rejection from
-  canonical semantic failure.
+Prompt changes require a separate empirical claim, isolated variable, fresh
+holdout, protected-regression gate, terminal-failure rule, and explicit
+decision impact. Deterministic contract repairs do not require paired model
+experiments.
 
-Those outcomes require a documented architecture decision, not an automatic
-live rerun.
+Model comparison, live Qwen confirmation, and D5-5H live execution are out of
+scope. No D5-5G rerun is authorized by this design. Historical CM/TW questions
+must not be rebuilt as new experiments.
 
-## Governance boundary
+## 8. Stop and Revisit Conditions
+
+Stop implementation/design progression for an explicit architecture review if:
+
+- the supported provider schema subset cannot represent the settled work-unit
+  and requiredness invariants;
+- canonical production context cannot expose required semantic facts without
+  hidden fixture authority;
+- capability closure, target inventory, or source state requires a second
+  semantic model or execution path;
+- correction preservation cannot be bounded without changing the canonical
+  engine; or
+- request, gold, and verifier cannot be reconciled without changing the
+  scientific target.
+
+Those outcomes require `KEEP`, `ADAPT`, `REPLACE`, or `REOPEN` review. They do
+not automatically authorize another experiment or live run.
+
+## 9. Provenance
+
+- Active authority: `docs/agent-code-mode-current-baseline.md` at
+  `9020db25ebe06db7f0f28654d63aabac4690fd7e`.
+- Methodology: `docs/project-decision-protocol.md` and `AGENTS.md` at the
+  accepted Active Knowledge Lifecycle update.
+- Historical reconciliation:
+  `docs/architecture/D5_5F_HISTORICAL_SEMANTIC_CONTRACT_RECONCILIATION.md`.
+- Historical consolidated memory:
+  `docs/evaluations/agent-code-mode/EXP-TW-consolidated-development-memory.md`.
+- Current forensic evidence:
+  `docs/architecture/D5_5G_QWEN_LIVE_001_FORENSIC_ANALYSIS.md` and its JSON
+  companion. The C0 record is `HARNESS` with no response validation.
+
+Historical mechanisms are evidence only. The unavailable `e24fd497...`
+candidate is not design or implementation authority.
+
+## 10. Governance Boundary
 
 ```yaml
-D5-5G forensic correction: ACCEPTED AS DESIGN BASIS / ARTIFACTS PRESERVED
-D5-5H design: READY FOR INDEPENDENT REVIEW
-D5-5H implementation: NOT AUTHORIZED
-D5-5G live rerun: NOT AUTHORIZED
-D5-5H live execution: NOT AUTHORIZED
+active_baseline: ACCEPTED / ACTIVE PROJECT AUTHORITY
+D5-5H_compliance_closure_design: READY FOR INDEPENDENT REVIEW
+D5-5H_implementation: NOT AUTHORIZED
+provider_model_calls: 0
+endpoint_calls: 0
+src_wellplot_changes: 0
+experiments: FORBIDDEN
+live_Qwen_confirmation: OUT OF SCOPE
+model_comparison: OUT OF SCOPE
+D5-5G_rerun: NOT AUTHORIZED
 D5-5I: NOT AUTHORIZED
-provider/model calls: 0
-endpoint calls: 0
 ```
 
-This document defines the next bounded study. It does not implement or execute
-the proposed repair.
+This document defines a baseline-compliance closure plan. It does not
+implement or execute the proposed repairs.
