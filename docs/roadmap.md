@@ -1,6 +1,6 @@
 # wellplot Roadmap
 
-Last updated: 2026-09-19
+Last updated: 2026-10-21
 
 ## Scope Summary
 
@@ -47,9 +47,8 @@ The active sequence is:
 
 ```text
 Accepted Current Active Baseline
-    -> D5-5H baseline-compliance closure
-    -> provider-free independent acceptance
-    -> baseline Knowledge Delta promotion
+    -> D5-5H baseline-compliance closure [COMPLETE]
+    -> baseline Knowledge Delta promotion [COMPLETE]
     -> one bounded repaired-baseline live confirmation
     -> investigate only genuinely residual semantic failures
 ```
@@ -632,7 +631,11 @@ Longer-term / UI-centric:
 - Publish contributor guide and architecture notes.
 - Prepare roadmap for web service/UI packaging.
 
-## Immediate Next Tasks
+## Historical Immediate Next Tasks
+
+The following CM-oriented list is preserved for historical roadmap context and
+is not the current agent execution sequence. The active road is the bounded
+repaired-baseline confirmation above.
 
 - Scope CM-54 separately to reconcile the production architecture with the
   typed-worker evidence; do not implement it as part of this roadmap update.

@@ -46,6 +46,22 @@ experiments from causing experimental rediscovery. The first application to
 the CM/TW/D5 knowledge set is a separate, subsequently authorized baseline
 construction task.
 
+### D5-5H Baseline-Compliance Acceptance (2026-10-21)
+
+The D5-5H baseline-compliance implementation at
+`e72e726b7f52c1975d862980543cd3f217ee6aa8` is independently and human
+accepted. Deterministic baseline compliance is closed and its Knowledge Delta
+is promoted into the active baseline. The accepted work promotes provider
+schema/work-unit parity, required nullable revision semantics, capability
+closure, revision/source inventories, report title ownership, causal negative
+grading, semantic CBL verification, and deterministic correction-scope
+preservation into current implementation and regression authority.
+
+Live or end-to-end scientific qualification was not performed. G7 live
+correction retention, residual semantic mappings, and repaired-baseline model
+behavior remain separate bounded questions. No historical campaign was
+replayed or mutated, and no provider or endpoint calls were made.
+
 The first active baseline is now
 [docs/agent-code-mode-current-baseline.md](agent-code-mode-current-baseline.md).
 Dependent agent/Code-Mode work must cite it and complete the protocol's

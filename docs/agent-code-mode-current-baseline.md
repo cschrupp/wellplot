@@ -413,29 +413,24 @@ not an authorization to run a study:
 
 ## 9. Current Known Gaps Between Baseline and Implementation
 
-The baseline is authoritative even where the current implementation does not
-yet comply. These are gaps, not permission to silently repair them:
+The accepted D5-5H implementation promotes the following former gaps into
+active requirements and regression coverage. Their historical provenance is
+retained in the compliance result and the implementation history:
 
-1. The provider schema can accept a summary-only plan that Python rejects
-   because a report or section work unit is required.
-2. `existing_section_hint` can be nullable/defaulted on the provider path while
-   revise-mode validation requires it.
-3. Capability-parent closure is rejected later in Python rather than expressed
-   in the provider-facing contract or an explicit closure operation.
-4. Revision context does not consistently expose a bounded target inventory.
-5. Source summaries can encode `channels: []` without saying whether the
-   source was inspected or unavailable.
-6. Report title semantics and host header-slot semantics are not sufficiently
-   distinguished in the current worker contract/examples.
-7. Correction regenerates a complete plan and can lose valid unrelated facts.
-8. Negative grading can accept an unrelated diagnostic instead of the expected
-   failure owner/class.
-9. At least one frozen request/verifier pair disagrees about semantic remark
-   text; production rewriting is not an acceptable fix.
+- G1: provider work-unit schema parity.
+- G2: required-key / nullable reconstruction semantics for
+  `existing_section_hint`.
+- G3: deterministic unique capability-parent closure.
+- G4: bounded revision target inventory.
+- G5: explicit source inspection state and bounded channel inventory.
+- G6: report title/subtitle ownership separate from header slots.
+- G8: causal negative grading.
+- G9: semantic CBL verification without exact benchmark prose.
 
-These gaps must be addressed by a separately authorized, finite study or
-implementation decision. They do not reopen settled architecture or authorize
-model comparison.
+The remaining implementation gap is G7 live/end-to-end correction retention.
+Residual semantic mappings and repaired-baseline end-to-end model behavior are
+also open questions. These remain separately bounded work; they do not reopen
+settled architecture or authorize model comparison.
 
 ## 10. Provenance Map
 
@@ -479,20 +474,21 @@ of current authority.
   capability conclusions are drawn.
 - Non-rediscovery preflight and baseline freshness are required for dependent
   work.
-- A D5-5H baseline-compliance implementation candidate exists, but it is not
-  current project authority until independent implementation review accepts it.
-  Its proposed contract covers provider work-unit parity, nullable-but-required
-  revision hints, deterministic unique capability closure, semantic revision
-  inventory, explicit source inspection states, bounded negative grading,
-  semantic report-title ownership, and correction-scope preservation.
+- The independently accepted D5-5H implementation at
+  `e72e726b7f52c1975d862980543cd3f217ee6aa8` is current implementation
+  authority for provider work-unit parity, nullable-but-required revision
+  hints, deterministic unique capability closure, semantic revision inventory,
+  explicit source inspection states, bounded negative grading, semantic
+  report-title ownership, semantic CBL verification, and deterministic
+  correction-scope preservation.
 
 ### Changed
 
 - Evidence strength is now explicitly separate from project knowledge status.
 - Accepted results require a Knowledge Delta and active-baseline update before
   dependent slices proceed.
-- The D5 production attestation candidate mechanically rehashes the H source
-  surfaces while preserving the component set; this remains pending review.
+- The D5 production attestation mechanically rehashes the H source surfaces
+  while preserving the component set; it passed independent review.
 
 ### Superseded
 
@@ -503,16 +499,17 @@ of current authority.
 
 ### New open questions
 
-- O-01 through O-05 above remain open pending a separately authorized study.
-- H-01 through H-08 implementation evidence remains pending independent review;
-  G7 end-to-end preservation success remains open.
+- O-01 through O-05 above remain open pending separately authorized work.
+- H-01 through H-07 and H-08 implementation requirements are active and
+  accepted; G7 end-to-end preservation success remains open.
 
 ### No-change findings
 
 - The single canonical engine remains authoritative.
 - Historical artifacts remain immutable.
 - No provider/model calls or source changes are part of this baseline. D5-5H
-  implementation changes remain a review candidate, not promoted authority.
+  implementation changes are accepted, while live/end-to-end qualification
+  remains separate.
 
 ### Required baseline/regression updates
 
