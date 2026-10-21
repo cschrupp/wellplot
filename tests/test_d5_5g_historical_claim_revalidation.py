@@ -218,6 +218,40 @@ def test_structured_failure_inspection_preserves_parse_boundary() -> None:
     }
 
 
+@pytest.mark.parametrize("reason", list(ProviderResponseFailureReason))
+def test_every_provider_response_reason_preserves_decode_progress(
+    reason: ProviderResponseFailureReason,
+) -> None:
+    """Only JSON parsing and schema validation reasons establish decode progress."""
+    error = StructuredResponseProviderError(
+        "bounded provider response diagnostic",
+        response_reason=reason,
+        validation_shape=(
+            ProviderSchemaValidationShape(
+                issue_count=1,
+                issues=(ProviderSchemaValidationIssue("missing", ("$root", "field")),),
+                truncated=False,
+            )
+            if reason is ProviderResponseFailureReason.SCHEMA_VALIDATION
+            else None
+        ),
+    )
+    boundary = d5g._structured_failure_boundary(error)
+    expected = {
+        "json_decode": "NOT_REACHED",
+        "schema_validation": "NOT_REACHED",
+        "response_reason": reason.value,
+    }
+    if reason is ProviderResponseFailureReason.INVALID_JSON:
+        expected["json_decode"] = "FAIL"
+    elif reason is ProviderResponseFailureReason.SCHEMA_VALIDATION:
+        expected["json_decode"] = "PASS"
+        expected["schema_validation"] = "FAIL"
+    assert boundary["json_decode"] == expected["json_decode"]
+    assert boundary["schema_validation"] == expected["schema_validation"]
+    assert boundary["response_reason"] == expected["response_reason"]
+
+
 def test_live_qwen_backend_does_not_add_structured_output_extra_body() -> None:
     """The Qwen lane uses only the accepted backend response-format contract."""
     source = inspect.getsource(d5g._build_live_study_dependencies)

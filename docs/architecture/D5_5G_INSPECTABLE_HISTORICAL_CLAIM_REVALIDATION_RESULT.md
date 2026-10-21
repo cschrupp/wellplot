@@ -125,6 +125,10 @@ structured_failure_evidence:
   transport_or_provider_rejection:
     json_decode: NOT_REACHED
     schema_validation: NOT_REACHED
+  pre_decode_response_reasons:
+    all_bounded_reasons_except_invalid_json_and_schema_validation:
+      json_decode: NOT_REACHED
+      schema_validation: NOT_REACHED
   response_reason_and_validation_shape: PRESERVED_WHEN_AVAILABLE
 
 semantic_grading:
@@ -184,7 +188,7 @@ replace the wire hashes.
 ## Validation
 
 ```yaml
-focused_d5_5g_tests: 14 passed
+focused_d5_5g_tests: 23 passed
 model_io_custody_regression: 6 passed
 adversarial_classifier_and_inspection_tests: PASS
 comparative_provider_free_regression: 11 passed, 2 deselected
@@ -197,6 +201,7 @@ production_changes: 0
 execution_integrity_isolation_regression: PASS
 shared_event_loop_regression: PASS
 structured_failure_boundary_regression: PASS
+all_provider_response_reasons_regression: PASS
 ```
 
 The existing D5-5 comparative regression is designed to require a clean

@@ -913,8 +913,6 @@ def _structured_failure_boundary(error: Exception) -> dict[str, Any]:
     elif reason == "schema_validation":
         boundary["json_decode"] = "PASS"
         boundary["schema_validation"] = "FAIL"
-    elif reason is not None:
-        boundary["json_decode"] = "PASS"
     if reason is not None:
         boundary["response_reason"] = reason
     validation_shape = getattr(error, "validation_shape", None)
