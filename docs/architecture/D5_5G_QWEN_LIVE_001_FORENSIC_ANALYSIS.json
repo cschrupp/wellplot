@@ -260,12 +260,7 @@
       "response_boundary": {
         "http_status": null,
         "json_decode": "NOT_REACHED",
-        "pydantic_error": {
-          "location": [
-            "$root"
-          ],
-          "type": "value_error"
-        },
+        "pydantic_error": null,
         "response_reason": null,
         "schema_validation": "NOT_REACHED",
         "semantic_validation": "NOT_REACHED",

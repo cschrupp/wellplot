@@ -57,7 +57,9 @@ execution path is outside the active architecture.
 ### K-01 - One canonical semantic engine
 
 - **Status:** `SETTLED_ARCHITECTURAL_INVARIANT`
-- **Evidence:** `HISTORICALLY_DEMONSTRATED`, accepted D5 architecture
+- **Evidence:** `ADAPTED`
+- **Provenance:** accepted D5 architecture and historically demonstrated
+  single-engine convergence
 - **Boundary:** all agent and Code-Mode authoring flows
 - **Finding:** all flows use the shared composition root and canonical
   planner/worker/lowering/reconciliation path.
@@ -71,7 +73,8 @@ execution path is outside the active architecture.
 ### K-02 - Typed semantic ownership boundary
 
 - **Status:** `SETTLED_ARCHITECTURAL_INVARIANT`
-- **Evidence:** `HISTORICALLY_DEMONSTRATED` by TW-02/02I and TW-03S
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** historically demonstrated by TW-02/02I and TW-03S
 - **Boundary:** model output versus host execution
 - **Finding:** model output contains explicit task semantics; host code owns
   identity, resolution, mutation, rendering, and execution mechanics.
@@ -85,7 +88,8 @@ execution path is outside the active architecture.
 ### K-03 - Structural validity is not semantic correctness
 
 - **Status:** `SETTLED_ARCHITECTURAL_INVARIANT`
-- **Evidence:** `HISTORICALLY_DEMONSTRATED` by TW-03/03S
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** historically demonstrated by TW-03/03S
 - **Boundary:** provider response, semantic validation, and host execution
 - **Finding:** valid JSON and schema-valid objects can still encode wrong
   scientific semantics.
@@ -99,7 +103,8 @@ execution path is outside the active architecture.
 ### K-04 - Deterministic safety contains damage but does not repair meaning
 
 - **Status:** `SETTLED_ARCHITECTURAL_INVARIANT`
-- **Evidence:** `HISTORICALLY_DEMONSTRATED` by CM-59A
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** historically demonstrated by CM-59A
 - **Boundary:** safety, reconciliation, and verification layers
 - **Finding:** fail-closed safety and mutation containment do not make an
   incorrect semantic plan correct.
@@ -112,7 +117,8 @@ execution path is outside the active architecture.
 ### K-05 - Historical artifacts are immutable evidence
 
 - **Status:** `SETTLED_ARCHITECTURAL_INVARIANT`
-- **Evidence:** `ADAPTED` from evidence-custody practice and accepted D5
+- **Evidence:** `ADAPTED`
+- **Provenance:** evidence-custody practice and accepted D5 campaign rules
   campaign rules
 - **Boundary:** all CM/TW/D5 artifacts and sealed campaigns
 - **Finding:** historical results are preserved, not rewritten or silently
@@ -129,8 +135,9 @@ execution path is outside the active architecture.
 ### R-01 - Provider-visible input sufficiency
 
 - **Status:** `IMPLEMENTATION_REQUIREMENT`
-- **Evidence:** `HISTORICALLY_DEMONSTRATED` by TW-02I; current gap is
-  `SUPPORTED_BY_CURRENT_D5_EVIDENCE`
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** historically demonstrated by TW-02I; current gap is
+  supported by current D5 evidence
 - **Boundary:** every model-scored semantic fact
 - **Requirement:** expose a deterministic, path-free input source and
   provenance for each scored fact. The host owns final resolution.
@@ -144,7 +151,8 @@ execution path is outside the active architecture.
 ### R-02 - Provider/schema/Python contract parity
 
 - **Status:** `IMPLEMENTATION_REQUIREMENT`
-- **Evidence:** `SUPPORTED_BY_CURRENT_D5_EVIDENCE`
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** current D5 evidence
 - **Boundary:** native provider schema through Python validation
 - **Requirement:** every immediate post-provider rejection must be represented
   in the provider contract where feasible, or exposed through an explicit
@@ -159,8 +167,9 @@ execution path is outside the active architecture.
 ### R-03 - Required semantic discriminators
 
 - **Status:** `IMPLEMENTATION_REQUIREMENT`
-- **Evidence:** `HISTORICALLY_DEMONSTRATED` by TW-07/08 for local
-  llama.cpp/Qwen; current violation is `SUPPORTED_BY_CURRENT_D5_EVIDENCE`
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** historically demonstrated by TW-07/08 for local
+  llama.cpp/Qwen; current violation is supported by current D5 evidence
 - **Boundary:** provider-facing fields that choose a branch, target, or work
   unit
 - **Requirement:** mandatory semantic fields must be required in the native
@@ -175,7 +184,8 @@ execution path is outside the active architecture.
 ### R-04 - Explicit capability-parent closure
 
 - **Status:** `IMPLEMENTATION_REQUIREMENT`
-- **Evidence:** `SUPPORTED_BY_CURRENT_D5_EVIDENCE`, grounded by TW-03S
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** current D5 evidence, grounded by TW-03S
 - **Boundary:** capability hierarchy and work-unit validation
 - **Requirement:** parent closure must be encoded in a validatable semantic
   shape or supplied through an explicit host closure operation.
@@ -188,7 +198,8 @@ execution path is outside the active architecture.
 ### R-05 - Revision and source inventory semantics
 
 - **Status:** `IMPLEMENTATION_REQUIREMENT`
-- **Evidence:** `SUPPORTED_BY_CURRENT_D5_EVIDENCE`, grounded by TW-02I
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** current D5 evidence, grounded by TW-02I
 - **Boundary:** revision workers and source selection
 - **Requirement:** revision context must include bounded addressable object
   inventory: section title/reference, track identity/signature, binding
@@ -203,8 +214,9 @@ execution path is outside the active architecture.
 ### R-06 - Bounded correction and preservation
 
 - **Status:** `IMPLEMENTATION_REQUIREMENT`
-- **Evidence:** `SUPPORTED_BY_CURRENT_D5_EVIDENCE`; proposed preservation
-  treatment is `ADAPTED_DESIGN_HYPOTHESIS`
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** current D5 evidence; proposed preservation treatment is an
+  adapted design hypothesis
 - **Boundary:** correction after semantic or host validation failure
 - **Requirement:** correction must preserve valid semantic subtrees or prove a
   complete replacement against the original request and context. It must
@@ -218,7 +230,8 @@ execution path is outside the active architecture.
 ### R-07 - Causal outcome grading
 
 - **Status:** `REGRESSION_REQUIREMENT`
-- **Evidence:** `SUPPORTED_BY_CURRENT_D5_EVIDENCE`
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** current D5 evidence
 - **Boundary:** negative cases and terminal evidence
 - **Requirement:** a negative result must match the expected diagnostic class,
   failure owner, unchanged canonical bytes/state, no persistence, and no
@@ -229,16 +242,21 @@ execution path is outside the active architecture.
   presence of a diagnostic field.
 - **Reopen:** if a bounded counterexample demonstrates causal misgrading.
 
-### R-08 - Controlled schema and prompt changes
+### R-08 - Controlled empirical changes
 
 - **Status:** `REGRESSION_REQUIREMENT`
-- **Evidence:** `HISTORICALLY_DEMONSTRATED` by TW-05/06 and CM-57P10
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** historically demonstrated by TW-05/06 and CM-57P10
 - **Boundary:** any provider-facing schema, prompt, example, inventory, or
   validator change
-- **Requirement:** isolate one representational variable, hash the exact
-  inputs, and evaluate paired arms on a fresh holdout.
-- **Implementation consequence:** no broad prompt tuning or schema bundle
-  changes before causal localization.
+- **Requirement:** for a deterministic contract or invariant correction, use
+  deterministic and regression proof. When making an empirical claim about
+  model/provider behavior or promoting a changed contract on that basis,
+  isolate one variable, hash the exact inputs, and evaluate paired arms on a
+  fresh holdout.
+- **Implementation consequence:** deterministic repairs do not require an
+  unnecessary model experiment; broad prompt tuning and bundled empirical
+  changes still require causal localization.
 - **Regression consequence:** require stability, protected-regression, and
   terminal-failure gates; aggregate score alone cannot promote a change.
 - **Reopen:** when a controlled study identifies a new causal boundary.
@@ -268,7 +286,8 @@ boundary, and failure that would reopen the relevant baseline item.
 ### T-01 - Capability-local contracts
 
 - **Status:** `CONDITIONAL_TECHNIQUE`
-- **Evidence:** `HISTORICALLY_DEMONSTRATED` by CM-56R8
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** historically demonstrated by CM-56R8
 - **Boundary:** a named capability with a known mapping ambiguity
 - **Use:** concise contract text and synthetic examples may be added only for
   the affected capability, with field-level metrics and no benchmark answers.
@@ -278,8 +297,9 @@ boundary, and failure that would reopen the relevant baseline item.
 ### T-02 - Prompt revision
 
 - **Status:** `CONDITIONAL_TECHNIQUE`
-- **Evidence:** `HISTORICALLY_DEMONSTRATED` effect in CM-57P10; current
-  composition remains an `ADAPTED_DESIGN_HYPOTHESIS`
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** historically demonstrated effect in CM-57P10; current
+  composition remains an adapted design hypothesis
 - **Boundary:** only after schema/input/grading defects are controlled
 - **Use:** versioned paired evaluation on a fresh holdout with protected
   regressions and terminal rules.
@@ -288,7 +308,8 @@ boundary, and failure that would reopen the relevant baseline item.
 ### T-03 - Bounded repair
 
 - **Status:** `CONDITIONAL_TECHNIQUE`
-- **Evidence:** `ADAPTED_DESIGN_HYPOTHESIS`, supported by current D5 evidence
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** adapted design hypothesis supported by current D5 evidence
 - **Boundary:** one explicit correction path after a typed violation
 - **Use:** preserve valid subtrees and never add a second engine or unbounded
   retry loop.
@@ -297,7 +318,8 @@ boundary, and failure that would reopen the relevant baseline item.
 ### T-04 - Model comparison
 
 - **Status:** `CONDITIONAL_TECHNIQUE`
-- **Evidence:** `ADAPTED_DESIGN_HYPOTHESIS`
+- **Evidence:** `ADAPTED`
+- **Provenance:** adapted design hypothesis pending a bounded comparison
 - **Boundary:** only after the canonical contract, input, and grading baseline
   is fresh and accepted
 - **Use:** compare models only on an interpretable, finite, unchanged contract.
@@ -332,8 +354,9 @@ not an authorization to run a study:
 
 ### O-01 - Current contract parity after repair
 
-- **Evidence:** `SUPPORTED_BY_CURRENT_D5_EVIDENCE` for the present defect;
-  repaired result is not established.
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** present defect is supported by current D5 evidence; repaired
+  result is not established
 - **Question:** after a bounded contract correction, do emitted schema,
   prompt, Python validation, deterministic lowering, and grading agree for all
   scored work-unit shapes?
@@ -343,8 +366,9 @@ not an authorization to run a study:
 
 ### O-02 - Production input sufficiency after inventory repair
 
-- **Evidence:** `SUPPORTED_BY_CURRENT_D5_EVIDENCE`; applicability of a repaired
-  inventory is unresolved.
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** current D5 evidence; applicability of a repaired inventory
+  is unresolved
 - **Question:** does every scored current-D5 fact have a deterministic,
   provider-visible source with explicit inventory state?
 - **Impact:** determines whether model failures are attributable to the model.
@@ -353,8 +377,9 @@ not an authorization to run a study:
 
 ### O-03 - Whole-plan correction preservation
 
-- **Evidence:** `SUPPORTED_BY_CURRENT_D5_EVIDENCE`; preservation approach is an
-  `ADAPTED_DESIGN_HYPOTHESIS`.
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** current D5 evidence; preservation approach is an adapted
+  design hypothesis
 - **Question:** can the existing correction path retain all unrelated valid
   semantic facts while correcting one bounded violation?
 - **Impact:** determines whether correction results are scientifically
@@ -364,8 +389,9 @@ not an authorization to run a study:
 
 ### O-04 - Remaining semantic mappings after inherited fixes
 
-- **Evidence:** `SUPPORTED_BY_CURRENT_D5_EVIDENCE` for known failures; exact
-  residual set is unresolved.
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** known failures are supported by current D5 evidence; exact
+  residual set is unresolved
 - **Question:** which report, target, source, scale, binding, and capability
   mappings still fail after the inherited baseline requirements are applied?
 - **Impact:** determines whether a remaining issue is contract, input,
@@ -375,8 +401,9 @@ not an authorization to run a study:
 
 ### O-05 - End-to-end repaired baseline
 
-- **Evidence:** `ADAPTED_DESIGN_HYPOTHESIS`; no repaired end-to-end result is
-  accepted in this baseline.
+- **Evidence:** `ADAPTED`
+- **Provenance:** adapted design hypothesis; no repaired end-to-end result is
+  accepted in this baseline
 - **Question:** does the consolidated repaired contract improve semantic
   outcomes without protected regressions or stable wrong-plan escapes?
 - **Impact:** determines whether the repaired contract can become active
@@ -421,7 +448,8 @@ model comparison.
   `docs/architecture/D5_5G_QWEN_LIVE_001_FORENSIC_ANALYSIS.md` and its JSON
   companion, plus the sealed campaign artifacts they digest.
 - Current architecture and implementation contracts: `src/wellplot/agent`,
-  `src/wellplot/code_mode`, relevant tests, and the accepted D5 design records.
+  `src/wellplot/agent/code_mode`, relevant tests, and the accepted D5 design
+  records.
 - CM-56R8, CM-57P10, and CM-59A are historical evidence referenced by the
   reconciliation and consolidated memory.
 
