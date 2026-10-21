@@ -23,6 +23,29 @@ project-governance rule for humans, Codex, and other autonomous contributors.
 - Autonomous agents must follow the protocol and may not silently broaden
   scope.
 
+### Active Knowledge Lifecycle Adoption (2026-10-21)
+
+WellPlot adopts an Active Knowledge Lifecycle so accepted experimental and
+architectural knowledge becomes current project authority instead of remaining
+only in historical archives. Evidence strength (`ESTABLISHED`, `ADAPTED`,
+`EMPIRICALLY_SUPPORTED`, or `NOVEL`) is tracked independently from project
+knowledge status (`SETTLED_ARCHITECTURAL_INVARIANT`,
+`IMPLEMENTATION_REQUIREMENT`, `REGRESSION_REQUIREMENT`, `CONDITIONAL_TECHNIQUE`,
+`GENUINELY_OPEN_QUESTION`, or `SUPERSEDED_DO_NOT_REPEAT`).
+
+Decision-bearing accepted work requires a Knowledge Delta covering promoted,
+changed, superseded, new open questions, no-change findings, and required
+baseline/regression updates. Dependent work cannot begin until applicable
+knowledge is reflected in the relevant Current Active Baseline. New experiments
+must pass a non-rediscovery preflight and may not silently reopen settled
+findings. Historical records remain immutable evidence; repository-owned active
+baselines are the normal bootstrap source for current decisions.
+
+This lifecycle was adopted to prevent stale project memory and repeated
+experiments from causing experimental rediscovery. The first application to
+the CM/TW/D5 knowledge set is a separate, subsequently authorized baseline
+construction task.
+
 ## Product and Scope Decisions
 
 - Language: Python only.

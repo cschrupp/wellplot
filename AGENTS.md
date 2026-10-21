@@ -21,6 +21,25 @@ Operational requirements:
 
 The complete policy is in `docs/project-decision-protocol.md`.
 
+## Active Knowledge Lifecycle
+
+Before agent, architecture, implementation, or experiment work:
+
+- read the relevant repository-owned Current Active Baseline after this file;
+- perform the protocol's experiment non-rediscovery preflight before proposing
+  or running an experiment;
+- honor `SETTLED_ARCHITECTURAL_INVARIANT`, `IMPLEMENTATION_REQUIREMENT`, and
+  `REGRESSION_REQUIREMENT` findings unless they are formally reopened through
+  documented contradictory evidence and architecture review; and
+- after accepted decision-bearing work, complete and incorporate a Knowledge
+  Delta before starting a dependent slice.
+
+Historical experiment files are evidence and provenance, not the normal
+bootstrap source for current engineering decisions. Chat or agent memory is
+non-authoritative. When a settled finding is mechanically testable, preserve
+it with a regression or invariant check; otherwise record why it cannot be
+tested mechanically.
+
 ## MCP Stabilization
 
 During MCP stabilization, no runtime workaround may be added merely because a

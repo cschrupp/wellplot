@@ -326,3 +326,119 @@ This should make the rationale auditable later.
 WellPlot should prefer known good engineering, domain-specific adaptation, and
 bounded empirical validation over ad-hoc invention and unbounded
 experimentation.
+
+## O. Active Knowledge Lifecycle
+
+Historical evidence and current project authority are separate concerns. A
+result may be strong evidence without yet being an active project constraint.
+WellPlot therefore tracks two independent dimensions.
+
+### Evidence strength
+
+Use one of:
+
+```text
+ESTABLISHED
+ADAPTED
+EMPIRICALLY_SUPPORTED
+NOVEL
+```
+
+### Project knowledge status
+
+Use one of:
+
+```text
+SETTLED_ARCHITECTURAL_INVARIANT
+IMPLEMENTATION_REQUIREMENT
+REGRESSION_REQUIREMENT
+CONDITIONAL_TECHNIQUE
+GENUINELY_OPEN_QUESTION
+SUPERSEDED_DO_NOT_REPEAT
+```
+
+Evidence strength describes why a claim is credible. Project knowledge status
+describes how the claim governs current work. They must not be conflated.
+
+### Active baseline and promotion
+
+Each substantial evolving architecture or domain with durable experimental
+knowledge must have a concise repository-owned Current Active Baseline. It is
+decision memory, not an experiment archive. Historical records remain
+immutable evidence and are linked from the baseline for provenance.
+
+An independently accepted, decision-bearing result is not fully closed until
+its Knowledge Delta has been incorporated into the relevant active baseline:
+
+```text
+Promoted:
+Changed:
+Superseded:
+New open questions:
+No-change findings:
+Required baseline/regression updates:
+```
+
+The next dependent design or experiment must not begin while applicable,
+accepted decision-bearing knowledge is absent from the active baseline.
+Repeated experiments caused by missing or stale project memory are a
+methodology failure: pause experimental progression, repair the active
+knowledge, then resume technical work.
+
+### Non-rediscovery preflight
+
+Before authorizing a new experiment, record:
+
+- the applicable current-baseline constraints;
+- the exact genuinely open question;
+- why source, documentation, current baseline, and prior evidence do not
+  already answer it;
+- the exact new controlled variable;
+- the settled findings inherited unchanged; and
+- which possible outcomes would change a project decision.
+
+If accepted prior knowledge already answers the question, do not run the
+experiment.
+
+### Reopening settled knowledge
+
+A settled item may be reopened only when concrete contradictory evidence is
+documented, its applicability is assessed, and an explicit architecture
+review chooses `KEEP`, `ADAPT`, `REPLACE`, or `REOPEN`. A new experiment proposal
+cannot silently turn a settled item into an open question.
+
+When settled knowledge is mechanically testable, promote it to a regression or
+invariant test. If it is not reasonably testable, record why in the decision
+record.
+
+### Authority and bootstrap order
+
+For project engineering knowledge, the default authority order is:
+
+```text
+repository standing rules
+→ current active baseline
+→ current accepted architecture/design decisions
+→ implementation contracts and regression tests
+→ historical reconciliation
+→ experimental/development archives
+→ conversation/chat memory
+```
+
+An explicit later supersession overrides an earlier document. Chat memory is
+useful context but is non-authoritative.
+
+For agent and architecture work, bootstrap in this order:
+
+```text
+AGENTS.md
+→ relevant Current Active Baseline
+→ active slice/design
+→ source and contracts relevant to the task
+```
+
+Consult historical archives for provenance, contradiction investigation, or
+genuinely unresolved questions, not as the normal first source of current
+project decisions. Keep active baselines concise: retain the finding, status,
+applicability boundary, provenance, implementation/regression consequence, and
+reopening condition rather than copying raw traces or chronology.
