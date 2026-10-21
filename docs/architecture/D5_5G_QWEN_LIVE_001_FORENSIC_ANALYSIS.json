@@ -1,0 +1,370 @@
+{
+  "authority": "WELLPLOT-D5-5G-LIVE-INCONCLUSIVE-FORENSIC-CLOSEOUT-AUTH-001",
+  "campaign": "d5-5g-qwen-live-001",
+  "cases": [
+    {
+      "arm": "A0",
+      "axis": "A",
+      "case_id": "D5-5G-A0",
+      "case_status": "INCONCLUSIVE",
+      "failure_category": "invalid_response",
+      "first_divergence": "PROVIDER_OR_STRUCTURED",
+      "logical_call": {
+        "engine_outcome": "failure",
+        "failure_category": "invalid_response",
+        "logical_call_index": 1,
+        "response_reason": "schema_validation",
+        "validation_shape": {
+          "issue_count": 1,
+          "issues": [
+            {
+              "error_type": "value_error",
+              "location": [
+                "$root"
+              ]
+            }
+          ],
+          "truncated": false
+        }
+      },
+      "request": {
+        "assistant_content": "{\"summary\":\"Revise Copper Ridge section using source-ember (GR, ILD); preserve Silver Meadow.\",\"unresolved_requirements\":[\n]}",
+        "assistant_json": {
+          "summary": "Revise Copper Ridge section using source-ember (GR, ILD); preserve Silver Meadow.",
+          "unresolved_requirements": []
+        },
+        "http_status": 200,
+        "request_sha256": "c6eb5fb7267a8f96cf1131306756f389cd0a6fe02555dedc6e105449f5edd96b",
+        "response_sha256": "0d391d8a33bceccd76d6f9c34e3f382eff8d0b68e59ffaca6194fecb9f36733c"
+      },
+      "response_boundary": {
+        "http_status": 200,
+        "json_decode": "PASS",
+        "pydantic_error": {
+          "location": [
+            "$root"
+          ],
+          "type": "value_error"
+        },
+        "response_reason": "schema_validation",
+        "schema_validation": "FAIL",
+        "semantic_validation": "NOT_REACHED",
+        "validation_shape": {
+          "issue_count": 1,
+          "issues": [
+            {
+              "error_type": "value_error",
+              "location": [
+                "$root"
+              ]
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "arm": "A1",
+      "axis": "A",
+      "case_id": "D5-5G-A1",
+      "case_status": "INCONCLUSIVE",
+      "failure_category": "invalid_response",
+      "first_divergence": "PROVIDER_OR_STRUCTURED",
+      "logical_call": {
+        "engine_outcome": "failure",
+        "failure_category": "invalid_response",
+        "logical_call_index": 2,
+        "response_reason": "schema_validation",
+        "validation_shape": {
+          "issue_count": 1,
+          "issues": [
+            {
+              "error_type": "value_error",
+              "location": [
+                "$root"
+              ]
+            }
+          ],
+          "truncated": false
+        }
+      },
+      "request": {
+        "assistant_content": "{\"summary\":\"Revise Copper Ridge section using source-ember (GR, ILD); preserve Silver Meadow.\",\"unresolved_requirements\":[\n]}",
+        "assistant_json": {
+          "summary": "Revise Copper Ridge section using source-ember (GR, ILD); preserve Silver Meadow.",
+          "unresolved_requirements": []
+        },
+        "http_status": 200,
+        "request_sha256": "fcf95f93ead4da8253953262936db5222d394d26aea11fe392fc1b1d4834b2e4",
+        "response_sha256": "b384451bdfe1b8839947999ea60e5046a7411956b9d50c710c7d183022f37a79"
+      },
+      "response_boundary": {
+        "http_status": 200,
+        "json_decode": "PASS",
+        "pydantic_error": {
+          "location": [
+            "$root"
+          ],
+          "type": "value_error"
+        },
+        "response_reason": "schema_validation",
+        "schema_validation": "FAIL",
+        "semantic_validation": "NOT_REACHED",
+        "validation_shape": {
+          "issue_count": 1,
+          "issues": [
+            {
+              "error_type": "value_error",
+              "location": [
+                "$root"
+              ]
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "arm": "B0",
+      "axis": "B",
+      "case_id": "D5-5G-B0",
+      "case_status": "INCONCLUSIVE",
+      "failure_category": "invalid_response",
+      "first_divergence": "PROVIDER_OR_STRUCTURED",
+      "logical_call": {
+        "engine_outcome": "failure",
+        "failure_category": "invalid_response",
+        "logical_call_index": 3,
+        "response_reason": "schema_validation",
+        "validation_shape": {
+          "issue_count": 1,
+          "issues": [
+            {
+              "error_type": "value_error",
+              "location": [
+                "$root"
+              ]
+            }
+          ],
+          "truncated": false
+        }
+      },
+      "request": {
+        "assistant_content": "{\"summary\":\"Revise Copper Ridge section using source-ember (GR, ILD); preserve Silver Meadow.\",\"unresolved_requirements\":[\n]}",
+        "assistant_json": {
+          "summary": "Revise Copper Ridge section using source-ember (GR, ILD); preserve Silver Meadow.",
+          "unresolved_requirements": []
+        },
+        "http_status": 200,
+        "request_sha256": "c6eb5fb7267a8f96cf1131306756f389cd0a6fe02555dedc6e105449f5edd96b",
+        "response_sha256": "5e6624859642a936ac4d51ae4eba37f14e0029d81ededa2162ab2657bea4b87e"
+      },
+      "response_boundary": {
+        "http_status": 200,
+        "json_decode": "PASS",
+        "pydantic_error": {
+          "location": [
+            "$root"
+          ],
+          "type": "value_error"
+        },
+        "response_reason": "schema_validation",
+        "schema_validation": "FAIL",
+        "semantic_validation": "NOT_REACHED",
+        "validation_shape": {
+          "issue_count": 1,
+          "issues": [
+            {
+              "error_type": "value_error",
+              "location": [
+                "$root"
+              ]
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "arm": "B1",
+      "axis": "B",
+      "case_id": "D5-5G-B1",
+      "case_status": "INCONCLUSIVE",
+      "failure_category": "invalid_response",
+      "first_divergence": "PROVIDER_OR_STRUCTURED",
+      "logical_call": {
+        "engine_outcome": "failure",
+        "failure_category": "invalid_response",
+        "logical_call_index": 4,
+        "response_reason": "schema_validation",
+        "validation_shape": {
+          "issue_count": 1,
+          "issues": [
+            {
+              "error_type": "value_error",
+              "location": [
+                "$root"
+              ]
+            }
+          ],
+          "truncated": false
+        }
+      },
+      "request": {
+        "assistant_content": "{\n  \"summary\": \"Revise Copper Ridge section using source-ember channels GR and ILD; preserve Silver Meadow section.\",\n  \"unresolved_requirements\": [\n    \"Revise Copper Ridge using source-ember; preserve Silver Meadow.\"\n  ]\n}",
+        "assistant_json": {
+          "summary": "Revise Copper Ridge section using source-ember channels GR and ILD; preserve Silver Meadow section.",
+          "unresolved_requirements": [
+            "Revise Copper Ridge using source-ember; preserve Silver Meadow."
+          ]
+        },
+        "http_status": 200,
+        "request_sha256": "1c7379069d3a69cf0edc76001db869ae9497222556e29e376263ca37a11469d5",
+        "response_sha256": "30890ce526a39ef39d3996e4dfb9ee0ca5c569f396788301261914bd557c480d"
+      },
+      "response_boundary": {
+        "http_status": 200,
+        "json_decode": "PASS",
+        "pydantic_error": {
+          "location": [
+            "$root"
+          ],
+          "type": "value_error"
+        },
+        "response_reason": "schema_validation",
+        "schema_validation": "FAIL",
+        "semantic_validation": "NOT_REACHED",
+        "validation_shape": {
+          "issue_count": 1,
+          "issues": [
+            {
+              "error_type": "value_error",
+              "location": [
+                "$root"
+              ]
+            }
+          ],
+          "truncated": false
+        }
+      }
+    },
+    {
+      "arm": "C0",
+      "axis": "C",
+      "case_id": "D5-5G-C0",
+      "case_status": "INCONCLUSIVE",
+      "failure_category": "harness",
+      "first_divergence": "HARNESS",
+      "logical_call": {},
+      "request": {},
+      "response_boundary": {
+        "http_status": null,
+        "json_decode": "NOT_REACHED",
+        "pydantic_error": {
+          "location": [
+            "$root"
+          ],
+          "type": "value_error"
+        },
+        "response_reason": null,
+        "schema_validation": "NOT_REACHED",
+        "semantic_validation": "NOT_REACHED",
+        "validation_shape": null
+      }
+    }
+  ],
+  "causal_boundary": {
+    "first_divergence_rule": "The earliest supported boundary is PROVIDER_OR_STRUCTURED for A0/A1/B0/B1 and HARNESS for C0; later semantic claims are inadmissible.",
+    "not_proven": [
+      "The exact server-side reason the provider produced incomplete SemanticPlan content is not identified by the retained bounded error shape.",
+      "No conclusion about Qwen semantic capability, prompt sufficiency, schema design, or model quality is scientifically supported by this campaign alone.",
+      "A/B effects cannot be estimated because neither arm produced a valid canonical plan."
+    ],
+    "supported": [
+      "A0, A1, B0, and B1 reached the provider and returned HTTP 200.",
+      "All four real calls stopped at the same bounded schema-validation shape: one value_error at $root.",
+      "Canonical semantic validation and scientific grading were not reached for those four cases.",
+      "C0 failed before provider delegation, with zero model/provider calls for C0."
+    ]
+  },
+  "comparisons": {
+    "axis_a": {
+      "A0_request_sha256": "c6eb5fb7267a8f96cf1131306756f389cd0a6fe02555dedc6e105449f5edd96b",
+      "A1_request_sha256": "fcf95f93ead4da8253953262936db5222d394d26aea11fe392fc1b1d4834b2e4",
+      "common_boundary": "schema_validation at $root; semantic validation not reached",
+      "interpretation": "The sealed result shows the provider-facing A request changed, but neither arm yielded an interpretable semantic outcome.",
+      "request_hashes_differ": true
+    },
+    "axis_b": {
+      "B0_request_sha256": "c6eb5fb7267a8f96cf1131306756f389cd0a6fe02555dedc6e105449f5edd96b",
+      "B1_request_sha256": "1c7379069d3a69cf0edc76001db869ae9497222556e29e376263ca37a11469d5",
+      "common_boundary": "schema_validation at $root; semantic validation not reached",
+      "interpretation": "The sealed result does not support a capability-contract or semantic comparison because both arms failed at structured response validation.",
+      "request_hashes_differ": true
+    },
+    "c0": {
+      "committed_temperature": null,
+      "logical_call_reserved": false,
+      "model_request_present": false,
+      "observed_failure_boundary": "pre-delegation harness control validation",
+      "physical_attempt_recorded": false,
+      "required_planner_temperature": 0.0
+    }
+  },
+  "implementation_checkpoint": "1714a944181077fe1b63ac634b5d3f00459981e4",
+  "parent_checkpoint": "1714a944181077fe1b63ac634b5d3f00459981e4",
+  "published_digests": {
+    "evidence": "fad0ffd34169924759c3851109d4e70770e9fcfd6fe8a5a2a6c01dd610eceb77",
+    "journal": "22d0d381030881f0687ace522ecf0c55d70b9cbf67593569d131d59f19c6d467",
+    "model_io": "592bc3378fcb6dbb16b15695b173f727bb75753847289f33c769b5f68ec02fa2",
+    "state": "e9c2109719bf222e1227763ce114e30acd058a19c5546f3b4324584be4a9f6c9",
+    "summary": "8c8d42c4be1606d4a540a5c46ade986a09e55bcaf50b7da360ab99168f917c56",
+    "terminal": "790369c2faaae1b4ca2630ea66c2ff87b3ea1549760dadca01e3bde71a2224f3"
+  },
+  "repair_scope": {
+    "c0_control": "Use temperature=0.0 in the canonical revision request so C0 satisfies the accepted planner control contract.",
+    "endpoint_calls_during_repair": 0,
+    "loader": "Use scripts.nlp_d4_live_acceptance.load_d4_api_key for the default D5-5G live loader.",
+    "production_source_changes": 0,
+    "provider_model_calls_during_repair": 0,
+    "regressions": [
+      "default loader resolution without injection",
+      "C0 provider-free correction control",
+      "exactly one C0 logical correction call",
+      "five-case provider-free study proof"
+    ]
+  },
+  "sealed_artifact_root": "workspace/evaluations/d5-5g/qwen-live-001",
+  "sealed_artifacts_unchanged": true,
+  "terminal": {
+    "attribution": "D5G_SEMANTIC_REVALIDATION",
+    "completed_turns": 5,
+    "decision": "INCONCLUSIVE",
+    "endpoint_calls": 2,
+    "identity_endpoint_calls": 2,
+    "journal_shape": {
+      "campaign_started": 1,
+      "logical_call_completed": 4,
+      "logical_call_started": 4,
+      "terminal_events": [
+        {
+          "attribution": "D5G_SEMANTIC_REVALIDATION",
+          "decision": "INCONCLUSIVE",
+          "event": "campaign_terminal"
+        }
+      ]
+    },
+    "logical_generation_calls": 4,
+    "model_calls": 4,
+    "physical_generation_attempts": 4,
+    "provider_calls": 4,
+    "readiness_status": "LIVE_READY",
+    "status": "TERMINAL",
+    "terminal_digest_links": {
+      "evidence_sha256": "fad0ffd34169924759c3851109d4e70770e9fcfd6fe8a5a2a6c01dd610eceb77",
+      "journal_sha256": "22d0d381030881f0687ace522ecf0c55d70b9cbf67593569d131d59f19c6d467",
+      "model_io_sha256": "592bc3378fcb6dbb16b15695b173f727bb75753847289f33c769b5f68ec02fa2",
+      "state_snapshot_sha256": "e9c2109719bf222e1227763ce114e30acd058a19c5546f3b4324584be4a9f6c9"
+    }
+  }
+}

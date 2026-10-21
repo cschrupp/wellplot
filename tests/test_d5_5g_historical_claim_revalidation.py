@@ -259,6 +259,19 @@ def test_live_qwen_backend_does_not_add_structured_output_extra_body() -> None:
     assert 'request_options={"structured_output"' not in source
 
 
+def test_default_live_loader_uses_canonical_d4_loader(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The D5-5G live path reuses the accepted D4 credential discovery."""
+    observed: list[Path] = []
+
+    def loader(repo_root: Path) -> str:
+        observed.append(repo_root)
+        return "sentinel-token"
+
+    monkeypatch.setattr(d5g.d4, "load_d4_api_key", loader)
+    assert d5g._default_live_api_key_loader(REPO_ROOT) == "sentinel-token"
+    assert observed == [REPO_ROOT]
+
+
 def test_live_executor_consumes_a_b_c_variables_through_custody() -> None:
     """The provider-free live-shaped executor proves the actual controlled requests."""
     result = d5g._provider_free_live_executor_proof(REPO_ROOT)
@@ -269,6 +282,7 @@ def test_live_executor_consumes_a_b_c_variables_through_custody() -> None:
     assert result["c_validator_diagnostic"]["code"] == "unknown_capability"
     assert result["exact_wire_bodies_custodied"] is True
     assert result["logical_calls"] == 5
+    assert result["c_logical_calls"] == 1
     assert result["physical_attempts"] == 5
     assert len(result["loop_ids"]) == 5
     assert len(set(result["loop_ids"])) == 1

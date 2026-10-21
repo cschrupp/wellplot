@@ -440,7 +440,7 @@ def _canonical_revision_request(
         diagnostic=diagnostic,
         registry=create_builtin_registry(),
         timeout_seconds=900.0,
-        temperature=None,
+        temperature=0.0,
         max_output_tokens=None,
     )
     return {
@@ -1040,7 +1040,7 @@ async def _default_study_executor(
                 diagnostic=diagnostic,
                 registry=registry,
                 timeout_seconds=900.0,
-                temperature=None,
+                temperature=0.0,
                 max_output_tokens=None,
             )
             corrected_plan, correction_evidence = await _generate_semantic_plan(
@@ -1396,6 +1396,9 @@ async def _provider_free_live_executor_proof_async(repo_root: Path) -> dict[str,
             raise AssertionError("provider-free live C did not use the validator diagnostic")
         model_io = paths.model_io.read_text(encoding="utf-8")
         first_inspection = rows[0]["inspection_record"]
+        c_logical_calls = sum(
+            1 for record in dependencies.logical_records if record.get("turn_id") == "D5-5G-C0"
+        )
         return {
             "case_ids": [row["case_id"] for row in rows],
             "inspection_records": len(rows),
@@ -1403,6 +1406,7 @@ async def _provider_free_live_executor_proof_async(repo_root: Path) -> dict[str,
             "b_request_difference_paths": b_differences,
             "c_validator_diagnostic": c_row["validator_diagnostic"],
             "logical_calls": terminal["logical_generation_calls"],
+            "c_logical_calls": c_logical_calls,
             "physical_attempts": terminal["physical_generation_attempts"],
             "loop_ids": list(backend.loop_ids),
             "model_io_sha256": custody_digests["model_io_sha256"],
@@ -1431,6 +1435,11 @@ async def _provider_free_live_executor_proof_async(repo_root: Path) -> dict[str,
 def _provider_free_live_executor_proof(repo_root: Path) -> dict[str, Any]:
     """Run the provider-free five-case proof inside one event loop."""
     return asyncio.run(_provider_free_live_executor_proof_async(repo_root))
+
+
+def _default_live_api_key_loader(repo_root: Path) -> str:
+    """Load the canonical D4 credential for the D5-5G live path."""
+    return d4.load_d4_api_key(repo_root)
 
 
 def _build_live_study_dependencies(
@@ -1513,7 +1522,7 @@ def run_authorized_live_study(
     artifact_root = (repo_root / d5_authorization.artifact_root).resolve()
     paths = d5.EvidencePaths(artifact_root, d5_authorization.campaign_id)
     static = d5.provider_free_preflight(repo_root, d5_authorization, paths)
-    load_key = api_key_loader or (lambda: d5.load_d4_api_key(repo_root))
+    load_key = api_key_loader or (lambda: _default_live_api_key_loader(repo_root))
     if dependencies is None:
         readiness = d5.prepare_readiness(
             authorization=d5_authorization,
