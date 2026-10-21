@@ -7,13 +7,14 @@ final_rework_authority: WELLPLOT-D5-5G-PROVIDER-FREE-FINAL-IMPLEMENTATION-REWORK
 live_wiring_rework_authority: WELLPLOT-D5-5G-LIVE-WIRING-FINAL-REWORK-AUTH-001
 measurement_integrity_rework_authority: WELLPLOT-D5-5G-MEASUREMENT-INTEGRITY-FINAL-REWORK-AUTH-001
 execution_integrity_closeout_authority: WELLPLOT-D5-5G-LIVE-EXECUTION-INTEGRITY-CLOSEOUT-AUTH-001
+async_and_structured_failure_closeout_authority: WELLPLOT-D5-5G-ASYNC-AND-STRUCTURED-FAILURE-CLOSEOUT-AUTH-001
 design_checkpoint: 5e530db90babf50c9992f3829d1a11d3cc79e433
-rework_parent_checkpoint: c0c3f216bde257ee0c6f9e1e849d4922c8a8a6f0
+rework_parent_checkpoint: 10ddb9768c295800b108e87b16943131bad80d71
 implementation_base_checkpoint: 29b63dbf54041cc70a9a62664a9d939a2ccea833
 provider_model_calls: 0
 live_execution: NOT AUTHORIZED
 production_source_changes: 0
-rework_status: LIVE_EXECUTION_INTEGRITY_CLOSEOUT_READY_FOR_INDEPENDENT_REVIEW
+rework_status: ASYNC_AND_STRUCTURED_FAILURE_CLOSEOUT_READY_FOR_INDEPENDENT_REVIEW
 ```
 
 ## Provider-Free Proof
@@ -106,10 +107,25 @@ provider_free_live_executor:
   c_validator_diagnostic: unknown_capability
   logical_calls: 5
   physical_attempts: 5
+  one_shared_event_loop: PASS
+  loop_ids: one unique running-loop id across A0 / A1 / B0 / B1 / C0
   exact_wire_bodies_custodied: true
   case_failure_isolation: PASS / CASE-LOCAL TERMINAL EVIDENCE
   failed_case_replay: FORBIDDEN
   provider_model_calls: 0
+
+structured_failure_evidence:
+  invalid_json:
+    json_decode: FAIL
+    schema_validation: NOT_REACHED
+  schema_validation:
+    json_decode: PASS
+    schema_validation: FAIL
+    validation_shape: BOUNDED / PRESERVED
+  transport_or_provider_rejection:
+    json_decode: NOT_REACHED
+    schema_validation: NOT_REACHED
+  response_reason_and_validation_shape: PRESERVED_WHEN_AVAILABLE
 
 semantic_grading:
   expected_projection:
@@ -168,7 +184,7 @@ replace the wire hashes.
 ## Validation
 
 ```yaml
-focused_d5_5g_tests: 13 passed
+focused_d5_5g_tests: 14 passed
 model_io_custody_regression: 6 passed
 adversarial_classifier_and_inspection_tests: PASS
 comparative_provider_free_regression: 11 passed, 2 deselected
@@ -179,6 +195,8 @@ endpoint_calls: 0
 committed_production_diff_from_design_checkpoint: 0
 production_changes: 0
 execution_integrity_isolation_regression: PASS
+shared_event_loop_regression: PASS
+structured_failure_boundary_regression: PASS
 ```
 
 The existing D5-5 comparative regression is designed to require a clean

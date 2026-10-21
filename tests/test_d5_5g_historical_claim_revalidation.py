@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import json
 from pathlib import Path
@@ -10,6 +11,13 @@ from types import SimpleNamespace
 import pytest
 from scripts import d5_5g_historical_claim_revalidation as d5g
 from scripts import nlp_d4_live_acceptance as d4
+
+from wellplot.agent.providers.response_diagnostics import (
+    ProviderResponseFailureReason,
+    ProviderSchemaValidationIssue,
+    ProviderSchemaValidationShape,
+    StructuredResponseProviderError,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -97,7 +105,7 @@ def test_study_runner_executes_the_frozen_d5g_population() -> None:
         dependencies=SimpleNamespace(planner=object()),
         executor=executor,
     )
-    result = runner.run()
+    result = asyncio.run(runner.run())
     assert seen == [case["case_id"] for case in d5g.D5G_STUDY_CASES]
     assert [row["axis"] for row in result] == ["A", "A", "B", "B", "C"]
     assert all(row["case_id"] not in {"D4-C01", "D4-L01-T1"} for row in result)
@@ -133,11 +141,13 @@ def test_study_runner_isolates_provider_failure_and_continues() -> None:
         return {"case_status": "PASS", "first_divergence": None}
 
     custody = RecordingCustody()
-    rows = d5g.D5GStudyRunner(
-        dependencies=SimpleNamespace(),
-        executor=executor,
-        custody=custody,
-    ).run()
+    rows = asyncio.run(
+        d5g.D5GStudyRunner(
+            dependencies=SimpleNamespace(),
+            executor=executor,
+            custody=custody,
+        ).run()
+    )
 
     assert seen == [case["case_id"] for case in d5g.D5G_STUDY_CASES]
     assert [row["case_id"] for row in rows] == seen
@@ -148,6 +158,64 @@ def test_study_runner_isolates_provider_failure_and_continues() -> None:
     assert [row["case_id"] for row in custody.turns] == seen
     assert rows[3]["case_id"] == "D5-5G-B1"
     assert rows[4]["case_id"] == "D5-5G-C0"
+
+
+def test_structured_failure_inspection_preserves_parse_boundary() -> None:
+    """Provider diagnostics map to truthful JSON/schema boundary states."""
+    case = d5g.D5G_STUDY_CASES[0]
+
+    invalid_json = StructuredResponseProviderError(
+        "provider returned invalid JSON",
+        response_reason=ProviderResponseFailureReason.INVALID_JSON,
+    )
+    invalid_row = d5g._case_failure_result(
+        dependencies=SimpleNamespace(), case=case, error=invalid_json
+    )
+    invalid_boundary = invalid_row["inspection_record"]["sections"]["structured_output_boundary"]
+    assert invalid_boundary == {
+        "json_decode": "FAIL",
+        "schema_validation": "NOT_REACHED",
+        "response_reason": "invalid_json",
+    }
+
+    schema_error = StructuredResponseProviderError(
+        "provider response failed schema validation",
+        response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
+        validation_shape=ProviderSchemaValidationShape(
+            issue_count=1,
+            issues=(ProviderSchemaValidationIssue("missing", ("$root", "field")),),
+            truncated=False,
+        ),
+    )
+    schema_row = d5g._case_failure_result(
+        dependencies=SimpleNamespace(), case=case, error=schema_error
+    )
+    schema_boundary = schema_row["inspection_record"]["sections"]["structured_output_boundary"]
+    assert schema_boundary == {
+        "json_decode": "PASS",
+        "schema_validation": "FAIL",
+        "response_reason": "schema_validation",
+        "validation_shape": {
+            "issue_count": 1,
+            "issues": [{"error_type": "missing", "location": ["$root", "field"]}],
+            "truncated": False,
+        },
+    }
+
+    transport_error = d4.ProviderRequestError(
+        d4.ProviderFailureCategory.TRANSPORT,
+        "transport failed",
+    )
+    transport_row = d5g._case_failure_result(
+        dependencies=SimpleNamespace(), case=case, error=transport_error
+    )
+    transport_boundary = transport_row["inspection_record"]["sections"][
+        "structured_output_boundary"
+    ]
+    assert transport_boundary == {
+        "json_decode": "NOT_REACHED",
+        "schema_validation": "NOT_REACHED",
+    }
 
 
 def test_live_qwen_backend_does_not_add_structured_output_extra_body() -> None:
@@ -168,6 +236,8 @@ def test_live_executor_consumes_a_b_c_variables_through_custody() -> None:
     assert result["exact_wire_bodies_custodied"] is True
     assert result["logical_calls"] == 5
     assert result["physical_attempts"] == 5
+    assert len(result["loop_ids"]) == 5
+    assert len(set(result["loop_ids"])) == 1
     assert result["provider_model_calls"] == 0
     assert result["inspection_metadata"] == {
         "authorization_id": "d5-5g-provider-free-live-proof-auth",

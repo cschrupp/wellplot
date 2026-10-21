@@ -11,9 +11,10 @@ import argparse
 import asyncio
 import copy
 import hashlib
+import inspect
 import json
 import subprocess
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Awaitable, Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -859,6 +860,7 @@ def _inspection_for_case(
     response: Mapping[str, Any] | None,
     canonical_boundary: Mapping[str, Any],
     observed: Mapping[str, Any],
+    structured_boundary: Mapping[str, Any] | None = None,
     wire_custody: Mapping[str, Any] | None = None,
     execution_metadata: Mapping[str, Any] | None = None,
     first_divergence: str | None = None,
@@ -877,6 +879,11 @@ def _inspection_for_case(
             "provider_calls": 0,
             "model_calls": 0,
         }
+    if structured_boundary is None:
+        structured_boundary = {
+            "json_decode": "PASS",
+            "schema_validation": "PASS" if response is not None else "NOT_ESTABLISHED",
+        }
     return inspection_record(
         axis=str(case["axis"]),
         case_id=str(case["case_id"]),
@@ -884,16 +891,36 @@ def _inspection_for_case(
         model_input=dict(context),
         request=request,
         response=response,
-        structured_boundary={
-            "json_decode": "PASS",
-            "schema_validation": "PASS" if response is not None else "NOT_ESTABLISHED",
-        },
+        structured_boundary=structured_boundary,
         canonical_boundary=dict(canonical_boundary),
         observed=dict(observed),
         boundaries=boundaries,
         wire_custody=wire_custody,
         execution_metadata=execution_metadata,
     )
+
+
+def _structured_failure_boundary(error: Exception) -> dict[str, Any]:
+    """Project bounded provider diagnostics into accurate parse-state evidence."""
+    boundary = {
+        "json_decode": "NOT_REACHED",
+        "schema_validation": "NOT_REACHED",
+    }
+    response_reason = getattr(error, "response_reason", None)
+    reason = getattr(response_reason, "value", None)
+    if reason == "invalid_json":
+        boundary["json_decode"] = "FAIL"
+    elif reason == "schema_validation":
+        boundary["json_decode"] = "PASS"
+        boundary["schema_validation"] = "FAIL"
+    elif reason is not None:
+        boundary["json_decode"] = "PASS"
+    if reason is not None:
+        boundary["response_reason"] = reason
+    validation_shape = getattr(error, "validation_shape", None)
+    if validation_shape is not None:
+        boundary["validation_shape"] = validation_shape.to_json()
+    return boundary
 
 
 def _case_execution_metadata(
@@ -940,13 +967,16 @@ def _case_failure_result(
     if isinstance(error, d4.ProviderRequestError):
         first_divergence = "PROVIDER_OR_STRUCTURED"
         failure_category = error.category.value
-        canonical_boundary = {
-            "semantic_validation": "NOT_REACHED",
-            "provider_failure_category": failure_category,
-        }
+        structured_boundary = _structured_failure_boundary(error)
+        canonical_boundary = {"semantic_validation": "NOT_REACHED"}
+        canonical_boundary["provider_failure_category"] = failure_category
     else:
         first_divergence = "HARNESS"
         failure_category = "harness"
+        structured_boundary = {
+            "json_decode": "NOT_REACHED",
+            "schema_validation": "NOT_REACHED",
+        }
         canonical_boundary = {
             "semantic_validation": "NOT_REACHED",
             "failure_category": failure_category,
@@ -956,6 +986,7 @@ def _case_failure_result(
         context=context,
         request={},
         response=None,
+        structured_boundary=structured_boundary,
         canonical_boundary=canonical_boundary,
         observed={},
         wire_custody=wire_custody,
@@ -979,7 +1010,7 @@ def _case_failure_result(
     }
 
 
-def _default_study_executor(
+async def _default_study_executor(
     *,
     dependencies: object,
     case: Mapping[str, Any],
@@ -1014,8 +1045,8 @@ def _default_study_executor(
                 temperature=None,
                 max_output_tokens=None,
             )
-            corrected_plan, correction_evidence = asyncio.run(
-                _generate_semantic_plan(backend, correction_request)
+            corrected_plan, correction_evidence = await _generate_semantic_plan(
+                backend, correction_request
             )
             corrected_plan = validate_semantic_plan(corrected_plan, registry, mode="revise")
             observation = observe_canonical_correction_result(
@@ -1069,12 +1100,10 @@ def _default_study_executor(
         raise AssertionError("deterministic C0 seed passed canonical semantic validation")
 
     schema_override = response_schema if axis == "A" else None
-    plan, request_evidence = asyncio.run(
-        _generate_semantic_plan(
-            backend,
-            planning_request,
-            response_schema=schema_override,
-        )
+    plan, request_evidence = await _generate_semantic_plan(
+        backend,
+        planning_request,
+        response_schema=schema_override,
     )
     validation_error: PlannerSemanticError | None = None
     try:
@@ -1140,7 +1169,7 @@ class D5GStudyRunner:
         self,
         *,
         dependencies: object,
-        executor: Callable[..., Mapping[str, Any]] | None = None,
+        executor: Callable[..., Mapping[str, Any] | Awaitable[Mapping[str, Any]]] | None = None,
         custody: object | None = None,
     ) -> None:
         """Retain the canonical dependencies and an optional test executor."""
@@ -1148,7 +1177,7 @@ class D5GStudyRunner:
         self.executor = executor or _default_study_executor
         self.custody = custody
 
-    def run(self) -> list[dict[str, Any]]:
+    async def run(self) -> list[dict[str, Any]]:
         """Execute exactly the frozen five-case study population."""
         bind_custody = getattr(self.dependencies, "bind_custody", None)
         if self.custody is not None and callable(bind_custody):
@@ -1164,6 +1193,8 @@ class D5GStudyRunner:
                 set_active_turn(str(case["case_id"]))
             try:
                 result = self.executor(dependencies=self.dependencies, case=dict(case))
+                if inspect.isawaitable(result):
+                    result = await result
             except Exception as error:
                 result = _case_failure_result(
                     dependencies=self.dependencies,
@@ -1246,6 +1277,7 @@ class _ProviderFreeStudyBackend:
         self.call_completed: Callable[[dict[str, Any]], None] | None = None
         self.calls = 0
         self.requests: list[dict[str, Any]] = []
+        self.loop_ids: list[int] = []
 
     async def generate_structured(
         self,
@@ -1255,6 +1287,7 @@ class _ProviderFreeStudyBackend:
     ) -> StructuredGenerationResult[SemanticPlan]:
         """Capture the canonical request and return a deterministic plan."""
         self.calls += 1
+        self.loop_ids.append(id(asyncio.get_running_loop()))
         index = self.calls
         event = {
             "event": "logical_call_started",
@@ -1300,7 +1333,7 @@ class _ProviderFreeStudyBackend:
         return StructuredGenerationResult(value=value, metrics=ProviderMetrics())
 
 
-def _provider_free_live_executor_proof(repo_root: Path) -> dict[str, Any]:
+async def _provider_free_live_executor_proof_async(repo_root: Path) -> dict[str, Any]:
     """Run the actual D5G executor through fake transport and full custody."""
     with TemporaryDirectory(dir=repo_root) as temporary:
         root = Path(temporary)
@@ -1339,7 +1372,7 @@ def _provider_free_live_executor_proof(repo_root: Path) -> dict[str, Any]:
             live=False,
             endpoint_call_count=0,
         )
-        rows = D5GStudyRunner(dependencies=dependencies, custody=custody).run()
+        rows = await D5GStudyRunner(dependencies=dependencies, custody=custody).run()
         terminal = custody.finish("PASS", attribution="PROVIDER_FREE_EXECUTOR", rows=rows)
         custody_digests = d5.verify_custody_artifacts(paths)
         if len(rows) != len(D5G_STUDY_CASES) or any(
@@ -1373,6 +1406,7 @@ def _provider_free_live_executor_proof(repo_root: Path) -> dict[str, Any]:
             "c_validator_diagnostic": c_row["validator_diagnostic"],
             "logical_calls": terminal["logical_generation_calls"],
             "physical_attempts": terminal["physical_generation_attempts"],
+            "loop_ids": list(backend.loop_ids),
             "model_io_sha256": custody_digests["model_io_sha256"],
             "exact_wire_bodies_custodied": "physical_request" in model_io
             and "physical_response" in model_io,
@@ -1394,6 +1428,11 @@ def _provider_free_live_executor_proof(repo_root: Path) -> dict[str, Any]:
             },
             "provider_model_calls": 0,
         }
+
+
+def _provider_free_live_executor_proof(repo_root: Path) -> dict[str, Any]:
+    """Run the provider-free five-case proof inside one event loop."""
+    return asyncio.run(_provider_free_live_executor_proof_async(repo_root))
 
 
 def _build_live_study_dependencies(
@@ -1515,11 +1554,13 @@ def run_authorized_live_study(
         endpoint_call_count=len(readiness.endpoint_calls),
     )
     try:
-        results = D5GStudyRunner(
-            dependencies=live_dependencies,
-            executor=executor or _default_study_executor,
-            custody=custody,
-        ).run()
+        results = asyncio.run(
+            D5GStudyRunner(
+                dependencies=live_dependencies,
+                executor=executor or _default_study_executor,
+                custody=custody,
+            ).run()
+        )
         if any(row.get("case_status") == "INCONCLUSIVE" for row in results):
             decision = "INCONCLUSIVE"
         elif all(row.get("first_divergence") is None for row in results):
@@ -1695,13 +1736,15 @@ def verify_provider_free(repo_root: Path) -> dict[str, Any]:
         write_synthetic_inspection_artifact(inspection_path)
         inspection = json.loads(inspection_path.read_text(encoding="utf-8"))
     live_executor = _provider_free_live_executor_proof(repo_root)
-    study_results = D5GStudyRunner(
-        dependencies=object(),
-        executor=lambda *, dependencies, case: {
-            "first_divergence": None,
-            "canonical_engine": D5_5G_SINGLE_ENGINE_ENTRYPOINT,
-        },
-    ).run()
+    study_results = asyncio.run(
+        D5GStudyRunner(
+            dependencies=object(),
+            executor=lambda *, dependencies, case: {
+                "first_divergence": None,
+                "canonical_engine": D5_5G_SINGLE_ENGINE_ENTRYPOINT,
+            },
+        ).run()
+    )
     divergence_proof = {
         boundary: classify_first_divergence(
             {
