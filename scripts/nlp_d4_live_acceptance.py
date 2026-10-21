@@ -1250,6 +1250,9 @@ def _add_session_evidence(actual: dict[str, Any], result: object) -> None:
     actual["intent_applied"] = getattr(result, "submitted_intent", None) is not None
     actual["changed"] = bool(report_facts.get("changed", False))
     actual["diagnostic_code"] = diagnostics[0].get("code") if diagnostics else None
+    actual["failure_owner"] = (
+        diagnostics[0].get("stage") if diagnostics else compilation.get("failure_owner")
+    )
 
 
 def _document_channels(document: Mapping[str, Any]) -> list[str]:
@@ -2274,6 +2277,20 @@ def grade_turn(actual: dict[str, Any], expected: dict[str, Any]) -> dict[str, An
             errors.append("failure_bytes_changed")
         if not actual.get("diagnostic_code"):
             errors.append("missing_actionable_diagnostic")
+        expected_diagnostic_code = contract.get("expected_diagnostic_code")
+        if (
+            expected_diagnostic_code is not None
+            and actual.get("diagnostic_code") != expected_diagnostic_code
+        ):
+            errors.append("unexpected_diagnostic_code")
+        expected_failure_owner = contract.get("expected_failure_owner")
+        if (
+            expected_failure_owner is not None
+            and actual.get("failure_owner") != expected_failure_owner
+        ):
+            errors.append("unexpected_failure_owner")
+        if actual.get("persisted") is True:
+            errors.append("failure_persisted_artifact")
         if actual.get("canonical_before") != actual.get("canonical_after"):
             errors.append("failure_canonical_state_changed")
         if actual.get("intent_applied") is not False:

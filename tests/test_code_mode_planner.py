@@ -8,6 +8,7 @@ import json
 from dataclasses import dataclass, field
 
 import pytest
+from jsonschema import Draft202012Validator
 from pydantic import BaseModel, ValidationError
 
 from wellplot.agent.code_mode.planner import (
@@ -18,6 +19,7 @@ from wellplot.agent.code_mode.planner import (
     SemanticPlan,
     SemanticPlanner,
     _correction_request,
+    _safe_source_summary,
     _safe_task_for_correction,
     _schema_correction_request,
     validate_semantic_plan,
@@ -135,6 +137,53 @@ def test_semantic_schema_contains_no_document_identity_fields() -> None:
     assert not forbidden.intersection(schema_text)
     assert "existing_section_hint" in schema_text
     assert "capability_ids" in schema_text
+
+
+def test_provider_schema_requires_work_unit_and_revision_hint_key() -> None:
+    """The emitted schema carries settled structural requirements."""
+    schema = SemanticPlan.model_json_schema()
+    section_schema = schema["$defs"]["SectionTask"]
+    assert "existing_section_hint" in section_schema["required"]
+    assert list(Draft202012Validator(schema).iter_errors({"summary": "No work"}))
+    assert SemanticPlan.model_validate(
+        {
+            "summary": "Reconstruct a section.",
+            "section_tasks": [
+                {
+                    "goal": "Build the section.",
+                    "capability_ids": ["section.log_plot"],
+                    "existing_section_hint": None,
+                }
+            ],
+        }
+    )
+    with pytest.raises(ValidationError):
+        SemanticPlan.model_validate(
+            {
+                "summary": "Reconstruct a section.",
+                "section_tasks": [
+                    {"goal": "Build the section.", "capability_ids": ["section.log_plot"]}
+                ],
+            }
+        )
+
+
+def test_source_inventory_distinguishes_inspection_states() -> None:
+    """Inspected-empty, unavailable, and not-inspected remain distinct facts."""
+    summary = _safe_source_summary(
+        {
+            "sources": [
+                {"labels": ["empty"], "channels": [], "inspection_state": "inspected"},
+                {"labels": ["pending"], "channels": [], "inspection_state": "not_inspected"},
+                {"labels": ["missing"], "channels": [], "inspection_state": "unavailable"},
+            ]
+        }
+    )
+    assert [item["inspection_state"] for item in summary["sources"]] == [
+        "inspected",
+        "not_inspected",
+        "unavailable",
+    ]
 
 
 def test_semantic_models_are_strict_and_frozen() -> None:
@@ -382,6 +431,28 @@ def test_revise_plan_correction_receives_existing_section_hints() -> None:
     assert correction["current_document_summary"] == {
         "existing_section_hints": [{"title": "Main Pass", "subtitle": "CBL presentation"}]
     }
+    assert correction["diagnostic"]["authorized_repair_scope"] == [
+        "/section_tasks/*/existing_section_hint"
+    ]
+
+
+def test_correction_rejects_out_of_scope_plan_mutation() -> None:
+    """A semantic correction cannot rewrite unrelated request meaning."""
+    invalid = _plan_payload()
+    invalid["section_tasks"] = ({**invalid["section_tasks"][0], "existing_section_hint": None},)
+    corrected = {**_plan_payload(), "summary": "Unrelated rewritten request meaning."}
+    backend = _SequenceBackend(responses=[invalid, corrected])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(PlannerSemanticFailure) as caught:
+        asyncio.run(
+            planner.plan(
+                request="Revise the section.",
+                mode="revise",
+                timeout_seconds=5.0,
+            )
+        )
+    assert caught.value.code == "unauthorized_correction_change"
 
 
 def _invalid_plan_payload(kind: str) -> dict[str, object]:
@@ -1045,23 +1116,29 @@ def test_selected_capability_parent_closure_accepts_valid_sets(
     assert validate_semantic_plan(_section_plan(capability_ids), registry)
 
 
-@pytest.mark.parametrize(
-    "capability_ids, expected_parents",
-    (
-        (("section.log_plot", "binding.raster"), ("track.array",)),
-        (("section.log_plot", "binding.curve"), ("track.normal", "track.reference")),
-    ),
-)
-def test_selected_capability_parent_closure_reports_missing_parent(
-    capability_ids: tuple[str, ...],
-    expected_parents: tuple[str, ...],
-) -> None:
-    """Missing structural parents fail without host-side parent selection."""
-    with pytest.raises(PlannerSemanticError) as caught:
-        validate_semantic_plan(_section_plan(capability_ids), create_builtin_registry())
+def test_selected_capability_parent_closure_adds_unique_parent() -> None:
+    """A uniquely determined parent is added without another model call."""
+    plan = validate_semantic_plan(
+        _section_plan(("section.log_plot", "binding.raster")),
+        create_builtin_registry(),
+    )
+    assert plan.section_tasks[0].capability_ids == (
+        "section.log_plot",
+        "binding.raster",
+        "track.array",
+    )
 
-    assert caught.value.code == "missing_capability_parent"
-    for parent in expected_parents:
+
+def test_selected_capability_parent_closure_rejects_ambiguity() -> None:
+    """Multiple legal parents remain a bounded machine-readable failure."""
+    with pytest.raises(PlannerSemanticError) as caught:
+        validate_semantic_plan(
+            _section_plan(("section.log_plot", "binding.curve")),
+            create_builtin_registry(),
+        )
+
+    assert caught.value.code == "ambiguous_capability_parent"
+    for parent in ("track.normal", "track.reference"):
         assert parent in caught.value.safe_message
 
 
@@ -1122,8 +1199,8 @@ def test_duplicate_plan_enters_correction_without_host_normalization() -> None:
     ]
 
 
-def test_missing_parent_enters_correction_without_host_injection() -> None:
-    """A parent gap is corrected by the planner rather than closed deterministically."""
+def test_missing_unique_parent_is_closed_without_correction() -> None:
+    """A unique parent is host-owned and does not consume a correction call."""
     invalid = _plan_payload()
     invalid["section_tasks"] = (
         {
@@ -1131,29 +1208,19 @@ def test_missing_parent_enters_correction_without_host_injection() -> None:
             "capability_ids": ("section.log_plot", "binding.raster"),
         },
     )
-    corrected = _plan_payload()
-    corrected["section_tasks"] = (
-        {
-            **corrected["section_tasks"][0],
-            "capability_ids": ("section.log_plot", "track.array", "binding.raster"),
-        },
-    )
-    backend = _SequenceBackend(responses=[invalid, corrected])
+    backend = _SequenceBackend(responses=[invalid])
     planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
 
     result = asyncio.run(
         planner.plan(request="Build a section.", mode="reconstruct", timeout_seconds=5.0)
     )
 
-    assert result == SemanticPlan.model_validate(corrected)
-    assert len(backend.requests) == 2
-    correction = json.loads(backend.requests[1].user_prompt.split("Correction context:\n", 1)[1])
-    assert correction["diagnostic"]["code"] == "missing_capability_parent"
-    assert correction["diagnostic"]["message"]
-    assert correction["previous_plan"]["section_tasks"][0]["capability_ids"] == [
+    assert result.section_tasks[0].capability_ids == (
         "section.log_plot",
         "binding.raster",
-    ]
+        "track.array",
+    )
+    assert len(backend.requests) == 1
 
 
 def test_invalid_duplicate_correction_stays_bounded() -> None:
@@ -1177,8 +1244,8 @@ def test_invalid_duplicate_correction_stays_bounded() -> None:
     assert len(backend.requests) == 2
 
 
-def test_invalid_parent_correction_stays_bounded() -> None:
-    """A parent gap surviving correction becomes a bounded typed failure."""
+def test_unique_parent_closure_is_recursive_and_bounded() -> None:
+    """Nested unique parents are added without planner recursion."""
     invalid = _plan_payload()
     invalid["section_tasks"] = (
         {
@@ -1186,16 +1253,14 @@ def test_invalid_parent_correction_stays_bounded() -> None:
             "capability_ids": ("section.log_plot", "binding.raster"),
         },
     )
-    backend = _SequenceBackend(responses=[invalid, invalid])
+    backend = _SequenceBackend(responses=[invalid])
     planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
 
-    with pytest.raises(PlannerSemanticFailure) as caught:
-        asyncio.run(
-            planner.plan(request="Build a section.", mode="reconstruct", timeout_seconds=5.0)
-        )
-
-    assert caught.value.code == "missing_capability_parent"
-    assert len(backend.requests) == 2
+    result = asyncio.run(
+        planner.plan(request="Build a section.", mode="reconstruct", timeout_seconds=5.0)
+    )
+    assert result.section_tasks[0].capability_ids[-1] == "track.array"
+    assert len(backend.requests) == 1
 
 
 def _synthetic_registry() -> CapabilityRegistry:
@@ -1235,9 +1300,12 @@ def test_parent_closure_uses_registry_metadata_for_synthetic_capabilities() -> N
     incomplete = _section_plan(("section.synthetic", "binding.synthetic"))
     complete = _section_plan(("section.synthetic", "track.synthetic", "binding.synthetic"))
 
-    with pytest.raises(PlannerSemanticError) as caught:
-        validate_semantic_plan(incomplete, registry)
-    assert caught.value.code == "missing_capability_parent"
+    closed = validate_semantic_plan(incomplete, registry)
+    assert closed.section_tasks[0].capability_ids == (
+        "section.synthetic",
+        "binding.synthetic",
+        "track.synthetic",
+    )
     assert validate_semantic_plan(complete, registry) == complete
 
 

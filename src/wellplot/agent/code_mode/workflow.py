@@ -68,6 +68,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
             }
             for section in inspection.sections()
         ]
+        summary["revision_inventory"] = _revision_inventory(inspection)
         plan = await dependencies.planner.plan(
             request=state["request"],
             mode=state.get("mode", "reconstruct"),
@@ -399,15 +400,27 @@ def _worker_payload(
 
 
 def _planner_source_summary(state: CodeModeGraphState) -> dict[str, object]:
-    """Build provider-safe source facts without candidate identities or paths."""
+    """Build provider-safe source facts with explicit inspection state."""
     candidates = [
         SourceCandidate.model_validate(candidate)
         for candidate in state.get("source_candidates", [])
     ]
     return {
         "version": "cm56r3.source-summary.v1",
-        "sources": [{"labels": list(candidate.labels), "channels": []} for candidate in candidates],
+        "sources": [
+            {
+                "labels": list(candidate.labels),
+                "channels": [],
+                "inspection_state": candidate.inspection_state,
+            }
+            for candidate in candidates
+        ],
     }
+
+
+def _revision_inventory(inspection: AuthoringInspectionFacade) -> list[dict[str, object]]:
+    """Expose semantic revision facts without host IDs or mutation handles."""
+    return [dict(item) for item in inspection.semantic_inventory()]
 
 
 def _isolated_section_context(

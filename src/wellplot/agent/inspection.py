@@ -240,6 +240,51 @@ class AuthoringInspectionFacade:
             for candidate in ordered
         )
 
+    def semantic_inventory(self) -> tuple[dict[str, object], ...]:
+        """Return addressable revision facts without canonical identities."""
+        inventory: list[dict[str, object]] = []
+        for section in self._document.sections:
+            tracks: list[dict[str, object]] = []
+            for track in section.tracks:
+                bindings: list[dict[str, object]] = []
+                for binding in getattr(track, "bindings", ()):
+                    scale = getattr(binding, "scale", None)
+                    bindings.append(
+                        {
+                            "kind": binding.kind,
+                            "channel": binding.channel,
+                            "label": getattr(binding, "label", None),
+                            "scale": (
+                                None
+                                if scale is None
+                                else {
+                                    "kind": scale.kind,
+                                    "minimum": scale.minimum,
+                                    "maximum": scale.maximum,
+                                    "reverse": scale.reverse,
+                                    "unit": scale.unit,
+                                }
+                            ),
+                        }
+                    )
+                tracks.append(
+                    {
+                        "title": track.title,
+                        "kind": track.kind,
+                        "width_mm": track.width_mm,
+                        "bindings": bindings,
+                    }
+                )
+            inventory.append(
+                {
+                    "title": section.title,
+                    "subtitle": section.subtitle,
+                    "depth_range": section.depth_range,
+                    "tracks": tracks,
+                }
+            )
+        return tuple(inventory)
+
     def _section(self, section_id: str) -> AuthoringSectionSpec:
         """Resolve a section through the fixed section-scoped API."""
         for section in self._document.sections:

@@ -8,7 +8,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from ...capabilities import CapabilityRegistry
 from ..providers.base import (
@@ -64,10 +64,27 @@ class SectionTask(_SemanticModel):
 
     goal: str = Field(min_length=1)
     capability_ids: tuple[str, ...] = Field(min_length=1)
-    existing_section_hint: str | None = Field(default=None, min_length=1)
+    # The key is part of the provider contract even when reconstruction has no
+    # existing target.  Revisions reject the explicit null during validation.
+    existing_section_hint: str | None = Field(min_length=1)
     source_hints: tuple[str, ...] = ()
     requirements: tuple[str, ...] = ()
     constraints: tuple[str, ...] = ()
+
+    def __init__(self, **data: object) -> None:
+        """Allow host-side construction to spell reconstruction null explicitly."""
+        # Provider/model validation still uses ``model_validate`` and therefore
+        # rejects an omitted key.  This convenience keeps existing host-side
+        # constructors equivalent to an explicit reconstruction null.
+        data.setdefault("existing_section_hint", None)
+        super().__init__(**data)
+
+    @classmethod
+    def model_validate(cls, obj: object, **kwargs: object) -> SectionTask:
+        """Reject omitted revision keys when validating provider-shaped mappings."""
+        if isinstance(obj, Mapping) and "existing_section_hint" not in obj:
+            raise _missing_section_hint_error(obj)
+        return super().model_validate(obj, **kwargs)
 
     @field_validator("capability_ids", "source_hints", "requirements", "constraints")
     @classmethod
@@ -80,10 +97,17 @@ class SectionTask(_SemanticModel):
 class PlannerSemanticError(ValueError):
     """One expected semantic error in provider-produced planner output."""
 
-    def __init__(self, code: str, safe_message: str) -> None:
+    def __init__(
+        self,
+        code: str,
+        safe_message: str,
+        *,
+        affected_paths: tuple[str, ...] = (),
+    ) -> None:
         """Initialize a stable, provider-safe correction diagnostic."""
         self.code = code
         self.safe_message = safe_message
+        self.affected_paths = affected_paths or _default_repair_scope(code)
         super().__init__(safe_message)
 
 
@@ -105,6 +129,24 @@ class SemanticPlan(_SemanticModel):
     section_tasks: tuple[SectionTask, ...] = ()
     unresolved_requirements: tuple[str, ...] = ()
 
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        str_strip_whitespace=True,
+        json_schema_extra=lambda schema: _add_work_unit_schema_constraint(schema),
+    )
+
+    @classmethod
+    def model_validate(cls, obj: object, **kwargs: object) -> SemanticPlan:
+        """Apply the required revision-key check to nested provider mappings."""
+        if isinstance(obj, Mapping):
+            section_tasks = obj.get("section_tasks", ())
+            if isinstance(section_tasks, (list, tuple)):
+                for task in section_tasks:
+                    if isinstance(task, Mapping) and "existing_section_hint" not in task:
+                        raise _missing_section_hint_error(task)
+        return super().model_validate(obj, **kwargs)
+
     @model_validator(mode="after")
     def validate_work_units(self) -> SemanticPlan:
         """Require at least one report or section work unit."""
@@ -118,6 +160,119 @@ class SemanticPlan(_SemanticModel):
         """Reject blank unresolved requirements."""
         _require_nonempty_items(values)
         return values
+
+
+def _add_work_unit_schema_constraint(schema: dict[str, object]) -> None:
+    """Require a report or section work unit in the emitted provider schema."""
+    constraints = schema.setdefault("allOf", [])
+    if not isinstance(constraints, list):
+        raise TypeError("SemanticPlan schema allOf must be a list.")
+    constraints.append(
+        {
+            "anyOf": [
+                {"required": ["report_task"]},
+                {"required": ["section_tasks"]},
+            ]
+        }
+    )
+
+
+def _missing_section_hint_error(input_value: object) -> ValidationError:
+    """Build the standard Pydantic missing-field error for provider mappings."""
+    return ValidationError.from_exception_data(
+        "SectionTask",
+        [
+            {
+                "type": "missing",
+                "loc": ("existing_section_hint",),
+                "input": input_value,
+            }
+        ],
+    )
+
+
+def _default_repair_scope(code: str) -> tuple[str, ...]:
+    """Return the narrow canonical path scope for one semantic diagnostic."""
+    if code == "missing_existing_section_hint":
+        return ("/section_tasks/*/existing_section_hint",)
+    if code in {
+        "unknown_capability",
+        "noncanonical_capability",
+        "duplicate_capability",
+        "ambiguous_capability_parent",
+        "noncanonical_capability_parent",
+        "missing_capability_parent",
+        "missing_section_capability",
+        "wrong_task_category",
+    }:
+        return ("/report_task/capability_ids", "/section_tasks/*/capability_ids")
+    return ()
+
+
+def _assert_correction_scope(
+    before: SemanticPlan,
+    after: SemanticPlan,
+    diagnostic: PlannerSemanticError,
+) -> None:
+    """Reject any correction that changes a path outside its typed scope."""
+    changed_paths = _semantic_plan_changed_paths(
+        before.model_dump(mode="json"),
+        after.model_dump(mode="json"),
+    )
+    if all(_path_matches_scope(path, diagnostic.affected_paths) for path in changed_paths):
+        return
+    unauthorized = [
+        path for path in changed_paths if not _path_matches_scope(path, diagnostic.affected_paths)
+    ]
+    raise PlannerSemanticFailure(
+        "unauthorized_correction_change",
+        "Semantic correction changed paths outside its authorized repair scope: "
+        + ", ".join(unauthorized),
+    )
+
+
+def _semantic_plan_changed_paths(
+    before: object,
+    after: object,
+    path: str = "",
+) -> tuple[str, ...]:
+    """Return deterministic JSON-pointer-like leaf paths changed by a correction."""
+    if isinstance(before, Mapping) and isinstance(after, Mapping):
+        paths: list[str] = []
+        for key in sorted(set(before) | set(after)):
+            child = f"{path}/{key}"
+            if key not in before or key not in after:
+                paths.append(child)
+            else:
+                paths.extend(_semantic_plan_changed_paths(before[key], after[key], child))
+        return tuple(paths)
+    if isinstance(before, list) and isinstance(after, list):
+        paths = []
+        for index in range(max(len(before), len(after))):
+            child = f"{path}/{index}"
+            if index >= len(before) or index >= len(after):
+                paths.append(child)
+            else:
+                paths.extend(_semantic_plan_changed_paths(before[index], after[index], child))
+        return tuple(paths)
+    return () if before == after else (path or "/",)
+
+
+def _path_matches_scope(path: str, scopes: tuple[str, ...]) -> bool:
+    """Match one changed path against a scope with one-segment wildcards."""
+    path_parts = path.strip("/").split("/") if path.strip("/") else []
+    for scope in scopes:
+        scope_parts = scope.strip("/").split("/") if scope.strip("/") else []
+        if len(path_parts) < len(scope_parts):
+            continue
+        if all(
+            expected == "*" or expected == actual
+            for expected, actual in zip(scope_parts, path_parts, strict=False)
+        ):
+            # A declared field scope authorizes changes within that semantic
+            # collection, including list-element additions/removals.
+            return True
+    return False
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,6 +366,10 @@ class SemanticPlanner:
             )
             corrected_plan = SemanticPlan.model_validate(corrected.value)
             try:
+                _assert_correction_scope(plan, corrected_plan, first_error)
+            except PlannerSemanticFailure:
+                raise
+            try:
                 return validate_semantic_plan(corrected_plan, self.registry, mode=mode)
             except PlannerSemanticError as second_error:
                 raise PlannerSemanticFailure(
@@ -226,15 +385,25 @@ def validate_semantic_plan(
     mode: CompilationMode = "reconstruct",
 ) -> SemanticPlan:
     """Validate capabilities and revision target contracts without host resolution."""
+    closed_report_task = None
     if plan.report_task is not None:
-        report_specs = _validate_capabilities(
+        _validate_capabilities(
             plan.report_task.capability_ids,
             registry,
             task_kind="report",
         )
         _validate_unique_capabilities(plan.report_task.capability_ids)
-        _validate_parent_closure(report_specs, plan.report_task.capability_ids)
+        closed_report_task = plan.report_task.model_copy(
+            update={
+                "capability_ids": _close_capability_parents(
+                    plan.report_task.capability_ids,
+                    registry,
+                    task_path="/report_task/capability_ids",
+                )
+            }
+        )
 
+    closed_section_tasks: list[SectionTask] = []
     for task in plan.section_tasks:
         if mode == "revise" and task.existing_section_hint is None:
             raise PlannerSemanticError(
@@ -257,8 +426,20 @@ def validate_semantic_plan(
                 "wrong_task_category",
                 "SectionTask selected a report capability.",
             )
-        _validate_parent_closure(specs, task.capability_ids)
-    return plan
+        closed_capabilities = _close_capability_parents(
+            task.capability_ids,
+            registry,
+            task_path="/section_tasks/*/capability_ids",
+        )
+        closed_section_tasks.append(task.model_copy(update={"capability_ids": closed_capabilities}))
+    if closed_report_task is None and not closed_section_tasks:
+        return plan
+    return plan.model_copy(
+        update={
+            "report_task": closed_report_task,
+            "section_tasks": tuple(closed_section_tasks),
+        }
+    )
 
 
 def _validate_capabilities(
@@ -304,22 +485,58 @@ def _validate_unique_capabilities(capability_ids: tuple[str, ...]) -> None:
     )
 
 
+def _close_capability_parents(
+    capability_ids: tuple[str, ...],
+    registry: CapabilityRegistry,
+    *,
+    task_path: str,
+) -> tuple[str, ...]:
+    """Add only uniquely determined parents while preserving provider order."""
+    ordered = list(capability_ids)
+    selected = set(ordered)
+    additions: list[str] = []
+    cursor = 0
+    while cursor < len(ordered):
+        capability_id = ordered[cursor]
+        spec = registry.get(capability_id)
+        allowed_parents = tuple(getattr(spec, "allowed_parents", ()))
+        if allowed_parents and not selected.intersection(allowed_parents):
+            if len(allowed_parents) != 1:
+                parent_text = ", ".join(allowed_parents)
+                raise PlannerSemanticError(
+                    "ambiguous_capability_parent",
+                    f"Capability {spec.capability_id!r} requires one selected parent "
+                    f"from the legal alternatives: {parent_text}.",
+                    affected_paths=(task_path,),
+                )
+            parent = allowed_parents[0]
+            parent_spec = registry.get(parent)
+            if parent_spec.capability_id != parent:
+                raise PlannerSemanticError(
+                    "noncanonical_capability_parent",
+                    "A capability parent resolved to a non-canonical identifier.",
+                    affected_paths=(task_path,),
+                )
+            selected.add(parent)
+            additions.append(parent)
+            ordered.append(parent)
+        cursor += 1
+    return (*capability_ids, *sorted(set(additions) - set(capability_ids)))
+
+
 def _validate_parent_closure(
     specs: tuple[object, ...],
     capability_ids: tuple[str, ...],
 ) -> None:
-    """Require every selected capability to include one registered parent."""
+    """Retained compatibility helper for callers auditing a closed selection."""
     selected = set(capability_ids)
     for spec in specs:
         allowed_parents = tuple(getattr(spec, "allowed_parents", ()))
-        if not allowed_parents or selected.intersection(allowed_parents):
-            continue
-        parent_text = ", ".join(allowed_parents)
-        raise PlannerSemanticError(
-            "missing_capability_parent",
-            f"Capability {spec.capability_id!r} requires one selected parent capability "
-            f"from: {parent_text}.",
-        )
+        if allowed_parents and not selected.intersection(allowed_parents):
+            raise PlannerSemanticError(
+                "missing_capability_parent",
+                f"Capability {spec.capability_id!r} has no selected legal parent.",
+            )
 
 
 def _planning_catalog(registry: CapabilityRegistry) -> tuple[dict[str, object], ...]:
@@ -405,6 +622,8 @@ def _correction_request(
         "diagnostic": {
             "code": diagnostic.code,
             "message": diagnostic.safe_message,
+            "affected_paths": list(diagnostic.affected_paths),
+            "authorized_repair_scope": list(diagnostic.affected_paths),
         },
     }
     return StructuredGenerationRequest(
@@ -437,13 +656,18 @@ def _safe_task_for_correction(task: ReportTask | SectionTask) -> dict[str, objec
     payload: dict[str, object] = {
         "goal": _safe_correction_text(task.goal),
         "capability_ids": list(task.capability_ids),
+        "existing_section_hint": (
+            None
+            if not isinstance(task, SectionTask) or task.existing_section_hint is None
+            else _safe_correction_text(task.existing_section_hint)
+        ),
         "requirements": [_safe_correction_text(value) for value in task.requirements],
         "constraints": [_safe_correction_text(value) for value in task.constraints],
     }
     if isinstance(task, SectionTask):
-        if task.existing_section_hint is not None:
-            payload["existing_section_hint"] = _safe_correction_text(task.existing_section_hint)
         payload["source_hints"] = [_safe_correction_text(value) for value in task.source_hints]
+    else:
+        payload.pop("existing_section_hint")
     return payload
 
 
@@ -466,6 +690,9 @@ def _safe_source_summary(summary: Mapping[str, object] | None) -> dict[str, obje
             raise ValueError("Source summary entries must be mappings.")
         raw_labels = raw_source.get("labels", ())
         raw_channels = raw_source.get("channels", ())
+        inspection_state = raw_source.get("inspection_state", "not_inspected")
+        if inspection_state not in {"inspected", "not_inspected", "unavailable"}:
+            raise ValueError("Source inspection state is invalid.")
         if not isinstance(raw_labels, (list, tuple)):
             raise ValueError("Source summary labels must be a sequence.")
         if not isinstance(raw_channels, (list, tuple)):
@@ -493,7 +720,13 @@ def _safe_source_summary(summary: Mapping[str, object] | None) -> dict[str, obje
             for label in raw_labels
             if isinstance(label, str) and label.strip()
         ]
-        sources.append({"labels": labels, "channels": channels})
+        sources.append(
+            {
+                "labels": labels,
+                "channels": channels,
+                "inspection_state": inspection_state,
+            }
+        )
 
     version = summary.get("version", "1")
     return {
@@ -503,7 +736,7 @@ def _safe_source_summary(summary: Mapping[str, object] | None) -> dict[str, obje
 
 
 def _safe_document_summary(summary: Mapping[str, object] | None) -> dict[str, object]:
-    """Project only section title clues needed for bounded plan correction."""
+    """Project semantic revision facts without canonical host identities."""
     if summary is None:
         return {"existing_section_hints": []}
     raw_hints = summary.get("existing_section_hints", ())
@@ -526,7 +759,62 @@ def _safe_document_summary(summary: Mapping[str, object] | None) -> dict[str, ob
                 "subtitle": (None if subtitle is None else _safe_correction_text(subtitle)),
             }
         )
-    return {"existing_section_hints": hints}
+    raw_inventory = summary.get("revision_inventory")
+    if raw_inventory is None:
+        return {"existing_section_hints": hints}
+    if not isinstance(raw_inventory, (list, tuple)):
+        raise ValueError("Document revision inventory must be a sequence.")
+    inventory: list[dict[str, object]] = []
+    for raw_section in raw_inventory:
+        if not isinstance(raw_section, Mapping):
+            raise ValueError("Document revision inventory entries must be mappings.")
+        tracks = raw_section.get("tracks", ())
+        if not isinstance(tracks, (list, tuple)):
+            raise ValueError("Document revision inventory tracks must be a sequence.")
+        safe_tracks: list[dict[str, object]] = []
+        for raw_track in tracks:
+            if not isinstance(raw_track, Mapping):
+                raise ValueError("Document revision inventory tracks must be mappings.")
+            bindings = raw_track.get("bindings", ())
+            if not isinstance(bindings, (list, tuple)):
+                raise ValueError("Document revision inventory bindings must be a sequence.")
+            safe_bindings = []
+            for raw_binding in bindings:
+                if not isinstance(raw_binding, Mapping):
+                    raise ValueError("Document revision inventory bindings must be mappings.")
+                safe_bindings.append(
+                    {
+                        "kind": _safe_correction_text(str(raw_binding.get("kind", ""))),
+                        "channel": _safe_correction_text(str(raw_binding.get("channel", ""))),
+                        "label": (
+                            None
+                            if raw_binding.get("label") is None
+                            else _safe_correction_text(str(raw_binding.get("label")))
+                        ),
+                        "scale": raw_binding.get("scale"),
+                    }
+                )
+            safe_tracks.append(
+                {
+                    "title": _safe_correction_text(str(raw_track.get("title", ""))),
+                    "kind": _safe_correction_text(str(raw_track.get("kind", ""))),
+                    "width_mm": raw_track.get("width_mm"),
+                    "bindings": safe_bindings,
+                }
+            )
+        inventory.append(
+            {
+                "title": _safe_correction_text(str(raw_section.get("title", ""))),
+                "subtitle": (
+                    None
+                    if raw_section.get("subtitle") is None
+                    else _safe_correction_text(str(raw_section.get("subtitle")))
+                ),
+                "depth_range": raw_section.get("depth_range"),
+                "tracks": safe_tracks,
+            }
+        )
+    return {"existing_section_hints": hints, "revision_inventory": inventory}
 
 
 def _require_nonempty_items(values: tuple[str, ...]) -> None:

@@ -479,12 +479,20 @@ of current authority.
   capability conclusions are drawn.
 - Non-rediscovery preflight and baseline freshness are required for dependent
   work.
+- D5-5H baseline-compliance repairs are now implemented on the canonical path:
+  provider work-unit parity, nullable-but-required revision hints,
+  deterministic unique capability closure, semantic revision inventory,
+  explicit source inspection states, bounded negative grading, and
+  correction-scope preservation.
 
 ### Changed
 
 - Evidence strength is now explicitly separate from project knowledge status.
 - Accepted results require a Knowledge Delta and active-baseline update before
   dependent slices proceed.
+- The D5 production attestation now hashes the H-01/H-03 canonical source
+  surfaces from the accepted implementation checkpoint; the component set is
+  unchanged.
 
 ### Superseded
 
@@ -496,6 +504,8 @@ of current authority.
 ### New open questions
 
 - O-01 through O-05 above remain open pending a separately authorized study.
+- G7 end-to-end preservation success remains open; only the deterministic
+  machine-readable scope and before/after path-diff guard are promoted.
 
 ### No-change findings
 
@@ -510,3 +520,6 @@ of current authority.
   causal-negative, and request/verifier consistency checks before qualification.
 - Any dependent design must cite this baseline and complete the methodology
   non-rediscovery preflight.
+- Provider-free acceptance must retain the exact H-01 through H-08 contract
+  checks and must not treat the unavailable historical tutorial DLIS asset as
+  a semantic result.

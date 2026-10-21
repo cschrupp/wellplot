@@ -275,7 +275,13 @@ def test_graph_plans_at_zero_and_keeps_source_summary_path_free() -> None:
     assert planner.source_summaries == [
         {
             "version": "cm56r3.source-summary.v1",
-            "sources": [{"labels": ["main pass"], "channels": []}],
+            "sources": [
+                {
+                    "labels": ["main pass"],
+                    "channels": [],
+                    "inspection_state": "not_inspected",
+                }
+            ],
         }
     ]
 
@@ -293,6 +299,24 @@ def test_graph_planner_context_exposes_safe_existing_section_hints() -> None:
     assert planner.summaries[0]["existing_section_hints"] == [
         {"title": "Existing section", "subtitle": None}
     ]
+    assert planner.summaries[0]["revision_inventory"] == [
+        {
+            "title": "Existing section",
+            "subtitle": None,
+            "depth_range": None,
+            "tracks": [
+                {
+                    "title": "Existing track",
+                    "kind": "normal",
+                    "width_mm": 20.0,
+                    "bindings": [],
+                }
+            ],
+        }
+    ]
+    inventory_text = json.dumps(planner.summaries[0]["revision_inventory"], sort_keys=True)
+    assert "existing-track" not in inventory_text
+    assert "section_id" not in inventory_text
 
 
 def test_graph_failure_is_atomic_and_keeps_bounded_diagnostics() -> None:

@@ -1395,6 +1395,34 @@ def test_turn_grader_requires_zero_mutation_for_safe_failures() -> None:
     assert d4.grade_turn(unsafe, expected)["status"] == "FAIL"
 
 
+def test_turn_grader_can_require_causal_negative_identity() -> None:
+    """Negative evidence names the expected diagnostic owner and code."""
+    expected = {
+        "turn_id": "D5-5H-G8",
+        "expected_outcome": "SAFE_ACTIONABLE_FAILURE",
+        "contract": {
+            "kind": "safety",
+            "expected_diagnostic_code": "enrichment.source_missing",
+            "expected_failure_owner": "enrichment",
+            "required_false_flags": ["intent_applied", "persisted", "rendered"],
+        },
+    }
+    actual = {
+        "changed": False,
+        "pre_bytes_sha256": "same",
+        "post_bytes_sha256": "same",
+        "diagnostic_code": "enrichment.source_missing",
+        "failure_owner": "enrichment",
+        "canonical_before": {"title": "same"},
+        "canonical_after": {"title": "same"},
+        "intent_applied": False,
+        "persisted": False,
+        "rendered": False,
+    }
+    assert d4.grade_turn(actual, expected)["status"] == "PASS"
+    assert d4.grade_turn({**actual, "failure_owner": "planner"}, expected)["status"] == "FAIL"
+
+
 _D4_REHEARSAL_LAS = """~Version Information
  VERS.                  2.0:   CWLS log ASCII standard - VERSION 2.0
  WRAP.                   NO:   One line per depth step

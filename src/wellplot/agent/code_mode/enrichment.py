@@ -41,6 +41,7 @@ class SourceCandidate(_EnrichmentModel):
     path: str = Field(min_length=1)
     labels: tuple[str, ...] = ()
     trusted_format: SourceFormat | None = None
+    inspection_state: Literal["inspected", "not_inspected", "unavailable"] = "not_inspected"
 
     @field_validator("labels")
     @classmethod
@@ -84,6 +85,7 @@ class SourceContext(_EnrichmentModel):
     labels: tuple[str, ...] = ()
     canonical_path: str = Field(min_length=1)
     source_format: SourceFormat
+    inspection_state: Literal["inspected", "not_inspected", "unavailable"] = "inspected"
     dataset_name: str = ""
     well_metadata: tuple[SourceMetadata, ...] = ()
     channels: tuple[ChannelContext, ...] = ()
