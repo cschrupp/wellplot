@@ -276,15 +276,19 @@
   "causal_boundary": {
     "first_divergence_rule": "The earliest supported boundary is PROVIDER_OR_STRUCTURED for A0/A1/B0/B1 and HARNESS for C0; later semantic claims are inadmissible.",
     "not_proven": [
-      "The exact server-side reason the provider produced incomplete SemanticPlan content is not identified by the retained bounded error shape.",
-      "No conclusion about Qwen semantic capability, prompt sufficiency, schema design, or model quality is scientifically supported by this campaign alone.",
-      "A/B effects cannot be estimated because neither arm produced a valid canonical plan."
+      "The reason Qwen selected the provider-schema-admitted no-work-unit object is not established.",
+      "No conclusion about Qwen semantic capability, prompt sufficiency, provider structured-output behavior, or model quality is scientifically supported by this campaign alone.",
+      "A/B effects cannot be estimated because neither arm produced a valid canonical plan.",
+      "C correction preservation cannot be evaluated because C0 failed before its correction call."
     ],
     "supported": [
       "A0, A1, B0, and B1 reached the provider and returned HTTP 200.",
-      "All four real calls stopped at the same bounded schema-validation shape: one value_error at $root.",
+      "All four real calls returned JSON with summary and unresolved_requirements but neither report_task nor section_tasks.",
+      "SemanticPlan.validate_work_units() requires at least one report_task or section_tasks entry and raised ValueError at $root.",
+      "The provider-facing schema admitted the no-work-unit shape while the canonical runtime invariant rejected it.",
       "Canonical semantic validation and scientific grading were not reached for those four cases.",
-      "C0 failed before provider delegation, with zero model/provider calls for C0."
+      "C0 failed before provider delegation, with zero model/provider calls for C0.",
+      "The D5-5G synthetic planner context used sections and candidates[].identity instead of the canonical existing_section_hints and sources[].labels shapes."
     ]
   },
   "comparisons": {
@@ -312,6 +316,18 @@
     }
   },
   "implementation_checkpoint": "1714a944181077fe1b63ac634b5d3f00459981e4",
+  "canonical_context_fidelity": {
+    "status": "FAIL",
+    "experimental_shape": {
+      "current_document_summary": "sections",
+      "source_summary": "candidates[].identity"
+    },
+    "canonical_workflow_shape": {
+      "current_document_summary": "existing_section_hints",
+      "source_summary": "sources[].labels"
+    },
+    "implication": "The sealed A/B/C experiment did not exercise the canonical planner-context contract as cleanly as intended."
+  },
   "parent_checkpoint": "1714a944181077fe1b63ac634b5d3f00459981e4",
   "published_digests": {
     "evidence": "fad0ffd34169924759c3851109d4e70770e9fcfd6fe8a5a2a6c01dd610eceb77",
@@ -333,6 +349,24 @@
       "exactly one C0 logical correction call",
       "five-case provider-free study proof"
     ]
+  },
+  "observed_a_b_mechanism": {
+    "status": "ESTABLISHED",
+    "response_shape": {
+      "present": ["summary", "unresolved_requirements"],
+      "absent": ["report_task", "section_tasks"]
+    },
+    "runtime_invariant": "SemanticPlan.validate_work_units() requires report_task or section_tasks.",
+    "failure_chain": [
+      "HTTP 200",
+      "valid JSON",
+      "no work unit",
+      "SemanticPlan.validate_work_units()",
+      "ValueError at $root",
+      "schema_validation",
+      "canonical semantic validation not reached"
+    ],
+    "model_choice_cause": "NOT_ESTABLISHED"
   },
   "sealed_artifact_root": "workspace/evaluations/d5-5g/qwen-live-001",
   "sealed_artifacts_unchanged": true,

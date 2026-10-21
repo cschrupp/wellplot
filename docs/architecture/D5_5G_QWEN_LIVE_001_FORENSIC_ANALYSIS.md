@@ -51,6 +51,26 @@ content and parsed object for boundary inspection, while intentionally
 excluding reasoning content. No case yielded a valid plan, so no semantic
 grading or A/B scientific comparison is admissible.
 
+The exact observed response shape for all four cases contains `summary` and
+`unresolved_requirements`, but neither `report_task` nor `section_tasks`.
+That shape is valid JSON and is admitted by the provider-facing schema as
+serialized in the sealed request, but it cannot satisfy the canonical runtime
+invariant: `SemanticPlan.validate_work_units()` requires at least one report or
+section work unit. Therefore the immediate rejection mechanism is established:
+
+```text
+HTTP 200
+-> valid JSON
+-> no report_task and no section_tasks
+-> SemanticPlan.validate_work_units()
+-> ValueError at $root
+-> schema_validation
+-> canonical semantic validation not reached
+```
+
+This identifies why WellPlot rejected the response, but not why Qwen selected
+that permitted no-work-unit shape.
+
 | Case | Request SHA-256 | Response SHA-256 | HTTP | Boundary | Outcome |
 | --- | --- | --- | ---: | --- | --- |
 | D5-5G-A0 | c6eb5fb7267a8f96cf1131306756f389cd0a6fe02555dedc6e105449f5edd96b | 0d391d8a33bceccd76d6f9c34e3f382eff8d0b68e59ffaca6194fecb9f36733c | 200 | schema validation at `$root` | INCONCLUSIVE |
@@ -70,6 +90,16 @@ planner control requires `temperature=0.0`. Control validation therefore failed
 before logical-call reservation and physical delegation. C0 is a `HARNESS`
 first divergence with zero model calls, not evidence about correction quality.
 
+The same sealed experiment also exposed a context-fidelity defect. The
+provider-free D5-5G fixture supplied `current_document_summary.sections` and
+`source_summary.candidates`, while the canonical production workflow supplies
+`current_document_summary.existing_section_hints` and
+`source_summary.sources[].labels` (with channel records). The production
+planner prompt names the canonical keys, so the fixture did not exercise the
+same planner-context contract. The correction request's safe-summary helpers
+would likewise omit those non-canonical fixture fields. This is a deterministic
+methodology defect, not a model observation.
+
 ## Comparison with D5-4
 
 The campaign reproduces the broad D5-4 pattern of a live provider path failing
@@ -85,15 +115,45 @@ mechanism is identical.
 The strongest supported conclusion is:
 
 > The accepted runtime reached Qwen successfully, but all four attempted model
-> calls returned JSON that failed the canonical `SemanticPlan` structured
-> validation at the root, so the scientific semantic comparison was not
-> observed. C0 independently failed in the harness before delegation.
+> calls returned JSON with no work unit. The provider-facing schema admitted
+> that shape, while the canonical `SemanticPlan` runtime invariant rejected it
+> at the root. C0 independently failed in the harness before delegation.
+
+The A/B immediate rejection mechanism is therefore **ESTABLISHED**. The
+provider-schema/runtime invariant mismatch and the D5-5G synthetic-context
+mismatch are also established. The reason Qwen chose the no-work-unit object
+is **NOT ESTABLISHED**. Consequently the A requiredness effect, B capability
+contract effect, and C correction-preservation effect were not revalidated;
+Qwen semantic capability was not adjudicated.
 
 This does **not** establish that Qwen cannot perform the WellPlot task. It does
-not distinguish among an insufficient response contract, missing prompt/schema
-context, provider structured-output behavior, or model behavior because the
-sealed boundary retained only the bounded validation shape. Any such explanation
-is a follow-up hypothesis, not a result of this campaign.
+not establish why Qwen selected the admitted no-work-unit shape. The remaining
+causal alternatives include provider-schema guidance, model behavior, and
+prompt/context effects, but they are follow-up hypotheses rather than results
+of this campaign.
+
+## D5-5H design handoff
+
+The next design study must restore representation fidelity before another
+model comparison. It must:
+
+1. Generate D5 planner inputs from the same canonical summary builders used by
+   the production workflow, including `existing_section_hints` and
+   `sources[].labels`.
+2. Make the provider-facing contract reject a no-work-unit response before
+   canonical semantic validation, or document and validate a narrow equivalent
+   if the provider's supported schema subset cannot encode the invariant.
+3. Reconnect the design to TW-07/TW-08's requiredness findings and the
+   established principle that type invariants must not exist only in prompt
+   prose.
+4. Preserve the single canonical `SemanticPlan` and execution engine; no
+   second planner, validator, repair engine, compiler, or shadow path is
+   permitted.
+5. Define a finite provider-free G-successor matrix that changes neither the
+   scientific variables nor the five-case population.
+
+This is a design boundary only. D5-5H implementation and live execution are
+not authorized by this record.
 
 ## Bounded repair
 
