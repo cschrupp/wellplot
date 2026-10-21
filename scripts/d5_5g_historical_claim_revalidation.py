@@ -15,7 +15,7 @@ import json
 import subprocess
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -426,16 +426,17 @@ def compare_capability_contract_arms() -> dict[str, Any]:
     }
 
 
-def _canonical_revision_request(plan: SemanticPlan) -> dict[str, Any]:
+def _canonical_revision_request(
+    plan: SemanticPlan,
+    *,
+    diagnostic: PlannerSemanticError,
+) -> dict[str, Any]:
     """Build the actual canonical correction request without calling a model."""
     request = _correction_request(
         mode="revise",
         request="Revise the Copper Ridge section using source-ember.",
         previous_plan=plan,
-        diagnostic=PlannerSemanticError(
-            "missing_section_capability",
-            "The selected section needs one registered section capability.",
-        ),
+        diagnostic=diagnostic,
         registry=create_builtin_registry(),
         timeout_seconds=900.0,
         temperature=None,
@@ -516,22 +517,30 @@ def observe_canonical_correction_result(
 
 
 def observe_canonical_correction() -> dict[str, Any]:
-    """Prove C0 request/projection mechanics without fabricating a post-plan."""
-    before = SemanticPlan.model_validate(canonical_revision_plan(include_hint=True))
+    """Prove the deterministic C0 seed and canonical diagnostic without inference."""
+    before = _invalid_c0_plan()
     before_projection = _protected_projection(before)
-    request_facts = _canonical_revision_request(before)
-    return {
-        "axis": "C",
-        "condition": "C0",
-        "correction_path": "existing_canonical_correction_request_builder",
-        "alternative_correction_paths": 0,
-        "request_facts": request_facts,
-        "before_projection_sha256": _sha256_json(before_projection),
-        "protected_subtrees": "NOT_OBSERVED_PROVIDER_FREE",
-        "preservation_evidence": "REQUIRES_ACTUAL_CANONICAL_CORRECTION_RESULT",
-        "canonical_model": f"{SemanticPlan.__module__}.{SemanticPlan.__name__}",
-        "provider_model_calls": 0,
-    }
+    try:
+        validate_semantic_plan(before, create_builtin_registry(), mode="revise")
+    except PlannerSemanticError as diagnostic:
+        request_facts = _canonical_revision_request(before, diagnostic=diagnostic)
+        return {
+            "axis": "C",
+            "condition": "C0",
+            "correction_path": "existing_canonical_correction_request_builder",
+            "alternative_correction_paths": 0,
+            "request_facts": request_facts,
+            "before_projection_sha256": _sha256_json(before_projection),
+            "protected_subtrees": "REQUIRES_CORRECTED_PLAN",
+            "preservation_evidence": "REQUIRES_CANONICAL_CORRECTION_RESULT",
+            "validator_diagnostic": {
+                "code": diagnostic.code,
+                "message": diagnostic.safe_message,
+            },
+            "canonical_model": f"{SemanticPlan.__module__}.{SemanticPlan.__name__}",
+            "provider_model_calls": 0,
+        }
+    raise AssertionError("deterministic C0 seed passed canonical semantic validation")
 
 
 def classify_first_divergence(boundaries: Mapping[str, str]) -> str | None:
@@ -562,6 +571,7 @@ def inspection_record(
     canonical_boundary: Mapping[str, Any],
     observed: Mapping[str, Any],
     boundaries: Mapping[str, str],
+    wire_custody: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build one redacted eight-section inspection record."""
     first = classify_first_divergence(boundaries)
@@ -585,8 +595,16 @@ def inspection_record(
         "sections": {
             "case_expected_semantics": {"case_id": case_id, "expected": dict(expected)},
             "model_input_state": dict(model_input),
-            "exact_model_facing_request": dict(request),
-            "exact_raw_model_response": response,
+            "exact_model_facing_request": (
+                {"wire_custody": dict(wire_custody["request"])}
+                if wire_custody is not None
+                else dict(request)
+            ),
+            "exact_raw_model_response": (
+                {"wire_custody": dict(wire_custody["response"])}
+                if wire_custody is not None
+                else response
+            ),
             "structured_output_boundary": dict(structured_boundary),
             "canonical_wellplot_boundary": dict(canonical_boundary),
             "resulting_semantics": dict(observed),
@@ -708,6 +726,99 @@ def _invalid_c0_plan() -> SemanticPlan:
     return SemanticPlan.model_validate(payload)
 
 
+def _expected_semantic_projection(case: Mapping[str, Any]) -> dict[str, Any]:
+    """Freeze the minimum semantic outcome required by each study case."""
+    del case
+    return {
+        "section_task_count": 1,
+        "unexpected_report_task": False,
+        "existing_section_hint": "Copper Ridge",
+        "source_hints": ["source-ember"],
+        "capability_ids": ["section.log_plot"],
+    }
+
+
+def _semantic_projection(plan: SemanticPlan) -> dict[str, Any]:
+    """Project only canonical semantic fields under deterministic grading."""
+    return {
+        "section_task_count": len(plan.section_tasks),
+        "unexpected_report_task": plan.report_task is not None,
+        "existing_section_hint": (
+            plan.section_tasks[0].existing_section_hint if plan.section_tasks else None
+        ),
+        "source_hints": list(plan.section_tasks[0].source_hints) if plan.section_tasks else [],
+        "capability_ids": list(plan.section_tasks[0].capability_ids) if plan.section_tasks else [],
+    }
+
+
+def _semantic_first_divergence(paths: list[str]) -> str | None:
+    """Map semantic projection paths to the frozen earliest-divergence taxonomy."""
+    if not paths:
+        return None
+    first = paths[0]
+    if first in {"$.section_task_count", "$.unexpected_report_task"}:
+        return "PLANNER_SHAPE"
+    if first in {"$.existing_section_hint", "$.source_hints"}:
+        return "TARGET_OR_SOURCE_LINKING"
+    if first == "$.capability_ids":
+        return "CAPABILITY_CLOSURE"
+    return "SEMANTIC_FIELD"
+
+
+def _evaluate_semantic_plan(
+    case: Mapping[str, Any],
+    plan: SemanticPlan,
+) -> dict[str, Any]:
+    """Compare a returned canonical plan with the frozen case projection."""
+    expected = _expected_semantic_projection(case)
+    observed = _semantic_projection(plan)
+    differences = _json_differences(expected, observed)
+    return {
+        "expected": expected,
+        "observed": observed,
+        "field_level_diff": differences,
+        "first_divergence": _semantic_first_divergence(differences),
+    }
+
+
+def _wire_custody_for_turn(dependencies: object, case_id: str) -> dict[str, Any] | None:
+    """Join inspection evidence to exact accepted model-I/O custody rows."""
+    records = [
+        row for row in getattr(dependencies, "wire_records", []) if row.get("turn_id") == case_id
+    ]
+    request_rows = [
+        {
+            "logical_call_index": row.get("logical_call_index"),
+            "physical_attempt": row.get("physical_attempt"),
+            "request_sha256": row.get("request_sha256"),
+        }
+        for row in records
+        if row.get("event") == "physical_request"
+    ]
+    response_rows = [
+        {
+            "logical_call_index": row.get("logical_call_index"),
+            "physical_attempt": row.get("physical_attempt"),
+            "http_status": row.get("http_status"),
+            "response_sha256": row.get("response_sha256"),
+        }
+        for row in records
+        if row.get("event") == "physical_response"
+    ]
+    if not request_rows and not response_rows:
+        return None
+    return {
+        "request": {
+            "artifact": "campaign.model-io.jsonl",
+            "records": request_rows,
+        },
+        "response": {
+            "artifact": "campaign.model-io.jsonl",
+            "records": response_rows,
+        },
+    }
+
+
 def _inspection_for_case(
     *,
     case: Mapping[str, Any],
@@ -716,17 +827,14 @@ def _inspection_for_case(
     response: Mapping[str, Any] | None,
     canonical_boundary: Mapping[str, Any],
     observed: Mapping[str, Any],
+    wire_custody: Mapping[str, Any] | None = None,
     first_divergence: str | None = None,
 ) -> dict[str, Any]:
     """Build the same ordered inspection structure for one live-shaped case."""
     boundaries = dict.fromkeys(FIRST_DIVERGENCE_ORDER, "PASS")
     if first_divergence is not None:
         boundaries[first_divergence] = first_divergence
-    expected = {
-        "axis": str(case["axis"]),
-        "arm": str(case["arm"]),
-        "contract": str(case["contract"]),
-    }
+    expected = _expected_semantic_projection(case)
     return inspection_record(
         axis=str(case["axis"]),
         case_id=str(case["case_id"]),
@@ -741,6 +849,7 @@ def _inspection_for_case(
         canonical_boundary=dict(canonical_boundary),
         observed=dict(observed),
         boundaries=boundaries,
+        wire_custody=wire_custody,
     )
 
 
@@ -763,9 +872,7 @@ def _default_study_executor(
         max_output_tokens=None,
     )
     if axis == "C":
-        invalid_plan, request_evidence = asyncio.run(
-            _generate_semantic_plan(backend, planning_request)
-        )
+        invalid_plan = _invalid_c0_plan()
         try:
             validate_semantic_plan(invalid_plan, registry, mode="revise")
         except PlannerSemanticError as diagnostic:
@@ -790,6 +897,7 @@ def _default_study_executor(
                 corrected_plan,
                 resolution_evidence={},
             )
+            semantic = _evaluate_semantic_plan(case, corrected_plan)
             inspection = _inspection_for_case(
                 case=case,
                 context=context,
@@ -801,26 +909,27 @@ def _default_study_executor(
                     "diagnostic_message": diagnostic.safe_message,
                     "correction_request": "_correction_request",
                     "corrected_validation": "PASS",
-                },
-                observed={
-                    "canonical_plan_sha256": _sha256_json(corrected_plan.model_dump(mode="json")),
                     "protected_subtrees": observation["protected_subtrees"],
                 },
+                observed=semantic["observed"],
+                wire_custody=_wire_custody_for_turn(dependencies, str(case["case_id"])),
+                first_divergence=semantic["first_divergence"],
             )
             return {
                 "case_id": case["case_id"],
                 "axis": axis,
                 "arm": arm,
                 "canonical_plan_sha256": _sha256_json(corrected_plan.model_dump(mode="json")),
-                "first_divergence": None,
+                "first_divergence": semantic["first_divergence"],
+                "semantic_evaluation": semantic,
                 "validator_diagnostic": {
                     "code": diagnostic.code,
                     "message": diagnostic.safe_message,
                 },
                 "inspection_record": inspection,
-                "request_evidence": [request_evidence, correction_evidence],
+                "request_evidence": [correction_evidence],
             }
-        raise AssertionError("C0 seed unexpectedly passed canonical semantic validation")
+        raise AssertionError("deterministic C0 seed passed canonical semantic validation")
 
     schema_override = response_schema if axis == "A" else None
     plan, request_evidence = asyncio.run(
@@ -830,22 +939,50 @@ def _default_study_executor(
             response_schema=schema_override,
         )
     )
-    plan = validate_semantic_plan(plan, registry, mode="revise")
+    validation_error: PlannerSemanticError | None = None
+    try:
+        plan = validate_semantic_plan(plan, registry, mode="revise")
+    except PlannerSemanticError as error:
+        validation_error = error
     plan_payload = plan.model_dump(mode="json")
+    semantic = _evaluate_semantic_plan(case, plan)
+    if semantic["first_divergence"] is None and validation_error is not None:
+        semantic["first_divergence"] = "CAPABILITY_CLOSURE"
+    canonical_boundary: dict[str, Any] = {
+        "semantic_validation": "PASS" if validation_error is None else "FAIL"
+    }
+    if validation_error is not None:
+        canonical_boundary.update(
+            {
+                "diagnostic_code": validation_error.code,
+                "diagnostic_message": validation_error.safe_message,
+            }
+        )
     inspection = _inspection_for_case(
         case=case,
         context=context,
         request=request_evidence,
         response=plan_payload,
-        canonical_boundary={"semantic_validation": "PASS"},
-        observed={"canonical_plan_sha256": _sha256_json(plan_payload)},
+        canonical_boundary=canonical_boundary,
+        observed=semantic["observed"],
+        wire_custody=_wire_custody_for_turn(dependencies, str(case["case_id"])),
+        first_divergence=semantic["first_divergence"],
     )
     result: dict[str, Any] = {
         "case_id": case["case_id"],
         "axis": axis,
         "arm": arm,
         "canonical_plan_sha256": _sha256_json(plan_payload),
-        "first_divergence": None,
+        "first_divergence": semantic["first_divergence"],
+        "semantic_evaluation": semantic,
+        "validator_diagnostic": (
+            None
+            if validation_error is None
+            else {
+                "code": validation_error.code,
+                "message": validation_error.safe_message,
+            }
+        ),
         "inspection_record": inspection,
         "request_evidence": [request_evidence],
     }
@@ -908,6 +1045,7 @@ class D5GLiveDependencies:
     planner: object
     registry: object
     observer: object
+    wire_records: list[dict[str, Any]] = field(default_factory=list)
 
     def set_active_turn(self, turn_id: str) -> None:
         """Bind the observer to the current finite study case."""
@@ -918,7 +1056,12 @@ class D5GLiveDependencies:
         self.backend.call_started = self._call_started(custody)
         self.backend.call_completed = self._call_completed(custody)
         self.observer.callback = custody.record_physical_attempt
-        self.observer.bind_model_io(custody.record_model_io)
+
+        def record_model_io(row: dict[str, Any]) -> None:
+            self.wire_records.append(dict(row))
+            custody.record_model_io(row)
+
+        self.observer.bind_model_io(record_model_io)
 
     def _call_started(self, custody: object) -> Callable[[dict[str, Any]], None]:
         def callback(event: dict[str, Any]) -> None:
@@ -966,10 +1109,7 @@ class _ProviderFreeStudyBackend:
         schema = response_model.model_json_schema()
         request_row = _request_evidence(request, response_schema=schema)
         self.requests.append(request_row)
-        is_correction = "Correct the previous SemanticPlan" in str(request.user_prompt)
         payload = canonical_revision_plan(include_hint=True)
-        if index == 5 and not is_correction:
-            payload["section_tasks"][0]["capability_ids"] = ["section.unregistered"]
         response_body = json.dumps(
             {"choices": [{"message": {"content": json.dumps(payload)}}]},
             sort_keys=True,

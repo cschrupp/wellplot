@@ -43,12 +43,13 @@ def test_axis_b_contract_is_generic_and_field_local() -> None:
 
 
 def test_axis_c_observes_only_canonical_correction_and_preserves_projection() -> None:
-    """C0 proves request mechanics without fabricating corrected output."""
+    """C0 deterministically reaches the canonical validator before correction."""
     result = d5g.observe_canonical_correction()
     assert result["condition"] == "C0"
     assert result["alternative_correction_paths"] == 0
-    assert result["protected_subtrees"] == "NOT_OBSERVED_PROVIDER_FREE"
-    assert result["preservation_evidence"] == "REQUIRES_ACTUAL_CANONICAL_CORRECTION_RESULT"
+    assert result["protected_subtrees"] == "REQUIRES_CORRECTED_PLAN"
+    assert result["preservation_evidence"] == "REQUIRES_CANONICAL_CORRECTION_RESULT"
+    assert result["validator_diagnostic"]["code"] == "unknown_capability"
     assert result["canonical_model"] == "wellplot.agent.code_mode.planner.SemanticPlan"
 
 
@@ -114,8 +115,8 @@ def test_live_executor_consumes_a_b_c_variables_through_custody() -> None:
     assert result["b_request_difference_paths"] == ["$.user_payload"]
     assert result["c_validator_diagnostic"]["code"] == "unknown_capability"
     assert result["exact_wire_bodies_custodied"] is True
-    assert result["logical_calls"] == 6
-    assert result["physical_attempts"] == 6
+    assert result["logical_calls"] == 5
+    assert result["physical_attempts"] == 5
     assert result["provider_model_calls"] == 0
 
 
@@ -182,7 +183,7 @@ def test_provider_free_d5g_proof_is_zero_call_and_single_engine() -> None:
     assert result["provider_model_calls"] == 0
     assert result["source_changes"] == 0
     assert result["production_changes"] == 0
-    assert result["axis_c"]["protected_subtrees"] == "NOT_OBSERVED_PROVIDER_FREE"
+    assert result["axis_c"]["protected_subtrees"] == "REQUIRES_CORRECTED_PLAN"
     assert result["future_live_harness"]["authority_gated"] is True
     assert result["inspection_artifact"]["status"] == "PASS"
     assert result["study_population_wiring"]["case_ids"] == [

@@ -5,8 +5,9 @@ authority: WELLPLOT-D5-5G-INSPECTABLE-HISTORICAL-CLAIM-REVALIDATION-IMPLEMENTATI
 rework_authority: WELLPLOT-D5-5G-PROVIDER-FREE-IMPLEMENTATION-REWORK-AUTH-001
 final_rework_authority: WELLPLOT-D5-5G-PROVIDER-FREE-FINAL-IMPLEMENTATION-REWORK-AUTH-001
 live_wiring_rework_authority: WELLPLOT-D5-5G-LIVE-WIRING-FINAL-REWORK-AUTH-001
+measurement_integrity_rework_authority: WELLPLOT-D5-5G-MEASUREMENT-INTEGRITY-FINAL-REWORK-AUTH-001
 design_checkpoint: 5e530db90babf50c9992f3829d1a11d3cc79e433
-rework_parent_checkpoint: 72dbec6040f1d6c5bac4e9f2409c7e04ee84ab1e
+rework_parent_checkpoint: 3cecc3f59fde5e6b69b6701d3aad96a339edf85a
 implementation_base_checkpoint: 29b63dbf54041cc70a9a62664a9d939a2ccea833
 provider_model_calls: 0
 live_execution: NOT AUTHORIZED
@@ -50,10 +51,11 @@ axis_b:
 axis_c:
   status: PASS_PROVIDER_FREE_LIVE_SHAPE
   condition: C0 ONLY
+  seed: deterministic Pydantic-valid semantic-invalid SemanticPlan
   correction_path: existing canonical correction request builder with actual validator diagnostic
   alternative_correction_paths: 0
   before_projection: HASHED
-  after_projection: OBSERVED_FROM_FAKE_CANONICAL_RESPONSE
+  after_projection: OBSERVED_FROM_PROVIDER_FREE_FAKE_RESPONSE
   validator_diagnostic: unknown_capability
   preservation_result: CUSTODIED_PROVIDER_FREE_LIVE_SHAPE
 
@@ -101,10 +103,27 @@ provider_free_live_executor:
   b_request_difference_paths:
     - $.user_payload
   c_validator_diagnostic: unknown_capability
-  logical_calls: 6
-  physical_attempts: 6
+  logical_calls: 5
+  physical_attempts: 5
   exact_wire_bodies_custodied: true
   provider_model_calls: 0
+
+semantic_grading:
+  expected_projection:
+    - section_task_count
+    - unexpected_report_task
+    - existing_section_hint
+    - source_hints
+    - capability_ids
+  field_level_diff: deterministic
+  first_divergence: frozen taxonomy
+  case_failure_isolation: preserved
+
+inspection_custody_join:
+  exact_request_response_sections: custody references only
+  exact_bodies: campaign.model-io.jsonl
+  join_keys: logical_call_index + physical_attempt
+  reconstructed_raw_payloads: FORBIDDEN
 
 wire_custody:
   status: PASS
@@ -123,9 +142,11 @@ exercise the accepted wire observer and custody join. They are not provider
 or model observations.
 
 The provider-free live executor proof uses a deterministic fake response at the
-existing provider boundary. Its C0 first response is Pydantic-valid but fails
-the real canonical semantic validator, and the existing correction request
-receives that exact validator diagnostic before returning the corrected plan.
+existing provider boundary. Its C0 seed is deterministic, Pydantic-valid, and
+semantically invalid; the existing correction request receives the exact
+validator diagnostic before making one correction call. A/B/C results are
+graded against frozen semantic projections, and one failed case does not erase
+the other case records.
 The request/response bodies and five inspection records are captured through
 the accepted D5 observer and custody path. This is provider-free live-shaped
 evidence, not a live model result or qualification acceptance.
