@@ -28,9 +28,10 @@ This baseline applies to:
 - provider-free and live experiments that measure this boundary.
 
 It does not authorize a new experiment, production redesign, provider call,
-model substitution, or D5-5H implementation. A later accepted architecture
-decision may supersede an item explicitly; a historical experiment alone may
-not.
+model substitution, or live qualification. D5-5H implementation is accepted;
+its live/end-to-end qualification remains separately governed. A later
+accepted architecture decision may supersede an item explicitly; a historical
+experiment alone may not.
 
 ## 2. Current Canonical Architecture
 
@@ -399,17 +400,18 @@ not an authorization to run a study:
 - **Reopen/closure:** close only with a finite, contrasting, non-rediscovery
   evaluation.
 
-### O-05 - End-to-end repaired baseline
+### O-05 - End-to-end repaired baseline qualification
 
 - **Evidence:** `ADAPTED`
 - **Provenance:** adapted design hypothesis; no repaired end-to-end result is
   accepted in this baseline
-- **Question:** does the consolidated repaired contract improve semantic
-  outcomes without protected regressions or stable wrong-plan escapes?
-- **Impact:** determines whether the repaired contract can become active
-  implementation authority.
-- **Reopen/closure:** close with fresh holdout, stability, terminal taxonomy,
-  and promotion gates.
+- **Question:** does the accepted repaired contract operate end-to-end with
+  the current Qwen lane without protected regressions or stable wrong-plan
+  escapes?
+- **Impact:** determines the strength and limits of qualification evidence;
+  it does not promote or replace implementation authority.
+- **Reopen/closure:** close with the bounded D5-5I confirmation, stability,
+  terminal taxonomy, and evidence review.
 
 ## 9. Current Known Gaps Between Baseline and Implementation
 
@@ -427,7 +429,8 @@ retained in the compliance result and the implementation history:
 - G8: causal negative grading.
 - G9: semantic CBL verification without exact benchmark prose.
 
-The remaining implementation gap is G7 live/end-to-end correction retention.
+The remaining qualification/evidence gap is G7 live/end-to-end correction
+retention.
 Residual semantic mappings and repaired-baseline end-to-end model behavior are
 also open questions. These remain separately bounded work; they do not reopen
 settled architecture or authorize model comparison.
@@ -513,8 +516,9 @@ of current authority.
 
 ### Required baseline/regression updates
 
-- Future contract work must add exact schema parity, inventory, preservation,
-  causal-negative, and request/verifier consistency checks before qualification.
+- Future contract work must preserve and exercise the accepted H schema parity,
+  inventory, preservation, causal-negative, and request/verifier consistency
+  regressions before qualification.
 - Any dependent design must cite this baseline and complete the methodology
   non-rediscovery preflight.
 - Provider-free acceptance must retain the exact H-01 through H-08 contract
