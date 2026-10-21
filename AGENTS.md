@@ -25,7 +25,8 @@ The complete policy is in `docs/project-decision-protocol.md`.
 
 Before agent, architecture, implementation, or experiment work:
 
-- read the relevant repository-owned Current Active Baseline after this file;
+- read the relevant repository-owned Current Active Baseline after this file
+  (`docs/agent-code-mode-current-baseline.md` for agent/Code-Mode work);
 - perform the protocol's experiment non-rediscovery preflight before proposing
   or running an experiment;
 - honor `SETTLED_ARCHITECTURAL_INVARIANT`, `IMPLEMENTATION_REQUIREMENT`, and

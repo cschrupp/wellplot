@@ -46,6 +46,11 @@ experiments from causing experimental rediscovery. The first application to
 the CM/TW/D5 knowledge set is a separate, subsequently authorized baseline
 construction task.
 
+The first active baseline is now
+[docs/agent-code-mode-current-baseline.md](agent-code-mode-current-baseline.md).
+Dependent agent/Code-Mode work must cite it and complete the protocol's
+non-rediscovery preflight before proceeding.
+
 ## Product and Scope Decisions
 
 - Language: Python only.
