@@ -6,13 +6,14 @@ rework_authority: WELLPLOT-D5-5G-PROVIDER-FREE-IMPLEMENTATION-REWORK-AUTH-001
 final_rework_authority: WELLPLOT-D5-5G-PROVIDER-FREE-FINAL-IMPLEMENTATION-REWORK-AUTH-001
 live_wiring_rework_authority: WELLPLOT-D5-5G-LIVE-WIRING-FINAL-REWORK-AUTH-001
 measurement_integrity_rework_authority: WELLPLOT-D5-5G-MEASUREMENT-INTEGRITY-FINAL-REWORK-AUTH-001
+execution_integrity_closeout_authority: WELLPLOT-D5-5G-LIVE-EXECUTION-INTEGRITY-CLOSEOUT-AUTH-001
 design_checkpoint: 5e530db90babf50c9992f3829d1a11d3cc79e433
-rework_parent_checkpoint: 3cecc3f59fde5e6b69b6701d3aad96a339edf85a
+rework_parent_checkpoint: c0c3f216bde257ee0c6f9e1e849d4922c8a8a6f0
 implementation_base_checkpoint: 29b63dbf54041cc70a9a62664a9d939a2ccea833
 provider_model_calls: 0
 live_execution: NOT AUTHORIZED
 production_source_changes: 0
-rework_status: LIVE_WIRING_PROVIDER_FREE_REWORK_READY_FOR_INDEPENDENT_REVIEW
+rework_status: LIVE_EXECUTION_INTEGRITY_CLOSEOUT_READY_FOR_INDEPENDENT_REVIEW
 ```
 
 ## Provider-Free Proof
@@ -106,6 +107,8 @@ provider_free_live_executor:
   logical_calls: 5
   physical_attempts: 5
   exact_wire_bodies_custodied: true
+  case_failure_isolation: PASS / CASE-LOCAL TERMINAL EVIDENCE
+  failed_case_replay: FORBIDDEN
   provider_model_calls: 0
 
 semantic_grading:
@@ -121,9 +124,15 @@ semantic_grading:
 
 inspection_custody_join:
   exact_request_response_sections: custody references only
-  exact_bodies: campaign.model-io.jsonl
+  exact_bodies: <campaign_id>.model-io.jsonl
   join_keys: logical_call_index + physical_attempt
+  wire_hashes_authoritative: true
+  live_identity_fields: authorization_id / campaign_id / checkpoint / provider / model
   reconstructed_raw_payloads: FORBIDDEN
+
+live_provider_contract:
+  qwen_request_options_extra_body: NONE
+  structured_output_contract: canonical response_format json_schema only
 
 wire_custody:
   status: PASS
@@ -150,11 +159,16 @@ the other case records.
 The request/response bodies and five inspection records are captured through
 the accepted D5 observer and custody path. This is provider-free live-shaped
 evidence, not a live model result or qualification acceptance.
+Live-shaped inspection records use the campaign authorization, provider,
+model, checkpoint, case status, logical-call identity, physical-attempt
+identity, exact request/response hashes, and the actual campaign model-I/O
+artifact name. Parsed response hashes are retained separately and never
+replace the wire hashes.
 
 ## Validation
 
 ```yaml
-focused_d5_5g_tests: 11 passed
+focused_d5_5g_tests: 13 passed
 model_io_custody_regression: 6 passed
 adversarial_classifier_and_inspection_tests: PASS
 comparative_provider_free_regression: 11 passed, 2 deselected
@@ -164,6 +178,7 @@ provider_model_calls: 0
 endpoint_calls: 0
 committed_production_diff_from_design_checkpoint: 0
 production_changes: 0
+execution_integrity_isolation_regression: PASS
 ```
 
 The existing D5-5 comparative regression is designed to require a clean

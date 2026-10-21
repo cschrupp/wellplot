@@ -571,27 +571,24 @@ def inspection_record(
     canonical_boundary: Mapping[str, Any],
     observed: Mapping[str, Any],
     boundaries: Mapping[str, str],
+    execution_metadata: Mapping[str, Any],
     wire_custody: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build one redacted eight-section inspection record."""
     first = classify_first_divergence(boundaries)
+    parsed_response_hash = _sha256_json(response) if response is not None else None
+    wire_response_hash = wire_custody.get("response_sha256") if wire_custody is not None else None
     record = {
         "axis": axis,
         "case_id": case_id,
         "attempt_index": 1,
-        "model": "FUTURE_AUTHORIZED_MODEL",
-        "provider_boundary": "openai_compat",
-        "implementation_checkpoint": "FUTURE_AUTHORIZED_CHECKPOINT",
         "input_hashes": {"model_input": _sha256_json(model_input)},
         "schema_hash": _sha256_json(request.get("response_schema")),
         "prompt_hashes": {
             "system": hashlib.sha256(str(request.get("system_prompt", "")).encode()).hexdigest(),
             "user": hashlib.sha256(str(request.get("user_payload", "")).encode()).hexdigest(),
         },
-        "response_hash": _sha256_json(response) if response is not None else None,
-        "terminal_status": "PROVIDER_FREE_SYNTHETIC",
-        "provider_calls": 0,
-        "model_calls": 0,
+        "response_hash": wire_response_hash or parsed_response_hash,
         "sections": {
             "case_expected_semantics": {"case_id": case_id, "expected": dict(expected)},
             "model_input_state": dict(model_input),
@@ -615,6 +612,12 @@ def inspection_record(
             "first_divergence": first,
         },
     }
+    if (
+        wire_custody is not None
+        or execution_metadata.get("terminal_status") != "PROVIDER_FREE_SYNTHETIC"
+    ):
+        record["parsed_response_hash"] = parsed_response_hash
+    record.update(dict(execution_metadata))
     if tuple(record["sections"]) != INSPECTION_SECTIONS:
         raise AssertionError("inspection record section order drifted")
     return record
@@ -648,6 +651,14 @@ def synthetic_inspection_artifact() -> dict[str, Any]:
         canonical_boundary={"target_resolution": "PASS", "source_resolution": "PASS"},
         observed=expected,
         boundaries=dict.fromkeys(FIRST_DIVERGENCE_ORDER, "PASS"),
+        execution_metadata={
+            "model": "FUTURE_AUTHORIZED_MODEL",
+            "provider_boundary": "openai_compat",
+            "implementation_checkpoint": "FUTURE_AUTHORIZED_CHECKPOINT",
+            "terminal_status": "PROVIDER_FREE_SYNTHETIC",
+            "provider_calls": 0,
+            "model_calls": 0,
+        },
     )
     return {
         "artifact": "D5-5G provider-free synthetic inspection",
@@ -786,6 +797,9 @@ def _wire_custody_for_turn(dependencies: object, case_id: str) -> dict[str, Any]
     records = [
         row for row in getattr(dependencies, "wire_records", []) if row.get("turn_id") == case_id
     ]
+    logical_records = [
+        row for row in getattr(dependencies, "logical_records", []) if row.get("turn_id") == case_id
+    ]
     request_rows = [
         {
             "logical_call_index": row.get("logical_call_index"),
@@ -805,15 +819,33 @@ def _wire_custody_for_turn(dependencies: object, case_id: str) -> dict[str, Any]
         for row in records
         if row.get("event") == "physical_response"
     ]
-    if not request_rows and not response_rows:
+    if not request_rows and not response_rows and not logical_records:
         return None
+    logical_indexes: set[int] = set()
+    for row in [*records, *logical_records]:
+        value = row.get("logical_call_index")
+        if value is None:
+            value = row.get("index")
+        if value is not None:
+            logical_indexes.add(int(value))
+    attempts = [
+        int(row["physical_attempt"]) for row in records if row.get("physical_attempt") is not None
+    ]
+    artifact = getattr(dependencies, "model_io_artifact", None)
+    if not isinstance(artifact, str) or not artifact:
+        artifact = "campaign.model-io.jsonl"
     return {
+        "artifact": artifact,
+        "logical_call_index": min(logical_indexes) if logical_indexes else None,
+        "physical_attempt": max(attempts) if attempts else None,
+        "request_sha256": request_rows[-1].get("request_sha256") if request_rows else None,
+        "response_sha256": response_rows[-1].get("response_sha256") if response_rows else None,
         "request": {
-            "artifact": "campaign.model-io.jsonl",
+            "artifact": artifact,
             "records": request_rows,
         },
         "response": {
-            "artifact": "campaign.model-io.jsonl",
+            "artifact": artifact,
             "records": response_rows,
         },
     }
@@ -828,6 +860,7 @@ def _inspection_for_case(
     canonical_boundary: Mapping[str, Any],
     observed: Mapping[str, Any],
     wire_custody: Mapping[str, Any] | None = None,
+    execution_metadata: Mapping[str, Any] | None = None,
     first_divergence: str | None = None,
 ) -> dict[str, Any]:
     """Build the same ordered inspection structure for one live-shaped case."""
@@ -835,6 +868,15 @@ def _inspection_for_case(
     if first_divergence is not None:
         boundaries[first_divergence] = first_divergence
     expected = _expected_semantic_projection(case)
+    if execution_metadata is None:
+        execution_metadata = {
+            "model": "PROVIDER_FREE_SYNTHETIC",
+            "provider_boundary": "openai_compat",
+            "implementation_checkpoint": "PROVIDER_FREE_SYNTHETIC",
+            "terminal_status": "PROVIDER_FREE_SYNTHETIC",
+            "provider_calls": 0,
+            "model_calls": 0,
+        }
     return inspection_record(
         axis=str(case["axis"]),
         case_id=str(case["case_id"]),
@@ -850,7 +892,91 @@ def _inspection_for_case(
         observed=dict(observed),
         boundaries=boundaries,
         wire_custody=wire_custody,
+        execution_metadata=execution_metadata,
     )
+
+
+def _case_execution_metadata(
+    dependencies: object,
+    *,
+    case_status: str,
+    wire_custody: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Combine live identity with exact per-case wire custody facts."""
+    metadata = getattr(dependencies, "inspection_metadata", None)
+    if not isinstance(metadata, Mapping):
+        return None
+    result = dict(metadata)
+    result.update(
+        {
+            "terminal_status": case_status,
+            "provider_calls": 1 if wire_custody is not None else 0,
+            "model_calls": 1 if wire_custody is not None else 0,
+        }
+    )
+    if wire_custody is not None:
+        result.update(
+            {
+                "logical_call_index": wire_custody.get("logical_call_index"),
+                "physical_attempt": wire_custody.get("physical_attempt"),
+                "request_sha256": wire_custody.get("request_sha256"),
+                "response_sha256": wire_custody.get("response_sha256"),
+                "wire_custody_artifact": wire_custody.get("artifact"),
+            }
+        )
+    return result
+
+
+def _case_failure_result(
+    *,
+    dependencies: object,
+    case: Mapping[str, Any],
+    error: Exception,
+) -> dict[str, Any]:
+    """Create one terminal case row without replaying a failed generation."""
+    case_id = str(case["case_id"])
+    _, context = _study_case_request(case)
+    wire_custody = _wire_custody_for_turn(dependencies, case_id)
+    if isinstance(error, d4.ProviderRequestError):
+        first_divergence = "PROVIDER_OR_STRUCTURED"
+        failure_category = error.category.value
+        canonical_boundary = {
+            "semantic_validation": "NOT_REACHED",
+            "provider_failure_category": failure_category,
+        }
+    else:
+        first_divergence = "HARNESS"
+        failure_category = "harness"
+        canonical_boundary = {
+            "semantic_validation": "NOT_REACHED",
+            "failure_category": failure_category,
+        }
+    inspection = _inspection_for_case(
+        case=case,
+        context=context,
+        request={},
+        response=None,
+        canonical_boundary=canonical_boundary,
+        observed={},
+        wire_custody=wire_custody,
+        execution_metadata=_case_execution_metadata(
+            dependencies,
+            case_status="INCONCLUSIVE",
+            wire_custody=wire_custody,
+        ),
+        first_divergence=first_divergence,
+    )
+    return {
+        "case_id": case_id,
+        "axis": case["axis"],
+        "arm": case["arm"],
+        "case_status": "INCONCLUSIVE",
+        "first_divergence": first_divergence,
+        "failure_category": failure_category,
+        "validator_diagnostic": None,
+        "inspection_record": inspection,
+        "request_evidence": [],
+    }
 
 
 def _default_study_executor(
@@ -898,6 +1024,7 @@ def _default_study_executor(
                 resolution_evidence={},
             )
             semantic = _evaluate_semantic_plan(case, corrected_plan)
+            wire_custody = _wire_custody_for_turn(dependencies, str(case["case_id"]))
             inspection = _inspection_for_case(
                 case=case,
                 context=context,
@@ -912,13 +1039,23 @@ def _default_study_executor(
                     "protected_subtrees": observation["protected_subtrees"],
                 },
                 observed=semantic["observed"],
-                wire_custody=_wire_custody_for_turn(dependencies, str(case["case_id"])),
+                wire_custody=wire_custody,
+                execution_metadata=_case_execution_metadata(
+                    dependencies,
+                    case_status=(
+                        "PASS" if semantic["first_divergence"] is None else "SEMANTIC_FAIL"
+                    ),
+                    wire_custody=wire_custody,
+                ),
                 first_divergence=semantic["first_divergence"],
             )
             return {
                 "case_id": case["case_id"],
                 "axis": axis,
                 "arm": arm,
+                "case_status": (
+                    "PASS" if semantic["first_divergence"] is None else "SEMANTIC_FAIL"
+                ),
                 "canonical_plan_sha256": _sha256_json(corrected_plan.model_dump(mode="json")),
                 "first_divergence": semantic["first_divergence"],
                 "semantic_evaluation": semantic,
@@ -958,6 +1095,7 @@ def _default_study_executor(
                 "diagnostic_message": validation_error.safe_message,
             }
         )
+    wire_custody = _wire_custody_for_turn(dependencies, str(case["case_id"]))
     inspection = _inspection_for_case(
         case=case,
         context=context,
@@ -965,13 +1103,19 @@ def _default_study_executor(
         response=plan_payload,
         canonical_boundary=canonical_boundary,
         observed=semantic["observed"],
-        wire_custody=_wire_custody_for_turn(dependencies, str(case["case_id"])),
+        wire_custody=wire_custody,
+        execution_metadata=_case_execution_metadata(
+            dependencies,
+            case_status=("PASS" if semantic["first_divergence"] is None else "SEMANTIC_FAIL"),
+            wire_custody=wire_custody,
+        ),
         first_divergence=semantic["first_divergence"],
     )
     result: dict[str, Any] = {
         "case_id": case["case_id"],
         "axis": axis,
         "arm": arm,
+        "case_status": "PASS" if semantic["first_divergence"] is None else "SEMANTIC_FAIL",
         "canonical_plan_sha256": _sha256_json(plan_payload),
         "first_divergence": semantic["first_divergence"],
         "semantic_evaluation": semantic,
@@ -1018,7 +1162,14 @@ class D5GStudyRunner:
             set_active_turn = getattr(self.dependencies, "set_active_turn", None)
             if callable(set_active_turn):
                 set_active_turn(str(case["case_id"]))
-            result = self.executor(dependencies=self.dependencies, case=dict(case))
+            try:
+                result = self.executor(dependencies=self.dependencies, case=dict(case))
+            except Exception as error:
+                result = _case_failure_result(
+                    dependencies=self.dependencies,
+                    case=case,
+                    error=error,
+                )
             if not isinstance(result, Mapping):
                 raise TypeError("D5-5G study executor must return a mapping")
             row = {**case, **dict(result)}
@@ -1031,6 +1182,8 @@ class D5GStudyRunner:
                         "first_divergence": row.get("first_divergence"),
                         "inspection_record": row.get("inspection_record"),
                         "provider_model_calls": "CUSTODIED_BY_EXISTING_WIRE_OBSERVER",
+                        "case_status": row.get("case_status", "PASS"),
+                        "failure_category": row.get("failure_category"),
                     }
                 )
             results.append(row)
@@ -1046,9 +1199,14 @@ class D5GLiveDependencies:
     registry: object
     observer: object
     wire_records: list[dict[str, Any]] = field(default_factory=list)
+    logical_records: list[dict[str, Any]] = field(default_factory=list)
+    inspection_metadata: dict[str, Any] = field(default_factory=dict)
+    model_io_artifact: str = "campaign.model-io.jsonl"
+    active_turn_id: str | None = None
 
     def set_active_turn(self, turn_id: str) -> None:
         """Bind the observer to the current finite study case."""
+        self.active_turn_id = str(turn_id)
         self.observer.set_active_turn(turn_id)
 
     def bind_custody(self, custody: object) -> None:
@@ -1065,6 +1223,7 @@ class D5GLiveDependencies:
 
     def _call_started(self, custody: object) -> Callable[[dict[str, Any]], None]:
         def callback(event: dict[str, Any]) -> None:
+            self.logical_records.append({**event, "turn_id": self.active_turn_id})
             self.observer.logical_call_started(event)
             custody.record_call_started(event)
 
@@ -1148,12 +1307,6 @@ def _provider_free_live_executor_proof(repo_root: Path) -> dict[str, Any]:
         observer = d5._PhysicalAttemptObserver()
         backend = _ProviderFreeStudyBackend(observer)
         canonical = create_canonical_dependencies(backend=backend, server_root=repo_root)
-        dependencies = D5GLiveDependencies(
-            backend=backend,
-            planner=canonical.planner,
-            registry=canonical.planner.registry,
-            observer=observer,
-        )
         authorization = d5.D5Authorization(
             implementation_checkpoint=_git(repo_root, "rev-parse", "HEAD"),
             authorization_id="d5-5g-provider-free-live-proof-auth",
@@ -1164,6 +1317,20 @@ def _provider_free_live_executor_proof(repo_root: Path) -> dict[str, Any]:
             artifact_root=str(root),
         )
         paths = d5.EvidencePaths(root, authorization.campaign_id)
+        dependencies = D5GLiveDependencies(
+            backend=backend,
+            planner=canonical.planner,
+            registry=canonical.planner.registry,
+            observer=observer,
+            inspection_metadata={
+                "authorization_id": authorization.authorization_id,
+                "campaign_id": authorization.campaign_id,
+                "implementation_checkpoint": authorization.implementation_checkpoint,
+                "provider": authorization.provider,
+                "model": authorization.model,
+            },
+            model_io_artifact=paths.model_io.name,
+        )
         custody = d5.D5CampaignCustody.start(
             paths,
             authorization=authorization,
@@ -1197,6 +1364,7 @@ def _provider_free_live_executor_proof(repo_root: Path) -> dict[str, Any]:
         if c_row.get("validator_diagnostic", {}).get("code") != "unknown_capability":
             raise AssertionError("provider-free live C did not use the validator diagnostic")
         model_io = paths.model_io.read_text(encoding="utf-8")
+        first_inspection = rows[0]["inspection_record"]
         return {
             "case_ids": [row["case_id"] for row in rows],
             "inspection_records": len(rows),
@@ -1208,6 +1376,22 @@ def _provider_free_live_executor_proof(repo_root: Path) -> dict[str, Any]:
             "model_io_sha256": custody_digests["model_io_sha256"],
             "exact_wire_bodies_custodied": "physical_request" in model_io
             and "physical_response" in model_io,
+            "inspection_metadata": {
+                key: first_inspection[key]
+                for key in (
+                    "authorization_id",
+                    "campaign_id",
+                    "implementation_checkpoint",
+                    "provider",
+                    "model",
+                    "terminal_status",
+                    "logical_call_index",
+                    "physical_attempt",
+                    "request_sha256",
+                    "response_sha256",
+                    "wire_custody_artifact",
+                )
+            },
             "provider_model_calls": 0,
         }
 
@@ -1241,7 +1425,7 @@ def _build_live_study_dependencies(
         model=str(authorization["model"]),
         client=client,
         structured_output=project_config.runtime.structured_output,
-        request_options={"structured_output": project_config.runtime.structured_output},
+        request_options=None,
     )
     calls: list[Any] = []
     ledger = d4.LogicalCallLedger()
@@ -1258,6 +1442,14 @@ def _build_live_study_dependencies(
         planner=canonical.planner,
         registry=canonical.planner.registry,
         observer=observer,
+        inspection_metadata={
+            "authorization_id": str(authorization["authorization_id"]),
+            "campaign_id": str(authorization["campaign_id"]),
+            "implementation_checkpoint": _git(repo_root, "rev-parse", "HEAD"),
+            "provider": "openai_compat",
+            "model": str(authorization["model"]),
+        },
+        model_io_artifact=f"{authorization['campaign_id']}.model-io.jsonl",
     )
 
 
@@ -1328,7 +1520,12 @@ def run_authorized_live_study(
             executor=executor or _default_study_executor,
             custody=custody,
         ).run()
-        decision = "PASS" if all(row.get("first_divergence") is None for row in results) else "FAIL"
+        if any(row.get("case_status") == "INCONCLUSIVE" for row in results):
+            decision = "INCONCLUSIVE"
+        elif all(row.get("first_divergence") is None for row in results):
+            decision = "PASS"
+        else:
+            decision = "FAIL"
         terminal = custody.finish(
             decision,
             attribution="D5G_SEMANTIC_REVALIDATION",

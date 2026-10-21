@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 from scripts import d5_5g_historical_claim_revalidation as d5g
+from scripts import nlp_d4_live_acceptance as d4
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -106,6 +107,56 @@ def test_study_runner_executes_the_frozen_d5g_population() -> None:
     assert "_correction_request" in inspect.getsource(d5g._default_study_executor)
 
 
+def test_study_runner_isolates_provider_failure_and_continues() -> None:
+    """A failed arm is terminal evidence and cannot prevent later arms."""
+    seen: list[str] = []
+
+    class RecordingCustody:
+        def __init__(self) -> None:
+            self.turns: list[dict[str, object]] = []
+
+        def begin_turn(self, case_id: str) -> None:
+            del case_id
+
+        def append_turn(self, row: dict[str, object]) -> None:
+            self.turns.append(row)
+
+    def executor(*, dependencies: object, case: dict[str, object]) -> dict[str, object]:
+        del dependencies
+        case_id = str(case["case_id"])
+        seen.append(case_id)
+        if case_id == "D5-5G-B0":
+            raise d4.ProviderRequestError(
+                d4.ProviderFailureCategory.PROVIDER_REJECTED,
+                "structured output rejected",
+            )
+        return {"case_status": "PASS", "first_divergence": None}
+
+    custody = RecordingCustody()
+    rows = d5g.D5GStudyRunner(
+        dependencies=SimpleNamespace(),
+        executor=executor,
+        custody=custody,
+    ).run()
+
+    assert seen == [case["case_id"] for case in d5g.D5G_STUDY_CASES]
+    assert [row["case_id"] for row in rows] == seen
+    failed = rows[2]
+    assert failed["case_status"] == "INCONCLUSIVE"
+    assert failed["first_divergence"] == "PROVIDER_OR_STRUCTURED"
+    assert failed["failure_category"] == "provider_rejected"
+    assert [row["case_id"] for row in custody.turns] == seen
+    assert rows[3]["case_id"] == "D5-5G-B1"
+    assert rows[4]["case_id"] == "D5-5G-C0"
+
+
+def test_live_qwen_backend_does_not_add_structured_output_extra_body() -> None:
+    """The Qwen lane uses only the accepted backend response-format contract."""
+    source = inspect.getsource(d5g._build_live_study_dependencies)
+    assert "request_options=None" in source
+    assert 'request_options={"structured_output"' not in source
+
+
 def test_live_executor_consumes_a_b_c_variables_through_custody() -> None:
     """The provider-free live-shaped executor proves the actual controlled requests."""
     result = d5g._provider_free_live_executor_proof(REPO_ROOT)
@@ -118,6 +169,23 @@ def test_live_executor_consumes_a_b_c_variables_through_custody() -> None:
     assert result["logical_calls"] == 5
     assert result["physical_attempts"] == 5
     assert result["provider_model_calls"] == 0
+    assert result["inspection_metadata"] == {
+        "authorization_id": "d5-5g-provider-free-live-proof-auth",
+        "campaign_id": "d5-5g-provider-free-live-proof",
+        "implementation_checkpoint": d5g._git(REPO_ROOT, "rev-parse", "HEAD"),
+        "provider": "openai_compat",
+        "model": "provider-free-d5-5g",
+        "terminal_status": "PASS",
+        "logical_call_index": 1,
+        "physical_attempt": 1,
+        "request_sha256": result["inspection_metadata"]["request_sha256"],
+        "response_sha256": result["inspection_metadata"]["response_sha256"],
+        "wire_custody_artifact": "d5-5g-provider-free-live-proof.model-io.jsonl",
+    }
+    assert (
+        result["inspection_metadata"]["response_sha256"]
+        != result["inspection_metadata"]["request_sha256"]
+    )
 
 
 def test_first_divergence_selects_only_the_earliest_failed_boundary() -> None:
