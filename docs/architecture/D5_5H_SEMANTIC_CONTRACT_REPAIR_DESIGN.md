@@ -65,14 +65,14 @@ Each known gap receives exactly one disposition:
 | Gap | Baseline basis | Disposition | Work type | Rationale |
 | --- | --- | --- | --- | --- |
 | G1 no-work-unit schema gap | R-02, R-04 | `IMPLEMENT` | deterministic repair | The canonical invariant is settled; the emitted provider contract must reject an empty work-unit plan before Python-only grading. |
-| G2 optional revision hint | R-03, R-05 | `IMPLEMENT` | deterministic repair | Revision target identity is already a settled requirement; omission must not be represented as an acceptable default. |
-| G3 hidden capability-parent closure | R-04 | `IMPLEMENT` | deterministic repair | The parent relationship must be represented structurally or by an explicit host-owned closure contract. |
-| G4 incomplete revision inventory | R-01, R-05 | `IMPLEMENT` | deterministic repair | The host must expose a bounded addressable target inventory; natural-language hints are not identifiers. |
+| G2 optional revision hint | R-03, R-05 | `IMPLEMENT` | deterministic repair | The key must be structurally required but nullable; reconstruct permits null while revise validation requires a non-null target. |
+| G3 hidden capability-parent closure | R-04 | `IMPLEMENT` | deterministic repair | A host-owned closure operation adds only uniquely determined parents and fails closed on semantic alternatives. |
+| G4 incomplete revision inventory | R-01, R-05 | `IMPLEMENT` | deterministic repair | The host must expose bounded semantic addressability; canonical IDs and mutation handles remain host-owned. |
 | G5 ambiguous source inventory state | R-01, R-05 | `IMPLEMENT` | deterministic repair | Inspected-empty, not-inspected, and unavailable are distinct host facts. |
 | G6 title/header-slot ambiguity | K-02, R-01 | `IMPLEMENT` | deterministic repair | Report-level title and host-owned layout slots require separate typed semantics and examples. |
-| G7 correction preservation | R-06 | `DEFER_OPEN` | deterministic contract first; bounded validation later | The requirement is settled, but the least-risk implementation and end-to-end preservation result are not yet established. |
+| G7 correction preservation | R-06 | `DEFER_OPEN` | deterministic guard first; bounded validation later | A machine-readable scope and before/after path-diff guard are required, but end-to-end retention is not yet established. |
 | G8 non-causal negative grading | R-07 | `IMPLEMENT` | deterministic repair | Expected diagnostic owner/class, immutability, and no-persistence checks are already required. |
-| G9 request/verifier mismatch | K-03, R-07 | `IMPLEMENT` | deterministic evaluation-contract repair | Request, gold, verifier, and examples must share semantics; production phrase rewriting is forbidden. |
+| G9 request/verifier mismatch | K-03, R-07 | `IMPLEMENT` | deterministic evaluation-contract repair | Historical artifacts remain immutable; a versioned successor contract or scientifically equivalent mutable verifier must carry the correction. |
 
 No gap is classified as `REGRESSION_ONLY` because each listed gap either
 describes a current contract defect or remains an explicit open question. No
@@ -87,8 +87,9 @@ Implement only in the existing canonical contract:
 
 - encode the report-or-section work-unit requirement in the provider-facing
   representation where the supported schema subset permits it;
-- make revision target identity explicit and required when revise semantics
-  require it;
+- make `existing_section_hint` structurally required with no Pydantic default;
+  reconstruct may emit explicit `null`, while revise-mode canonical semantic
+  validation requires a non-null value;
 - keep canonical `SemanticPlan` validation authoritative for semantic and
   scientific constraints after structural acceptance; and
 - preserve one schema/model source rather than introducing a provider DTO.
@@ -99,24 +100,36 @@ The compliance proof must use the exact emitted schema and canonical
 - summary-only/no-work-unit input is rejected at the provider-facing boundary;
 - minimal valid report and section work units pass both structural and
   canonical validation; and
-- omission of a required revision target is rejected with a bounded diagnostic.
+- omission of the required `existing_section_hint` key is rejected
+  structurally, while an explicit `null` is accepted only for reconstruct and
+  rejected by revise-mode canonical validation.
 
 **Why no experiment:** TW-07/TW-08 and current D5 evidence already answer the
 requiredness direction. The remaining work is contract implementation and
-regression proof, not an optional-vs-required live arm.
+regression proof, not an optional-vs-required live arm or a second planner
+model.
 
-### H-02 Explicit capability closure: G3
+### H-02 Host-owned deterministic capability closure: G3
 
-Keep the canonical capability registry and hierarchy. Choose one deterministic
-contract implementation, to be justified during implementation review:
+Keep the canonical capability registry and hierarchy. Add one canonical,
+host-owned deterministic parent-closure operation between provider selection
+and final semantic validation:
 
-- represent the required parent closure in the canonical structural contract;
-  or
-- expose a host-owned closure operation with explicit input/output semantics
-  before canonical validation.
+```text
+provider-selected capabilities
+  -> deterministic host parent closure
+  -> canonical semantic validation
+```
 
-The provider must not infer hidden parents, and host closure must not become a
-second semantic planner.
+The operation must preserve an already-selected legal parent, add a missing
+parent only when exactly one legal semantic parent is possible, and recurse
+only while every next parent remains uniquely determined. If multiple
+semantically distinct parents are legal and none is selected, it must fail
+closed with a bounded diagnostic listing the legal choices. It must preserve
+provider order and unrelated task fields.
+
+Closure is host completion, not another planner or validator, and no model
+correction call is allowed solely to add a deterministic unique parent.
 
 **Why no experiment:** the baseline already settles that hidden closure is an
 ownership/contract defect. The implementation decision is bounded and
@@ -124,16 +137,20 @@ mechanically testable.
 
 ### H-03 Revision inventory: G4
 
-Project the production revision context into one bounded, host-grounded
+Project the production revision context into one bounded semantic/addressable
 inventory containing at least:
 
-- section title and stable host reference;
-- track identity/signature and relevant existing values;
-- binding identity/channel and relevant existing values; and
+- section title/subtitle;
+- track title, kind, semantic signature, and relevant existing values;
+- binding channel, label, semantic signature, and relevant existing values; and
 - applicable fills, scales, and other addressable objects.
 
-Natural-language labels remain clues. Ambiguous, missing, or conflicting
-identity resolution must fail closed without mutation or substitution.
+The model does not own canonical IDs, filesystem paths, or mutation handles.
+`existing_section_hint` remains a semantic clue that the host resolves
+deterministically. Ambiguous, missing, or conflicting identity resolution
+must fail closed without mutation or substitution. The TW-02I audit must show
+that this semantic inventory is sufficient; if it is not, stop rather than
+exposing implementation identities as a hidden protocol.
 
 **Why no experiment:** TW-02I and current D5 evidence already establish the
 input-sufficiency requirement. Compliance requires a source audit and
@@ -191,36 +208,46 @@ remaining work is deterministic grader correction and regression coverage.
 
 ### H-07 Request/verifier contract: G9
 
-Reconcile the frozen request, gold, verifier, and examples around semantic
-meaning. If textual normalization is retained, it must be an explicitly
-documented contract operation that cannot weaken the scientific requirement.
-Do not add production phrase recognition or answer rewriting to make a frozen
-case pass. If the request and verifier cannot be reconciled without changing
-the scientific target, record the contradiction for architecture review rather
-than silently changing either side.
+Treat historical frozen requests, gold, sealed campaign artifacts, and evidence
+as immutable. If evaluation semantics are defective, document the defect and
+create a versioned successor request/gold/verifier contract. If only current
+mutable verifier code is wrong and can be corrected without changing the
+historical scientific target, it may be corrected while the original artifact
+remains unchanged.
+
+If textual normalization is retained in a successor contract, it must be an
+explicit semantic operation that cannot weaken the scientific requirement. Do
+not add production phrase recognition or answer rewriting to make a frozen
+case pass.
 
 **Why no experiment:** this is a deterministic evaluation-contract mismatch
-already exposed by current evidence, not model-capability uncertainty.
+already exposed by current evidence, not model-capability uncertainty. The
+historical contract remains evidence; a successor contract is the current
+evaluation surface.
 
 ### H-08 Correction preservation: G7
 
-Define the deterministic preservation contract before implementation:
+Define and enforce the deterministic preservation contract before
+implementation:
 
 - correction receives a typed invalid fragment and machine-readable violation;
+- the diagnostic identifies the affected task/path or equivalent bounded scope;
 - valid unrelated subtrees remain addressable and are preserved;
 - legal replacement scope is explicit;
-- before/after projections identify every changed path; and
+- a before/after semantic path diff identifies every changed path;
+- any change outside the authorized repair scope rejects the correction;
 - final canonical validation and grading remain authoritative.
 
-The exact end-to-end retention behavior remains `DEFER_OPEN`. Any later
-bounded validation must be finite, use contrasting wording/names, and measure
-preservation separately from semantic success. It must not introduce a second
-repair engine or unbounded retry loop.
+The existing canonical correction call remains the only correction call. There
+is no silent whole-plan replacement and no second repair engine. The exact
+end-to-end retention behavior remains `DEFER_OPEN`. Any later bounded
+validation must be finite, use contrasting wording/names, and measure
+preservation separately from semantic success.
 
-**Why not implement a full answer now:** the baseline settles the required
-property but not which bounded implementation achieves it without unintended
-semantic loss. That is the only remaining implementation question in this
-design that may justify later empirical validation.
+**Why not claim closure now:** the baseline settles the required property and
+the deterministic guard, but end-to-end retention after the guard is not yet
+established. That is the only remaining implementation question in this
+design that may justify later bounded validation.
 
 ## 5. Provider-Visible Sufficiency Audit
 
@@ -243,13 +270,13 @@ provider, endpoint, or model calls:
 | Surface | Required proof |
 | --- | --- |
 | G1/G2 | exact emitted schema, empty-plan rejection, required revision target, canonical validation |
-| G3 | explicit parent closure or explicit host closure operation; orphan rejection |
-| G4 | complete target inventory, reordered/ambiguous target rejection, no mutation |
+| G3 | host-owned unique parent closure, ambiguous-parent diagnostic, orphan rejection |
+| G4 | semantic target inventory, reordered/ambiguous target rejection, no host-ID leakage |
 | G5 | inspected-empty versus not-inspected/unavailable source state |
 | G6 | title and header-slot semantic separation |
 | G8 | exact diagnostic owner/class, immutability, no persistence |
 | G9 | request/gold/verifier/example semantic consistency |
-| G7 | deterministic preservation projection contract; no claim of end-to-end success until separately validated |
+| G7 | machine-readable scope, deterministic before/after path diff, out-of-scope mutation rejection; no end-to-end success claim until separately validated |
 | Architecture | one canonical engine, no new planner/DTO/compiler/validator, production attestation/reachability pass |
 | Custody | existing accepted custody interfaces only; no synthetic replacement observer |
 | Source boundary | `src/wellplot/**` unchanged in this design slice; any later implementation must be separately authorized |
@@ -302,7 +329,8 @@ not automatically authorize another experiment or live run.
   `docs/evaluations/agent-code-mode/EXP-TW-consolidated-development-memory.md`.
 - Current forensic evidence:
   `docs/architecture/D5_5G_QWEN_LIVE_001_FORENSIC_ANALYSIS.md` and its JSON
-  companion. The C0 record is `HARNESS` with no response validation.
+  companion. The C0 record is `HARNESS` with no response validation, and
+  historical request/gold/campaign artifacts remain immutable.
 
 Historical mechanisms are evidence only. The unavailable `e24fd497...`
 candidate is not design or implementation authority.
