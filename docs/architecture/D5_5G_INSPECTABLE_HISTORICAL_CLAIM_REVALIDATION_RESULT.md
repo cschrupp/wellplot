@@ -4,13 +4,14 @@
 authority: WELLPLOT-D5-5G-INSPECTABLE-HISTORICAL-CLAIM-REVALIDATION-IMPLEMENTATION-AUTH-001
 rework_authority: WELLPLOT-D5-5G-PROVIDER-FREE-IMPLEMENTATION-REWORK-AUTH-001
 final_rework_authority: WELLPLOT-D5-5G-PROVIDER-FREE-FINAL-IMPLEMENTATION-REWORK-AUTH-001
+live_wiring_rework_authority: WELLPLOT-D5-5G-LIVE-WIRING-FINAL-REWORK-AUTH-001
 design_checkpoint: 5e530db90babf50c9992f3829d1a11d3cc79e433
-rework_parent_checkpoint: 57648f6a69e3c93f2dd1222a5b91216a1103d74b
+rework_parent_checkpoint: 72dbec6040f1d6c5bac4e9f2409c7e04ee84ab1e
 implementation_base_checkpoint: 29b63dbf54041cc70a9a62664a9d939a2ccea833
 provider_model_calls: 0
 live_execution: NOT AUTHORIZED
 production_source_changes: 0
-rework_status: PROVIDER_FREE_REWORK_READY_FOR_INDEPENDENT_REVIEW
+rework_status: LIVE_WIRING_PROVIDER_FREE_REWORK_READY_FOR_INDEPENDENT_REVIEW
 ```
 
 ## Provider-Free Proof
@@ -47,13 +48,14 @@ axis_b:
   schema_context_evaluator: SHARED
 
 axis_c:
-  status: MECHANICS_ONLY
+  status: PASS_PROVIDER_FREE_LIVE_SHAPE
   condition: C0 ONLY
-  correction_path: existing canonical correction request builder
+  correction_path: existing canonical correction request builder with actual validator diagnostic
   alternative_correction_paths: 0
   before_projection: HASHED
-  after_projection: NOT_OBSERVED_PROVIDER_FREE
-  preservation_result: REQUIRES_ACTUAL_CANONICAL_CORRECTION_RESULT
+  after_projection: OBSERVED_FROM_FAKE_CANONICAL_RESPONSE
+  validator_diagnostic: unknown_capability
+  preservation_result: CUSTODIED_PROVIDER_FREE_LIVE_SHAPE
 
 preservation_classifier:
   equal_values: PRESERVED
@@ -89,6 +91,21 @@ future_live_harness:
   inherited_d4_nine_turn_runner: NOT_USED
   canonical_correction_case: D5-5G-C0 / existing SemanticPlanner correction builder
 
+provider_free_live_executor:
+  status: PASS
+  executor: scripts.d5_5g_historical_claim_revalidation._default_study_executor
+  cases: 5
+  inspection_records: 5
+  a_request_difference_paths:
+    - $.response_schema.$defs.SectionTask.required
+  b_request_difference_paths:
+    - $.user_payload
+  c_validator_diagnostic: unknown_capability
+  logical_calls: 6
+  physical_attempts: 6
+  exact_wire_bodies_custodied: true
+  provider_model_calls: 0
+
 wire_custody:
   status: PASS
   mechanism: accepted D5 wire-level Model-I/O observer
@@ -105,16 +122,18 @@ The provider-free proof uses synthetic HTTP request/response objects only to
 exercise the accepted wire observer and custody join. They are not provider
 or model observations.
 
-The Axis C result is deliberately a mechanics/preflight proof. It proves that
-the existing canonical correction request is constructed and that the before
-projection is available for custody. It does not claim that correction
-preserves fields: that comparison requires the actual corrected SemanticPlan
-returned by the canonical correction path under a later live authority.
+The provider-free live executor proof uses a deterministic fake response at the
+existing provider boundary. Its C0 first response is Pydantic-valid but fails
+the real canonical semantic validator, and the existing correction request
+receives that exact validator diagnostic before returning the corrected plan.
+The request/response bodies and five inspection records are captured through
+the accepted D5 observer and custody path. This is provider-free live-shaped
+evidence, not a live model result or qualification acceptance.
 
 ## Validation
 
 ```yaml
-focused_d5_5g_tests: 10 passed
+focused_d5_5g_tests: 11 passed
 model_io_custody_regression: 6 passed
 adversarial_classifier_and_inspection_tests: PASS
 comparative_provider_free_regression: 11 passed, 2 deselected
@@ -129,6 +148,10 @@ production_changes: 0
 The existing D5-5 comparative regression is designed to require a clean
 checkout; it is rerun after this candidate is committed and must remain
 unchanged.
+
+The provider-free live executor proof uses an injected deterministic backend
+and the accepted D5 observer/custody path. It does not contact an endpoint,
+construct a real live campaign, or provide live qualification evidence.
 
 ## Handoff
 

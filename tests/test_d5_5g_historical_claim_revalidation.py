@@ -105,6 +105,20 @@ def test_study_runner_executes_the_frozen_d5g_population() -> None:
     assert "_correction_request" in inspect.getsource(d5g._default_study_executor)
 
 
+def test_live_executor_consumes_a_b_c_variables_through_custody() -> None:
+    """The provider-free live-shaped executor proves the actual controlled requests."""
+    result = d5g._provider_free_live_executor_proof(REPO_ROOT)
+    assert result["case_ids"] == [case["case_id"] for case in d5g.D5G_STUDY_CASES]
+    assert result["inspection_records"] == 5
+    assert result["a_request_difference_paths"] == ["$.response_schema.$defs.SectionTask.required"]
+    assert result["b_request_difference_paths"] == ["$.user_payload"]
+    assert result["c_validator_diagnostic"]["code"] == "unknown_capability"
+    assert result["exact_wire_bodies_custodied"] is True
+    assert result["logical_calls"] == 6
+    assert result["physical_attempts"] == 6
+    assert result["provider_model_calls"] == 0
+
+
 def test_first_divergence_selects_only_the_earliest_failed_boundary() -> None:
     """Later failures cannot replace the first failed canonical boundary."""
     boundaries = dict.fromkeys(d5g.FIRST_DIVERGENCE_ORDER, "PASS")

@@ -13,13 +13,16 @@ import copy
 import hashlib
 import json
 import subprocess
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
 import httpx
 
+from scripts import nlp_d4_live_acceptance as d4
 from scripts import nlp_d5_live_semantic_qualification as d5
 from wellplot.agent.code_mode.planner import (
     PlannerSemanticError,
@@ -28,6 +31,8 @@ from wellplot.agent.code_mode.planner import (
     _planning_request,
     validate_semantic_plan,
 )
+from wellplot.agent.composition import create_canonical_dependencies
+from wellplot.agent.providers.base import ProviderMetrics, StructuredGenerationResult
 from wellplot.capabilities import create_builtin_registry
 from wellplot.project_config import load_project_config
 
@@ -180,6 +185,61 @@ def _request_controls(request: object) -> dict[str, Any]:
         "temperature": request.temperature,
         "max_output_tokens": request.max_output_tokens,
     }
+
+
+@contextmanager
+def _provider_schema_override(schema: Mapping[str, Any] | None) -> Iterator[None]:
+    """Temporarily vary only the provider schema for Axis A."""
+    if schema is None:
+        yield
+        return
+    had_local_override = "model_json_schema" in SemanticPlan.__dict__
+    original = SemanticPlan.__dict__.get("model_json_schema")
+    SemanticPlan.model_json_schema = classmethod(  # type: ignore[method-assign]
+        lambda cls: copy.deepcopy(dict(schema))
+    )
+    try:
+        yield
+    finally:
+        if had_local_override:
+            SemanticPlan.model_json_schema = original  # type: ignore[method-assign]
+        else:
+            delattr(SemanticPlan, "model_json_schema")
+
+
+def _request_evidence(
+    request: object,
+    *,
+    response_schema: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Project one canonical request for the immutable inspection record."""
+    return {
+        "system_prompt": str(request.system_prompt),
+        "user_payload": str(request.user_prompt),
+        "response_schema": copy.deepcopy(dict(response_schema)),
+        "controls": _request_controls(request),
+    }
+
+
+async def _generate_semantic_plan(
+    backend: object,
+    request: object,
+    *,
+    response_schema: Mapping[str, Any] | None = None,
+) -> tuple[SemanticPlan, dict[str, Any]]:
+    """Generate through the existing backend and canonical SemanticPlan model."""
+    schema = (
+        copy.deepcopy(dict(response_schema))
+        if response_schema is not None
+        else SemanticPlan.model_json_schema()
+    )
+    with _provider_schema_override(response_schema):
+        generated = await backend.generate_structured(  # type: ignore[attr-defined]
+            request,
+            response_model=SemanticPlan,
+        )
+    plan = SemanticPlan.model_validate(generated.value)
+    return plan, _request_evidence(request, response_schema=schema)
 
 
 def _planning_context(*, capability_contract: object | None = None) -> dict[str, Any]:
@@ -641,70 +701,154 @@ def _study_case_request(case: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
     return str(context["request"]), context
 
 
+def _invalid_c0_plan() -> SemanticPlan:
+    """Build a Pydantic-valid plan with one deliberate semantic defect."""
+    payload = canonical_revision_plan(include_hint=True)
+    payload["section_tasks"][0]["capability_ids"] = ["section.unregistered"]
+    return SemanticPlan.model_validate(payload)
+
+
+def _inspection_for_case(
+    *,
+    case: Mapping[str, Any],
+    context: Mapping[str, Any],
+    request: Mapping[str, Any],
+    response: Mapping[str, Any] | None,
+    canonical_boundary: Mapping[str, Any],
+    observed: Mapping[str, Any],
+    first_divergence: str | None = None,
+) -> dict[str, Any]:
+    """Build the same ordered inspection structure for one live-shaped case."""
+    boundaries = dict.fromkeys(FIRST_DIVERGENCE_ORDER, "PASS")
+    if first_divergence is not None:
+        boundaries[first_divergence] = first_divergence
+    expected = {
+        "axis": str(case["axis"]),
+        "arm": str(case["arm"]),
+        "contract": str(case["contract"]),
+    }
+    return inspection_record(
+        axis=str(case["axis"]),
+        case_id=str(case["case_id"]),
+        expected=expected,
+        model_input=dict(context),
+        request=request,
+        response=response,
+        structured_boundary={
+            "json_decode": "PASS",
+            "schema_validation": "PASS" if response is not None else "NOT_ESTABLISHED",
+        },
+        canonical_boundary=dict(canonical_boundary),
+        observed=dict(observed),
+        boundaries=boundaries,
+    )
+
+
 def _default_study_executor(
     *,
     dependencies: object,
     case: Mapping[str, Any],
 ) -> Mapping[str, Any]:
-    """Execute one arm through the existing canonical planner only."""
-    planner = dependencies.planner  # type: ignore[attr-defined]
+    """Execute one arm through canonical request/validation primitives."""
+    backend = dependencies.backend  # type: ignore[attr-defined]
+    registry = dependencies.registry  # type: ignore[attr-defined]
     request, context = _study_case_request(case)
-    plan = asyncio.run(
-        planner.plan(
-            request=request,
-            mode="revise",
-            current_document_summary=context["current_document_summary"],
-            source_summary=context["source_summary"],
-            timeout_seconds=900.0,
-            temperature=0.0,
-            max_output_tokens=None,
+    axis = str(case["axis"])
+    arm = str(case["arm"])
+    response_schema = canonical_provider_schema(required_section_hint=arm == "A1")
+    planning_request = _planning_request(
+        context=context,
+        timeout_seconds=900.0,
+        temperature=0.0,
+        max_output_tokens=None,
+    )
+    if axis == "C":
+        invalid_plan, request_evidence = asyncio.run(
+            _generate_semantic_plan(backend, planning_request)
         )
+        try:
+            validate_semantic_plan(invalid_plan, registry, mode="revise")
+        except PlannerSemanticError as diagnostic:
+            correction_request = _correction_request(
+                mode="revise",
+                request=request,
+                current_document_summary=context["current_document_summary"],
+                source_summary=context["source_summary"],
+                previous_plan=invalid_plan,
+                diagnostic=diagnostic,
+                registry=registry,
+                timeout_seconds=900.0,
+                temperature=None,
+                max_output_tokens=None,
+            )
+            corrected_plan, correction_evidence = asyncio.run(
+                _generate_semantic_plan(backend, correction_request)
+            )
+            corrected_plan = validate_semantic_plan(corrected_plan, registry, mode="revise")
+            observation = observe_canonical_correction_result(
+                invalid_plan,
+                corrected_plan,
+                resolution_evidence={},
+            )
+            inspection = _inspection_for_case(
+                case=case,
+                context=context,
+                request=correction_evidence,
+                response=corrected_plan.model_dump(mode="json"),
+                canonical_boundary={
+                    "initial_validation": "FAIL",
+                    "diagnostic_code": diagnostic.code,
+                    "diagnostic_message": diagnostic.safe_message,
+                    "correction_request": "_correction_request",
+                    "corrected_validation": "PASS",
+                },
+                observed={
+                    "canonical_plan_sha256": _sha256_json(corrected_plan.model_dump(mode="json")),
+                    "protected_subtrees": observation["protected_subtrees"],
+                },
+            )
+            return {
+                "case_id": case["case_id"],
+                "axis": axis,
+                "arm": arm,
+                "canonical_plan_sha256": _sha256_json(corrected_plan.model_dump(mode="json")),
+                "first_divergence": None,
+                "validator_diagnostic": {
+                    "code": diagnostic.code,
+                    "message": diagnostic.safe_message,
+                },
+                "inspection_record": inspection,
+                "request_evidence": [request_evidence, correction_evidence],
+            }
+        raise AssertionError("C0 seed unexpectedly passed canonical semantic validation")
+
+    schema_override = response_schema if axis == "A" else None
+    plan, request_evidence = asyncio.run(
+        _generate_semantic_plan(
+            backend,
+            planning_request,
+            response_schema=schema_override,
+        )
+    )
+    plan = validate_semantic_plan(plan, registry, mode="revise")
+    plan_payload = plan.model_dump(mode="json")
+    inspection = _inspection_for_case(
+        case=case,
+        context=context,
+        request=request_evidence,
+        response=plan_payload,
+        canonical_boundary={"semantic_validation": "PASS"},
+        observed={"canonical_plan_sha256": _sha256_json(plan_payload)},
     )
     result: dict[str, Any] = {
         "case_id": case["case_id"],
-        "axis": case["axis"],
-        "arm": case["arm"],
-        "canonical_plan_sha256": _sha256_json(plan.model_dump(mode="json")),
+        "axis": axis,
+        "arm": arm,
+        "canonical_plan_sha256": _sha256_json(plan_payload),
         "first_divergence": None,
+        "inspection_record": inspection,
+        "request_evidence": [request_evidence],
     }
-    if str(case["axis"]) != "C":
-        return result
-
-    correction_request = _correction_request(
-        mode="revise",
-        request=request,
-        previous_plan=plan,
-        diagnostic=PlannerSemanticError(
-            "missing_section_capability",
-            "The selected section needs one registered section capability.",
-        ),
-        registry=planner.registry,
-        timeout_seconds=900.0,
-        temperature=None,
-        max_output_tokens=None,
-    )
-    corrected = asyncio.run(
-        planner.backend.generate_structured(
-            correction_request,
-            response_model=SemanticPlan,
-        )
-    )
-    corrected_plan = validate_semantic_plan(
-        SemanticPlan.model_validate(corrected.value),
-        planner.registry,
-        mode="revise",
-    )
-    result.update(
-        {
-            "canonical_correction_request": "existing_canonical_correction_request_builder",
-            "canonical_plan_sha256": _sha256_json(corrected_plan.model_dump(mode="json")),
-            "protected_subtrees": observe_canonical_correction_result(
-                plan,
-                corrected_plan,
-                resolution_evidence={},
-            )["protected_subtrees"],
-        }
-    )
     return result
 
 
@@ -725,10 +869,18 @@ class D5GStudyRunner:
 
     def run(self) -> list[dict[str, Any]]:
         """Execute exactly the frozen five-case study population."""
+        bind_custody = getattr(self.dependencies, "bind_custody", None)
+        if self.custody is not None and callable(bind_custody):
+            bind_custody(self.custody)
+            if hasattr(self.custody, "require_physical_observer"):
+                self.custody.require_physical_observer = True  # type: ignore[attr-defined]
         results: list[dict[str, Any]] = []
         for case in D5G_STUDY_CASES:
             if self.custody is not None:
                 self.custody.begin_turn(str(case["case_id"]))  # type: ignore[attr-defined]
+            set_active_turn = getattr(self.dependencies, "set_active_turn", None)
+            if callable(set_active_turn):
+                set_active_turn(str(case["case_id"]))
             result = self.executor(dependencies=self.dependencies, case=dict(case))
             if not isinstance(result, Mapping):
                 raise TypeError("D5-5G study executor must return a mapping")
@@ -740,11 +892,184 @@ class D5GStudyRunner:
                         "case_id": case["case_id"],
                         "arm": case["arm"],
                         "first_divergence": row.get("first_divergence"),
+                        "inspection_record": row.get("inspection_record"),
                         "provider_model_calls": "CUSTODIED_BY_EXISTING_WIRE_OBSERVER",
                     }
                 )
             results.append(row)
         return results
+
+
+@dataclass(slots=True)
+class D5GLiveDependencies:
+    """Canonical D5-5G backend plus the accepted D5 wire observer."""
+
+    backend: object
+    planner: object
+    registry: object
+    observer: object
+
+    def set_active_turn(self, turn_id: str) -> None:
+        """Bind the observer to the current finite study case."""
+        self.observer.set_active_turn(turn_id)
+
+    def bind_custody(self, custody: object) -> None:
+        """Attach existing D5 logical, physical, and model-I/O custody hooks."""
+        self.backend.call_started = self._call_started(custody)
+        self.backend.call_completed = self._call_completed(custody)
+        self.observer.callback = custody.record_physical_attempt
+        self.observer.bind_model_io(custody.record_model_io)
+
+    def _call_started(self, custody: object) -> Callable[[dict[str, Any]], None]:
+        def callback(event: dict[str, Any]) -> None:
+            self.observer.logical_call_started(event)
+            custody.record_call_started(event)
+
+        return callback
+
+    def _call_completed(self, custody: object) -> Callable[[dict[str, Any]], None]:
+        def callback(event: dict[str, Any]) -> None:
+            self.observer.logical_call_completed(event)
+            custody.record_call_completed(event)
+
+        return callback
+
+
+class _ProviderFreeStudyBackend:
+    """Deterministic fake of the existing backend boundary for proof only."""
+
+    def __init__(self, observer: object) -> None:
+        self.observer = observer
+        self.call_started: Callable[[dict[str, Any]], None] | None = None
+        self.call_completed: Callable[[dict[str, Any]], None] | None = None
+        self.calls = 0
+        self.requests: list[dict[str, Any]] = []
+
+    async def generate_structured(
+        self,
+        request: object,
+        *,
+        response_model: type[SemanticPlan],
+    ) -> StructuredGenerationResult[SemanticPlan]:
+        """Capture the canonical request and return a deterministic plan."""
+        self.calls += 1
+        index = self.calls
+        event = {
+            "event": "logical_call_started",
+            "index": index,
+            "generation_role": "planner",
+            "provider": "openai_compat",
+            "model": "provider-free-d5-5g",
+        }
+        if self.call_started is not None:
+            self.call_started(event)
+        schema = response_model.model_json_schema()
+        request_row = _request_evidence(request, response_schema=schema)
+        self.requests.append(request_row)
+        is_correction = "Correct the previous SemanticPlan" in str(request.user_prompt)
+        payload = canonical_revision_plan(include_hint=True)
+        if index == 5 and not is_correction:
+            payload["section_tasks"][0]["capability_ids"] = ["section.unregistered"]
+        response_body = json.dumps(
+            {"choices": [{"message": {"content": json.dumps(payload)}}]},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        request_body = json.dumps(
+            {
+                "model": "provider-free-d5-5g",
+                "messages": [
+                    {"role": "system", "content": request.system_prompt},
+                    {"role": "user", "content": request.user_prompt},
+                ],
+                "response_format": {"type": "json_schema", "json_schema": schema},
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        http_request = httpx.Request(
+            "POST",
+            "https://provider-free.invalid/v1/chat/completions",
+            content=request_body,
+        )
+        http_response = httpx.Response(200, content=response_body, request=http_request)
+        await self.observer.on_request(http_request)
+        await self.observer.on_response(http_response)
+        value = response_model.model_validate(payload)
+        if self.call_completed is not None:
+            self.call_completed({**event, "outcome": "success"})
+        return StructuredGenerationResult(value=value, metrics=ProviderMetrics())
+
+
+def _provider_free_live_executor_proof(repo_root: Path) -> dict[str, Any]:
+    """Run the actual D5G executor through fake transport and full custody."""
+    with TemporaryDirectory(dir=repo_root) as temporary:
+        root = Path(temporary)
+        observer = d5._PhysicalAttemptObserver()
+        backend = _ProviderFreeStudyBackend(observer)
+        canonical = create_canonical_dependencies(backend=backend, server_root=repo_root)
+        dependencies = D5GLiveDependencies(
+            backend=backend,
+            planner=canonical.planner,
+            registry=canonical.planner.registry,
+            observer=observer,
+        )
+        authorization = d5.D5Authorization(
+            implementation_checkpoint=_git(repo_root, "rev-parse", "HEAD"),
+            authorization_id="d5-5g-provider-free-live-proof-auth",
+            campaign_id="d5-5g-provider-free-live-proof",
+            project_config_fingerprint_sha256=load_project_config(repo_root).fingerprint_sha256,
+            provider="openai_compat",
+            model="provider-free-d5-5g",
+            artifact_root=str(root),
+        )
+        paths = d5.EvidencePaths(root, authorization.campaign_id)
+        custody = d5.D5CampaignCustody.start(
+            paths,
+            authorization=authorization,
+            provenance={"study": "D5-5G-provider-free-live-executor"},
+            readiness=_readiness(),
+            live=False,
+            endpoint_call_count=0,
+        )
+        rows = D5GStudyRunner(dependencies=dependencies, custody=custody).run()
+        terminal = custody.finish("PASS", attribution="PROVIDER_FREE_EXECUTOR", rows=rows)
+        custody_digests = d5.verify_custody_artifacts(paths)
+        if len(rows) != len(D5G_STUDY_CASES) or any(
+            len(row.get("inspection_record", {}).get("sections", {})) != len(INSPECTION_SECTIONS)
+            for row in rows
+        ):
+            raise AssertionError(
+                "provider-free live executor did not produce full inspection records"
+            )
+        a_requests = backend.requests[:2]
+        b_requests = backend.requests[2:4]
+        if _json_differences(a_requests[0], a_requests[1]) != [
+            "$.response_schema.$defs.SectionTask.required"
+        ]:
+            raise AssertionError("provider-free live A arms did not vary only requiredness")
+        b_differences = _json_differences(b_requests[0], b_requests[1])
+        if not b_differences or any(
+            not path.startswith("$.user_payload") for path in b_differences
+        ):
+            raise AssertionError("provider-free live B arms changed outside capability text")
+        c_row = rows[-1]
+        if c_row.get("validator_diagnostic", {}).get("code") != "unknown_capability":
+            raise AssertionError("provider-free live C did not use the validator diagnostic")
+        model_io = paths.model_io.read_text(encoding="utf-8")
+        return {
+            "case_ids": [row["case_id"] for row in rows],
+            "inspection_records": len(rows),
+            "a_request_difference_paths": _json_differences(a_requests[0], a_requests[1]),
+            "b_request_difference_paths": b_differences,
+            "c_validator_diagnostic": c_row["validator_diagnostic"],
+            "logical_calls": terminal["logical_generation_calls"],
+            "physical_attempts": terminal["physical_generation_attempts"],
+            "model_io_sha256": custody_digests["model_io_sha256"],
+            "exact_wire_bodies_custodied": "physical_request" in model_io
+            and "physical_response" in model_io,
+            "provider_model_calls": 0,
+        }
 
 
 def _build_live_study_dependencies(
@@ -754,19 +1079,46 @@ def _build_live_study_dependencies(
     api_key: str,
 ) -> object:
     """Construct the accepted provider boundary and canonical composition root."""
-    from wellplot.agent.composition import create_canonical_dependencies, create_provider_backend
+    import httpx
+    from openai import AsyncOpenAI
+
+    from wellplot.agent.composition import create_canonical_dependencies
+    from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
 
     project_config = load_project_config(repo_root)
-    backend = create_provider_backend(
-        provider="openai_compat",
-        model=str(authorization["model"]),
-        server_root=repo_root,
+    observer = d5._PhysicalAttemptObserver()
+    http_client = httpx.AsyncClient(
+        event_hooks={"request": [observer.on_request], "response": [observer.on_response]}
+    )
+    client = AsyncOpenAI(
         api_key=api_key,
         base_url=project_config.openai_compat_base_url,
-        timeout=float(project_config.provider.timeout_seconds),
+        timeout=project_config.provider.timeout_seconds,
+        max_retries=project_config.provider.max_retries,
+        http_client=http_client,
+    )
+    raw_backend = OpenAICompatibleBackendV2(
+        model=str(authorization["model"]),
+        client=client,
+        structured_output=project_config.runtime.structured_output,
         request_options={"structured_output": project_config.runtime.structured_output},
     )
-    return create_canonical_dependencies(backend=backend, server_root=repo_root)
+    calls: list[Any] = []
+    ledger = d4.LogicalCallLedger()
+    counted = d4.CountingBackend(
+        delegate=raw_backend,
+        provider="openai_compat",
+        model=str(authorization["model"]),
+        calls=calls,
+        ledger=ledger,
+    )
+    canonical = create_canonical_dependencies(backend=counted, server_root=repo_root)
+    return D5GLiveDependencies(
+        backend=counted,
+        planner=canonical.planner,
+        registry=canonical.planner.registry,
+        observer=observer,
+    )
 
 
 def run_authorized_live_study(
@@ -788,19 +1140,74 @@ def run_authorized_live_study(
     expected_fingerprint = authorization.get("project_config_fingerprint_sha256")
     if expected_fingerprint and expected_fingerprint != project_config.fingerprint_sha256:
         raise ValueError("future live project configuration fingerprint does not match checkout")
+    d5_authorization = d5.D5Authorization.from_mapping(authorization)
+    artifact_root = (repo_root / d5_authorization.artifact_root).resolve()
+    paths = d5.EvidencePaths(artifact_root, d5_authorization.campaign_id)
+    static = d5.provider_free_preflight(repo_root, d5_authorization, paths)
     load_key = api_key_loader or (lambda: d5.load_d4_api_key(repo_root))
-    live_dependencies = dependencies or _build_live_study_dependencies(
-        repo_root,
-        authorization,
-        api_key=load_key(),
+    if dependencies is None:
+        readiness = d5.prepare_readiness(
+            authorization=d5_authorization,
+            project_config=project_config,
+            api_key_loader=load_key,
+            endpoint_get=d5._credential_bearing_json_get,
+            static_preflight=static,
+            provider_factory=lambda token: _build_live_study_dependencies(
+                repo_root,
+                authorization,
+                api_key=token,
+            ),
+        )
+        live_dependencies = readiness.adapter
+        if live_dependencies is None:
+            raise d5.D5ReadinessError("provider_construction_failed", len(readiness.endpoint_calls))
+    else:
+        live_dependencies = dependencies
+        readiness = d5.D5OperationalReadiness(
+            projection=_readiness(),
+            endpoint_calls=("/v1/models", "/props"),
+            live=True,
+            provider_calls=0,
+            model_calls=0,
+        )
+    custody = d5.D5CampaignCustody.start(
+        paths,
+        authorization=d5_authorization,
+        provenance={
+            "d5_5g_authority": str(authorization["authorization_id"]),
+            "implementation_checkpoint": current,
+            "study_cases": [case["case_id"] for case in D5G_STUDY_CASES],
+        },
+        readiness=readiness.projection,
+        live=True,
+        endpoint_call_count=len(readiness.endpoint_calls),
     )
-    results = D5GStudyRunner(dependencies=live_dependencies, executor=executor).run()
+    try:
+        results = D5GStudyRunner(
+            dependencies=live_dependencies,
+            executor=executor or _default_study_executor,
+            custody=custody,
+        ).run()
+        decision = "PASS" if all(row.get("first_divergence") is None for row in results) else "FAIL"
+        terminal = custody.finish(
+            decision,
+            attribution="D5G_SEMANTIC_REVALIDATION",
+            rows=results,
+        )
+    except Exception:
+        terminal = custody.finish(
+            "INCONCLUSIVE",
+            attribution="D5G_EXECUTION_INTERNAL_ERROR",
+            rows=[],
+        )
+        raise
     return {
         "authority": str(authorization["authorization_id"]),
         "campaign_id": str(authorization["campaign_id"]),
         "implementation_checkpoint": current,
         "study_cases": [case["case_id"] for case in D5G_STUDY_CASES],
         "results": results,
+        "terminal": terminal,
         "shared_canonical_engine": D5_5G_SINGLE_ENGINE_ENTRYPOINT,
         "inherited_d4_nine_turn_runner": "NOT_USED",
         "provider_model_calls": "LIVE_EXECUTION",
@@ -950,6 +1357,7 @@ def verify_provider_free(repo_root: Path) -> dict[str, Any]:
         inspection_path = Path(temporary) / "D5_5G_SYNTHETIC_INSPECTION_ARTIFACT.json"
         write_synthetic_inspection_artifact(inspection_path)
         inspection = json.loads(inspection_path.read_text(encoding="utf-8"))
+    live_executor = _provider_free_live_executor_proof(repo_root)
     study_results = D5GStudyRunner(
         dependencies=object(),
         executor=lambda *, dependencies, case: {
@@ -974,6 +1382,7 @@ def verify_provider_free(repo_root: Path) -> dict[str, Any]:
         "axis_b": compare_capability_contract_arms(),
         "axis_c": observe_canonical_correction(),
         "wire_custody": custody,
+        "live_executor": live_executor,
         "first_divergence_taxonomy": {
             "classes": list(FIRST_DIVERGENCE_ORDER),
             "synthetic_earliest_boundary_proof": divergence_proof,
