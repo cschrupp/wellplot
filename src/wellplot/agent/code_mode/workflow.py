@@ -410,7 +410,14 @@ def _planner_source_summary(state: CodeModeGraphState) -> dict[str, object]:
         "sources": [
             {
                 "labels": list(candidate.labels),
-                "channels": [],
+                "channels": [
+                    {
+                        "mnemonic": channel.mnemonic,
+                        "kind": channel.kind,
+                        "unit": channel.unit,
+                    }
+                    for channel in candidate.channels
+                ],
                 "inspection_state": candidate.inspection_state,
             }
             for candidate in candidates

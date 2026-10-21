@@ -41,6 +41,22 @@ agent recovery sequence. The project remains under an eval-first feature
 freeze: each agent slice must improve a named end-state evaluation or reduce
 measured complexity.
 
+## Current Agent Work Road
+
+The active sequence is:
+
+```text
+Accepted Current Active Baseline
+    -> D5-5H baseline-compliance closure
+    -> provider-free independent acceptance
+    -> baseline Knowledge Delta promotion
+    -> one bounded repaired-baseline live confirmation
+    -> investigate only genuinely residual semantic failures
+```
+
+The older CM-54 through CM-58 wording below is preserved as historical
+roadmap context, not as the current execution sequence.
+
 ## Current Agent Architecture Status
 
 Code Mode v2 routing and the default host path are implemented, but the CM-53
@@ -49,7 +65,7 @@ worker did not achieve stable public live acceptance. EXP-TW-00 through
 EXP-TW-08 validated a static typed semantic section-worker candidate with
 required track discriminator tags and a deterministic semantic compiler.
 
-The next active migration sequence is CM-54 through CM-58. CM-60 and later
+The historical migration sequence was CM-54 through CM-58. CM-60 and later
 reachability/deletion work remains blocked until that revised path passes
 unchanged public acceptance. The report worker remains program-based pending
 separate evidence; the LangGraph planner, enrichment, fan-out, deterministic

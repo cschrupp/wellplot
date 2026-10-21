@@ -43,7 +43,11 @@ REGISTRY = create_builtin_registry()
 
 def _task(*capability_ids: str) -> SectionTask:
     """Build one semantic section task."""
-    return SectionTask(goal="plot the requested view", capability_ids=capability_ids)
+    return SectionTask(
+        goal="plot the requested view",
+        capability_ids=capability_ids,
+        existing_section_hint=None,
+    )
 
 
 def _plan(

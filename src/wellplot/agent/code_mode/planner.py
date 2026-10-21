@@ -71,14 +71,6 @@ class SectionTask(_SemanticModel):
     requirements: tuple[str, ...] = ()
     constraints: tuple[str, ...] = ()
 
-    def __init__(self, **data: object) -> None:
-        """Allow host-side construction to spell reconstruction null explicitly."""
-        # Provider/model validation still uses ``model_validate`` and therefore
-        # rejects an omitted key.  This convenience keeps existing host-side
-        # constructors equivalent to an explicit reconstruction null.
-        data.setdefault("existing_section_hint", None)
-        super().__init__(**data)
-
     @classmethod
     def model_validate(cls, obj: object, **kwargs: object) -> SectionTask:
         """Reject omitted revision keys when validating provider-shaped mappings."""
@@ -163,15 +155,25 @@ class SemanticPlan(_SemanticModel):
 
 
 def _add_work_unit_schema_constraint(schema: dict[str, object]) -> None:
-    """Require a report or section work unit in the emitted provider schema."""
+    """Require an executable report or non-empty section work unit."""
     constraints = schema.setdefault("allOf", [])
     if not isinstance(constraints, list):
         raise TypeError("SemanticPlan schema allOf must be a list.")
     constraints.append(
         {
             "anyOf": [
-                {"required": ["report_task"]},
-                {"required": ["section_tasks"]},
+                {
+                    "required": ["report_task"],
+                    "properties": {
+                        "report_task": {"not": {"type": "null"}},
+                    },
+                },
+                {
+                    "required": ["section_tasks"],
+                    "properties": {
+                        "section_tasks": {"type": "array", "minItems": 1},
+                    },
+                },
             ]
         }
     )

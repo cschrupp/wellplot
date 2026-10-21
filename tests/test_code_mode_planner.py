@@ -145,6 +145,33 @@ def test_provider_schema_requires_work_unit_and_revision_hint_key() -> None:
     section_schema = schema["$defs"]["SectionTask"]
     assert "existing_section_hint" in section_schema["required"]
     assert list(Draft202012Validator(schema).iter_errors({"summary": "No work"}))
+    assert list(
+        Draft202012Validator(schema).iter_errors({"summary": "No work", "report_task": None})
+    )
+    assert list(
+        Draft202012Validator(schema).iter_errors({"summary": "No work", "section_tasks": []})
+    )
+    assert list(
+        Draft202012Validator(schema).iter_errors(
+            {"summary": "No work", "report_task": None, "section_tasks": []}
+        )
+    )
+    report_only = {
+        "summary": "Update the report.",
+        "report_task": {"goal": "Update the report."},
+    }
+    assert not list(Draft202012Validator(schema).iter_errors(report_only))
+    section_only = {
+        "summary": "Build a section.",
+        "section_tasks": [
+            {
+                "goal": "Build the section.",
+                "capability_ids": ["section.log_plot"],
+                "existing_section_hint": None,
+            }
+        ],
+    }
+    assert not list(Draft202012Validator(schema).iter_errors(section_only))
     assert SemanticPlan.model_validate(
         {
             "summary": "Reconstruct a section.",
@@ -531,6 +558,7 @@ def test_section_correction_projection_preserves_source_and_scientific_requireme
     task = SectionTask(
         goal="Build the secondary section.",
         capability_ids=("section.log_plot",),
+        existing_section_hint=None,
         source_hints=("secondary source", "/secret/well/repeat.dlis"),
         requirements=(
             "Bind CBL twice with scales 0 to 100 and 0 to 10.",
@@ -583,6 +611,7 @@ def test_correction_request_preserves_redacted_original_semantics() -> None:
             SectionTask(
                 goal="Build the section.",
                 capability_ids=("section.log_plot",),
+                existing_section_hint=None,
                 source_hints=("main source",),
                 requirements=("Preserve 0 to 150.",),
             ),
@@ -613,7 +642,11 @@ def test_correction_request_preserves_the_separate_source_summary() -> None:
     plan = SemanticPlan(
         summary="Build a section.",
         section_tasks=(
-            SectionTask(goal="Build the section.", capability_ids=("section.log_plot",)),
+            SectionTask(
+                goal="Build the section.",
+                capability_ids=("section.log_plot",),
+                existing_section_hint=None,
+            ),
         ),
     )
     correction = _correction_request(
@@ -1017,6 +1050,7 @@ def test_semantic_plan_rejects_unknown_and_wrong_category_capabilities() -> None
     section_task = SectionTask(
         goal="Show a log section.",
         capability_ids=("section.log_plot",),
+        existing_section_hint=None,
     )
 
     with pytest.raises(ValueError, match="Unknown capability id"):
@@ -1049,6 +1083,7 @@ def test_semantic_plan_rejects_unknown_and_wrong_category_capabilities() -> None
                     SectionTask(
                         goal="Show a track.",
                         capability_ids=("track.normal",),
+                        existing_section_hint=None,
                     ),
                 ),
             ),
@@ -1086,6 +1121,7 @@ def _section_plan(capability_ids: tuple[str, ...]) -> SemanticPlan:
             SectionTask(
                 goal="Represent the requested section.",
                 capability_ids=capability_ids,
+                existing_section_hint=None,
             ),
         ),
     )
@@ -1321,6 +1357,7 @@ def test_mixed_report_and_section_work_remains_valid() -> None:
             SectionTask(
                 goal="Add a curve section.",
                 capability_ids=("section.log_plot", "track.normal", "binding.curve"),
+                existing_section_hint=None,
             ),
         ),
     )
@@ -1336,6 +1373,7 @@ def test_unresolved_requirements_remain_legal() -> None:
             SectionTask(
                 goal="Add a curve section.",
                 capability_ids=("section.log_plot", "track.normal", "binding.curve"),
+                existing_section_hint=None,
             ),
         ),
         unresolved_requirements=("Keep the unsupported detail visible.",),

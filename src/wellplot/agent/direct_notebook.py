@@ -79,29 +79,35 @@ def _declared_source_inventory(
         allowed_root=root,
     )
     unique_sources = sorted(set(declared.values()), key=lambda item: (str(item[0]), item[1]))
-    candidates = tuple(
-        AgentSourceConfig(
+    loader = LogfileSourceLoader()
+    available_channels: dict[str, tuple[AuthoringChannelCandidate, ...]] = {}
+    loaded: dict[tuple[Path, str], LoadedSource] = {}
+    candidates_list: list[AgentSourceConfig] = []
+    candidate_by_source: dict[tuple[Path, str], AgentSourceConfig] = {}
+    for index, (path, source_format) in enumerate(unique_sources, start=1):
+        cache_key = (path, source_format)
+        if path.is_file():
+            loaded[cache_key] = loader.load(path, source_format)
+            inspection_state = "inspected"
+            channels = loaded[cache_key].channels
+        else:
+            inspection_state = "unavailable"
+            channels = ()
+        candidate = AgentSourceConfig(
             candidate_id=f"source-{index}",
             root_id="server",
             path=str(path),
             labels=(path.name, path.stem, source_format),
             trusted_format=source_format if source_format in {"las", "dlis"} else None,
+            inspection_state=inspection_state,
+            channels=channels,
         )
-        for index, (path, source_format) in enumerate(unique_sources, start=1)
-    )
-    candidate_by_source = {
-        (Path(candidate.path), candidate.trusted_format or "auto"): candidate
-        for candidate in candidates
-    }
-    loader = LogfileSourceLoader()
-    available_channels: dict[str, tuple[AuthoringChannelCandidate, ...]] = {}
-    loaded: dict[tuple[Path, str], LoadedSource] = {}
+        candidates_list.append(candidate)
+        candidate_by_source[cache_key] = candidate
     for section_id, (path, source_format) in declared.items():
         if not path.is_file():
             continue
         cache_key = (path, source_format)
-        if cache_key not in loaded:
-            loaded[cache_key] = loader.load(path, source_format)
         source = loaded[cache_key]
         candidate = candidate_by_source[(path, source_format)]
         available_channels[section_id] = tuple(
@@ -116,7 +122,7 @@ def _declared_source_inventory(
             )
             for channel in source.channels
         )
-    return candidates, available_channels
+    return tuple(candidates_list), available_channels
 
 
 def _load_document_context(logfile_path: Path, *, root: Path) -> _NotebookDocumentContext:

@@ -219,8 +219,16 @@ def test_graph_merges_report_and_sections_in_plan_order() -> None:
         summary="multi-section plan",
         report_task=ReportTask(goal="Report title", capability_ids=("report.standard",)),
         section_tasks=(
-            SectionTask(goal="first section", capability_ids=("section.log_plot",)),
-            SectionTask(goal="second section", capability_ids=("section.log_plot",)),
+            SectionTask(
+                goal="first section",
+                capability_ids=("section.log_plot",),
+                existing_section_hint=None,
+            ),
+            SectionTask(
+                goal="second section",
+                capability_ids=("section.log_plot",),
+                existing_section_hint=None,
+            ),
         ),
     )
     workers = _Workers()
@@ -246,7 +254,13 @@ def test_graph_supports_report_only_and_section_only_plans() -> None:
 
     section_plan = SemanticPlan(
         summary="section only",
-        section_tasks=(SectionTask(goal="first section", capability_ids=("section.log_plot",)),),
+        section_tasks=(
+            SectionTask(
+                goal="first section",
+                capability_ids=("section.log_plot",),
+                existing_section_hint=None,
+            ),
+        ),
     )
     section_result = _invoke(section_plan, _Workers())
     assert section_result["merged_intent"]["sections"][0]["section_id"] == "section-0"
@@ -256,7 +270,13 @@ def test_graph_plans_at_zero_and_keeps_source_summary_path_free() -> None:
     """Planner sampling is fixed while worker configuration remains separate."""
     plan = SemanticPlan(
         summary="section only",
-        section_tasks=(SectionTask(goal="first section", capability_ids=("section.log_plot",)),),
+        section_tasks=(
+            SectionTask(
+                goal="first section",
+                capability_ids=("section.log_plot",),
+                existing_section_hint=None,
+            ),
+        ),
     )
     planner = _Planner(plan)
     state = _state(plan)
@@ -266,6 +286,8 @@ def test_graph_plans_at_zero_and_keeps_source_summary_path_free() -> None:
             "root_id": "input",
             "path": "/secret/main.las",
             "labels": ["main pass"],
+            "inspection_state": "inspected",
+            "channels": [{"mnemonic": "GR", "kind": "scalar", "unit": "gAPI"}],
         }
     ]
 
@@ -278,8 +300,8 @@ def test_graph_plans_at_zero_and_keeps_source_summary_path_free() -> None:
             "sources": [
                 {
                     "labels": ["main pass"],
-                    "channels": [],
-                    "inspection_state": "not_inspected",
+                    "channels": [{"mnemonic": "GR", "kind": "scalar", "unit": "gAPI"}],
+                    "inspection_state": "inspected",
                 }
             ],
         }
@@ -290,7 +312,11 @@ def test_graph_planner_context_exposes_safe_existing_section_hints() -> None:
     """Planner context includes titles without exposing nested canonical state."""
     plan = SemanticPlan(
         summary="section only",
-        section_tasks=(SectionTask(goal="update", capability_ids=("section.log_plot",)),),
+        section_tasks=(
+            SectionTask(
+                goal="update", capability_ids=("section.log_plot",), existing_section_hint=None
+            ),
+        ),
     )
     planner = _Planner(plan)
 
@@ -324,8 +350,16 @@ def test_graph_failure_is_atomic_and_keeps_bounded_diagnostics() -> None:
     plan = SemanticPlan(
         summary="failure plan",
         section_tasks=(
-            SectionTask(goal="first section", capability_ids=("section.log_plot",)),
-            SectionTask(goal="second section", capability_ids=("section.log_plot",)),
+            SectionTask(
+                goal="first section",
+                capability_ids=("section.log_plot",),
+                existing_section_hint=None,
+            ),
+            SectionTask(
+                goal="second section",
+                capability_ids=("section.log_plot",),
+                existing_section_hint=None,
+            ),
         ),
     )
     result = _invoke(plan, _Workers(fail_section=1))
@@ -339,8 +373,16 @@ def test_graph_rejects_duplicate_section_id_at_merge() -> None:
     plan = SemanticPlan(
         summary="duplicate plan",
         section_tasks=(
-            SectionTask(goal="first section", capability_ids=("section.log_plot",)),
-            SectionTask(goal="second section", capability_ids=("section.log_plot",)),
+            SectionTask(
+                goal="first section",
+                capability_ids=("section.log_plot",),
+                existing_section_hint=None,
+            ),
+            SectionTask(
+                goal="second section",
+                capability_ids=("section.log_plot",),
+                existing_section_hint=None,
+            ),
         ),
     )
 

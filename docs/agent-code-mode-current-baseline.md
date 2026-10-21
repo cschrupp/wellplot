@@ -479,20 +479,20 @@ of current authority.
   capability conclusions are drawn.
 - Non-rediscovery preflight and baseline freshness are required for dependent
   work.
-- D5-5H baseline-compliance repairs are now implemented on the canonical path:
-  provider work-unit parity, nullable-but-required revision hints,
-  deterministic unique capability closure, semantic revision inventory,
-  explicit source inspection states, bounded negative grading, and
-  correction-scope preservation.
+- A D5-5H baseline-compliance implementation candidate exists, but it is not
+  current project authority until independent implementation review accepts it.
+  Its proposed contract covers provider work-unit parity, nullable-but-required
+  revision hints, deterministic unique capability closure, semantic revision
+  inventory, explicit source inspection states, bounded negative grading,
+  semantic report-title ownership, and correction-scope preservation.
 
 ### Changed
 
 - Evidence strength is now explicitly separate from project knowledge status.
 - Accepted results require a Knowledge Delta and active-baseline update before
   dependent slices proceed.
-- The D5 production attestation now hashes the H-01/H-03 canonical source
-  surfaces from the accepted implementation checkpoint; the component set is
-  unchanged.
+- The D5 production attestation candidate mechanically rehashes the H source
+  surfaces while preserving the component set; this remains pending review.
 
 ### Superseded
 
@@ -504,15 +504,15 @@ of current authority.
 ### New open questions
 
 - O-01 through O-05 above remain open pending a separately authorized study.
-- G7 end-to-end preservation success remains open; only the deterministic
-  machine-readable scope and before/after path-diff guard are promoted.
+- H-01 through H-08 implementation evidence remains pending independent review;
+  G7 end-to-end preservation success remains open.
 
 ### No-change findings
 
 - The single canonical engine remains authoritative.
 - Historical artifacts remain immutable.
-- No provider/model calls, source changes, or D5-5H implementation are part
-  of this baseline construction.
+- No provider/model calls or source changes are part of this baseline. D5-5H
+  implementation changes remain a review candidate, not promoted authority.
 
 ### Required baseline/regression updates
 

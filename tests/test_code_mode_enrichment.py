@@ -395,6 +395,7 @@ def test_equivalent_paths_are_loaded_once_and_channels_are_semantic_only(tmp_pat
             SectionTask(
                 goal="Use both explicit source labels.",
                 capability_ids=("section.log_plot",),
+                existing_section_hint=None,
                 source_hints=("first", "second"),
             ),
         ),
@@ -569,6 +570,7 @@ def test_new_section_has_no_allocated_id_and_existing_channels_use_facade(tmp_pa
             SectionTask(
                 goal="Prepare a new pass.",
                 capability_ids=("section.log_plot",),
+                existing_section_hint=None,
                 source_hints=("main",),
             ),
         ),

@@ -41,7 +41,11 @@ def _plan(*capability_ids: str, summary: str = "section") -> SemanticPlan:
     return SemanticPlan(
         summary=summary,
         section_tasks=(
-            SectionTask(goal="plot the requested section", capability_ids=capability_ids),
+            SectionTask(
+                goal="plot the requested section",
+                capability_ids=capability_ids,
+                existing_section_hint=None,
+            ),
         ),
     )
 
@@ -248,10 +252,12 @@ def test_positive_multi_section_request_is_not_reallocated() -> None:
             SectionTask(
                 goal="scalar view",
                 capability_ids=("section.log_plot", "track.normal", "binding.curve"),
+                existing_section_hint=None,
             ),
             SectionTask(
                 goal="depth-referenced view",
                 capability_ids=("section.log_plot", "track.reference", "binding.curve"),
+                existing_section_hint=None,
             ),
         ),
     )
@@ -291,6 +297,7 @@ def test_repair_preserves_plan_metadata_and_section_order() -> None:
             SectionTask(
                 goal="keep the second section",
                 capability_ids=("section.log_plot", "track.array", "binding.raster"),
+                existing_section_hint=None,
                 source_hints=("source-b",),
             ),
         ),

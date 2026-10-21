@@ -49,3 +49,14 @@ schema. If the call is permitted or ambiguous under that schema, fix the
 schema. A new regex intent heuristic, argument normalizer, fallback executor,
 stage controller, or provider-specific branch requires a committed failing
 live evaluation and must replace or delete equivalent complexity elsewhere.
+
+## Operational Debt
+
+Non-blocking operational debt belongs in `docs/backlog.md` and must not
+interrupt an active scientific or architectural slice unless it becomes a
+demonstrated blocker. Absence from Git or GitHub does not prove that an
+intentionally local asset is missing; only a filesystem check establishes
+local-file absence. Default to the existing canonical checkout and do not
+create a new clone or worktree merely because a new slice or branch begins.
+Independent SHA review does not require a second checkout; extra worktrees
+require a real simultaneous-checkout need.

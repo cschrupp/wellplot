@@ -33,6 +33,17 @@ class _EnrichmentModel(BaseModel):
     )
 
 
+class ChannelContext(_EnrichmentModel):
+    """Semantic channel metadata without samples or parser objects."""
+
+    mnemonic: str = Field(min_length=1)
+    kind: str = Field(min_length=1)
+    unit: str | None = Field(default=None, min_length=1)
+    shape: tuple[int, ...] = ()
+    description: str = ""
+    aliases: tuple[str, ...] = ()
+
+
 class SourceCandidate(_EnrichmentModel):
     """One host-approved source candidate available for deterministic selection."""
 
@@ -42,6 +53,7 @@ class SourceCandidate(_EnrichmentModel):
     labels: tuple[str, ...] = ()
     trusted_format: SourceFormat | None = None
     inspection_state: Literal["inspected", "not_inspected", "unavailable"] = "not_inspected"
+    channels: tuple[ChannelContext, ...] = ()
 
     @field_validator("labels")
     @classmethod
@@ -57,17 +69,6 @@ class SourceMetadata(_EnrichmentModel):
 
     key: str = Field(min_length=1)
     value: str = Field(min_length=1)
-
-
-class ChannelContext(_EnrichmentModel):
-    """Semantic channel metadata without samples or parser objects."""
-
-    mnemonic: str = Field(min_length=1)
-    kind: str = Field(min_length=1)
-    unit: str | None = Field(default=None, min_length=1)
-    shape: tuple[int, ...] = ()
-    description: str = ""
-    aliases: tuple[str, ...] = ()
 
 
 class LoadedSource(_EnrichmentModel):

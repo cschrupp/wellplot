@@ -8,7 +8,8 @@ provider_model_calls: 0
 endpoint_calls: 0
 live_experiments: 0
 production_component_set: UNCHANGED
-production_attestation: PASS_AFTER_MECHANICAL_HASH_REBASELINE
+production_attestation: PASS_AFTER_MECHANICAL_HASH_REBASELINE_PENDING_IR
+implementation_status: CANDIDATE_PENDING_INDEPENDENT_REVIEW
 ```
 
 ## Scope
@@ -23,15 +24,15 @@ immutable.
 
 | Item | Provider-visible or host-owned proof | Status |
 | --- | --- | --- |
-| H-01 / G1 | `SemanticPlan` schema requires `report_task` or `section_tasks`; Python validation remains authoritative. | PASS |
-| H-01 / G2 | `existing_section_hint` is required in provider mappings, nullable for reconstruction, and required semantically for revision. | PASS |
+| H-01 / G1 | Provider schema requires a non-null report task or a non-empty section task list; Python validation remains authoritative. | PASS / CANDIDATE |
+| H-01 / G2 | `existing_section_hint` is required in provider mappings, nullable for reconstruction, and required semantically for revision. | PASS / CANDIDATE |
 | H-02 / G3 | Unique capability parents are added deterministically; ambiguous legal parents fail with a bounded diagnostic and do not call the model. | PASS |
 | H-03 / G4 | Revision context exposes title, kind, width, channel, label, scale, and depth facts without IDs, paths, or mutation handles. | PASS |
-| H-04 / G5 | Source inventory distinguishes `inspected`, `not_inspected`, and `unavailable`, including inspected-empty. | PASS |
-| H-05 / G6 | Canonical report title/subtitle fields remain distinct from general, service-title, and detail slot groups. | PASS / EXISTING CANONICAL CONTRACT |
+| H-04 / G5 | Source inventory distinguishes `inspected`, `not_inspected`, and `unavailable`, including inspected-empty, and carries bounded mnemonic/kind facts when inspected. | PASS / CANDIDATE |
+| H-05 / G6 | Canonical report title/subtitle fields are explicitly distinct from general, service-title, and detail slot groups, including with empty slot inventories. | PASS / CANDIDATE |
 | H-06 / G8 | Negative grading can require exact diagnostic code and failure owner, plus no intent, mutation, persistence, or substitution. | PASS |
-| H-07 / G9 | Historical request/gold/campaign artifacts are unchanged; the current mutable verifier remains the evaluation surface. | PASS / NO SUCCESSOR REQUIRED |
-| H-08 / G7 | Full-plan correction, machine-readable repair scope, deterministic path diff, out-of-scope rejection, and final canonical validation are enforced. | PASS / END-TO-END RETENTION OPEN |
+| H-07 / G9 | Historical request/gold/campaign artifacts are unchanged; the mutable verifier now checks the frozen CBL meaning without exact benchmark prose. | PASS / CANDIDATE |
+| H-08 / G7 | Full-plan correction, machine-readable repair scope, deterministic path diff, out-of-scope rejection, and final canonical validation are enforced. | PASS / CANDIDATE; END-TO-END RETENTION OPEN |
 
 ## Provider-Visible Sufficiency Audit
 
@@ -54,11 +55,12 @@ and final verification remain outside the provider contract.
 
 ## Validation
 
-Provider-free focused and adjacent suites pass for the implemented contracts.
-The historical D4 nine-turn rehearsal was also attempted without provider
-activity; this checkout does not contain the historical tutorial DLIS inputs,
-so it terminates before turn one with `evidence_integrity_failure`. That is an
-execution-environment custody limitation, not semantic acceptance evidence.
+Provider-free focused and adjacent suites pass for the corrected contracts.
+The historical D4 nine-turn rehearsal is non-blocking for this slice because
+the required local scientific assets are intentionally not provisioned in this
+checkout. Record this state as
+`LOCAL_ASSET_NOT_PROVISIONED_IN_THIS_CHECKOUT`, not as project asset absence;
+the rehearsal is not semantic acceptance evidence.
 
 The D5-5H result therefore does not claim live or end-to-end scientific
 qualification. G7 retention remains explicitly open for a later bounded study.

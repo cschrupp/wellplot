@@ -12,7 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from ..model.authoring import AuthoringDocumentSpec
 from ..model.intent import AuthoringDocumentIntent
-from .code_mode.enrichment import SourceCandidate
+from .code_mode.enrichment import ChannelContext, SourceCandidate
 
 CompilationMode = Literal["reconstruct", "revise"]
 
@@ -62,6 +62,8 @@ class AgentSourceConfig(_SessionModel):
     path: str = Field(min_length=1)
     labels: tuple[str, ...] = ()
     trusted_format: Literal["las", "dlis"] | None = None
+    inspection_state: Literal["inspected", "not_inspected", "unavailable"] = "not_inspected"
+    channels: tuple[ChannelContext, ...] = ()
 
     @field_validator("labels")
     @classmethod
@@ -79,6 +81,8 @@ class AgentSourceConfig(_SessionModel):
             path=self.path,
             labels=self.labels,
             trusted_format=self.trusted_format,
+            inspection_state=self.inspection_state,
+            channels=self.channels,
         )
 
 

@@ -157,22 +157,62 @@ def _check_header(payload: Mapping[str, Any], errors: list[str]) -> None:
             errors.append(f"header value {key!r} is not {expected!r}")
 
 
-def _check_remarks(payload: Mapping[str, Any], errors: list[str]) -> None:
-    remarks = {
-        item.get("title"): " ".join(
-            [str(item.get("text") or ""), *[str(line) for line in item.get("lines", [])]]
+def _remark_texts(payload: Mapping[str, Any]) -> list[str]:
+    """Return normalized remark text without assigning benchmark-specific titles."""
+    texts: list[str] = []
+    for item in payload.get("remarks", []):
+        if not isinstance(item, Mapping):
+            continue
+        texts.append(
+            " ".join(
+                [
+                    str(item.get("title") or ""),
+                    str(item.get("text") or ""),
+                    *[str(line) for line in item.get("lines", [])],
+                ]
+            ).casefold()
         )
-        for item in payload.get("remarks", [])
-        if isinstance(item, Mapping)
-    }
-    required = {
-        "Supported Reconstruction Scope": "Reconstruct only the supported subset",
-        "Data Sources": "staged DLIS files",
-        "Public Data and IP Notice": "wellplot",
-    }
-    for title, phrase in required.items():
-        if title not in remarks or phrase.lower() not in remarks[title].lower():
-            errors.append(f"remark {title!r} does not contain {phrase!r}")
+    return texts
+
+
+def _has_remark_semantics(
+    texts: Sequence[str],
+    *,
+    required: tuple[str, ...],
+    one_of: tuple[str, ...] = (),
+) -> bool:
+    """Match a bounded semantic requirement independent of wording or title."""
+    for text in texts:
+        if all(token in text for token in required) and (
+            not one_of or any(token in text for token in one_of)
+        ):
+            return True
+    return False
+
+
+def _check_remarks(payload: Mapping[str, Any], errors: list[str]) -> None:
+    """Check the CBL remark contract by meaning rather than exact prose."""
+    texts = _remark_texts(payload)
+    requirements = (
+        (
+            "reconstruction scope",
+            ("reconstruct", "supported"),
+            ("heading", "remark", "pass", "tail"),
+        ),
+        (
+            "source provenance",
+            ("source", "dlis"),
+            ("stage", "file", "data"),
+        ),
+        (
+            "reproduction boundary",
+            ("wellplot",),
+            ("boundary", "vendor", "disclaimer", "ip", "public"),
+        ),
+    )
+    for name, required, one_of in requirements:
+        if not _has_remark_semantics(texts, required=required, one_of=one_of):
+            errors.append(f"remarks do not establish semantic requirement {name!r}")
 
 
 def _check_scale(

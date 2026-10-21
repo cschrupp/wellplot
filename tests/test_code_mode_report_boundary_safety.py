@@ -41,7 +41,11 @@ def _section_task(
     goal: str = "plot the requested section",
 ) -> SectionTask:
     """Build one valid section task for boundary tests."""
-    return SectionTask(goal=goal, capability_ids=capability_ids)
+    return SectionTask(
+        goal=goal,
+        capability_ids=capability_ids,
+        existing_section_hint=None,
+    )
 
 
 def _plan(

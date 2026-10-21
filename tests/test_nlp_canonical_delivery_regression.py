@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
-from scripts.verify_cbl_packet import verify_cbl_packet
+from scripts.verify_cbl_packet import _check_remarks, verify_cbl_packet
 from tests._mcp_fixtures import REPO_ROOT
 from tests.test_nlp_d4_live_acceptance import _build_rehearsal_cbl_artifact
 
@@ -174,7 +174,42 @@ def test_canonical_report_worker_owns_report_title_only() -> None:
     assert result.success is True
     assert result.intent_fragment is not None
     assert result.intent_fragment.title == "Gamma Ray Quality Control Review"
+    assert "empty header-slot inventory does not prevent" in backend.requests[0].user_prompt
     assert len(backend.requests) == 1
+
+
+def test_cbl_remark_verifier_accepts_semantic_paraphrases() -> None:
+    """The mutable verifier checks the frozen meaning without exact prose."""
+    payload = {
+        "remarks": [
+            {
+                "title": "Scope Boundary",
+                "text": "Reconstruct the supported heading, passes, remarks, and tail.",
+            },
+            {
+                "title": "Input Provenance",
+                "text": "Use the staged DLIS source files for both passes.",
+            },
+            {
+                "title": "Public Reproduction Boundary",
+                "text": "Keep the WellPlot boundary clear and do not copy vendor disclaimers.",
+            },
+        ]
+    }
+    errors: list[str] = []
+
+    _check_remarks(payload, errors)
+
+    assert errors == []
+
+
+def test_cbl_remark_verifier_rejects_unrelated_remarks() -> None:
+    """An unrelated successful-looking remark set cannot satisfy CBL-02."""
+    errors: list[str] = []
+
+    _check_remarks({"remarks": [{"title": "Notes", "text": "A routine summary."}]}, errors)
+
+    assert len(errors) == 3
 
 
 def test_canonical_report_worker_receives_slot_groups_and_enforces_them() -> None:
@@ -623,6 +658,7 @@ def test_section_normalization_matches_reordered_tracks_by_identity() -> None:
     task = SectionTask(
         goal="Build the requested tracks.",
         capability_ids=("section.log_plot", "track.normal", "track.reference"),
+        existing_section_hint=None,
         requirements=(
             "Track 1 (combo): normal, 42 mm",
             "Track 2 (depth): reference, 12 mm",
@@ -671,6 +707,7 @@ def test_section_normalization_rejects_requested_track_kind_mismatch() -> None:
     task = SectionTask(
         goal="Build a reference track.",
         capability_ids=("section.log_plot", "track.reference"),
+        existing_section_hint=None,
         requirements=("Track 1 (combo): reference, 42 mm", "Track 1: GR -> Gamma Ray."),
     )
     with pytest.raises(SemanticActionError, match="requested kind 'reference'"):
@@ -699,6 +736,7 @@ def test_section_normalization_does_not_fallback_to_track_position() -> None:
     task = SectionTask(
         goal="Build the combo track.",
         capability_ids=("section.log_plot", "track.normal"),
+        existing_section_hint=None,
         requirements=(
             "Combo bindings: GR -> Gamma Ray, linear 5..125, #123456 dashed, width 0.65",
         ),
@@ -735,6 +773,7 @@ def test_section_worker_normalizes_explicit_curve_presentation() -> None:
     task = SectionTask(
         goal="Build the combo track.",
         capability_ids=("section.log_plot", "track.normal", "binding.curve"),
+        existing_section_hint=None,
         requirements=(
             "Combo bindings: GR -> Gamma Ray, linear 5..125, #123456 dashed, width 0.65",
         ),
