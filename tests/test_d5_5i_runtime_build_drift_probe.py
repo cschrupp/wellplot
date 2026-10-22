@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from dataclasses import replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import pytest
 from scripts import d5_5i_runtime_build_drift_probe as probe
+from scripts import d5_5i_runtime_pin_establishment as pin
 from scripts import nlp_d5_live_semantic_qualification as d5
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -42,8 +45,9 @@ def _identity() -> dict[str, Any]:
 def _authorization(tmp_path: Path) -> probe.ProbeAuthorization:
     """Build an explicit test authority without deriving runtime identity."""
     return probe.ProbeAuthorization(
-        implementation_checkpoint=probe.TARGET_EXECUTABLE_CHECKPOINT,
-        tooling_checkpoint=probe.TOOLING_CHECKPOINT,
+        scientific_executable_checkpoint=probe.TARGET_EXECUTABLE_CHECKPOINT,
+        projection_baseline_checkpoint=probe.PROJECTION_BASELINE_CHECKPOINT,
+        probe_tooling_checkpoint="probe-tooling-checkpoint",
         authorization_id="probe-auth",
         project_config_fingerprint_sha256=PROJECT_CONFIG.fingerprint_sha256,
         artifact_root=str(tmp_path / "probe-evidence"),
@@ -75,6 +79,8 @@ def _static_pass(
 def _run(
     authorization: probe.ProbeAuthorization,
     endpoint_request: Callable[[str, str, str, bytes | None], object],
+    *,
+    observation_clock: Callable[[], datetime] | None = None,
 ) -> dict[str, Any]:
     """Run the probe with injected transport and no provider construction."""
     return probe.establish_successor_compatibility(
@@ -84,6 +90,7 @@ def _run(
         endpoint_request=endpoint_request,
         api_key_loader=lambda: "secret-token",
         static_checker=_static_pass,
+        observation_clock=observation_clock,
     )
 
 
@@ -103,13 +110,18 @@ def _endpoint_double(
         if fail_at == len(calls):
             raise probe.ProbeEndpointError("endpoint_transport_error")
         if method == "GET" and url == PROJECT_CONFIG.model_catalog_url:
-            return {"data": [{"id": probe.EXPECTED_MODEL}]}
+            return probe.ProbeEndpointResponse(
+                {"data": [{"id": probe.EXPECTED_MODEL}]}, http_status=200
+            )
         if method == "GET" and url == PROJECT_CONFIG.props_url:
-            return _props(build_info=build_info)
+            return probe.ProbeEndpointResponse(_props(build_info=build_info), http_status=200)
         if method == "POST":
             assert body is not None
             options = json.loads(body)["chat_template_kwargs"]
-            return {"prompt": false_prompt if options["enable_thinking"] is False else true_prompt}
+            return probe.ProbeEndpointResponse(
+                {"prompt": false_prompt if options["enable_thinking"] is False else true_prompt},
+                http_status=200,
+            )
         raise AssertionError((method, url))
 
     return endpoint_request
@@ -118,7 +130,11 @@ def _endpoint_double(
 def test_differing_prompt_hashes_seal_control_effect(tmp_path: Path) -> None:
     """A contemporaneously matching runtime can establish control sensitivity."""
     calls: list[tuple[str, str, bytes | None]] = []
-    result = _run(_authorization(tmp_path), _endpoint_double(calls))
+    result = _run(
+        _authorization(tmp_path),
+        _endpoint_double(calls),
+        observation_clock=lambda: datetime(2026, 10, 22, 12, tzinfo=UTC),
+    )
 
     assert result["outcome"] == "CONTROL_EFFECT_OBSERVED"
     assert result["thinking_off_semantics"] == "NOT_ESTABLISHED_BY_THIS_PROBE"
@@ -126,6 +142,14 @@ def test_differing_prompt_hashes_seal_control_effect(tmp_path: Path) -> None:
     assert [method for method, _, _ in calls] == ["GET", "GET", "POST", "POST"]
     assert calls[2][2] == probe._request_body(False)
     assert calls[3][2] == probe._request_body(True)
+    assert result["successor_identity_comparison"] == "EXACT_MATCH"
+    assert result["successor_identity_observed_at_utc"] == "2026-10-22T12:00:00Z"
+    assert result["false_request_body_sha256"] == probe.FALSE_REQUEST_BODY_SHA256
+    assert result["true_request_body_sha256"] == probe.TRUE_REQUEST_BODY_SHA256
+    assert result["false_http_status"] == 200
+    assert result["true_http_status"] == 200
+    assert result["false_response_shape"] == "object_with_string_prompt"
+    assert result["true_response_shape"] == "object_with_string_prompt"
 
 
 def test_identity_drift_blocks_both_template_posts(tmp_path: Path) -> None:
@@ -138,6 +162,38 @@ def test_identity_drift_blocks_both_template_posts(tmp_path: Path) -> None:
     assert result["mismatched_fields"] == ["build_info"]
     assert result["endpoint_attempts"] == 2
     assert [method for method, _, _ in calls] == ["GET", "GET"]
+
+
+def test_auth001_observed_successor_identity_cannot_be_substituted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Valid AUTH-001 digests cannot authorize a different successor identity."""
+    authorization = _authorization(tmp_path)
+    historical_root = tmp_path / "historical"
+    paths = pin.MetadataEvidencePaths(historical_root, probe.HISTORICAL_AUTHORIZATION_ID)
+    paths.root.mkdir(parents=True)
+    paths.terminal.write_text(
+        json.dumps(
+            {
+                "outcome": "MISMATCH",
+                "reason": "HISTORICAL_IDENTITY_MISMATCH",
+                "mismatched_fields": ["build_info"],
+                "observed_empirical_pins": _identity(),
+            }
+        ),
+        encoding="utf-8",
+    )
+    digests = {"state_sha256": "state", "journal_sha256": "journal", "terminal_sha256": "terminal"}
+    monkeypatch.setattr(probe.pin, "verify_metadata_custody", lambda _: digests)
+    substituted = replace(
+        authorization,
+        historical_pin_artifact_root=str(historical_root),
+        historical_pin_custody_digests=digests,
+        successor_identity={**_identity(), "build_info": "b11669-substituted"},
+    )
+
+    with pytest.raises(probe.ProbeStaticPreflightError, match="not joined"):
+        probe._verify_historical_pin_join(REPO_ROOT, substituted)
 
 
 def test_first_identity_get_failure_consumes_one_attempt(tmp_path: Path) -> None:
@@ -249,8 +305,9 @@ def test_generation_route_is_not_allowlisted() -> None:
 def test_probe_authorization_rejects_checkpoint_or_identity_drift() -> None:
     """Machine-readable authority cannot synthesize a different target."""
     payload = {
-        "implementation_checkpoint": probe.TARGET_EXECUTABLE_CHECKPOINT,
-        "tooling_checkpoint": probe.TOOLING_CHECKPOINT,
+        "scientific_executable_checkpoint": probe.TARGET_EXECUTABLE_CHECKPOINT,
+        "projection_baseline_checkpoint": probe.PROJECTION_BASELINE_CHECKPOINT,
+        "probe_tooling_checkpoint": "probe-tooling-checkpoint",
         "authorization_id": "probe-auth",
         "project_config_fingerprint_sha256": PROJECT_CONFIG.fingerprint_sha256,
         "artifact_root": "workspace/probe",
@@ -268,4 +325,6 @@ def test_probe_authorization_rejects_checkpoint_or_identity_drift() -> None:
         "credential_resolution": probe.EXPECTED_CREDENTIAL_RESOLUTION,
     }
     with pytest.raises(probe.ProbeStaticPreflightError, match="checkpoint"):
-        probe.ProbeAuthorization.from_mapping({**payload, "implementation_checkpoint": "wrong"})
+        probe.ProbeAuthorization.from_mapping(
+            {**payload, "scientific_executable_checkpoint": "wrong"}
+        )

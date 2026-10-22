@@ -16,6 +16,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -26,7 +27,7 @@ from scripts import nlp_d5_live_semantic_qualification as d5
 from wellplot.project_config import load_project_config
 
 TARGET_EXECUTABLE_CHECKPOINT = "fa3bfe59819d9b5e4cac9821b7770d7f4b4b3a0b"
-TOOLING_CHECKPOINT = "aeb2ad07e9e4430efe60098a58629201f19cbaee"
+PROJECTION_BASELINE_CHECKPOINT = "aeb2ad07e9e4430efe60098a58629201f19cbaee"
 TARGET_SERVER_ORIGIN = "http://192.168.2.141:8888"
 TARGET_OPENAI_COMPAT_BASE_URL = f"{TARGET_SERVER_ORIGIN}/v1"
 EXPECTED_MODEL = "qwen3.6-35b-a3b"
@@ -97,11 +98,20 @@ class ProbeUnusableJson:
 
 
 @dataclass(frozen=True, slots=True)
+class ProbeEndpointResponse:
+    """Retain bounded HTTP status separately from the parsed response."""
+
+    payload: object
+    http_status: int | None
+
+
+@dataclass(frozen=True, slots=True)
 class ProbeAuthorization:
     """Facts needed to run one fresh successor-runtime probe namespace."""
 
-    implementation_checkpoint: str
-    tooling_checkpoint: str
+    scientific_executable_checkpoint: str
+    projection_baseline_checkpoint: str
+    probe_tooling_checkpoint: str
     authorization_id: str
     project_config_fingerprint_sha256: str
     artifact_root: str
@@ -118,8 +128,9 @@ class ProbeAuthorization:
     def from_mapping(cls, value: Mapping[str, Any]) -> ProbeAuthorization:
         """Parse explicit probe authority without deriving identity values."""
         required = {
-            "implementation_checkpoint",
-            "tooling_checkpoint",
+            "scientific_executable_checkpoint",
+            "projection_baseline_checkpoint",
+            "probe_tooling_checkpoint",
             "authorization_id",
             "project_config_fingerprint_sha256",
             "artifact_root",
@@ -155,8 +166,9 @@ class ProbeAuthorization:
                 f"successor identity has unsupported fields: {unsupported_identity!r}"
             )
         authorization = cls(
-            implementation_checkpoint=str(value["implementation_checkpoint"]),
-            tooling_checkpoint=str(value["tooling_checkpoint"]),
+            scientific_executable_checkpoint=str(value["scientific_executable_checkpoint"]),
+            projection_baseline_checkpoint=str(value["projection_baseline_checkpoint"]),
+            probe_tooling_checkpoint=str(value["probe_tooling_checkpoint"]),
             authorization_id=str(value["authorization_id"]),
             project_config_fingerprint_sha256=str(value["project_config_fingerprint_sha256"]),
             artifact_root=str(value["artifact_root"]),
@@ -169,10 +181,14 @@ class ProbeAuthorization:
             model=str(value["model"]),
             credential_resolution=str(value["credential_resolution"]),
         )
-        if authorization.implementation_checkpoint != TARGET_EXECUTABLE_CHECKPOINT:
+        if authorization.scientific_executable_checkpoint != TARGET_EXECUTABLE_CHECKPOINT:
             raise ProbeStaticPreflightError("probe executable checkpoint drifted")
-        if authorization.tooling_checkpoint != TOOLING_CHECKPOINT:
-            raise ProbeStaticPreflightError("probe tooling checkpoint drifted")
+        if authorization.projection_baseline_checkpoint != PROJECTION_BASELINE_CHECKPOINT:
+            raise ProbeStaticPreflightError("projection baseline checkpoint drifted")
+        if not authorization.probe_tooling_checkpoint:
+            raise ProbeStaticPreflightError("probe tooling checkpoint is missing")
+        if authorization.probe_tooling_checkpoint == PROJECTION_BASELINE_CHECKPOINT:
+            raise ProbeStaticPreflightError("probe tooling checkpoint is not distinct")
         if authorization.target_server_origin != TARGET_SERVER_ORIGIN:
             raise ProbeStaticPreflightError("probe server origin drifted")
         if authorization.target_openai_compat_base_url != TARGET_OPENAI_COMPAT_BASE_URL:
@@ -333,15 +349,16 @@ def _default_endpoint_request(
     if len(raw) > MAX_ENDPOINT_RESPONSE_BYTES:
         raise ProbeEndpointError("endpoint_response_too_large")
     try:
-        return json.loads(raw)
+        payload = json.loads(raw)
     except (TypeError, ValueError):
-        return ProbeUnusableJson()
+        payload = ProbeUnusableJson()
+    return ProbeEndpointResponse(payload=payload, http_status=response.status)
 
 
 def _verify_historical_pin_join(
     repo_root: Path, authorization: ProbeAuthorization
-) -> dict[str, str]:
-    """Verify AUTH-001 terminal custody and the immutable digest join."""
+) -> tuple[dict[str, str], dict[str, Any]]:
+    """Verify AUTH-001 custody and bind its sealed successor observation."""
     root = _artifact_root(repo_root, authorization.historical_pin_artifact_root)
     paths = pin.MetadataEvidencePaths(root, authorization.historical_pin_authorization_id)
     digests = pin.verify_metadata_custody(paths)
@@ -352,7 +369,16 @@ def _verify_historical_pin_join(
         raise ProbeStaticPreflightError("historical pin terminal outcome drifted")
     if terminal.get("reason") != "HISTORICAL_IDENTITY_MISMATCH":
         raise ProbeStaticPreflightError("historical pin terminal reason drifted")
-    return digests
+    if terminal.get("mismatched_fields") != ["build_info"]:
+        raise ProbeStaticPreflightError("historical pin mismatch scope drifted")
+    observed = terminal.get("observed_empirical_pins")
+    if not isinstance(observed, Mapping):
+        raise ProbeStaticPreflightError("historical pin successor observation is missing")
+    if set(observed) != set(SUCCESSOR_FIELDS):
+        raise ProbeStaticPreflightError("historical pin successor observation shape drifted")
+    if dict(observed) != dict(authorization.successor_identity):
+        raise ProbeStaticPreflightError("successor identity is not joined to AUTH-001")
+    return digests, dict(observed)
 
 
 def _validate_frozen_contract() -> None:
@@ -377,9 +403,9 @@ def _static_preflight(
     if static_checker is not None:
         facts = static_checker(repo_root, authorization, paths)
     else:
-        if _git(repo_root, "rev-parse", "HEAD") != authorization.implementation_checkpoint:
+        if _git(repo_root, "rev-parse", "HEAD") != authorization.scientific_executable_checkpoint:
             raise ProbeStaticPreflightError("implementation checkpoint mismatch")
-        if _git(tooling_root, "rev-parse", "HEAD") != authorization.tooling_checkpoint:
+        if _git(tooling_root, "rev-parse", "HEAD") != authorization.probe_tooling_checkpoint:
             raise ProbeStaticPreflightError("tooling checkpoint mismatch")
         if repo_root.resolve() == tooling_root.resolve():
             raise ProbeStaticPreflightError("target and tooling worktrees must be distinct")
@@ -399,14 +425,18 @@ def _static_preflight(
             raise ProbeStaticPreflightError("configured model mismatch")
         if authorization.credential_resolution != EXPECTED_CREDENTIAL_RESOLUTION:
             raise ProbeStaticPreflightError("probe credential resolution drifted")
-        historical_digests = _verify_historical_pin_join(repo_root, authorization)
+        historical_digests, historical_successor_identity = _verify_historical_pin_join(
+            repo_root, authorization
+        )
         attestation = d5._run_static_attestation(repo_root)
         facts = {
             "status": "PASS",
-            "implementation_checkpoint": authorization.implementation_checkpoint,
-            "tooling_checkpoint": authorization.tooling_checkpoint,
+            "scientific_executable_checkpoint": authorization.scientific_executable_checkpoint,
+            "projection_baseline_checkpoint": authorization.projection_baseline_checkpoint,
+            "probe_tooling_checkpoint": authorization.probe_tooling_checkpoint,
             "project_config_fingerprint_sha256": project_config.fingerprint_sha256,
             "successor_identity": dict(authorization.successor_identity),
+            "historical_pin_successor_identity": historical_successor_identity,
             "historical_pin_custody_digests": historical_digests,
             "single_engine_attestation": attestation,
         }
@@ -437,7 +467,9 @@ class ProbeCustody:
             paths.state,
             {
                 "authorization_id": authorization.authorization_id,
-                "implementation_checkpoint": authorization.implementation_checkpoint,
+                "scientific_executable_checkpoint": authorization.scientific_executable_checkpoint,
+                "projection_baseline_checkpoint": authorization.projection_baseline_checkpoint,
+                "probe_tooling_checkpoint": authorization.probe_tooling_checkpoint,
                 "status": "READY",
                 "consumed": False,
                 "endpoint_attempts": 0,
@@ -484,7 +516,9 @@ class ProbeCustody:
         state = self._state()
         record = {
             "authorization_id": self.authorization.authorization_id,
-            "implementation_checkpoint": self.authorization.implementation_checkpoint,
+            "scientific_executable_checkpoint": self.authorization.scientific_executable_checkpoint,
+            "projection_baseline_checkpoint": self.authorization.projection_baseline_checkpoint,
+            "probe_tooling_checkpoint": self.authorization.probe_tooling_checkpoint,
             "provider_calls": 0,
             "model_calls": 0,
             **dict(terminal),
@@ -562,7 +596,33 @@ def _prompt_projection(payload: object) -> dict[str, Any]:
         raise ProbeToolError("apply-template response lacks a string prompt")
     prompt = payload["prompt"]
     encoded = prompt.encode("utf-8")
-    return {"prompt_length": len(prompt), "prompt_sha256": hashlib.sha256(encoded).hexdigest()}
+    return {
+        "response_shape": "object_with_string_prompt",
+        "prompt_length": len(prompt),
+        "prompt_sha256": hashlib.sha256(encoded).hexdigest(),
+    }
+
+
+def _response_payload(response: object) -> object:
+    """Unwrap the bounded transport result used by the real HTTP helper."""
+    if isinstance(response, ProbeEndpointResponse):
+        return response.payload
+    return response
+
+
+def _response_status(response: object) -> int | None:
+    """Return an HTTP status when the transport exposes one."""
+    if isinstance(response, ProbeEndpointResponse):
+        return response.http_status
+    return None
+
+
+def _utc_observation_timestamp(clock: Callable[[], datetime] | None) -> str:
+    """Return an injected or current UTC timestamp in bounded ISO form."""
+    observed_at = (clock or (lambda: datetime.now(UTC)))()
+    if observed_at.tzinfo is None:
+        raise ProbeToolError("observation clock must provide timezone-aware UTC time")
+    return observed_at.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def establish_successor_compatibility(
@@ -574,6 +634,7 @@ def establish_successor_compatibility(
     api_key_loader: Callable[[], str],
     static_checker: Callable[[Path, ProbeAuthorization, ProbeEvidencePaths], dict[str, Any]]
     | None = None,
+    observation_clock: Callable[[], datetime] | None = None,
 ) -> dict[str, Any]:
     """Run the bounded GET, GET, POST(false), POST(true) probe sequence."""
     root = _artifact_root(repo_root, authorization.artifact_root)
@@ -596,7 +657,8 @@ def establish_successor_compatibility(
 
     first_attempt = custody.issue("GET", "/v1/models")
     try:
-        catalog_payload = endpoint_request("GET", project_config.model_catalog_url, token, None)
+        catalog_response = endpoint_request("GET", project_config.model_catalog_url, token, None)
+        catalog_payload = _response_payload(catalog_response)
     except Exception as error:
         outcome, status = _endpoint_failure(error)
         return custody.seal(_endpoint_terminal("FIRST_IDENTITY_GET_FAILED", first_attempt, status))
@@ -609,7 +671,8 @@ def establish_successor_compatibility(
 
     second_attempt = custody.issue("GET", "/props")
     try:
-        props_payload = endpoint_request("GET", project_config.props_url, token, None)
+        props_response = endpoint_request("GET", project_config.props_url, token, None)
+        props_payload = _response_payload(props_response)
     except Exception as error:
         outcome, status = _endpoint_failure(error)
         return custody.seal(
@@ -637,6 +700,11 @@ def establish_successor_compatibility(
             }
         )
     mismatches = _identity_mismatches(observed_identity, authorization.successor_identity)
+    identity_observation = {
+        "contemporaneous_successor_identity": observed_identity,
+        "successor_identity_observed_at_utc": _utc_observation_timestamp(observation_clock),
+        "successor_identity_comparison": "EXACT_MATCH" if not mismatches else "MISMATCH",
+    }
     if mismatches:
         return custody.seal(
             {
@@ -645,6 +713,7 @@ def establish_successor_compatibility(
                 "mismatched_fields": list(mismatches),
                 "endpoint_attempts": second_attempt,
                 "generation_calls": 0,
+                **identity_observation,
             }
         )
 
@@ -652,10 +721,10 @@ def establish_successor_compatibility(
     _validate_frozen_request_body(False, false_body)
     false_attempt = custody.issue("POST", "/apply-template")
     try:
-        false_payload = endpoint_request(
+        false_response = endpoint_request(
             "POST", f"{TARGET_SERVER_ORIGIN}/apply-template", token, false_body
         )
-        false_projection = _prompt_projection(false_payload)
+        false_projection = _prompt_projection(_response_payload(false_response))
     except Exception:
         return custody.seal(
             {
@@ -663,6 +732,9 @@ def establish_successor_compatibility(
                 "reason": "FALSE_ARM_FAILED",
                 "endpoint_attempts": false_attempt,
                 "generation_calls": 0,
+                "false_request_body_sha256": FALSE_REQUEST_BODY_SHA256,
+                "false_response_shape": "NOT_OBSERVED",
+                **identity_observation,
             }
         )
 
@@ -670,10 +742,10 @@ def establish_successor_compatibility(
     _validate_frozen_request_body(True, true_body)
     true_attempt = custody.issue("POST", "/apply-template")
     try:
-        true_payload = endpoint_request(
+        true_response = endpoint_request(
             "POST", f"{TARGET_SERVER_ORIGIN}/apply-template", token, true_body
         )
-        true_projection = _prompt_projection(true_payload)
+        true_projection = _prompt_projection(_response_payload(true_response))
     except Exception:
         return custody.seal(
             {
@@ -681,16 +753,28 @@ def establish_successor_compatibility(
                 "reason": "TRUE_ARM_FAILED",
                 "endpoint_attempts": true_attempt,
                 "generation_calls": 0,
+                "false_request_body_sha256": FALSE_REQUEST_BODY_SHA256,
+                "true_request_body_sha256": TRUE_REQUEST_BODY_SHA256,
+                "false_response_shape": "OBSERVED",
+                "true_response_shape": "NOT_OBSERVED",
+                **identity_observation,
             }
         )
 
     terminal = {
         "endpoint_attempts": true_attempt,
         "generation_calls": 0,
+        "false_request_body_sha256": FALSE_REQUEST_BODY_SHA256,
+        "true_request_body_sha256": TRUE_REQUEST_BODY_SHA256,
+        "false_http_status": _response_status(false_response),
+        "true_http_status": _response_status(true_response),
+        "false_response_shape": false_projection["response_shape"],
+        "true_response_shape": true_projection["response_shape"],
         "false_prompt_length": false_projection["prompt_length"],
         "false_prompt_sha256": false_projection["prompt_sha256"],
         "true_prompt_length": true_projection["prompt_length"],
         "true_prompt_sha256": true_projection["prompt_sha256"],
+        **identity_observation,
     }
     if false_projection["prompt_sha256"] == true_projection["prompt_sha256"]:
         return custody.seal(
