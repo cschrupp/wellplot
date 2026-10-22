@@ -8,6 +8,12 @@ branch: design/d5-5g-inspectable-historical-claim-revalidation
 implementation_commit: 4cf78369516bda8dbfb10991f6d7b915c43ebd85
 implementation_parent: c0a44b6432b01dffeb614246cfacb1c9deb705c5
 accepted_h_implementation_checkpoint: e72e726b7f52c1975d862980543cd3f217ee6aa8
+thinking_control_implementation_authority: WELLPLOT-D5-5I-THINKING-OFF-REQUEST-CONTROL-IMPL-AUTH-001
+thinking_control_implementation_commit: 52a65c7fa
+thinking_control_mechanism: chat_template_kwargs.enable_thinking
+thinking_control_value: false
+thinking_control_options_sha256: 220b99e47feb82851cab428f86b8fe977ae7c605400d421a91e99d4a35ec9c26
+thinking_off_readiness_semantics: STATIC_REQUEST_CONTRACT
 historical_d5_identity: PRESERVED_SEPARATELY
 changed_files:
   - scripts/nlp_d5_live_semantic_qualification.py
@@ -85,6 +91,23 @@ baseline against the earlier D5-5G design checkpoint and therefore reports the
 accepted H production changes as a baseline mismatch. The current D5 single-
 engine attestation passes; no H source was changed by this adaptation.
 
+## Thinking-Off Request Control
+
+The D5-5I executable now binds the exact request options below at the
+OpenAI-compatible adapter boundary:
+
+```json
+{"chat_template_kwargs":{"enable_thinking":false}}
+```
+
+The canonical JSON SHA-256 is
+`220b99e47feb82851cab428f86b8fe977ae7c605400d421a91e99d4a35ec9c26`.
+Static preflight rejects a missing, changed, or caller-overridden control.
+The existing model-I/O observer verifies the serialized
+`/chat/completions` body for planner, report-worker, and section-worker
+requests, including SDK retries. `/v1/models` and `/props` remain runtime
+identity observations; they do not claim to establish thinking mode.
+
 ## Scope Boundary
 
 The live Qwen confirmation remains separately unauthorized. The exact frozen
@@ -95,6 +118,7 @@ scientific acceptance.
 
 ```yaml
 src_wellplot_changes: 0
+thinking_control: FROZEN / PROVIDER_FREE_VERIFIED
 historical_campaigns_mutated: false
 D5-5G_replay: NOT_AUTHORIZED
 D5-5J: NOT_AUTHORIZED
