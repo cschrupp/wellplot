@@ -39,7 +39,8 @@ this design does not consume them or create campaign state.
 
 ## Frozen Contract
 
-The later authorization record must bind these values without substitution:
+The later authorization record must bind these runner-consumed values without
+substitution:
 
 ```yaml
 implementation_checkpoint: 661a7eeeabcfa4e6364aeb3e74bf55859ac48539
@@ -48,16 +49,49 @@ model: qwen3.6-35b-a3b
 structured_output_contract: json_schema
 openai_sdk_version: 2.34.0
 sdk_max_retries: 2
+```
+
+The runner-consumed authorization fields are:
+
+```text
+implementation checkpoint
+authorization and campaign identifiers
+artifact root
+project configuration fingerprint
+accepted H/D5 identities
+provider/model identity
+endpoint identity
+minimum context size
+runtime-default fingerprint
+thinking-off state
+structured-output contract
+SDK version and retry policy
+source, case, gold, dependency, and production identities
+```
+
+The following are executable-attested fixed invariants. They must still be
+recorded in the Gate-B record and independently checked against the frozen
+executable, but the design does not claim that
+`D5Authorization.from_mapping()` parses or validates each one as an
+authorization field:
+
+```yaml
 request_timeout_seconds: 900
 scientist_turn_concurrency: 1
 logical_generation_call_ceiling: 45
 physical_generation_attempt_ceiling: 135
 identity_endpoint_attempt_ceiling: 2
+role_limits: FROZEN_EXECUTABLE_INVARIANT
 fallback: NONE
 model_substitution: FORBIDDEN
 experiment_level_replay: FORBIDDEN
 selective_rerun: FORBIDDEN
 ```
+
+The timeout and concurrency must match the frozen project configuration; the
+logical and physical ceilings must match the executable ledger; and the two
+identity observations must match `prepare_readiness()`. Any mismatch blocks
+Gate-B issuance even when the runner would otherwise ignore the extra field.
 
 The project configuration fingerprint is frozen as:
 
@@ -72,10 +106,13 @@ must not be recomputed from a different checkout or silently refreshed.
 
 The exact Qwen endpoint identity, runtime-default fingerprint, chat-template
 fingerprint, minimum context size, and `thinking_off: true` evidence must be
-reused verbatim from the sealed `d5-5-qwen-inspectable-002` run. They are not
-inferred by this design and may not be regenerated, normalized, weakened, or
-replaced. If the sealed values cannot be recovered exactly, the later run
-stops before readiness.
+recovered verbatim from the sealed `d5-5-qwen-inspectable-002` run and copied
+as concrete values into the eventual Gate-B authorization record. A reference
+such as “same as d5-5-qwen-inspectable-002” is not sufficient execution
+authority. These values are not inferred by this design and may not be
+regenerated, normalized, weakened, or replaced. If the sealed values cannot be
+recovered exactly, the later authorization record must not be issued and the
+run stops before readiness.
 
 ## Scientific Population
 
@@ -102,9 +139,11 @@ terminate preflight as `LOCAL_ASSET_NOT_PROVISIONED_IN_THIS_CHECKOUT`.
 Historical campaigns, requests, gold, fixtures, and evidence are immutable and
 must not be reused as the new campaign namespace.
 
-## Readiness Sequence
+## Authorization Consumption And Readiness Sequence
 
-After static custody and local-asset checks pass, the later live authority
+The later authorization is consumed at the first actually-issued readiness
+GET, not when `STARTED` is created. Static preflight and local-asset checks
+occur before consumption. After static checks pass, the later live authority
 permits exactly these two credential-bearing identity observations, in order:
 
 ```text
@@ -126,6 +165,13 @@ The separate identity-attempt ceiling is `2`:
 - `/props` failure terminates with two identity attempts;
 - a successful pair still requires exact identity/configuration comparison
   before any generation request.
+
+If the first or second GET fails, the existing harness must retain the bounded
+`NOT_READY` evidence as the terminal result for that consumed authority. The
+fresh campaign namespace must not be reused, even though scientific custody
+never reached `STARTED`. A subsequent readiness attempt requires a new
+authorization ID and a new campaign ID; there is no retry, replay, or second
+invocation under the consumed authority.
 
 Any static, asset, identity, endpoint, model, runtime-default, structured-
 output, or thinking-mode mismatch stops before model calls.
