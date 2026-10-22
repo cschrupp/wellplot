@@ -4,8 +4,8 @@
 authority: WELLPLOT-D5-5I-CONFIRMATION-HARNESS-ADAPTATION-AUTH-001
 design: docs/architecture/D5_5I_REPAIRED_BASELINE_LIVE_CONFIRMATION_DESIGN.md
 branch: design/d5-5g-inspectable-historical-claim-revalidation
-implementation_commit: 320da575a2bf2b0ff0d36b76dcfce70bcd8b4f3d
-parent: 16d7289745bea16af3443eea02e90efa1ce85855
+implementation_commit: 1ee0d3d19
+implementation_parent: 28140cdcf5a060d4d9082caba9872086e8bcd5fa
 accepted_h_implementation_checkpoint: e72e726b7f52c1975d862980543cd3f217ee6aa8
 historical_d5_identity: PRESERVED_SEPARATELY
 changed_files:
