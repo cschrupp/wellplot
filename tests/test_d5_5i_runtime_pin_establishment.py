@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -42,10 +43,15 @@ def _authorization(
     }
     return tool.MetadataAuthorization(
         implementation_checkpoint=tool.TARGET_EXECUTABLE_CHECKPOINT,
+        tooling_checkpoint="tooling-test-checkpoint",
         authorization_id=authorization_id,
         project_config_fingerprint_sha256=PROJECT_CONFIG.fingerprint_sha256,
         artifact_root=str(tmp_path / "runtime-pins"),
         historical_continuity=continuity,
+        target_server_origin=tool.TARGET_SERVER_ORIGIN,
+        target_openai_compat_base_url=tool.TARGET_OPENAI_COMPAT_BASE_URL,
+        model=tool.EXPECTED_MODEL,
+        credential_resolution=tool.EXPECTED_CREDENTIAL_RESOLUTION,
     )
 
 
@@ -66,6 +72,7 @@ def _run(
     """Run the tool with injected transport and no provider construction."""
     return tool.establish_runtime_pins(
         repo_root=REPO_ROOT,
+        tooling_root=REPO_ROOT,
         authorization=authorization,
         endpoint_get=endpoint_get,
         api_key_loader=lambda: "secret-token",
@@ -96,6 +103,10 @@ def test_successful_two_get_projection_and_custody_are_redacted(tmp_path: Path) 
     serialized = json.dumps(result, sort_keys=True)
     assert "secret-token" not in serialized
     assert "/srv/models" not in serialized
+    assert "structured_output_contract" not in result["empirical_pins"]
+    assert "gguf_byte_identity" not in result["empirical_pins"]
+    assert result["inherited_configuration"] == {"structured_output_contract": "json_schema"}
+    assert result["gguf_byte_identity"] == "NOT_ESTABLISHED"
     paths = tool.MetadataEvidencePaths(
         Path(authorization.artifact_root), authorization.authorization_id
     )
@@ -120,10 +131,29 @@ def test_static_failure_has_zero_endpoint_calls_and_no_consumption(tmp_path: Pat
     with pytest.raises(tool.MetadataStaticPreflightError, match="checkpoint mismatch"):
         tool.establish_runtime_pins(
             repo_root=REPO_ROOT,
+            tooling_root=REPO_ROOT,
             authorization=authorization,
             endpoint_get=lambda url, token: calls.append(url),
             api_key_loader=lambda: "secret-token",
             static_checker=static_failure,
+        )
+    assert calls == []
+    assert not Path(authorization.artifact_root).exists()
+
+
+def test_missing_credential_is_unconsumed_and_has_zero_gets(tmp_path: Path) -> None:
+    """Credential failure occurs before namespace creation or one-shot use."""
+    authorization = _authorization(tmp_path)
+    calls: list[str] = []
+
+    with pytest.raises(tool.MetadataToolError, match="CREDENTIAL_UNAVAILABLE"):
+        tool.establish_runtime_pins(
+            repo_root=REPO_ROOT,
+            tooling_root=REPO_ROOT,
+            authorization=authorization,
+            endpoint_get=lambda url, token: calls.append(url),
+            api_key_loader=lambda: "",
+            static_checker=_static_pass,
         )
     assert calls == []
     assert not Path(authorization.artifact_root).exists()
@@ -183,22 +213,127 @@ def test_incomplete_props_is_not_a_successful_pin(tmp_path: Path) -> None:
     assert result["endpoint_attempts"] == 2
 
 
-def test_historical_mismatch_stops_before_second_get(tmp_path: Path) -> None:
-    """A continuity mismatch is not silently refreshed or followed by props."""
+def test_catalog_mismatch_still_issues_both_metadata_gets(tmp_path: Path) -> None:
+    """A catalog mismatch does not suppress the required second observation."""
     authorization = _authorization(tmp_path)
     calls: list[str] = []
 
     def endpoint_get(url: str, token: str) -> object:
         del token
         calls.append(url)
-        return {"data": [{"id": "different-model"}]}
+        if url == PROJECT_CONFIG.model_catalog_url:
+            return {"data": [{"id": "different-model"}]}
+        return _props()
 
     result = _run(authorization, endpoint_get)
     assert result["outcome"] == "MISMATCH"
     assert result["reason"] == "HISTORICAL_IDENTITY_MISMATCH"
     assert result["mismatched_fields"] == ["model_catalog"]
-    assert result["endpoint_attempts"] == 1
-    assert calls == [PROJECT_CONFIG.model_catalog_url]
+    assert result["endpoint_attempts"] == 2
+    assert calls == [PROJECT_CONFIG.model_catalog_url, PROJECT_CONFIG.props_url]
+
+
+def test_malformed_catalog_still_issues_props_before_classification(tmp_path: Path) -> None:
+    """A malformed successful first response still permits the second GET."""
+    authorization = _authorization(tmp_path)
+    calls: list[str] = []
+
+    def endpoint_get(url: str, token: str) -> object:
+        del token
+        calls.append(url)
+        if url == PROJECT_CONFIG.model_catalog_url:
+            return {"unexpected": "shape"}
+        return _props()
+
+    result = _run(authorization, endpoint_get)
+    assert result["outcome"] == "INCOMPLETE_PROPS"
+    assert result["reason"] == "MODEL_CATALOG_UNAVAILABLE"
+    assert result["endpoint_attempts"] == 2
+    assert calls == [PROJECT_CONFIG.model_catalog_url, PROJECT_CONFIG.props_url]
+
+
+def test_authorization_requires_explicit_target_and_credential_bindings(
+    tmp_path: Path,
+) -> None:
+    """Target identity and credential resolution cannot be synthesized."""
+    authorization = _authorization(tmp_path)
+    payload = {
+        "implementation_checkpoint": authorization.implementation_checkpoint,
+        "tooling_checkpoint": authorization.tooling_checkpoint,
+        "authorization_id": authorization.authorization_id,
+        "project_config_fingerprint_sha256": authorization.project_config_fingerprint_sha256,
+        "artifact_root": authorization.artifact_root,
+        "historical_continuity": dict(authorization.historical_continuity),
+    }
+    for field in (
+        "target_server_origin",
+        "target_openai_compat_base_url",
+        "model",
+        "credential_resolution",
+    ):
+        with pytest.raises(tool.MetadataStaticPreflightError, match="missing"):
+            tool.MetadataAuthorization.from_mapping(dict(payload))
+        payload[field] = getattr(authorization, field)
+
+
+def test_unsupported_continuity_fields_fail_before_gets(tmp_path: Path) -> None:
+    """Continuity projection is closed before any endpoint activity."""
+    authorization = _authorization(tmp_path)
+    payload = {
+        "implementation_checkpoint": authorization.implementation_checkpoint,
+        "tooling_checkpoint": authorization.tooling_checkpoint,
+        "authorization_id": authorization.authorization_id,
+        "project_config_fingerprint_sha256": authorization.project_config_fingerprint_sha256,
+        "artifact_root": authorization.artifact_root,
+        "target_server_origin": authorization.target_server_origin,
+        "target_openai_compat_base_url": authorization.target_openai_compat_base_url,
+        "model": authorization.model,
+        "credential_resolution": authorization.credential_resolution,
+        "historical_continuity": {
+            **authorization.historical_continuity,
+            "unexpected": "value",
+        },
+    }
+    with pytest.raises(tool.MetadataStaticPreflightError, match="unsupported fields"):
+        tool.MetadataAuthorization.from_mapping(payload)
+
+
+def test_static_preflight_binds_tooling_and_target_checkpoints(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The metadata tool and scientific target identities are separate pins."""
+    target_root = tmp_path / "target"
+    tooling_root = tmp_path / "tooling"
+    authorization = replace(_authorization(tmp_path), tooling_checkpoint="tooling-sha")
+    paths = tool.MetadataEvidencePaths(tmp_path / "evidence", authorization.authorization_id)
+
+    def fake_git(root: Path, *arguments: str) -> str:
+        if arguments == ("status", "--porcelain"):
+            return ""
+        if root == target_root:
+            return authorization.implementation_checkpoint
+        if root == tooling_root:
+            return authorization.tooling_checkpoint
+        raise AssertionError(root)
+
+    monkeypatch.setattr(tool, "_git", fake_git)
+    monkeypatch.setattr(tool, "load_project_config", lambda root: PROJECT_CONFIG)
+    monkeypatch.setattr(
+        tool.d5,
+        "_run_static_attestation",
+        lambda root: {"status": "PASS"},
+    )
+    facts = tool._static_preflight(target_root, tooling_root, authorization, paths)
+    assert facts["implementation_checkpoint"] == authorization.implementation_checkpoint
+    assert facts["tooling_checkpoint"] == "tooling-sha"
+
+    with pytest.raises(tool.MetadataStaticPreflightError, match="tooling checkpoint"):
+        tool._static_preflight(
+            target_root,
+            tooling_root,
+            replace(authorization, tooling_checkpoint="wrong-tooling-sha"),
+            tool.MetadataEvidencePaths(tmp_path / "other-evidence", authorization.authorization_id),
+        )
 
 
 def test_third_metadata_attempt_is_rejected_before_transport(tmp_path: Path) -> None:

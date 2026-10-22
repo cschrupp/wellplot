@@ -28,6 +28,7 @@ TARGET_SERVER_ORIGIN = "http://192.168.2.141:8888"
 TARGET_OPENAI_COMPAT_BASE_URL = f"{TARGET_SERVER_ORIGIN}/v1"
 EXPECTED_MODEL = "qwen3.6-35b-a3b"
 EXPECTED_STRUCTURED_OUTPUT = "json_schema"
+EXPECTED_CREDENTIAL_RESOLUTION = "d4.load_d4_api_key(repo_root)"
 MAX_METADATA_ATTEMPTS = 2
 MAX_ENDPOINT_RESPONSE_BYTES = d5.MAX_ENDPOINT_RESPONSE_BYTES
 
@@ -40,6 +41,7 @@ CONTINUITY_FIELDS = (
     "total_slots",
     "chat_template_sha256",
 )
+EMPIRICAL_PIN_FIELDS = (*CONTINUITY_FIELDS, "runtime_defaults_sha256")
 
 STATE_SUFFIX = ".state.json"
 JOURNAL_SUFFIX = ".journal.jsonl"
@@ -70,23 +72,30 @@ class MetadataAuthorization:
     """Facts needed to establish one fresh runtime-pin evidence namespace."""
 
     implementation_checkpoint: str
+    tooling_checkpoint: str
     authorization_id: str
     project_config_fingerprint_sha256: str
     artifact_root: str
     historical_continuity: Mapping[str, Any]
-    target_server_origin: str = TARGET_SERVER_ORIGIN
-    target_openai_compat_base_url: str = TARGET_OPENAI_COMPAT_BASE_URL
-    model: str = EXPECTED_MODEL
+    target_server_origin: str
+    target_openai_compat_base_url: str
+    model: str
+    credential_resolution: str
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> MetadataAuthorization:
         """Parse explicit metadata authority without deriving its identity."""
         required = {
             "implementation_checkpoint",
+            "tooling_checkpoint",
             "authorization_id",
             "project_config_fingerprint_sha256",
             "artifact_root",
             "historical_continuity",
+            "target_server_origin",
+            "target_openai_compat_base_url",
+            "model",
+            "credential_resolution",
         }
         missing = sorted(required - set(value))
         if missing:
@@ -99,17 +108,22 @@ class MetadataAuthorization:
             raise MetadataStaticPreflightError(
                 f"historical continuity is missing: {missing_continuity!r}"
             )
+        unsupported_continuity = sorted(set(continuity) - set(CONTINUITY_FIELDS))
+        if unsupported_continuity:
+            raise MetadataStaticPreflightError(
+                f"historical continuity has unsupported fields: {unsupported_continuity!r}"
+            )
         authorization = cls(
             implementation_checkpoint=str(value["implementation_checkpoint"]),
+            tooling_checkpoint=str(value["tooling_checkpoint"]),
             authorization_id=str(value["authorization_id"]),
             project_config_fingerprint_sha256=str(value["project_config_fingerprint_sha256"]),
             artifact_root=str(value["artifact_root"]),
             historical_continuity=dict(continuity),
-            target_server_origin=str(value.get("target_server_origin", TARGET_SERVER_ORIGIN)),
-            target_openai_compat_base_url=str(
-                value.get("target_openai_compat_base_url", TARGET_OPENAI_COMPAT_BASE_URL)
-            ),
-            model=str(value.get("model", EXPECTED_MODEL)),
+            target_server_origin=str(value["target_server_origin"]),
+            target_openai_compat_base_url=str(value["target_openai_compat_base_url"]),
+            model=str(value["model"]),
+            credential_resolution=str(value["credential_resolution"]),
         )
         if authorization.implementation_checkpoint != TARGET_EXECUTABLE_CHECKPOINT:
             raise MetadataStaticPreflightError("metadata executable checkpoint drifted")
@@ -119,6 +133,8 @@ class MetadataAuthorization:
             raise MetadataStaticPreflightError("metadata OpenAI-compatible base URL drifted")
         if authorization.model != EXPECTED_MODEL:
             raise MetadataStaticPreflightError("metadata model identity drifted")
+        if authorization.credential_resolution != EXPECTED_CREDENTIAL_RESOLUTION:
+            raise MetadataStaticPreflightError("metadata credential resolution drifted")
         if not authorization.authorization_id or not authorization.artifact_root:
             raise MetadataStaticPreflightError("metadata custody identity is missing")
         if Path(authorization.authorization_id).name != authorization.authorization_id:
@@ -199,6 +215,7 @@ def _artifact_root(repo_root: Path, authorization: MetadataAuthorization) -> Pat
 
 def _static_preflight(
     repo_root: Path,
+    tooling_root: Path,
     authorization: MetadataAuthorization,
     paths: MetadataEvidencePaths,
     *,
@@ -207,36 +224,48 @@ def _static_preflight(
 ) -> dict[str, Any]:
     """Verify checkout/configuration/custody before loading a credential."""
     if static_checker is not None:
-        return static_checker(repo_root, authorization, paths)
-    if _git(repo_root, "rev-parse", "HEAD") != authorization.implementation_checkpoint:
-        raise MetadataStaticPreflightError("implementation checkpoint mismatch")
-    if _git(repo_root, "status", "--porcelain"):
-        raise MetadataStaticPreflightError("working tree is not clean")
-    project_config = load_project_config(repo_root)
-    d5._validate_project_config(project_config)
-    if project_config.fingerprint_sha256 != authorization.project_config_fingerprint_sha256:
-        raise MetadataStaticPreflightError("project configuration fingerprint mismatch")
-    if project_config.server_origin != authorization.target_server_origin:
-        raise MetadataStaticPreflightError("configured server origin mismatch")
-    if project_config.openai_compat_base_url != authorization.target_openai_compat_base_url:
-        raise MetadataStaticPreflightError("configured OpenAI-compatible base URL mismatch")
-    if project_config.provider.model != authorization.model:
-        raise MetadataStaticPreflightError("configured model mismatch")
-    if project_config.runtime.structured_output != EXPECTED_STRUCTURED_OUTPUT:
-        raise MetadataStaticPreflightError("structured-output contract drifted")
+        static_facts = static_checker(repo_root, authorization, paths)
+    else:
+        if _git(repo_root, "rev-parse", "HEAD") != authorization.implementation_checkpoint:
+            raise MetadataStaticPreflightError("implementation checkpoint mismatch")
+        if _git(tooling_root, "rev-parse", "HEAD") != authorization.tooling_checkpoint:
+            raise MetadataStaticPreflightError("tooling checkpoint mismatch")
+        if repo_root.resolve() == tooling_root.resolve():
+            raise MetadataStaticPreflightError("target and tooling worktrees must be distinct")
+        if _git(repo_root, "status", "--porcelain"):
+            raise MetadataStaticPreflightError("target working tree is not clean")
+        if _git(tooling_root, "status", "--porcelain"):
+            raise MetadataStaticPreflightError("tooling working tree is not clean")
+        project_config = load_project_config(repo_root)
+        d5._validate_project_config(project_config)
+        if project_config.fingerprint_sha256 != authorization.project_config_fingerprint_sha256:
+            raise MetadataStaticPreflightError("project configuration fingerprint mismatch")
+        if project_config.server_origin != authorization.target_server_origin:
+            raise MetadataStaticPreflightError("configured server origin mismatch")
+        if project_config.openai_compat_base_url != authorization.target_openai_compat_base_url:
+            raise MetadataStaticPreflightError("configured OpenAI-compatible base URL mismatch")
+        if project_config.provider.model != authorization.model:
+            raise MetadataStaticPreflightError("configured model mismatch")
+        if project_config.runtime.structured_output != EXPECTED_STRUCTURED_OUTPUT:
+            raise MetadataStaticPreflightError("structured-output contract drifted")
+        if authorization.credential_resolution != EXPECTED_CREDENTIAL_RESOLUTION:
+            raise MetadataStaticPreflightError("metadata credential resolution drifted")
+        attestation = d5._run_static_attestation(repo_root)
+        static_facts = {
+            "status": "PASS",
+            "implementation_checkpoint": authorization.implementation_checkpoint,
+            "tooling_checkpoint": authorization.tooling_checkpoint,
+            "project_config_fingerprint_sha256": project_config.fingerprint_sha256,
+            "server_origin": project_config.server_origin,
+            "openai_compat_base_url": project_config.openai_compat_base_url,
+            "model": project_config.provider.model,
+            "credential_resolution": authorization.credential_resolution,
+            "structured_output_contract": EXPECTED_STRUCTURED_OUTPUT,
+            "single_engine_attestation": attestation,
+        }
     if paths.root.exists() or any(path.exists() for path in paths.all_paths()):
         raise MetadataStaticPreflightError("metadata evidence namespace is not fresh")
-    attestation = d5._run_static_attestation(repo_root)
-    return {
-        "status": "PASS",
-        "implementation_checkpoint": authorization.implementation_checkpoint,
-        "project_config_fingerprint_sha256": project_config.fingerprint_sha256,
-        "server_origin": project_config.server_origin,
-        "openai_compat_base_url": project_config.openai_compat_base_url,
-        "model": project_config.provider.model,
-        "structured_output_contract": EXPECTED_STRUCTURED_OUTPUT,
-        "single_engine_attestation": attestation,
-    }
+    return static_facts
 
 
 @dataclass(slots=True)
@@ -437,6 +466,7 @@ def _default_endpoint_get(url: str, api_key: str) -> object:
 def establish_runtime_pins(
     *,
     repo_root: Path,
+    tooling_root: Path,
     authorization: MetadataAuthorization,
     endpoint_get: Callable[[str, str], object] = _default_endpoint_get,
     api_key_loader: Callable[[], str] | None = None,
@@ -448,30 +478,19 @@ def establish_runtime_pins(
     paths = MetadataEvidencePaths(root, authorization.authorization_id)
     static = _static_preflight(
         repo_root,
+        tooling_root,
         authorization,
         paths,
         static_checker=static_checker,
     )
-    custody = MetadataCustody.create(paths, authorization, static)
     load_key = api_key_loader or (lambda: d4.load_d4_api_key(repo_root))
     try:
         token = load_key()
     except Exception:
-        return custody.seal(
-            {
-                "outcome": "AUTHENTICATION_FAILURE",
-                "reason": "CREDENTIAL_UNAVAILABLE",
-                "endpoint_attempts": 0,
-            }
-        )
+        raise MetadataToolError("CREDENTIAL_UNAVAILABLE before endpoint issuance") from None
     if not isinstance(token, str) or not token.strip():
-        return custody.seal(
-            {
-                "outcome": "AUTHENTICATION_FAILURE",
-                "reason": "CREDENTIAL_UNAVAILABLE",
-                "endpoint_attempts": 0,
-            }
-        )
+        raise MetadataToolError("CREDENTIAL_UNAVAILABLE before endpoint issuance")
+    custody = MetadataCustody.create(paths, authorization, static)
 
     try:
         first_attempt = custody.issue("/v1/models")
@@ -484,33 +503,12 @@ def establish_runtime_pins(
         return custody.seal(
             _terminal_for_endpoint_failure(outcome, "FIRST_GET_FAILED", first_attempt, status)
         )
+    catalog_projection_error = False
     try:
         model_catalog = d5._project_model_catalog(catalog_payload, "")
-    except d5.D5ReadinessError:
-        return custody.seal(
-            {
-                "outcome": "INCOMPLETE_PROPS",
-                "reason": "MODEL_CATALOG_UNAVAILABLE",
-                "endpoint_attempts": first_attempt,
-                "generation_calls": 0,
-            }
-        )
-    observed_catalog = {"model_catalog": model_catalog}
-    catalog_mismatches = _continuity_mismatches(
-        observed_catalog,
-        {"model_catalog": authorization.historical_continuity["model_catalog"]},
-    )
-    if model_catalog != (authorization.model,) or catalog_mismatches:
-        return custody.seal(
-            {
-                "outcome": "MISMATCH",
-                "reason": "HISTORICAL_IDENTITY_MISMATCH",
-                "mismatched_fields": ["model_catalog"],
-                "observed_model_catalog": list(model_catalog),
-                "endpoint_attempts": first_attempt,
-                "generation_calls": 0,
-            }
-        )
+    except (d5.D5ReadinessError, TypeError, ValueError):
+        model_catalog = ()
+        catalog_projection_error = True
 
     try:
         second_attempt = custody.issue("/props")
@@ -531,15 +529,28 @@ def establish_runtime_pins(
                 "generation_calls": 0,
             }
         )
-    observed = {"model_catalog": model_catalog, **props}
+    if catalog_projection_error:
+        return custody.seal(
+            {
+                "outcome": "INCOMPLETE_PROPS",
+                "reason": "MODEL_CATALOG_UNAVAILABLE",
+                "endpoint_attempts": second_attempt,
+                "generation_calls": 0,
+            }
+        )
+    observed = {
+        field: (list(model_catalog) if field == "model_catalog" else props[field])
+        for field in EMPIRICAL_PIN_FIELDS
+        if field == "model_catalog" or field in props
+    }
     mismatches = _continuity_mismatches(observed, authorization.historical_continuity)
-    if mismatches:
+    if model_catalog != (authorization.model,) or mismatches:
         return custody.seal(
             {
                 "outcome": "MISMATCH",
                 "reason": "HISTORICAL_IDENTITY_MISMATCH",
                 "mismatched_fields": list(mismatches),
-                "observed_runtime_identity": observed,
+                "observed_empirical_pins": observed,
                 "endpoint_attempts": second_attempt,
                 "generation_calls": 0,
             }
@@ -549,8 +560,16 @@ def establish_runtime_pins(
             "outcome": "SUCCESS",
             "reason": "RUNTIME_PINS_ESTABLISHED",
             "historical_overlap": "EXACT_MATCH",
-            "extended_pins": observed,
-            "thinking_off": "STATIC_REQUEST_CONTRACT",
+            "empirical_pins": observed,
+            "inherited_configuration": {
+                "structured_output_contract": EXPECTED_STRUCTURED_OUTPUT,
+            },
+            "thinking_control": {
+                "semantics": "STATIC_REQUEST_CONTRACT",
+                "mechanism": d5.THINKING_CONTROL_MECHANISM,
+                "options_sha256": d5.THINKING_CONTROL_OPTIONS_SHA256,
+            },
+            "gguf_byte_identity": "NOT_ESTABLISHED",
             "compatibility_review": "REQUIRED_BEFORE_GATE_B",
             "endpoint_attempts": second_attempt,
             "generation_calls": 0,
@@ -594,12 +613,14 @@ def _load_authorization(path: Path) -> MetadataAuthorization:
 def main() -> int:
     """Run the explicitly supplied metadata-only authority."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo-root", type=Path, default=Path.cwd())
+    parser.add_argument("--repo-root", type=Path, required=True)
+    parser.add_argument("--tooling-repo-root", type=Path, required=True)
     parser.add_argument("--authorization-json", type=Path, required=True)
     args = parser.parse_args()
     try:
         result = establish_runtime_pins(
             repo_root=args.repo_root.resolve(),
+            tooling_root=args.tooling_repo_root.resolve(),
             authorization=_load_authorization(args.authorization_json.resolve()),
         )
     except MetadataToolError as error:
