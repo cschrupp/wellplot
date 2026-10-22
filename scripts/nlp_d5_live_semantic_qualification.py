@@ -258,6 +258,24 @@ class D5Authorization:
         missing = required - set(value)
         if missing:
             raise D5StaticPreflightError(f"authorization is missing: {sorted(missing)!r}")
+        control_fields = {
+            "thinking_off",
+            "thinking_control_options",
+            "thinking_control_options_sha256",
+        }
+        missing_control = control_fields - set(value)
+        if missing_control:
+            raise D5StaticPreflightError(
+                f"authorization is missing thinking control: {sorted(missing_control)!r}"
+            )
+        if value["thinking_off"] is not True:
+            raise D5StaticPreflightError("thinking_off must be the literal boolean true")
+        options = value["thinking_control_options"]
+        if not isinstance(options, Mapping) or dict(options) != _thinking_control_options():
+            raise D5StaticPreflightError("thinking-off request control drifted")
+        digest = value["thinking_control_options_sha256"]
+        if digest != THINKING_CONTROL_OPTIONS_SHA256:
+            raise D5StaticPreflightError("thinking-off request control digest drifted")
         return cls(
             implementation_checkpoint=str(value["implementation_checkpoint"]),
             authorization_id=str(value["authorization_id"]),
@@ -290,16 +308,9 @@ class D5Authorization:
             ),
             minimum_context_size=int(value.get("minimum_context_size", 0)),
             runtime_defaults_sha256=str(value.get("runtime_defaults_sha256", "")),
-            thinking_off=bool(value.get("thinking_off", True)),
-            thinking_control_options=dict(
-                value.get("thinking_control_options", _thinking_control_options())
-            ),
-            thinking_control_options_sha256=str(
-                value.get(
-                    "thinking_control_options_sha256",
-                    THINKING_CONTROL_OPTIONS_SHA256,
-                )
-            ),
+            thinking_off=value["thinking_off"],
+            thinking_control_options=dict(options),
+            thinking_control_options_sha256=digest,
             structured_output_contract=str(value.get("structured_output_contract", "json_schema")),
             sdk_version=str(value.get("sdk_version", EXPECTED_OPENAI_VERSION)),
             sdk_max_retries=int(value.get("sdk_max_retries", EXPECTED_SDK_MAX_RETRIES)),
@@ -366,8 +377,10 @@ def _validated_thinking_control_options(
     request_options: Mapping[str, object] | None,
 ) -> dict[str, object]:
     """Require the exact frozen request control and return an isolated copy."""
+    if request_options is None:
+        raise D5StaticPreflightError("thinking-off request control is missing")
     expected = _thinking_control_options()
-    candidate = expected if request_options is None else dict(request_options)
+    candidate = dict(request_options)
     if candidate != expected or _sha256_json(candidate) != THINKING_CONTROL_OPTIONS_SHA256:
         raise D5StaticPreflightError("thinking-off request control drifted")
     return json.loads(json.dumps(expected, sort_keys=True, separators=(",", ":")))

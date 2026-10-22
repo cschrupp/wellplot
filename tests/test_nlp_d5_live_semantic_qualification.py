@@ -93,6 +93,19 @@ def _authorization(
     )
 
 
+def _authorization_payload() -> dict[str, object]:
+    """Build the smallest JSON-shaped authorization payload for parser tests."""
+    return {
+        "implementation_checkpoint": "synthetic-checkpoint",
+        "authorization_id": "auth-test-001",
+        "campaign_id": "campaign",
+        "project_config_fingerprint_sha256": PROJECT_CONFIG.fingerprint_sha256,
+        "thinking_off": True,
+        "thinking_control_options": d5._thinking_control_options(),
+        "thinking_control_options_sha256": d5.THINKING_CONTROL_OPTIONS_SHA256,
+    }
+
+
 def _ready(*, live: bool = False) -> d5.D5OperationalReadiness:
     """Build already-qualified readiness without endpoint activity."""
     projection = d5.D5ReadinessProjection(
@@ -126,6 +139,51 @@ def _provenance() -> dict[str, object]:
         "accepted_d5_engine_checkpoint": d5.D5_ENGINE_CHECKPOINT,
         "accepted_d5_design_checkpoint": d5.D5_DESIGN_CHECKPOINT,
     }
+
+
+def test_authorization_requires_explicit_strict_thinking_control() -> None:
+    """Missing or malformed external control fields fail before endpoint use."""
+    cases: list[tuple[str, dict[str, object]]] = []
+    for field in (
+        "thinking_off",
+        "thinking_control_options",
+        "thinking_control_options_sha256",
+    ):
+        payload = _authorization_payload()
+        payload.pop(field)
+        cases.append((f"missing_{field}", payload))
+
+    malformed = _authorization_payload()
+    malformed["thinking_off"] = "false"
+    cases.append(("string_false", malformed))
+    malformed = _authorization_payload()
+    malformed["thinking_off"] = None
+    cases.append(("null_thinking_off", malformed))
+    malformed = _authorization_payload()
+    malformed["thinking_control_options_sha256"] = "0" * 64
+    cases.append(("wrong_digest", malformed))
+    malformed = _authorization_payload()
+    malformed["thinking_control_options"] = {"chat_template_kwargs": {"enable_thinking": True}}
+    cases.append(("changed_value", malformed))
+    malformed = _authorization_payload()
+    malformed["thinking_control_options"] = {
+        "chat_template_kwargs": {"enable_thinking": False},
+        "unexpected": True,
+    }
+    cases.append(("extra_option", malformed))
+
+    for name, payload in cases:
+        calls: list[str] = []
+        with pytest.raises(d5.D5StaticPreflightError):
+            authorization = d5.D5Authorization.from_mapping(payload)
+            d5.prepare_readiness(
+                authorization=authorization,
+                project_config=PROJECT_CONFIG,
+                api_key_loader=lambda: "secret-token",
+                endpoint_get=lambda url, token, calls=calls: calls.append(url),
+                static_preflight={"status": "PASS"},
+            )
+        assert calls == [], name
 
 
 class _StructuredOutputRejectingAdapter:
@@ -1248,6 +1306,7 @@ def test_real_live_adapter_transport_retries_keep_one_logical_id(
             api_key="provider-free-test-token",
             project_config=PROJECT_CONFIG,
             require_thinking_control=True,
+            request_options=d5._thinking_control_options(),
             http_client_factory=_live_transport_factory(
                 retry_count=retry_count,
                 clients=clients,
@@ -1300,6 +1359,7 @@ def test_live_wire_control_is_exact_for_each_generation_role_and_retry(
             api_key="provider-free-test-token",
             project_config=PROJECT_CONFIG,
             require_thinking_control=True,
+            request_options=d5._thinking_control_options(),
             http_client_factory=_live_transport_factory(
                 retry_count=2,
                 clients=clients,
@@ -1349,6 +1409,15 @@ def test_live_adapter_rejects_thinking_control_override() -> None:
             require_thinking_control=True,
             request_options={"chat_template_kwargs": {"enable_thinking": True}},
         )
+    with pytest.raises(d5.D5StaticPreflightError, match="request control is missing"):
+        d5.create_live_adapter(
+            repo_root=REPO_ROOT,
+            artifact_root=REPO_ROOT / "workspace" / "test-live",
+            api_key="provider-free-test-token",
+            project_config=PROJECT_CONFIG,
+            require_thinking_control=True,
+            request_options=None,
+        )
 
 
 def test_real_live_transport_physical_ceiling_fails_closed(
@@ -1369,6 +1438,7 @@ def test_real_live_transport_physical_ceiling_fails_closed(
             api_key="provider-free-test-token",
             project_config=PROJECT_CONFIG,
             require_thinking_control=True,
+            request_options=d5._thinking_control_options(),
             http_client_factory=_live_transport_factory(
                 retry_count=2,
                 clients=clients,
@@ -1423,6 +1493,7 @@ def test_real_live_provider_rejection_is_inconclusive_without_replay(
             api_key="provider-free-test-token",
             project_config=PROJECT_CONFIG,
             require_thinking_control=True,
+            request_options=d5._thinking_control_options(),
             http_client_factory=_live_transport_factory(
                 retry_count=0,
                 failure_mode="provider_rejection",
@@ -1477,6 +1548,7 @@ def test_real_live_transport_exhaustion_is_not_semantic_failure(
             api_key="provider-free-test-token",
             project_config=PROJECT_CONFIG,
             require_thinking_control=True,
+            request_options=d5._thinking_control_options(),
             http_client_factory=_live_transport_factory(
                 retry_count=0,
                 failure_mode="transport",
