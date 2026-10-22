@@ -3,6 +3,13 @@
 ```yaml
 authority: WELLPLOT-D5-5I-CONFIRMATION-HARNESS-ADAPTATION-AUTH-001
 design: docs/architecture/D5_5I_REPAIRED_BASELINE_LIVE_CONFIRMATION_DESIGN.md
+branch: design/d5-5g-inspectable-historical-claim-revalidation
+implementation_commit: 320da575a2bf2b0ff0d36b76dcfce70bcd8b4f3d
+parent: 16d7289745bea16af3443eea02e90efa1ce85855
+changed_files:
+  - scripts/nlp_d5_live_semantic_qualification.py
+  - tests/test_nlp_d5_live_semantic_qualification.py
+  - docs/architecture/D5_5I_CONFIRMATION_HARNESS_RESULT.md
 provider_model_calls: 0
 endpoint_calls: 0
 live_execution: NOT_AUTHORIZED
