@@ -4,13 +4,14 @@
 authority: WELLPLOT-D5-5I-CONFIRMATION-HARNESS-ADAPTATION-AUTH-001
 design: docs/architecture/D5_5I_REPAIRED_BASELINE_LIVE_CONFIRMATION_DESIGN.md
 branch: design/d5-5g-inspectable-historical-claim-revalidation
-implementation_commit: 2b2eb8d6e
-implementation_parent: ab9c2b434b06c30951d9c4846a81dd57f6d11339
+implementation_commit: 4cf783695
+implementation_parent: c0a44b6432b01dffeb614246cfacb1c9deb705c5
 accepted_h_implementation_checkpoint: e72e726b7f52c1975d862980543cd3f217ee6aa8
 historical_d5_identity: PRESERVED_SEPARATELY
 changed_files:
   - scripts/nlp_d5_live_semantic_qualification.py
   - tests/test_nlp_d5_live_semantic_qualification.py
+  - tests/_d4_canonical_fixtures.py
   - docs/architecture/D5_5I_CONFIRMATION_HARNESS_RESULT.md
 provider_model_calls: 0
 endpoint_calls: 0
@@ -50,17 +51,21 @@ The provider-free tests cover:
 - existing model-I/O custody and redaction behavior;
 - canonical adapter wiring and the existing D4 regression surfaces.
 
-The canonical nine-turn rehearsal was not considered a pass in this checkout.
-Its required external LAS/DLIS sources are not provisioned under the isolated
-execution checkout. The required pre-live classification is:
+The canonical nine-turn rehearsal now passes with the required local LAS/DLIS
+assets provisioned from the canonical checkout. The exact frozen source hashes
+were verified before and after provisioning, and the source-dependent suite
+completed with:
 
-```text
-LOCAL_ASSET_NOT_PROVISIONED_IN_THIS_CHECKOUT
+```yaml
+provider-free D5-5I focused suite: 66 passed, 0 skipped
+canonical nine-turn rehearsal: 9/9 PASS
+CBL requirements: CBL-01..CBL-09 PASS
 ```
 
-No source was copied, synthesized, committed, or substituted, and no endpoint
-or model call was made. This is an execution-checkout condition, not a claim
-that the project assets are absent.
+The deterministic CBL response fixture preserves the frozen object-level
+reconstruction scope required by CBL-02. No source asset was modified,
+synthesized, committed, or substituted, and no endpoint or model call was
+made.
 
 The historical D5-5G provider-free proof remains an adjacent baseline check,
 not a D5-5I claim. Its existing source-delta guard compares the current H
