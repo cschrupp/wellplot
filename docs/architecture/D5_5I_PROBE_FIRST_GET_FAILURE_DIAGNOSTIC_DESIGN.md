@@ -176,6 +176,38 @@ Stage 1 is not authorized by this design. A later authority must bind a fresh
 diagnostic ID, fresh evidence namespace, exact target URL, and bounded
 observation budget before any network call.
 
+That later authority must also bind the contemporaneous Stage-1 preflight
+inputs independently of Stage 0:
+
+~~~yaml
+target_scientific_checkpoint: fa3bfe59819d9b5e4cac9821b7770d7f4b4b3a0b
+failed_probe_tooling_checkpoint: fa8f1247ef6763c2fafcc024c4502aed8bd7af83
+diagnostic_tooling_checkpoint: <future accepted SHA>
+project_config_fingerprint_sha256: b1d794a5ede8d4855717d34b3a02993f19b473ad120ff4fa51a06322a08a5bc3
+target_url: http://192.168.2.141:8888/v1/models
+credential_resolution: d4.load_d4_api_key(repo_root)
+failed_probe_authorization: WELLPLOT-D5-5I-RUNTIME-BUILD-DRIFT-PROBE-AUTH-001
+failed_probe_artifact_root: <exact existing AUTH-001 artifact root>
+failed_probe_custody_digests:
+  state_sha256: <exact sealed value>
+  journal_sha256: <exact sealed value>
+  terminal_sha256: <exact sealed value>
+~~~
+
+Immediately before credential resolution and any network issuance, Stage 1
+must repeat the zero-network checks for the target/tooling checkpoints,
+diagnostic-tooling checkpoint, clean and distinct worktrees, project-config
+fingerprint, credential-source availability, exact origin/path construction,
+the failed-probe artifact root/digest join, and distinct diagnostic-tooling
+identity. The diagnostic-tooling checkpoint must not equal either failed-probe
+tooling checkpoint or the scientific checkpoint. Stage 0 results are advisory and
+must not be reused across this boundary.
+
+If this contemporaneous preflight fails, Stage 1 must seal and close its own
+authority as LOCAL_PRECONDITION with network_request_issued=false and
+endpoint_attempts=0. Remediation requires a fresh diagnostic authority and
+fresh namespace; the failed Stage-1 namespace is not reusable.
+
 If authorized, Stage 1 may perform exactly one request:
 
 ~~~text
@@ -184,8 +216,9 @@ GET http://192.168.2.141:8888/v1/models
 
 It must use the existing credential-loading mechanism and an Authorization:
 Bearer header, but must not retain or print the credential or request headers.
-It must not follow an alternate endpoint, retry, probe /props, or issue any
-generation request.
+Transport configuration must set redirect following disabled and retries to
+zero. It must not follow an alternate endpoint, retry, probe /props, or issue
+any generation request. The physical network ceiling is exactly one request.
 
 The request is a diagnostic observation, not a probe replay. A successful
 diagnostic does not consume or alter AUTH-001; it only supports a future fresh
@@ -240,9 +273,13 @@ malformed, oversized, or otherwise unusable for the reachability shape check.
 network_request_issued: true
 http_status: bounded_status
 response_body: NOT_RETAINED
+redirect_followed: false
 ~~~
 
-No semantic interpretation of a non-200 response is permitted.
+Any 3xx response from the exact request is classified here with its bounded
+status and redirect_followed=false. It is an HTTP response, not a separate
+endpoint-identity classification. No semantic interpretation of a non-200
+response is permitted.
 
 ### ENDPOINT_REACHABLE
 
@@ -254,13 +291,13 @@ or that apply-template is compatible.
 ~~~yaml
 network_request_issued: true
 http_status: 200
+redirect_followed: false
 bounded_json_shape: model_catalog_observable
 ~~~
 
-Malformed JSON, oversized bodies, redirects away from the exact URL, and
-unexpected response shapes are therefore HTTP_REACHABLE_OTHER_FAILURE evidence
-or a bounded endpoint-identity failure under the future execution authority.
-They must never trigger a retry or a second route.
+Malformed JSON, oversized bodies, redirects, and unexpected response shapes
+are therefore HTTP_REACHABLE_OTHER_FAILURE evidence under the future
+execution authority. They must never trigger a retry or a second route.
 
 ## Custody And Redaction
 
@@ -274,6 +311,7 @@ target_url: http://192.168.2.141:8888/v1/models
 classification:
 network_request_issued: true/false
 http_status: bounded status or NOT_RECEIVED
+redirect_followed: false
 credential_resolution: d4.load_d4_api_key(repo_root)
 endpoint_attempts: 0_or_1
 provider_calls: 0
@@ -298,9 +336,10 @@ Custody verification must prove:
 Stop without further requests when:
 
 - Stage 0 is LOCAL_PRECONDITION;
+- the repeated Stage-1 preflight is LOCAL_PRECONDITION;
 - no HTTP response is received;
 - any HTTP response is received, regardless of classification;
-- the exact URL redirects or response bounds are violated;
+- the exact URL returns a 3xx or response bounds are violated;
 - custody cannot prove the one-shot sequence.
 
 If the result is ENDPOINT_REACHABLE, the next action is not to rerun AUTH-001.
