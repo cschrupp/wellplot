@@ -50,6 +50,8 @@ ROLE_LOGICAL_CALL_LIMITS = {
     "section_worker": MAX_ROLE_LOGICAL_CALLS,
 }
 MAX_ENDPOINT_RESPONSE_BYTES = 1_048_576
+THINKING_CONTROL_MECHANISM = "chat_template_kwargs.enable_thinking"
+THINKING_CONTROL_OPTIONS_SHA256 = "220b99e47feb82851cab428f86b8fe977ae7c605400d421a91e99d4a35ec9c26"
 FROZEN_TURN_IDS = (
     "D4-C01:C01",
     "D4-L01:T1",
@@ -203,6 +205,11 @@ class D5ProcessInterruption(D5HarnessError):
     """Represent an interruption after STARTED without exposing process details."""
 
 
+def _thinking_control_options() -> dict[str, object]:
+    """Return the one frozen request-level thinking control."""
+    return {"chat_template_kwargs": {"enable_thinking": False}}
+
+
 TERMINAL_DECISIONS = frozenset({"PASS", "FAIL", "INCONCLUSIVE", "ARCHITECTURAL_ESCALATION"})
 
 
@@ -230,6 +237,10 @@ class D5Authorization:
     minimum_context_size: int = 0
     runtime_defaults_sha256: str = ""
     thinking_off: bool = True
+    thinking_control_options: Mapping[str, object] = field(
+        default_factory=_thinking_control_options
+    )
+    thinking_control_options_sha256: str = THINKING_CONTROL_OPTIONS_SHA256
     structured_output_contract: str = "json_schema"
     sdk_version: str = EXPECTED_OPENAI_VERSION
     sdk_max_retries: int = EXPECTED_SDK_MAX_RETRIES
@@ -280,6 +291,15 @@ class D5Authorization:
             minimum_context_size=int(value.get("minimum_context_size", 0)),
             runtime_defaults_sha256=str(value.get("runtime_defaults_sha256", "")),
             thinking_off=bool(value.get("thinking_off", True)),
+            thinking_control_options=dict(
+                value.get("thinking_control_options", _thinking_control_options())
+            ),
+            thinking_control_options_sha256=str(
+                value.get(
+                    "thinking_control_options_sha256",
+                    THINKING_CONTROL_OPTIONS_SHA256,
+                )
+            ),
             structured_output_contract=str(value.get("structured_output_contract", "json_schema")),
             sdk_version=str(value.get("sdk_version", EXPECTED_OPENAI_VERSION)),
             sdk_max_retries=int(value.get("sdk_max_retries", EXPECTED_SDK_MAX_RETRIES)),
@@ -340,6 +360,17 @@ def _sha256_json(value: object) -> str:
     """Hash a deterministic JSON projection."""
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _validated_thinking_control_options(
+    request_options: Mapping[str, object] | None,
+) -> dict[str, object]:
+    """Require the exact frozen request control and return an isolated copy."""
+    expected = _thinking_control_options()
+    candidate = expected if request_options is None else dict(request_options)
+    if candidate != expected or _sha256_json(candidate) != THINKING_CONTROL_OPTIONS_SHA256:
+        raise D5StaticPreflightError("thinking-off request control drifted")
+    return json.loads(json.dumps(expected, sort_keys=True, separators=(",", ":")))
 
 
 def _git(repo_root: Path, *args: str) -> str:
@@ -457,7 +488,10 @@ def _default_static_checks(
     if authorization.structured_output_contract != "json_schema":
         raise D5StaticPreflightError("structured-output contract drifted")
     if not authorization.thinking_off:
-        raise D5StaticPreflightError("thinking-off readiness precondition is absent")
+        raise D5StaticPreflightError("thinking-off request contract is absent")
+    if authorization.thinking_control_options_sha256 != THINKING_CONTROL_OPTIONS_SHA256:
+        raise D5StaticPreflightError("thinking-off request control digest drifted")
+    _validated_thinking_control_options(authorization.thinking_control_options)
     if not authorization.endpoint_identity:
         raise D5StaticPreflightError("authorized endpoint identity is missing")
     if not authorization.runtime_defaults_sha256:
@@ -528,6 +562,8 @@ def _default_static_checks(
         "server_origin": project_config.server_origin,
         "model_catalog_url": project_config.model_catalog_url,
         "props_url": project_config.props_url,
+        "thinking_control_mechanism": THINKING_CONTROL_MECHANISM,
+        "thinking_control_options_sha256": THINKING_CONTROL_OPTIONS_SHA256,
         "fallback": "NONE",
         "model_substitution": "FORBIDDEN",
         "d5_attestation": static_attestation,
@@ -1161,7 +1197,7 @@ def validate_readiness_projection(
     observed: Mapping[str, Any],
     authorization: D5Authorization,
 ) -> D5ReadinessProjection:
-    """Require exact authorized runtime identity and server thinking precondition."""
+    """Require runtime identity plus the statically authorized request control."""
     required = {
         "model_catalog",
         "model_path_basename",
@@ -1189,7 +1225,13 @@ def validate_readiness_projection(
         raise D5ReadinessError("structured_output_contract_mismatch", 2)
     expected = dict(authorization.endpoint_identity)
     if not isinstance(expected.get("chat_template_sha256"), str):
+        raise D5ReadinessError("endpoint_identity_mismatch", 2)
+    if authorization.thinking_control_options_sha256 != THINKING_CONTROL_OPTIONS_SHA256:
         raise D5ReadinessError("thinking_off_not_established", 2)
+    try:
+        _validated_thinking_control_options(authorization.thinking_control_options)
+    except D5StaticPreflightError:
+        raise D5ReadinessError("thinking_off_not_established", 2) from None
     mismatched_fields: list[str] = []
     for key, value in expected.items():
         observed_value = observed.get(key)
@@ -1203,14 +1245,9 @@ def validate_readiness_projection(
             2,
             mismatched_fields=mismatched_fields,
         )
-    thinking_off = (
-        authorization.thinking_off is True
-        and observed["chat_template_sha256"] == expected["chat_template_sha256"]
-        and observed["runtime_defaults_sha256"] == authorization.runtime_defaults_sha256
-    )
-    if not thinking_off:
+    if not authorization.thinking_off:
         raise D5ReadinessError("thinking_off_not_established", 2)
-    return D5ReadinessProjection(**dict(observed), thinking_off=thinking_off)
+    return D5ReadinessProjection(**dict(observed), thinking_off=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1466,6 +1503,7 @@ def create_live_adapter(
     model: str | None = None,
     provider_name: str | None = None,
     request_options: Mapping[str, object] | None = None,
+    require_thinking_control: bool = False,
 ) -> _ObservedLiveAdapter:
     """Build the accepted canonical adapter with retry-visible HTTP transport."""
     import httpx
@@ -1474,6 +1512,8 @@ def create_live_adapter(
     from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
 
     _validate_project_config(project_config)
+    if require_thinking_control:
+        request_options = _validated_thinking_control_options(request_options)
     observer = _PhysicalAttemptObserver()
     http_client = (
         http_client_factory(observer)
@@ -1613,6 +1653,8 @@ def execute_live_campaign(
             artifact_root=key_artifact_root,
             api_key=token,
             project_config=project_config,
+            request_options=authorization.thinking_control_options,
+            require_thinking_control=True,
         )
     )
     readiness = prepare_readiness(

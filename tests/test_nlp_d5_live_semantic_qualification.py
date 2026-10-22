@@ -1247,6 +1247,7 @@ def test_real_live_adapter_transport_retries_keep_one_logical_id(
             artifact_root=server_root / "live",
             api_key="provider-free-test-token",
             project_config=PROJECT_CONFIG,
+            require_thinking_control=True,
             http_client_factory=_live_transport_factory(
                 retry_count=retry_count,
                 clients=clients,
@@ -1277,6 +1278,77 @@ def test_real_live_adapter_transport_retries_keep_one_logical_id(
         assert physical[: retry_count + 1] == [1] * (retry_count + 1)
         assert len(requests) == retry_count + 1
         assert str(requests[0].url).startswith(PROJECT_CONFIG.openai_compat_base_url)
+        for request in requests:
+            assert json.loads(request.content)["chat_template_kwargs"] == {"enable_thinking": False}
+
+
+@pytest.mark.parametrize("generation_role", ["planner", "report_worker", "section_worker"])
+def test_live_wire_control_is_exact_for_each_generation_role_and_retry(
+    monkeypatch: pytest.MonkeyPatch,
+    generation_role: str,
+) -> None:
+    """Every measured role and SDK retry carries the exact thinking control."""
+    from openai import _base_client
+
+    monkeypatch.setattr(_base_client, "get_platform", lambda: "Linux")
+    with TemporaryDirectory(dir=REPO_ROOT) as temporary:
+        clients: list[httpx.AsyncClient] = []
+        requests: list[httpx.Request] = []
+        adapter = d5.create_live_adapter(
+            repo_root=Path(temporary),
+            artifact_root=Path(temporary) / "live",
+            api_key="provider-free-test-token",
+            project_config=PROJECT_CONFIG,
+            require_thinking_control=True,
+            http_client_factory=_live_transport_factory(
+                retry_count=2,
+                clients=clients,
+                requests=requests,
+            ),
+        )
+        client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
+        client._platform = "Linux"
+        physical: list[int] = []
+        adapter.bind_physical_attempt(physical.append)
+        backend = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate
+        request = _live_planner_request()
+        if generation_role != "planner":
+            request = replace(request, temperature=None)
+        adapter.observer.logical_call_started(
+            {
+                "index": 1,
+                "generation_role": generation_role,
+                "model": d5.EXPECTED_MODEL,
+            }
+        )
+        try:
+            asyncio.run(
+                backend.generate_structured(
+                    request,
+                    response_model=d4.SemanticPlan,
+                )
+            )
+        finally:
+            asyncio.run(clients[0].aclose())
+        assert len(requests) == 3
+        assert physical == [1, 1, 1]
+        assert all(
+            json.loads(request.content)["chat_template_kwargs"] == {"enable_thinking": False}
+            for request in requests
+        )
+
+
+def test_live_adapter_rejects_thinking_control_override() -> None:
+    """A caller cannot silently replace the frozen request-level control."""
+    with pytest.raises(d5.D5StaticPreflightError, match="request control drifted"):
+        d5.create_live_adapter(
+            repo_root=REPO_ROOT,
+            artifact_root=REPO_ROOT / "workspace" / "test-live",
+            api_key="provider-free-test-token",
+            project_config=PROJECT_CONFIG,
+            require_thinking_control=True,
+            request_options={"chat_template_kwargs": {"enable_thinking": True}},
+        )
 
 
 def test_real_live_transport_physical_ceiling_fails_closed(
@@ -1296,6 +1368,7 @@ def test_real_live_transport_physical_ceiling_fails_closed(
             artifact_root=server_root / "live",
             api_key="provider-free-test-token",
             project_config=PROJECT_CONFIG,
+            require_thinking_control=True,
             http_client_factory=_live_transport_factory(
                 retry_count=2,
                 clients=clients,
@@ -1349,6 +1422,7 @@ def test_real_live_provider_rejection_is_inconclusive_without_replay(
             artifact_root=artifact_root,
             api_key="provider-free-test-token",
             project_config=PROJECT_CONFIG,
+            require_thinking_control=True,
             http_client_factory=_live_transport_factory(
                 retry_count=0,
                 failure_mode="provider_rejection",
@@ -1402,6 +1476,7 @@ def test_real_live_transport_exhaustion_is_not_semantic_failure(
             artifact_root=artifact_root,
             api_key="provider-free-test-token",
             project_config=PROJECT_CONFIG,
+            require_thinking_control=True,
             http_client_factory=_live_transport_factory(
                 retry_count=0,
                 failure_mode="transport",
