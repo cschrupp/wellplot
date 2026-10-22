@@ -258,7 +258,10 @@ def _cbl_report_response(payload: dict[str, Any]) -> dict[str, object]:
             {
                 "semantic_id": "scope",
                 "title": "Supported Reconstruction Scope",
-                "lines": ["Reconstruct only the supported subset of this packet."],
+                "lines": [
+                    "Reconstruct only the supported heading, remarks, main pass, "
+                    "repeat pass, and tail."
+                ],
             },
             {
                 "semantic_id": "sources",
