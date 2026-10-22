@@ -4,7 +4,9 @@
 authority: WELLPLOT-D5-5I-RUNTIME-PIN-ESTABLISHMENT-DESIGN-AUTH-001
 branch: design/d5-5g-inspectable-historical-claim-revalidation
 historical_campaign: d5-5-qwen-inspectable-002
-historical_identity: PARTIALLY_RECOVERED
+historical_identity: PARTIALLY_RECOVERED_AND_PROVENANCE_SPLIT
+target_server_origin: http://192.168.2.141:8888
+target_openai_compat_base_url: http://192.168.2.141:8888/v1
 metadata_endpoint_execution: NOT_AUTHORIZED
 provider_model_calls_during_design: 0
 endpoint_calls_during_design: 0
@@ -31,13 +33,27 @@ zero provider/model generations
 No production, harness, prompt, schema, frozen population, case/gold, source,
 or dependency changes are part of this design.
 
-## Historical Continuity Anchor
+## Historical Evidence And Provenance
 
-The following values are recovered historical evidence and remain continuity
-constraints. They are not newly established by the future observation:
+The surviving D5-5 inspectable evidence supports the following facts:
 
 ```yaml
-historical_campaign: d5-5-qwen-inspectable-002
+campaign: d5-5-qwen-inspectable-002
+provider_path: openai_compat
+model: qwen3.6-35b-a3b
+successful_generation_observed: YES
+generation_result: provider/structured boundary evidence only
+endpoint_identity_for_pin_values: NOT_PROVEN_BY_SURVIVING_D5-5_ARTIFACT
+```
+
+The following values come from the **older D4 Qwen endpoint qualification**
+against server origin `http://192.168.2.140:8888`. They remain secondary
+continuity constraints only; they are not sealed D5-5 inspectable pins and must
+not be attributed to `d5-5-qwen-inspectable-002`:
+
+```yaml
+provenance: D4_QWEN_ENDPOINT_QUALIFICATION
+server_origin: http://192.168.2.140:8888
 model_catalog:
   - qwen3.6-35b-a3b
 model_path_basename: Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
@@ -50,10 +66,25 @@ chat_template_sha256: 55d4931433fe502b794226ee7f4d206a6bdd436ac9f80eb7d8ebb4c639
 historical_chat_format: Content-only
 ```
 
-The historical evidence does not contain a sealed `runtime_defaults_sha256`
-or explicit `thinking_off: true` attestation at the required granularity.
-Neither value may be derived from `context_size`, inferred from model naming,
-or attributed retroactively to the historical campaign.
+The surviving evidence does not contain a sealed `runtime_defaults_sha256` or
+explicit `thinking_off: true` attestation at the required granularity for the
+frozen D5-5I target origin. Neither value may be derived from `context_size`,
+inferred from model naming, or attributed retroactively to the D5-5 inspectable
+campaign.
+
+The future observation target is the frozen D5-5I project configuration:
+
+```yaml
+server_origin: http://192.168.2.141:8888
+openai_compat_base_url: http://192.168.2.141:8888/v1
+model_catalog_url: http://192.168.2.141:8888/v1/models
+props_url: http://192.168.2.141:8888/props
+```
+
+The older `.140` values may be compared for continuity only where the future
+authority explicitly declares the comparison applicable. A `.141` mismatch,
+an unavailable overlap, or an ambiguous cross-origin comparison is not a
+silent refresh.
 
 ## New Pin Qualification Contract
 
@@ -61,9 +92,36 @@ The future metadata-only attempt may establish only these new values:
 
 ```yaml
 runtime_defaults_sha256: SHA256(canonical observed /props.default_generation_settings)
-thinking_off: explicit evidence from the accepted serving/runtime metadata
-structured_output_contract: observed/validated readiness identity
+thinking_off: ESTABLISHED_ONLY_BY_EXPLICIT_DOCUMENTED_PROPS_BOOLEAN_TRUE
 ```
+
+`structured_output_contract: json_schema` is an inherited frozen
+WellPlot/provider-adapter configuration invariant. It is carried into the
+eventual Gate-B record but is not established by `/v1/models` or `/props` and
+must not be described as empirically proven by this metadata gate.
+
+The exact `thinking_off` success predicate is:
+
+```text
+SUCCESS only if the observed /props payload contains a pre-reviewed,
+documented boolean field explicitly representing reasoning/thinking mode and
+that field is exactly true for thinking-off.
+```
+
+The field path and server documentation must be named in the later execution
+authority before the GETs are issued. Absence of that explicit boolean,
+presence of only defaults/context/template data, absence of a documented
+mapping, or any ambiguity produces:
+
+```yaml
+terminal: INCOMPLETE_PROPS
+reason: EXTENDED_RUNTIME_IDENTITY_UNAVAILABLE
+thinking_off: NOT_ESTABLISHED
+```
+
+The following are not admissible proof: absence of a request parameter, model
+name, historical behavior, absence of visible `<think>` output, or a newly
+invented interpretation of the chat template.
 
 Newly observed values must be labeled:
 
@@ -73,12 +131,13 @@ historical_campaign: d5-5-qwen-inspectable-002
 historical_values: CONTINUITY_ONLY
 ```
 
-The observation may not silently replace a historical value. The overlapping
-historical fields must match exactly: model catalog, model path basename,
-model path fingerprint, build info, context size, total slots, chat-template
-fingerprint, and chat format where exposed. Any mismatch is a terminal
-continuity failure, not a refreshed identity. `gguf_byte_identity` remains
-`NOT_AVAILABLE` unless separately authorized and observed.
+The observation may not silently replace a historical value. The applicable
+overlapping fields must match exactly, with provenance retained for each:
+model catalog, model path basename, model path fingerprint, build info,
+context size, total slots, chat-template fingerprint, and chat format where
+exposed. Any mismatch is a terminal continuity failure, not a refreshed
+identity. `gguf_byte_identity` remains `NOT_AVAILABLE` unless separately
+authorized and observed.
 
 ## Future Execution Sequence
 
@@ -133,6 +192,7 @@ TRANSPORT_FAILURE:
 
 INCOMPLETE_PROPS:
   reason: EXTENDED_RUNTIME_IDENTITY_UNAVAILABLE
+  thinking_off: NOT_ESTABLISHED
   extended_pins: NOT_ESTABLISHED
   generation_calls: 0
 ```
