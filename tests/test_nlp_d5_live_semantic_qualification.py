@@ -257,6 +257,9 @@ def test_provider_free_preflight_exposes_d5i_contract_without_calls(tmp_path: Pa
         "report_worker": 2,
         "section_worker": 2,
     }
+    assert result["accepted_h_implementation_checkpoint"] == (
+        d5.D5I_ACCEPTED_H_IMPLEMENTATION_CHECKPOINT
+    )
     assert set(result["scientific_terminals"]) == d5.D5I_SCIENTIFIC_TERMINALS
     assert result["provider_calls"] == result["endpoint_calls"] == result["model_calls"] == 0
 
@@ -414,9 +417,9 @@ def test_identity_mismatch_is_bounded_after_two_gets() -> None:
             endpoint_get=endpoint_get,
             static_preflight={"status": "PASS"},
         )
-    assert raised.value.endpoint_calls == 1
+    assert raised.value.endpoint_calls == 2
     assert raised.value.mismatched_fields == ("model_catalog",)
-    assert calls == [PROJECT_CONFIG.model_catalog_url]
+    assert calls == [PROJECT_CONFIG.model_catalog_url, PROJECT_CONFIG.props_url]
 
 
 def test_identity_mismatch_reports_only_safe_field_names() -> None:
@@ -672,6 +675,76 @@ def test_d5i_dimension_and_correction_evidence_are_explicit() -> None:
     assert row["evidence_dimensions"]["safe_negative"] == "PASS"
     assert row["evidence_dimensions"]["mutation"] == "PASS"
     assert row["correction_preservation"]["final_status"] == "ACCEPTED"
+
+
+def test_d5i_correction_evidence_is_derived_from_canonical_adapter_observation() -> None:
+    """A repaired canonical before/after pair produces observable G7 evidence."""
+    before = {"sections": [{"title": "before", "subtitle": "stable"}]}
+    after = {"sections": [{"title": "after", "subtitle": "stable"}]}
+    row = d5._bounded_turn_row(
+        {"case_id": "D4-L01", "turn_id": "D4-L01:T1"},
+        {
+            "contract": {
+                "kind": "las",
+                "allowed_change_paths": ["/sections/0/title"],
+            }
+        },
+        {
+            "canonical_before": before,
+            "canonical_after": after,
+            "worker_repair_count": 1,
+            "diagnostic_code": "semantic_contract_incomplete",
+            "persisted": True,
+            "rendered": True,
+        },
+        {"status": "PASS", "errors": [], "verifier_requirements": []},
+        execution_index=1,
+        call_count=2,
+        physical_attempt_count=2,
+    )
+    evidence = row["correction_preservation"]
+    assert evidence["status"] == "OBSERVED"
+    assert evidence["changed_paths"] == ["/sections/0/title"]
+    assert evidence["unauthorized_change"] is False
+    assert evidence["final_status"] == "ACCEPTED"
+    assert (
+        evidence["before_semantic_projection_sha256"]
+        != evidence["after_semantic_projection_sha256"]
+    )
+
+
+def test_d5i_contract_input_and_residual_semantic_failures_are_distinct() -> None:
+    """Observed contract diagnostics cannot collapse into residual semantics."""
+    base = {
+        "canonical_before": {},
+        "canonical_after": {},
+        "persisted": True,
+        "rendered": True,
+    }
+    contract_row = d5._bounded_turn_row(
+        {"case_id": "D4-L01", "turn_id": "D4-L01:T1"},
+        {"contract": {"kind": "las"}},
+        {
+            **base,
+            "diagnostics": [{"code": "semantic_contract_incomplete"}],
+            "failure_owner": "contract",
+        },
+        {"status": "FAIL", "errors": ["semantic mismatch"], "verifier_requirements": []},
+        execution_index=1,
+        call_count=1,
+        physical_attempt_count=1,
+    )
+    residual_row = d5._bounded_turn_row(
+        {"case_id": "D4-L01", "turn_id": "D4-L01:T1"},
+        {"contract": {"kind": "las"}},
+        {**base, "diagnostics": [{"code": "semantic_mismatch"}]},
+        {"status": "FAIL", "errors": ["semantic mismatch"], "verifier_requirements": []},
+        execution_index=1,
+        call_count=1,
+        physical_attempt_count=1,
+    )
+    assert contract_row["scientific_terminal"] == "FAIL / CONTRACT_OR_INPUT"
+    assert residual_row["scientific_terminal"] == "FAIL / RESIDUAL_SEMANTIC"
 
 
 def test_d5i_provider_failure_preserves_provider_terminal_boundary(tmp_path: Path) -> None:

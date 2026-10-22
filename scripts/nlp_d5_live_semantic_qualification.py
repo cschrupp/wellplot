@@ -30,9 +30,10 @@ from typing import Any, Protocol
 from scripts import nlp_d4_live_acceptance as d4
 from wellplot.project_config import ProjectConfig, load_project_config
 
-D5_EXPERIMENT_VERSION = "WELLPLOT-NLP-D5-4"
+D5_EXPERIMENT_VERSION = "WELLPLOT-NLP-D5-5I"
 D5_DESIGN_CHECKPOINT = "1658c1593330620501baa4a551b965fa209cc95b"
 D5_ENGINE_CHECKPOINT = "51fd23fe18ca77c067b0cdf702f88a57ba4c457d"
+D5I_ACCEPTED_H_IMPLEMENTATION_CHECKPOINT = "e72e726b7f52c1975d862980543cd3f217ee6aa8"
 EXPECTED_PROVIDER = "openai_compat"
 EXPECTED_MODEL = "qwen3.6-35b-a3b"
 EXPECTED_OPENAI_VERSION = "2.34.0"
@@ -215,6 +216,7 @@ class D5Authorization:
     project_config_fingerprint_sha256: str = ""
     accepted_d5_engine_checkpoint: str = D5_ENGINE_CHECKPOINT
     accepted_d5_design_checkpoint: str = D5_DESIGN_CHECKPOINT
+    accepted_h_implementation_checkpoint: str = D5I_ACCEPTED_H_IMPLEMENTATION_CHECKPOINT
     provider: str = EXPECTED_PROVIDER
     model: str = EXPECTED_MODEL
     endpoint_identity: Mapping[str, Any] = field(default_factory=dict)
@@ -255,6 +257,12 @@ class D5Authorization:
             ),
             accepted_d5_design_checkpoint=str(
                 value.get("accepted_d5_design_checkpoint", D5_DESIGN_CHECKPOINT)
+            ),
+            accepted_h_implementation_checkpoint=str(
+                value.get(
+                    "accepted_h_implementation_checkpoint",
+                    D5I_ACCEPTED_H_IMPLEMENTATION_CHECKPOINT,
+                )
             ),
             provider=str(value.get("provider", EXPECTED_PROVIDER)),
             model=str(value.get("model", EXPECTED_MODEL)),
@@ -420,6 +428,26 @@ def _default_static_checks(
         raise D5StaticPreflightError("accepted D5 engine checkpoint drifted")
     if authorization.accepted_d5_design_checkpoint != D5_DESIGN_CHECKPOINT:
         raise D5StaticPreflightError("accepted D5 design checkpoint drifted")
+    if (
+        authorization.accepted_h_implementation_checkpoint
+        != D5I_ACCEPTED_H_IMPLEMENTATION_CHECKPOINT
+    ):
+        raise D5StaticPreflightError("accepted H implementation checkpoint drifted")
+    if (
+        subprocess.run(
+            [
+                "git",
+                "merge-base",
+                "--is-ancestor",
+                D5I_ACCEPTED_H_IMPLEMENTATION_CHECKPOINT,
+                current,
+            ],
+            cwd=repo_root,
+            check=False,
+        ).returncode
+        != 0
+    ):
+        raise D5StaticPreflightError("accepted H implementation is not an ancestor")
     if authorization.provider != EXPECTED_PROVIDER or authorization.model != EXPECTED_MODEL:
         raise D5StaticPreflightError("provider/model contract drifted")
     if authorization.sdk_version != EXPECTED_OPENAI_VERSION:
@@ -489,6 +517,7 @@ def _default_static_checks(
         "current_checkout": current,
         "accepted_d5_engine_checkpoint": D5_ENGINE_CHECKPOINT,
         "accepted_d5_design_checkpoint": D5_DESIGN_CHECKPOINT,
+        "accepted_h_implementation_checkpoint": D5I_ACCEPTED_H_IMPLEMENTATION_CHECKPOINT,
         "openai_version": version,
         "sdk_max_retries": retries,
         "logical_call_ceiling": MAX_LOGICAL_CALLS,
@@ -1076,7 +1105,7 @@ def _project_model_catalog(payload: object, expected_model: str) -> tuple[str, .
     identifiers = tuple(
         str(item.get("id", "")).strip() for item in payload["data"] if isinstance(item, Mapping)
     )
-    if identifiers != (expected_model,):
+    if expected_model and identifiers != (expected_model,):
         raise D5ReadinessError(
             "endpoint_identity_mismatch",
             1,
@@ -1219,7 +1248,7 @@ def prepare_readiness(
         return endpoint_get(url, token)
 
     try:
-        catalog = _project_model_catalog(get(project_config.model_catalog_url), authorization.model)
+        catalog = _project_model_catalog(get(project_config.model_catalog_url), "")
         props = _project_props(
             get(project_config.props_url), authorization.structured_output_contract
         )
@@ -1606,6 +1635,9 @@ def execute_live_campaign(
             "implementation_checkpoint": authorization.implementation_checkpoint,
             "accepted_d5_engine_checkpoint": authorization.accepted_d5_engine_checkpoint,
             "accepted_d5_design_checkpoint": authorization.accepted_d5_design_checkpoint,
+            "accepted_h_implementation_checkpoint": (
+                authorization.accepted_h_implementation_checkpoint
+            ),
         },
     )
     return asyncio.run(runner.run(readiness.adapter))
@@ -1635,13 +1667,19 @@ def _bounded_turn_row(
     observed_failure: tuple[str, str] | None = None,
 ) -> dict[str, Any]:
     """Project one D4 actual/grade pair into redacted D5 evidence."""
+    projected_actual = dict(actual)
+    projected_actual.setdefault(
+        "correction_preservation",
+        _derive_correction_preservation(actual, expected),
+    )
+    projected_actual["contract_or_input_failure"] = _derive_contract_or_input_failure(actual)
     verifier = grade.get("verifier_requirements", [])
     status = str(grade.get("status"))
     outcome = "PASS" if status == "PASS" else "INCONCLUSIVE" if status == "INCONCLUSIVE" else "FAIL"
-    first_divergence = _first_divergence(actual, grade, observed_failure)
+    first_divergence = _first_divergence(projected_actual, grade, observed_failure)
     scientific_terminal = _turn_scientific_terminal(
         grade=grade,
-        actual=actual,
+        actual=projected_actual,
         observed_failure=observed_failure,
         first_divergence=first_divergence,
     )
@@ -1656,11 +1694,11 @@ def _bounded_turn_row(
         "grader_status": grade.get("status"),
         "diagnostics": list(grade.get("errors", [])),
         "verifier_requirements": verifier,
-        "starting_artifact_sha256": _safe_hash(actual.get("starting_artifact_path")),
-        "ending_artifact_sha256": _safe_hash(actual.get("ending_artifact_path")),
-        "render_sha256": _safe_hash(actual.get("render_path")),
-        "persisted": actual.get("persisted") is True,
-        "rendered": actual.get("rendered") is True,
+        "starting_artifact_sha256": _safe_hash(projected_actual.get("starting_artifact_path")),
+        "ending_artifact_sha256": _safe_hash(projected_actual.get("ending_artifact_path")),
+        "render_sha256": _safe_hash(projected_actual.get("render_path")),
+        "persisted": projected_actual.get("persisted") is True,
+        "rendered": projected_actual.get("rendered") is True,
         "logical_generation_calls": call_count,
         "physical_attempts": physical_attempt_count,
         "provider": provider,
@@ -1670,12 +1708,13 @@ def _bounded_turn_row(
         "evidence_dimensions": _dimension_evidence(
             case=case,
             expected=expected,
-            actual=actual,
+            actual=projected_actual,
             grade=grade,
             first_divergence=first_divergence,
             observed_failure=observed_failure,
         ),
-        "correction_preservation": _correction_preservation_evidence(actual),
+        "correction_preservation": _correction_preservation_evidence(projected_actual),
+        "contract_or_input_failure": projected_actual["contract_or_input_failure"],
     }
 
 
@@ -1815,6 +1854,87 @@ def _correction_preservation_evidence(actual: Mapping[str, Any]) -> dict[str, An
     if actual.get("correction_occurred") is True:
         return {"status": "NOT_ESTABLISHED"}
     return {"status": "NOT_APPLICABLE"}
+
+
+def _derive_correction_preservation(
+    actual: Mapping[str, Any], expected: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Derive G7 evidence from the canonical adapter's before/after artifacts."""
+    if isinstance(actual.get("correction_preservation"), Mapping):
+        return dict(actual["correction_preservation"])
+    repair_count = actual.get("worker_repair_count", 0)
+    if not actual.get("correction_occurred") and not (
+        isinstance(repair_count, int) and repair_count > 0
+    ):
+        return {"status": "NOT_APPLICABLE"}
+    before = actual.get("canonical_before")
+    after = actual.get("canonical_after")
+    contract = expected.get("contract")
+    if (
+        not isinstance(before, Mapping)
+        or not isinstance(after, Mapping)
+        or not isinstance(contract, Mapping)
+    ):
+        return {"status": "NOT_ESTABLISHED"}
+    changed_paths = d4._changed_paths(before, after)
+    allowed_paths = [str(path) for path in contract.get("allowed_change_paths", [])]
+    unauthorized = any(
+        not any(
+            path == allowed
+            or path.startswith(allowed.rstrip("/") + "/")
+            or allowed.startswith(path.rstrip("/") + "/")
+            for allowed in allowed_paths
+        )
+        for path in changed_paths
+    )
+    return {
+        "status": "OBSERVED",
+        "diagnostic_code": actual.get("diagnostic_code"),
+        "authorized_paths": allowed_paths,
+        "before_semantic_projection_sha256": _sha256_json(before),
+        "after_semantic_projection_sha256": _sha256_json(after),
+        "changed_paths": changed_paths,
+        "unauthorized_change": unauthorized,
+        "final_status": "REJECTED" if unauthorized else "ACCEPTED",
+    }
+
+
+_CONTRACT_INPUT_DIAGNOSTIC_CODES = frozenset(
+    {
+        "contract_violation",
+        "input_contract_violation",
+        "semantic_contract_incomplete",
+        "missing_existing_section_hint",
+        "missing_required_field",
+        "source_inventory_unavailable",
+        "channel_inventory_unavailable",
+        "insufficient_source_inventory",
+        "insufficient_channel_inventory",
+    }
+)
+
+
+def _derive_contract_or_input_failure(actual: Mapping[str, Any]) -> bool:
+    """Classify closed-contract/input contradictions from observed facts."""
+    if actual.get("contract_or_input_failure") is True:
+        return True
+    diagnostic_codes = {
+        str(item.get("code"))
+        for item in actual.get("diagnostics", [])
+        if isinstance(item, Mapping) and item.get("code") is not None
+    }
+    if diagnostic_codes.intersection(_CONTRACT_INPUT_DIAGNOSTIC_CODES):
+        return True
+    if str(actual.get("failure_owner", "")).casefold() in {
+        "contract",
+        "input",
+        "inventory",
+    }:
+        return True
+    return any(
+        actual.get(field) in {"missing", "unavailable", "insufficient"}
+        for field in ("inventory_state", "source_inventory_state", "channel_inventory_state")
+    )
 
 
 def _dimension_evidence(
@@ -2119,6 +2239,7 @@ def provider_free_preflight(
         "status": "PASS",
         "accepted_d5_engine_checkpoint": D5_ENGINE_CHECKPOINT,
         "accepted_d5_design_checkpoint": D5_DESIGN_CHECKPOINT,
+        "accepted_h_implementation_checkpoint": D5I_ACCEPTED_H_IMPLEMENTATION_CHECKPOINT,
         "population": {"turns": 9, "turn_ids": list(FROZEN_TURN_IDS)},
         "logical_call_ceiling": MAX_LOGICAL_CALLS,
         "physical_attempt_upper_bound": MAX_PHYSICAL_ATTEMPTS,

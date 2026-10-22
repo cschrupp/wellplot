@@ -6,6 +6,8 @@ design: docs/architecture/D5_5I_REPAIRED_BASELINE_LIVE_CONFIRMATION_DESIGN.md
 branch: design/d5-5g-inspectable-historical-claim-revalidation
 implementation_commit: 320da575a2bf2b0ff0d36b76dcfce70bcd8b4f3d
 parent: 16d7289745bea16af3443eea02e90efa1ce85855
+accepted_h_implementation_checkpoint: e72e726b7f52c1975d862980543cd3f217ee6aa8
+historical_d5_identity: PRESERVED_SEPARATELY
 changed_files:
   - scripts/nlp_d5_live_semantic_qualification.py
   - tests/test_nlp_d5_live_semantic_qualification.py
@@ -24,6 +26,11 @@ in turn, journal, state, terminal, and summary evidence. It also exposes the
 independent evidence dimensions and bounded correction-preservation evidence
 without retaining prompts, headers, credentials, or raw payloads outside the
 existing model-I/O custody artifact.
+
+Campaign evidence is identified as `WELLPLOT-NLP-D5-5I` and binds the accepted
+H implementation checkpoint above. Historical D5-4 engine/design identifiers
+remain compatibility/provenance fields and are not used as the active H
+authority.
 
 Logical calls remain capped at 45 and physical attempts at 135. The accepted
 SDK retry contract remains 2. Planner, report-worker, and section-worker calls
