@@ -42,6 +42,12 @@ EXPECTED_CONCURRENCY = 1
 EXPECTED_STRUCTURED_OUTPUT = "json_schema"
 MAX_LOGICAL_CALLS = 45
 MAX_PHYSICAL_ATTEMPTS = 135
+MAX_ROLE_LOGICAL_CALLS = 2
+ROLE_LOGICAL_CALL_LIMITS = {
+    "planner": MAX_ROLE_LOGICAL_CALLS,
+    "report_worker": MAX_ROLE_LOGICAL_CALLS,
+    "section_worker": MAX_ROLE_LOGICAL_CALLS,
+}
 MAX_ENDPOINT_RESPONSE_BYTES = 1_048_576
 FROZEN_TURN_IDS = (
     "D4-C01:C01",
@@ -82,6 +88,45 @@ TERMINAL_SUFFIX = ".terminal.json"
 SUMMARY_SUFFIX = ".summary.json"
 EVIDENCE_SUFFIX = ".evidence.jsonl"
 MODEL_IO_SUFFIX = ".model-io.jsonl"
+
+D5I_SCIENTIFIC_TERMINALS = frozenset(
+    {
+        "PASS",
+        "FAIL / RESIDUAL_SEMANTIC",
+        "FAIL / CONTRACT_OR_INPUT",
+        "INCONCLUSIVE / PROVIDER",
+        "INCONCLUSIVE / HARNESS",
+    }
+)
+D5I_FIRST_DIVERGENCES = frozenset(
+    {
+        "NONE",
+        "PROVIDER_OR_STRUCTURED",
+        "PLANNER_STRUCTURAL",
+        "SEMANTIC",
+        "TARGET_GROUNDING",
+        "SOURCE_CHANNEL_GROUNDING",
+        "CAPABILITY",
+        "CORRECTION_PRESERVATION",
+        "HOST_EXECUTION",
+        "PERSISTENCE_RELOAD_RENDER",
+        "DETERMINISTIC_GRADING",
+        "HARNESS",
+    }
+)
+D5I_DIMENSIONS = (
+    "provider_structured",
+    "planner_structural",
+    "semantic",
+    "target_grounding",
+    "source_channel_grounding",
+    "capability",
+    "correction_preservation",
+    "safe_negative",
+    "mutation",
+    "persistence_reload_render",
+    "deterministic_grading",
+)
 
 SECRET_KEYS = frozenset(
     {
@@ -405,6 +450,9 @@ def _default_static_checks(
         if path.exists():
             raise D5StaticPreflightError(f"fresh artifact path already exists: {path.name}")
 
+    for relative in authorization.source_sha256:
+        if not (repo_root / relative).is_file():
+            raise D5StaticPreflightError("LOCAL_ASSET_NOT_PROVISIONED_IN_THIS_CHECKOUT")
     _assert_hash(repo_root / d4.CASES_PATH, authorization.cases_sha256, "case fixture")
     _assert_hash(repo_root / d4.GOLD_PATH, authorization.gold_sha256, "gold fixture")
     _assert_hash(repo_root / d4.UV_LOCK_PATH, authorization.uv_lock_sha256, "uv.lock")
@@ -558,11 +606,25 @@ class D5LogicalCallLedger:
     logical_calls: int = 0
     physical_attempts: int = 0
     calls: list[dict[str, Any]] = field(default_factory=list)
+    active_turn_id: str | None = None
+    turn_role_counts: dict[str, int] = field(default_factory=dict)
+
+    def begin_turn(self, turn_id: str) -> None:
+        """Reset per-turn role accounting at the frozen turn boundary."""
+        self.active_turn_id = str(turn_id)
+        self.turn_role_counts = {}
 
     def reserve(self, role: str) -> int:
         """Reserve a role-tagged logical call before provider delegation."""
         if role not in {"planner", "report_worker", "section_worker"}:
             raise D5HarnessError("unknown generation role")
+        if self.active_turn_id is not None:
+            used = self.turn_role_counts.get(role, 0)
+            limit = ROLE_LOGICAL_CALL_LIMITS[role]
+            if used >= limit:
+                raise D5CallCapExceeded(
+                    f"{role} logical call limit {limit} exceeded for turn {self.active_turn_id}"
+                )
         next_index = self.logical_calls + 1
         if next_index > self.max_logical_calls:
             raise D5CallCapExceeded("logical call 46 rejected before provider delegation")
@@ -575,14 +637,19 @@ class D5LogicalCallLedger:
                 "outcome": "reserved",
             }
         )
+        if self.active_turn_id is not None:
+            self.turn_role_counts[role] = self.turn_role_counts.get(role, 0) + 1
         return next_index
 
     def physical_attempt(self, logical_index: int) -> None:
         """Record one SDK-level attempt without reserving a new logical call."""
         if logical_index < 1 or logical_index > self.logical_calls:
             raise D5HarnessError("physical attempt references unknown logical call")
-        if self.physical_attempts >= self.max_physical_attempts:
-            raise D5CallCapExceeded("physical attempt ceiling exceeded")
+        next_attempt = self.physical_attempts + 1
+        if next_attempt > self.max_physical_attempts:
+            raise D5CallCapExceeded(
+                f"physical attempt {next_attempt} rejected before provider delegation"
+            )
         self.physical_attempts += 1
         row = self.calls[logical_index - 1]
         row["physical_attempt_count"] += 1
@@ -790,6 +857,7 @@ class D5CampaignCustody:
     def begin_turn(self, turn_id: str) -> None:
         """Bind subsequent model-I/O observations to the active frozen turn."""
         self._active_turn_id = str(turn_id)
+        self.ledger.begin_turn(turn_id)
 
     def append_model_io(self, row: Mapping[str, Any]) -> None:
         """Append exact request/response bodies without headers or credentials."""
@@ -856,10 +924,16 @@ class D5CampaignCustody:
         *,
         attribution: str,
         rows: Sequence[Mapping[str, Any]],
+        scientific_terminal: str | None = None,
+        first_divergence: str = "NONE",
     ) -> dict[str, Any]:
         """Write exactly one terminal artifact and close the campaign."""
         if decision not in TERMINAL_DECISIONS:
             raise D5HarnessError("unknown terminal decision")
+        if scientific_terminal is not None and scientific_terminal not in D5I_SCIENTIFIC_TERMINALS:
+            raise D5HarnessError("unknown scientific terminal")
+        if first_divergence not in D5I_FIRST_DIVERGENCES:
+            raise D5HarnessError("unknown first divergence")
         if self._terminal_written or self.paths.terminal.exists():
             raise D5HarnessError("terminal artifact already written")
         _append_jsonl(
@@ -871,6 +945,8 @@ class D5CampaignCustody:
                 "authorization_id": self.authorization_id,
                 "decision": decision,
                 "attribution": attribution,
+                "scientific_terminal": scientific_terminal,
+                "first_divergence": first_divergence,
                 "completed_turns": len(rows),
             },
         )
@@ -879,6 +955,8 @@ class D5CampaignCustody:
                 "status": "TERMINAL",
                 "decision": decision,
                 "attribution": attribution,
+                "scientific_terminal": scientific_terminal,
+                "first_divergence": first_divergence,
                 "completed_turns": len(rows),
                 "logical_generation_calls": self.ledger.logical_calls,
                 "physical_generation_attempts": self.ledger.physical_attempts,
@@ -904,6 +982,8 @@ class D5CampaignCustody:
             "authorization_id": self.authorization_id,
             "decision": decision,
             "attribution": attribution,
+            "scientific_terminal": scientific_terminal,
+            "first_divergence": first_divergence,
             "completed_turns": len(rows),
             "logical_generation_calls": self.ledger.logical_calls,
             "physical_generation_attempts": self.ledger.physical_attempts,
@@ -923,6 +1003,8 @@ class D5CampaignCustody:
             "authorization_id": self.authorization_id,
             "decision": decision,
             "attribution": attribution,
+            "scientific_terminal": scientific_terminal,
+            "first_divergence": first_divergence,
             "completed_turns": len(rows),
             "logical_generation_calls": self.ledger.logical_calls,
             "physical_generation_attempts": self.ledger.physical_attempts,
@@ -1550,11 +1632,19 @@ def _bounded_turn_row(
     physical_attempt_count: int,
     provider: str = EXPECTED_PROVIDER,
     model: str = EXPECTED_MODEL,
+    observed_failure: tuple[str, str] | None = None,
 ) -> dict[str, Any]:
     """Project one D4 actual/grade pair into redacted D5 evidence."""
     verifier = grade.get("verifier_requirements", [])
     status = str(grade.get("status"))
     outcome = "PASS" if status == "PASS" else "INCONCLUSIVE" if status == "INCONCLUSIVE" else "FAIL"
+    first_divergence = _first_divergence(actual, grade, observed_failure)
+    scientific_terminal = _turn_scientific_terminal(
+        grade=grade,
+        actual=actual,
+        observed_failure=observed_failure,
+        first_divergence=first_divergence,
+    )
     return {
         "experiment_version": D5_EXPERIMENT_VERSION,
         "case_id": case.get("case_id"),
@@ -1575,6 +1665,17 @@ def _bounded_turn_row(
         "physical_attempts": physical_attempt_count,
         "provider": provider,
         "model": model,
+        "first_divergence": first_divergence,
+        "scientific_terminal": scientific_terminal,
+        "evidence_dimensions": _dimension_evidence(
+            case=case,
+            expected=expected,
+            actual=actual,
+            grade=grade,
+            first_divergence=first_divergence,
+            observed_failure=observed_failure,
+        ),
+        "correction_preservation": _correction_preservation_evidence(actual),
     }
 
 
@@ -1650,6 +1751,192 @@ def _classify_exception(error: Exception) -> tuple[str, str]:
     return "INCONCLUSIVE", "EXECUTION_INTERNAL_ERROR"
 
 
+def _first_divergence_for_exception(error: Exception) -> str:
+    """Map a post-STARTED exception to the earliest bounded evidence layer."""
+    if isinstance(error, (D5StructuredOutputRejected, D5TransportFailure, TimeoutError)):
+        return "PROVIDER_OR_STRUCTURED"
+    return "HARNESS"
+
+
+def _first_divergence(
+    actual: Mapping[str, Any],
+    grade: Mapping[str, Any],
+    observed_failure: tuple[str, str] | None,
+) -> str:
+    """Select the earliest evidence-supported turn divergence."""
+    if observed_failure is not None:
+        return "PROVIDER_OR_STRUCTURED"
+    declared = actual.get("first_divergence")
+    if isinstance(declared, str) and declared in D5I_FIRST_DIVERGENCES:
+        return declared
+    if actual.get("harness_failure") is True:
+        return "HARNESS"
+    errors = {str(error) for error in grade.get("errors", [])}
+    if any(
+        "canonical_change_outside" in error or "failure_bytes_changed" in error for error in errors
+    ):
+        return "CORRECTION_PRESERVATION"
+    if any("persistence" in error or "render" in error for error in errors):
+        return "PERSISTENCE_RELOAD_RENDER"
+    if any("diagnostic" in error or "owner" in error or "mutation" in error for error in errors):
+        return "HOST_EXECUTION"
+    if any("capability" in error or "parent" in error for error in errors):
+        return "CAPABILITY"
+    if any("source" in error or "channel" in error for error in errors):
+        return "SOURCE_CHANNEL_GROUNDING"
+    if any("target" in error or "section" in error for error in errors):
+        return "TARGET_GROUNDING"
+    if any("schema" in error or "work_unit" in error for error in errors):
+        return "PLANNER_STRUCTURAL"
+    if errors:
+        return "SEMANTIC"
+    return "NONE"
+
+
+def _correction_preservation_evidence(actual: Mapping[str, Any]) -> dict[str, Any]:
+    """Project only bounded H correction evidence when a correction occurred."""
+    raw = actual.get("correction_preservation")
+    if isinstance(raw, Mapping):
+        allowed = {
+            "status",
+            "diagnostic_code",
+            "authorized_paths",
+            "before_semantic_projection_sha256",
+            "after_semantic_projection_sha256",
+            "changed_paths",
+            "unauthorized_change",
+            "final_status",
+        }
+        return {
+            str(key): value
+            for key, value in raw.items()
+            if str(key) in allowed and isinstance(value, (str, bool, list, tuple))
+        }
+    if actual.get("correction_occurred") is True:
+        return {"status": "NOT_ESTABLISHED"}
+    return {"status": "NOT_APPLICABLE"}
+
+
+def _dimension_evidence(
+    *,
+    case: Mapping[str, Any],
+    expected: Mapping[str, Any],
+    actual: Mapping[str, Any],
+    grade: Mapping[str, Any],
+    first_divergence: str,
+    observed_failure: tuple[str, str] | None,
+) -> dict[str, str]:
+    """Project independent bounded states without inferring hidden model work."""
+    provided = actual.get("evidence_dimensions")
+    dimensions = dict.fromkeys(D5I_DIMENSIONS, "NOT_ESTABLISHED")
+    if isinstance(provided, Mapping):
+        for name in D5I_DIMENSIONS:
+            value = provided.get(name)
+            if value in {"PASS", "FAIL", "NOT_REACHED", "NOT_APPLICABLE", "NOT_ESTABLISHED"}:
+                dimensions[name] = str(value)
+    if observed_failure is not None:
+        dimensions["provider_structured"] = (
+            "FAIL"
+            if observed_failure[1] in _STRUCTURED_OUTPUT_FAILURE_CATEGORIES
+            else "NOT_REACHED"
+        )
+        for name in D5I_DIMENSIONS[1:]:
+            if dimensions[name] == "NOT_ESTABLISHED":
+                dimensions[name] = "NOT_REACHED"
+        return dimensions
+
+    grade_status = str(grade.get("status"))
+    dimensions["provider_structured"] = "PASS"
+    dimensions["planner_structural"] = "PASS"
+    contract = expected.get("contract")
+    contract_kind = str(contract.get("kind", "")) if isinstance(contract, Mapping) else ""
+    if contract_kind == "safety":
+        dimensions["semantic"] = "NOT_APPLICABLE"
+        dimensions["safe_negative"] = "PASS" if grade_status == "PASS" else "FAIL"
+        dimensions["mutation"] = "PASS" if actual.get("changed") is False else "FAIL"
+        dimensions["target_grounding"] = "NOT_APPLICABLE"
+        dimensions["source_channel_grounding"] = "NOT_APPLICABLE"
+        dimensions["capability"] = "NOT_APPLICABLE"
+    elif grade_status == "PASS":
+        for name in ("semantic", "target_grounding", "source_channel_grounding", "capability"):
+            dimensions[name] = "PASS"
+    elif first_divergence in D5I_FIRST_DIVERGENCES:
+        dimension_by_divergence = {
+            "PLANNER_STRUCTURAL": "planner_structural",
+            "SEMANTIC": "semantic",
+            "TARGET_GROUNDING": "target_grounding",
+            "SOURCE_CHANNEL_GROUNDING": "source_channel_grounding",
+            "CAPABILITY": "capability",
+            "CORRECTION_PRESERVATION": "correction_preservation",
+            "HOST_EXECUTION": "mutation",
+            "PERSISTENCE_RELOAD_RENDER": "persistence_reload_render",
+            "DETERMINISTIC_GRADING": "deterministic_grading",
+        }
+        failing_dimension = dimension_by_divergence.get(first_divergence)
+        if failing_dimension is not None:
+            dimensions[failing_dimension] = "FAIL"
+
+    dimensions["mutation"] = "PASS" if actual.get("changed") is not True else "FAIL"
+    dimensions["persistence_reload_render"] = (
+        "PASS"
+        if actual.get("persisted") is True and actual.get("rendered") is True
+        else "FAIL"
+        if actual.get("persisted") is False or actual.get("rendered") is False
+        else "NOT_ESTABLISHED"
+    )
+    dimensions["deterministic_grading"] = "PASS" if grade_status == "PASS" else "FAIL"
+    return dimensions
+
+
+def _turn_scientific_terminal(
+    *,
+    grade: Mapping[str, Any],
+    actual: Mapping[str, Any],
+    observed_failure: tuple[str, str] | None,
+    first_divergence: str,
+) -> str:
+    """Classify one turn using sealed evidence, not the expected gold outcome."""
+    if observed_failure is not None:
+        return "INCONCLUSIVE / PROVIDER"
+    if actual.get("harness_failure") is True:
+        return "INCONCLUSIVE / HARNESS"
+    if grade.get("status") == "PASS":
+        return "PASS"
+    if actual.get("contract_or_input_failure") is True:
+        return "FAIL / CONTRACT_OR_INPUT"
+    if first_divergence == "HARNESS":
+        return "INCONCLUSIVE / HARNESS"
+    return "FAIL / RESIDUAL_SEMANTIC"
+
+
+def _campaign_scientific_terminal(
+    *,
+    decision: str,
+    attribution: str,
+    rows: Sequence[Mapping[str, Any]],
+    first_divergence: str,
+) -> str:
+    """Project legacy campaign outcomes into the D5-5I terminal taxonomy."""
+    if first_divergence == "HARNESS":
+        return "INCONCLUSIVE / HARNESS"
+    if attribution.startswith(("PROVIDER", "TRANSPORT")):
+        return "INCONCLUSIVE / PROVIDER"
+    if attribution in {
+        "EVIDENCE_INTEGRITY",
+        "EXECUTION_INTERNAL_ERROR",
+        "PROCESS_INTERRUPTION",
+        "CALL_CAP_EXCEEDED",
+        "PRODUCTION_DEFECT",
+        "POPULATION_INCOMPLETE",
+    }:
+        return "INCONCLUSIVE / HARNESS"
+    if decision == "PASS" and len(rows) == len(FROZEN_TURN_IDS):
+        return "PASS"
+    if any(row.get("scientific_terminal") == "FAIL / CONTRACT_OR_INPUT" for row in rows):
+        return "FAIL / CONTRACT_OR_INPUT"
+    return "FAIL / RESIDUAL_SEMANTIC"
+
+
 class D5CampaignRunner:
     """Execute one injected provider-free or future live campaign."""
 
@@ -1693,6 +1980,7 @@ class D5CampaignRunner:
             getattr(adapter, "observes_physical_attempts", False)
         )
         rows: list[dict[str, Any]] = []
+        campaign_first_divergence = "NONE"
         try:
             if callable(getattr(adapter, "bind_call_started", None)):
                 adapter.bind_call_started(custody.record_call_started)
@@ -1735,6 +2023,7 @@ class D5CampaignRunner:
                     physical_attempt_count=custody.ledger.physical_attempts - physical_cursor,
                     provider=self.authorization.provider,
                     model=self.authorization.model,
+                    observed_failure=observed_failure,
                 )
                 row["duration_seconds"] = round(time.perf_counter() - started, 6)
                 row["authorization_id"] = self.authorization.authorization_id
@@ -1748,6 +2037,8 @@ class D5CampaignRunner:
                 )
                 if observed_failure is not None:
                     row["attribution"] = observed_failure[0]
+                if campaign_first_divergence == "NONE":
+                    campaign_first_divergence = str(row["first_divergence"])
                 custody.append_turn(row)
                 rows.append(row)
                 if row["infrastructure_failure"]:
@@ -1771,7 +2062,21 @@ class D5CampaignRunner:
                 decision, attribution = "INCONCLUSIVE", observed_failure[0]
             else:
                 decision, attribution = _classify_exception(error)
-        terminal = custody.finish(decision, attribution=attribution, rows=rows)
+            if campaign_first_divergence == "NONE":
+                campaign_first_divergence = _first_divergence_for_exception(error)
+        scientific_terminal = _campaign_scientific_terminal(
+            decision=decision,
+            attribution=attribution,
+            rows=rows,
+            first_divergence=campaign_first_divergence,
+        )
+        terminal = custody.finish(
+            decision,
+            attribution=attribution,
+            rows=rows,
+            scientific_terminal=scientific_terminal,
+            first_divergence=campaign_first_divergence,
+        )
         custody_digests = verify_custody_artifacts(self.paths)
         self._finished = True
         return {
@@ -1786,6 +2091,8 @@ class D5CampaignRunner:
             "provider_calls": custody.ledger.logical_calls if self.readiness.live else 0,
             "endpoint_calls": len(self.readiness.endpoint_calls) if self.readiness.live else 0,
             "model_calls": custody.ledger.logical_calls if self.readiness.live else 0,
+            "scientific_terminal": scientific_terminal,
+            "first_divergence": campaign_first_divergence,
         }
 
 
@@ -1815,6 +2122,10 @@ def provider_free_preflight(
         "population": {"turns": 9, "turn_ids": list(FROZEN_TURN_IDS)},
         "logical_call_ceiling": MAX_LOGICAL_CALLS,
         "physical_attempt_upper_bound": MAX_PHYSICAL_ATTEMPTS,
+        "role_logical_call_limits": dict(ROLE_LOGICAL_CALL_LIMITS),
+        "scientific_terminals": sorted(D5I_SCIENTIFIC_TERMINALS),
+        "first_divergences": sorted(D5I_FIRST_DIVERGENCES),
+        "evidence_dimensions": list(D5I_DIMENSIONS),
         "provider_calls": 0,
         "endpoint_calls": 0,
         "model_calls": 0,

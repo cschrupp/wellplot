@@ -33,6 +33,15 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_CONFIG = d5.load_project_config(REPO_ROOT)
 
 
+def _require_local_d5_sources() -> None:
+    """Skip canonical-source tests when the isolated checkout lacks frozen assets."""
+    missing = [
+        relative for relative in d5.FROZEN_SOURCE_SHA256 if not (REPO_ROOT / relative).is_file()
+    ]
+    if missing:
+        pytest.skip("LOCAL_ASSET_NOT_PROVISIONED_IN_THIS_CHECKOUT")
+
+
 def _props(*, chat_template: str = "qwen3") -> dict[str, object]:
     """Build a sanitized llama.cpp property double."""
     return {
@@ -230,6 +239,26 @@ def test_provider_free_preflight_is_network_free_and_fail_closed() -> None:
             static_preflight={"status": "FAIL"},
         )
     assert endpoint_calls == []
+
+
+def test_provider_free_preflight_exposes_d5i_contract_without_calls(tmp_path: Path) -> None:
+    """Provider-free preflight publishes the D5-5I contract and zero-call proof."""
+    result = d5.provider_free_preflight(
+        REPO_ROOT,
+        _authorization(campaign_id="preflight-contract"),
+        _paths(tmp_path, "preflight-contract"),
+        static_checker=lambda repo, authorization, paths: {"status": "PASS"},
+    )
+    assert result["status"] == "PASS"
+    assert result["logical_call_ceiling"] == 45
+    assert result["physical_attempt_upper_bound"] == 135
+    assert result["role_logical_call_limits"] == {
+        "planner": 2,
+        "report_worker": 2,
+        "section_worker": 2,
+    }
+    assert set(result["scientific_terminals"]) == d5.D5I_SCIENTIFIC_TERMINALS
+    assert result["provider_calls"] == result["endpoint_calls"] == result["model_calls"] == 0
 
 
 def test_project_config_fingerprint_mismatch_fails_before_static_boundary() -> None:
@@ -566,6 +595,126 @@ def test_call_ledger_rejects_call_46_and_keeps_retries_physical() -> None:
     assert retry_ledger.calls[0]["physical_attempt_count"] == 2
 
 
+def test_d5i_role_limits_reset_per_turn_and_physical_136_fails_closed() -> None:
+    """Per-turn role caps and the global physical ceiling fail before delegation."""
+    ledger = d5.D5LogicalCallLedger()
+    ledger.begin_turn("turn-1")
+    ledger.reserve("report_worker")
+    ledger.reserve("report_worker")
+    with pytest.raises(d5.D5CallCapExceeded, match="report_worker logical call limit 2"):
+        ledger.reserve("report_worker")
+
+    ledger.begin_turn("turn-2")
+    ledger.reserve("report_worker")
+    physical_ledger = d5.D5LogicalCallLedger()
+    index = physical_ledger.reserve("planner")
+    for _ in range(d5.MAX_PHYSICAL_ATTEMPTS):
+        physical_ledger.physical_attempt(index)
+    with pytest.raises(d5.D5CallCapExceeded, match="physical attempt 136"):
+        physical_ledger.physical_attempt(index)
+
+
+@pytest.mark.parametrize(
+    ("actual", "grade", "failure", "expected"),
+    [
+        ({}, {}, ("PROVIDER", "transport"), "PROVIDER_OR_STRUCTURED"),
+        ({}, {"errors": ["schema invalid"]}, None, "PLANNER_STRUCTURAL"),
+        ({}, {"errors": ["target mismatch"]}, None, "TARGET_GROUNDING"),
+        ({}, {"errors": ["source channel unavailable"]}, None, "SOURCE_CHANNEL_GROUNDING"),
+        ({}, {"errors": ["capability parent missing"]}, None, "CAPABILITY"),
+        ({}, {"errors": ["canonical_change_outside"]}, None, "CORRECTION_PRESERVATION"),
+        ({}, {"errors": ["owner diagnostic mismatch"]}, None, "HOST_EXECUTION"),
+        ({}, {"errors": ["persistence_not_proven"]}, None, "PERSISTENCE_RELOAD_RENDER"),
+        ({}, {"errors": ["semantic mismatch"]}, None, "SEMANTIC"),
+        ({"first_divergence": "DETERMINISTIC_GRADING"}, {}, None, "DETERMINISTIC_GRADING"),
+        ({"harness_failure": True}, {}, None, "HARNESS"),
+        ({}, {}, None, "NONE"),
+    ],
+)
+def test_d5i_first_divergence_is_bounded_and_earliest(
+    actual: dict[str, object],
+    grade: dict[str, object],
+    failure: tuple[str, str] | None,
+    expected: str,
+) -> None:
+    """Turn evidence uses only the accepted first-divergence vocabulary."""
+    assert d5._first_divergence(actual, grade, failure) == expected
+
+
+def test_d5i_dimension_and_correction_evidence_are_explicit() -> None:
+    """Correction and safety evidence remain visible instead of inferred away."""
+    actual = {
+        "changed": False,
+        "persisted": True,
+        "rendered": True,
+        "correction_occurred": True,
+        "correction_preservation": {
+            "status": "PASS",
+            "diagnostic_code": "semantic_contract_incomplete",
+            "authorized_paths": ["/sections/0"],
+            "before_semantic_projection_sha256": "a" * 64,
+            "after_semantic_projection_sha256": "b" * 64,
+            "changed_paths": ["/sections/0"],
+            "unauthorized_change": False,
+            "final_status": "ACCEPTED",
+        },
+    }
+    row = d5._bounded_turn_row(
+        {"case_id": "D4-L04", "turn_id": "D4-L04:C01"},
+        {"contract": {"kind": "safety"}},
+        actual,
+        {"status": "PASS", "errors": [], "verifier_requirements": []},
+        execution_index=1,
+        call_count=1,
+        physical_attempt_count=1,
+    )
+    assert row["first_divergence"] == "NONE"
+    assert row["evidence_dimensions"]["safe_negative"] == "PASS"
+    assert row["evidence_dimensions"]["mutation"] == "PASS"
+    assert row["correction_preservation"]["final_status"] == "ACCEPTED"
+
+
+def test_d5i_provider_failure_preserves_provider_terminal_boundary(tmp_path: Path) -> None:
+    """A structured provider refusal is inconclusive and never semantically graded."""
+    runner = d5.D5CampaignRunner(
+        repo_root=REPO_ROOT,
+        authorization=_authorization(),
+        paths=_paths(tmp_path),
+        readiness=_ready(),
+        provenance=_provenance(),
+    )
+    result = asyncio.run(runner.run(_StructuredOutputRejectingAdapter()))
+    assert result["scientific_terminal"] == "INCONCLUSIVE / PROVIDER"
+    assert result["first_divergence"] == "PROVIDER_OR_STRUCTURED"
+    assert result["terminal"]["scientific_terminal"] == "INCONCLUSIVE / PROVIDER"
+
+
+class _MissingAssetAdapter:
+    """Raise a local source error without making a provider-shaped call."""
+
+    async def execute_turn(
+        self,
+        case: dict[str, object],
+        expected: dict[str, object],
+    ) -> object:
+        del case, expected
+        raise OSError("local frozen asset is not provisioned")
+
+
+def test_d5i_local_asset_failure_is_harness_inconclusive(tmp_path: Path) -> None:
+    """Checkout-local asset failures cannot be misreported as provider evidence."""
+    runner = d5.D5CampaignRunner(
+        repo_root=REPO_ROOT,
+        authorization=_authorization(),
+        paths=_paths(tmp_path),
+        readiness=_ready(),
+        provenance=_provenance(),
+    )
+    result = asyncio.run(runner.run(_MissingAssetAdapter()))
+    assert result["scientific_terminal"] == "INCONCLUSIVE / HARNESS"
+    assert result["first_divergence"] == "HARNESS"
+
+
 def test_redaction_rejects_secrets_raw_payloads_and_absolute_paths() -> None:
     """Evidence rejects credentials and unbounded provider material."""
     assert not d5.evidence_is_redacted({"api_key": "secret"})
@@ -828,6 +977,7 @@ def test_execute_live_rejects_artifact_root_relocation_before_readiness(tmp_path
 
 def test_provider_free_nine_turn_rehearsal_uses_canonical_direct_notebook() -> None:
     """Rehearse all nine frozen turns through the accepted canonical adapter."""
+    _require_local_d5_sources()
     with TemporaryDirectory(dir=REPO_ROOT) as temporary:
         root = Path(temporary)
         harness = _D4SessionHarness.create(root)
@@ -1072,6 +1222,7 @@ def test_real_live_provider_rejection_is_inconclusive_without_replay(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A real provider refusal becomes structured-output INCONCLUSIVE evidence."""
+    _require_local_d5_sources()
     from openai import _base_client
 
     monkeypatch.setattr(_base_client, "get_platform", lambda: "Linux")
@@ -1124,6 +1275,7 @@ def test_real_live_transport_exhaustion_is_not_semantic_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Exhausted real transport retries become provider-runtime INCONCLUSIVE."""
+    _require_local_d5_sources()
     from openai import _base_client
 
     monkeypatch.setattr(_base_client, "get_platform", lambda: "Linux")
