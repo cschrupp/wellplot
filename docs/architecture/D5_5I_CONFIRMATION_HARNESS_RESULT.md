@@ -78,6 +78,8 @@ completed with:
 provider-free D5-5I focused suite: 66 passed, 0 skipped
 canonical nine-turn rehearsal: 9/9 PASS
 CBL requirements: CBL-01..CBL-09 PASS
+post-control D5-5I focused file: 64 passed
+post-control wire/retry validation: 10 passed
 ```
 
 The deterministic CBL response fixture preserves the frozen object-level
