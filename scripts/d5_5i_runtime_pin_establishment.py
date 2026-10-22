@@ -68,6 +68,13 @@ class MetadataEndpointError(MetadataToolError):
 
 
 @dataclass(frozen=True, slots=True)
+class MetadataUnusableJson:
+    """Represent an HTTP-successful response whose body is not JSON."""
+
+    reason: str = "invalid_json"
+
+
+@dataclass(frozen=True, slots=True)
 class MetadataAuthorization:
     """Facts needed to establish one fresh runtime-pin evidence namespace."""
 
@@ -460,7 +467,7 @@ def _default_endpoint_get(url: str, api_key: str) -> object:
     try:
         return json.loads(body)
     except (TypeError, ValueError):
-        raise MetadataEndpointError("endpoint_identity_mismatch") from None
+        return MetadataUnusableJson()
 
 
 def establish_runtime_pins(

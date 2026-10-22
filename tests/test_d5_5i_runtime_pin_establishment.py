@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import urllib.request
 from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
@@ -246,6 +247,56 @@ def test_malformed_catalog_still_issues_props_before_classification(tmp_path: Pa
         return _props()
 
     result = _run(authorization, endpoint_get)
+    assert result["outcome"] == "INCOMPLETE_PROPS"
+    assert result["reason"] == "MODEL_CATALOG_UNAVAILABLE"
+    assert result["endpoint_attempts"] == 2
+    assert calls == [PROJECT_CONFIG.model_catalog_url, PROJECT_CONFIG.props_url]
+
+
+def test_http_success_invalid_catalog_json_still_issues_props(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """HTTP-successful invalid JSON is projection failure, not transport failure."""
+    authorization = _authorization(tmp_path)
+    calls: list[str] = []
+
+    class Response:
+        def __init__(self, url: str, body: bytes) -> None:
+            self._url = url
+            self._body = body
+
+        def __enter__(self) -> Response:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            del args
+
+        def geturl(self) -> str:
+            return self._url
+
+        def read(self, limit: int) -> bytes:
+            return self._body[:limit]
+
+    responses = [
+        Response(PROJECT_CONFIG.model_catalog_url, b"{not-json"),
+        Response(PROJECT_CONFIG.props_url, json.dumps(_props()).encode("utf-8")),
+    ]
+
+    def urlopen(request: urllib.request.Request, timeout: float) -> Response:
+        del timeout
+        calls.append(request.full_url)
+        return responses.pop(0)
+
+    monkeypatch.setattr(tool.urllib.request, "urlopen", urlopen)
+    result = tool.establish_runtime_pins(
+        repo_root=REPO_ROOT,
+        tooling_root=REPO_ROOT,
+        authorization=authorization,
+        endpoint_get=tool._default_endpoint_get,
+        api_key_loader=lambda: "secret-token",
+        static_checker=_static_pass,
+    )
+
     assert result["outcome"] == "INCOMPLETE_PROPS"
     assert result["reason"] == "MODEL_CATALOG_UNAVAILABLE"
     assert result["endpoint_attempts"] == 2
