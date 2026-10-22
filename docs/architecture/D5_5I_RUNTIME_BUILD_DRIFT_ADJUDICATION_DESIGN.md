@@ -2,6 +2,7 @@
 
 ```yaml
 authority: WELLPLOT-D5-5I-RUNTIME-BUILD-DRIFT-ADJUDICATION-DESIGN-AUTH-001
+rework_authority: WELLPLOT-D5-5I-RUNTIME-BUILD-DRIFT-ADJUDICATION-DESIGN-REWORK-AUTH-001
 branch: design/d5-5g-inspectable-historical-claim-revalidation
 historical_pin_authority: WELLPLOT-D5-5I-RUNTIME-PIN-ESTABLISHMENT-AUTH-001
 historical_pin_status: MISMATCH / ACCEPTED / CLOSED
@@ -163,6 +164,11 @@ does not prove that an unknown deployed build accepts every documented option.
 The exact `.141` build must therefore demonstrate acceptance rather than
 inherit current upstream behavior by assumption.
 
+Source provenance and behavioral compatibility are separate predicates. The
+public upstream attestation is not required for an empirical control-effect
+observation, and an empirical control-effect observation does not establish
+upstream source provenance.
+
 Evidence classification:
 
 ```yaml
@@ -195,9 +201,10 @@ new current identity only if all of the following are true:
    semantics: thinking_off = STATIC_REQUEST_CONTRACT
    ```
 
-6. A separate compatibility review demonstrates that the exact `.141`
-   server/template accepts the request control, or records that compatibility
-   as unresolved and blocks Gate-B.
+6. A separate compatibility review demonstrates behavior at the exact `.141`
+   server/template boundary, or records compatibility as unresolved and blocks
+   Gate-B. This empirical result is independent of whether upstream source
+   provenance is verified.
 
 The rule deliberately permits a new current runtime identity without making
 an unsupported source-provenance claim. Exact identity and upstream
@@ -223,13 +230,45 @@ The probe requires a separate one-shot execution authority. That authority
 must bind the successor observation digest, target origin, model, tooling and
 scientific checkpoints, and a fresh evidence namespace.
 
+The probe must first revalidate the successor identity immediately before the
+template calls. AUTH-001 remains closed and is joined by digest; these GETs
+are a new contemporaneous identity observation, not a retry or reopening of
+the historical pin attempt:
+
+```text
+GET /v1/models
+GET /props
+compare the projected values to the sealed AUTH-001 `.141` observation
+if and only if all values match, issue the two template calls
+```
+
+The exact required identity match is:
+
+```yaml
+model_catalog: [qwen3.6-35b-a3b]
+model_path_basename: Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
+model_path_fingerprint_sha256: 3a6fd986bebd4047876869e8b079f9f9b7b15fb2429853ba0501b5f6ea480b21
+build_info: b11669-378a347ce
+context_size: 65536
+total_slots: 1
+chat_template_sha256: 55d4931433fe502b794226ee7f4d206a6bdd436ac9f80eb7d8ebb4c639f9ea0c
+runtime_defaults_sha256: 358285bb3448909823ca884f7806b42e81cc4a96841004fa3c903437d0714b30
+```
+
+Any difference, including a changed build or runtime-default fingerprint,
+produces `SUCCESSOR_IDENTITY_DRIFT` and prohibits both POST requests.
+
 The fixed request budget is:
 
 ```yaml
 requests:
+  - GET /v1/models for contemporaneous successor revalidation
+  - GET /props for contemporaneous successor revalidation
   - POST /apply-template with enable_thinking: false
   - POST /apply-template with enable_thinking: true
+max_identity_gets: 2
 max_apply_template_requests: 2
+max_non_generative_endpoint_requests: 4
 chat_completions: 0
 other_generation_endpoints: 0
 retries: 0
@@ -242,17 +281,41 @@ No response body or raw prompt may be retained. The evidence stores only
 bounded request-control facts, response status/shape, prompt lengths, and
 hashes of redacted prompt projections.
 
-### Fixed request
+### Fixed request stimulus and identities
 
-Both requests use the same minimal, non-scientific message sequence and model
-identity. The messages must be frozen before execution and contain no WellPlot
-case, gold, source, or answer content. The only allowed difference is:
+Both template requests use this exact minimal, non-scientific message sequence
+and model identity. It contains no WellPlot case, gold, source, or answer
+content:
+
+```json
+{
+  "model": "qwen3.6-35b-a3b",
+  "messages": [
+    {"role": "system", "content": "You are a template-formatting probe."},
+    {"role": "user", "content": "State the word READY."}
+  ]
+}
+```
+
+Canonical request serialization is UTF-8 JSON with sorted keys, compact
+separators, and no trailing newline. The only allowed difference is the
+Boolean value in this object:
 
 ```json
 {"chat_template_kwargs":{"enable_thinking":false}}
 ```
 
-versus the same object with `true`.
+versus the same object with `true`. The complete canonical request bodies and
+digests are frozen here:
+
+```yaml
+false_request_body:
+  {"chat_template_kwargs":{"enable_thinking":false},"messages":[{"content":"You are a template-formatting probe.","role":"system"},{"content":"State the word READY.","role":"user"}],"model":"qwen3.6-35b-a3b"}
+false_request_body_sha256: e4711fcaad9b74d2c50cdf8d0d56df4959958366b574682c8b4b3f74f999f259
+true_request_body:
+  {"chat_template_kwargs":{"enable_thinking":true},"messages":[{"content":"You are a template-formatting probe.","role":"system"},{"content":"State the word READY.","role":"user"}],"model":"qwen3.6-35b-a3b"}
+true_request_body_sha256: a9cb9e9ee04db246c5eb1f4b5b92fd888074688d14bf62a1ba9b792e802f859c
+```
 
 The future runner must verify the serialized request body before issuance and
 must not accept a server response as evidence if the request control was
@@ -260,19 +323,44 @@ omitted, mutated, or placed in an unsupported location.
 
 ### Acceptance predicate
 
-The probe can produce `COMPATIBLE_FOR_GATE_B_REVIEW` only when:
+The probe must compute, transiently, only these response projections:
+
+```yaml
+false_prompt_length: integer
+false_prompt_sha256: sha256(prompt UTF-8 bytes)
+true_prompt_length: integer
+true_prompt_sha256: sha256(prompt UTF-8 bytes)
+```
+
+No raw prompt may be retained. The minimum empirical result is
+`CONTROL_EFFECT_OBSERVED` only when:
 
 1. both calls receive successful, bounded JSON responses with a string
    `prompt` field;
 2. the exact request controls are present and differ only in Boolean value;
-3. the deployed endpoint's documented/source contract for that exact build
-   confirms that the field is interpreted by the template path; and
-4. the two prompt projections exhibit the documented control-sensitive
-   difference, recorded as bounded hashes/predicates rather than raw text.
+3. the contemporaneous identity exactly matches the sealed AUTH-001 successor
+   observation; and
+4. the two prompt projections have different SHA-256 values.
+
+This result proves that the exact observed server/template produced a
+control-sensitive template result. It does not, by itself, prove which output
+means "thinking off."
+
+`THINKING_OFF_COMPATIBILITY_ESTABLISHED` is admissible only if a separate,
+pre-execution review freezes a directional predicate from the exact deployed
+template/source contract, for example a documented non-thinking versus
+thinking-enabled template projection. That predicate must be evaluated
+transiently and retained only as Boolean evidence, lengths, and hashes. It
+must not be selected after observing the responses.
+
+This design does not currently freeze such a directional predicate. Therefore
+the default positive terminal is `CONTROL_EFFECT_OBSERVED`, not
+`THINKING_OFF_COMPATIBILITY_ESTABLISHED`.
 
 If the endpoint ignores unknown fields, returns identical prompt projections,
-rejects the field, or the exact build's contract cannot be established, the
-result is not compatibility success. It is `COMPATIBILITY_UNESTABLISHED`.
+rejects the field, or the exact identity changes before the POSTs, the result
+is respectively `CONTROL_NOT_OBSERVED`, `COMPATIBILITY_UNESTABLISHED`, or
+`SUCCESSOR_IDENTITY_DRIFT`.
 
 The probe must not infer compatibility from a successful HTTP status alone,
 from the presence of the field in the request, from model naming, or from the
@@ -288,12 +376,30 @@ SUCCESSOR_IDENTITY_ESTABLISHED:
   historical_auth_001: MISMATCH / CLOSED / PRESERVED
   current_identity: SEALED_FROM_.141_OBSERVATION
   upstream_provenance: VERIFIED | UNVERIFIED
-  compatibility: PENDING_OR_COMPATIBLE_FOR_GATE_B_REVIEW
+  compatibility: PENDING
   gate_b: BLOCKED_UNTIL_INDEPENDENT_REVIEW
 
-NON_BUILD_CONTINUITY_MISMATCH:
+SUCCESSOR_IDENTITY_DRIFT:
   historical_auth_001: PRESERVED
-  current_identity: NOT_ACCEPTED
+  current_identity: NOT_REVALIDATED
+  apply_template_requests: 0
+  gate_b: BLOCKED
+
+CONTROL_EFFECT_OBSERVED:
+  successor_identity: EXACT_CONTEMPORANEOUS_MATCH
+  request_control: EMPIRICALLY_CONTROL_SENSITIVE
+  thinking_off_semantics: NOT_ESTABLISHED_BY_THIS_PROBE
+  gate_b: BLOCKED_UNTIL_INDEPENDENT_REVIEW
+
+THINKING_OFF_COMPATIBILITY_ESTABLISHED:
+  successor_identity: EXACT_CONTEMPORANEOUS_MATCH
+  request_control: DIRECTIONALLY_VALIDATED
+  upstream_provenance: VERIFIED | UNVERIFIED
+  gate_b: BLOCKED_UNTIL_INDEPENDENT_REVIEW
+
+CONTROL_NOT_OBSERVED:
+  successor_identity: PRESERVED_AS_OBSERVED
+  request_control: NOT_OBSERVED_AT_TEMPLATE_BOUNDARY
   gate_b: BLOCKED
 
 COMPATIBILITY_UNESTABLISHED:
@@ -325,6 +431,7 @@ Any future execution must preserve:
 - the immutable AUTH-001 state, journal, terminal record, and digests;
 - the exact `.141` projected identity values and their observation timestamp;
 - the authorization and fresh successor/probe namespace identities;
+- both contemporaneous identity GETs and their exact projected comparison;
 - request method, endpoint path, status, bounded response shape, and request
   control digest;
 - prompt projection lengths/hashes only, never credentials, headers, or raw
@@ -356,8 +463,8 @@ completion boundary. The public b11669 attestation identifies upstream commit
   separately. Selected.
 - C: claim official upstream b11669 provenance from the version prefix.
   Rejected; insufficient evidence.
-- D: use a non-generative paired template probe. Selected as the bounded
-  compatibility mechanism, subject to the exact-build acceptance predicate.
+- D: use a non-generative paired template probe after contemporaneous identity
+  revalidation. Selected as the bounded empirical mechanism.
 
 **Evidence class:** ADAPTED / EMPIRICALLY_SUPPORTED.
 
@@ -376,6 +483,8 @@ historical_runtime_pin_auth_001: MISMATCH / ACCEPTED / CLOSED
 historical_identity: PRESERVED
 observed_.141_runtime: SUCCESSOR_CANDIDATE / PROVENANCE_UNVERIFIED
 compatibility_probe: DESIGNED / NOT_EXECUTED
+probe_budget: 2 GET + 2 POST /apply-template, zero generation
+positive_probe_claim: CONTROL_EFFECT_OBSERVED unless a directional predicate is separately frozen
 metadata_calls_after_auth_001: 0
 provider_model_calls: 0
 gate_b: BLOCKED
