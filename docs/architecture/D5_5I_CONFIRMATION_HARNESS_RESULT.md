@@ -2,9 +2,10 @@
 
 ```yaml
 authority: WELLPLOT-D5-5I-CONFIRMATION-HARNESS-ADAPTATION-AUTH-001
+fixture_correction_authority: WELLPLOT-D5-5I-CBL02-FIXTURE-CORRECTION-AUTH-001
 design: docs/architecture/D5_5I_REPAIRED_BASELINE_LIVE_CONFIRMATION_DESIGN.md
 branch: design/d5-5g-inspectable-historical-claim-revalidation
-implementation_commit: 4cf783695
+implementation_commit: 4cf78369516bda8dbfb10991f6d7b915c43ebd85
 implementation_parent: c0a44b6432b01dffeb614246cfacb1c9deb705c5
 accepted_h_implementation_checkpoint: e72e726b7f52c1975d862980543cd3f217ee6aa8
 historical_d5_identity: PRESERVED_SEPARATELY
@@ -33,11 +34,22 @@ H implementation checkpoint above. Historical D5-4 engine/design identifiers
 remain compatibility/provenance fields and are not used as the active H
 authority.
 
-Logical calls remain capped at 45 and physical attempts at 135. The accepted
-SDK retry contract remains 2. Planner, report-worker, and section-worker calls
-are limited to two per applicable turn. Logical call 46 and physical attempt
-136 are rejected before provider delegation. No replay or selective rerun is
-introduced.
+Logical generation calls remain capped at 45 and physical generation attempts
+at 135. A logical call counts one semantic generation invocation by the
+planner, report worker, section worker, or an existing authorized correction;
+an SDK retry of that same generation does not add a logical call. A physical
+attempt counts every generation HTTP attempt, including failed or retried
+attempts; with `sdk_max_retries = 2`, one logical call can consume at most
+three physical attempts.
+
+The `/v1/models` and `/props` readiness requests are identity endpoint calls
+tracked separately from both generation ceilings. A request rejected before
+provider delegation consumes neither a physical generation attempt nor an
+endpoint call. Once an HTTP generation request is attempted, it consumes one
+physical attempt even if transport or provider execution fails. Planner,
+report-worker, and section-worker calls remain limited to two per applicable
+turn. Logical call 46 and physical attempt 136 are rejected before provider
+delegation. No replay or selective rerun is introduced.
 
 ## Provider-Free Evidence
 
