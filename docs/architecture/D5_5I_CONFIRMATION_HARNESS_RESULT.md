@@ -9,7 +9,9 @@ implementation_commit: 4cf78369516bda8dbfb10991f6d7b915c43ebd85
 implementation_parent: c0a44b6432b01dffeb614246cfacb1c9deb705c5
 accepted_h_implementation_checkpoint: e72e726b7f52c1975d862980543cd3f217ee6aa8
 thinking_control_implementation_authority: WELLPLOT-D5-5I-THINKING-OFF-REQUEST-CONTROL-IMPL-AUTH-001
-thinking_control_implementation_commit: 52a65c7fa
+thinking_control_rework_authority: WELLPLOT-D5-5I-THINKING-OFF-REQUEST-CONTROL-IMPL-REWORK-AUTH-001
+thinking_control_code_commit: 8fad94761176026a0d60bd19622c06b1c022968a
+review_candidate_checkpoint: FINAL_PUBLISHED_HEAD
 thinking_control_mechanism: chat_template_kwargs.enable_thinking
 thinking_control_value: false
 thinking_control_options_sha256: 220b99e47feb82851cab428f86b8fe977ae7c605400d421a91e99d4a35ec9c26
@@ -104,7 +106,8 @@ OpenAI-compatible adapter boundary:
 
 The canonical JSON SHA-256 is
 `220b99e47feb82851cab428f86b8fe977ae7c605400d421a91e99d4a35ec9c26`.
-Static preflight rejects a missing, changed, or caller-overridden control.
+Authorization parsing and static preflight reject missing, malformed, changed,
+or caller-overridden control information.
 The existing model-I/O observer verifies the serialized
 `/chat/completions` body for planner, report-worker, and section-worker
 requests, including SDK retries. `/v1/models` and `/props` remain runtime
