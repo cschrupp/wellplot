@@ -11,6 +11,7 @@ from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from typing import Any
 
 import httpx
@@ -677,26 +678,58 @@ def test_d5i_dimension_and_correction_evidence_are_explicit() -> None:
     assert row["correction_preservation"]["final_status"] == "ACCEPTED"
 
 
-def test_d5i_correction_evidence_is_derived_from_canonical_adapter_observation() -> None:
-    """A repaired canonical before/after pair produces observable G7 evidence."""
-    before = {"sections": [{"title": "before", "subtitle": "stable"}]}
-    after = {"sections": [{"title": "after", "subtitle": "stable"}]}
+def test_d5i_correction_evidence_is_derived_from_canonical_adapter_observation(
+    tmp_path: Path,
+) -> None:
+    """The reused D4 adapter produces observable G7 correction evidence."""
+
+    class CorrectionSession:
+        provider = "deterministic"
+        model = "d5i-test-model"
+
+        async def revise(self, *, feedback: str, logfile_path: Path) -> object:
+            del feedback
+            payload = d4.yaml.safe_load(logfile_path.read_text(encoding="utf-8"))
+            payload["document"]["header"]["title"] = "Repaired title"
+            logfile_path.write_text(d4.yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+            return SimpleNamespace(
+                submitted_intent={"correction": True},
+                report_facts={
+                    "success": True,
+                    "changed": True,
+                    "apply_status": "persisted",
+                    "compilation": {
+                        "diagnostics": [
+                            {
+                                "code": "semantic_contract_incomplete",
+                                "stage": "contract",
+                            }
+                        ],
+                        "metrics": {"total_repairs": 1},
+                    },
+                },
+            )
+
+        async def render_logfile_to_file(
+            self,
+            *,
+            logfile_path: Path,
+            output_path: Path,
+            overwrite: bool,
+        ) -> dict[str, object]:
+            del logfile_path, overwrite
+            output_path.write_bytes(b"deterministic render")
+            return {"output_path": str(output_path)}
+
+    harness = _D4SessionHarness.create(tmp_path)
+    harness.adapter.session = CorrectionSession()
+    case = next(item for item in d4.load_cases(REPO_ROOT) if item["turn_id"] == "D4-L01:T1")
+    gold = next(item for item in d4.load_gold(REPO_ROOT)["cases"] if item["turn_id"] == "D4-L01:T1")
+    actual = asyncio.run(harness.adapter.execute_turn(case, {}))
     row = d5._bounded_turn_row(
-        {"case_id": "D4-L01", "turn_id": "D4-L01:T1"},
-        {
-            "contract": {
-                "kind": "las",
-                "allowed_change_paths": ["/sections/0/title"],
-            }
-        },
-        {
-            "canonical_before": before,
-            "canonical_after": after,
-            "worker_repair_count": 1,
-            "diagnostic_code": "semantic_contract_incomplete",
-            "persisted": True,
-            "rendered": True,
-        },
+        case,
+        {"contract": gold["contract"]},
+        actual,
         {"status": "PASS", "errors": [], "verifier_requirements": []},
         execution_index=1,
         call_count=2,
@@ -704,7 +737,14 @@ def test_d5i_correction_evidence_is_derived_from_canonical_adapter_observation()
     )
     evidence = row["correction_preservation"]
     assert evidence["status"] == "OBSERVED"
-    assert evidence["changed_paths"] == ["/sections/0/title"]
+    assert set(evidence["changed_paths"]) == {
+        "/title",
+        "/extensions/compatibility/legacy_document/header/title",
+    }
+    assert set(evidence["authorized_paths"]) == {
+        "/title",
+        "/extensions/compatibility/legacy_document/header/title",
+    }
     assert evidence["unauthorized_change"] is False
     assert evidence["final_status"] == "ACCEPTED"
     assert (
