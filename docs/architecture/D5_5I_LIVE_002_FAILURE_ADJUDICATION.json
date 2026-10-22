@@ -1,0 +1,1539 @@
+{
+  "all_campaign_file_digests": {
+    "cases/D4-L01/30-23a-3 8117_d.las": "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9",
+    "cases/D4-L01/D4-L01.log.yaml": "c2ecd653f7ad33d5caf37fd7898703e362f7adb41ed4b856c99838ba8d9acace",
+    "cases/D4-L02/30-23a-3 8117_d.las": "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9",
+    "cases/D4-L02/D4-L02.log.yaml": "6e88e1dc0032b569ff8e136cf7c6cf6b27b98cc2057f9c88af27b28a51c666e5",
+    "cases/D4-L03/30-23a-3 8117_d.las": "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9",
+    "cases/D4-L03/D4-L03.log.yaml": "fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93",
+    "cases/D4-L04/30-23a-3 8117_d.las": "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9",
+    "cases/D4-L04/D4-L04.log.yaml": "fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93",
+    "d5-5i-qwen-live-002.evidence.jsonl": "7acdb2e970b8be9eeabfa818bf861ad21f9d991d15b36ba50ad7c0158f9200b8",
+    "d5-5i-qwen-live-002.journal.jsonl": "7ed0994a58feb0ef944f0d6bd8be807f19499afa14cff05fe67016e56f68c311",
+    "d5-5i-qwen-live-002.model-io.jsonl": "d877c087f3469b77e1f86295dd78bc713c530eb15693d01e6c44f5983f5495b7",
+    "d5-5i-qwen-live-002.state.json": "43eea8fdcd715091ab02b2db1e66b40beee329fcc0d2f9805e1849a6ea4506e9",
+    "d5-5i-qwen-live-002.summary.json": "992997e4fd81b95c30561dd8adc02a70172bb9cc99d7284a171607654c4432ab",
+    "d5-5i-qwen-live-002.terminal.json": "fbd53f983e22ae672f7a1f96a18e84f352883a876d84a767f0a1f94add22565d",
+    "turns/D4-C01-C01/cbl-scaffold.log.yaml": "ef659a71042a06039afddc142d8d6ebb46f30f8d1f40c1c130b60c74778905a1",
+    "turns/D4-C01-C01/generated-cbl.log.yaml": "f1f8f6d1279a910dc06b0efefe889812f5e54ec46549a9844996e9e0c152c6e5",
+    "turns/D4-L01-T1/30-23a-3 8117_d.las": "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9",
+    "turns/D4-L01-T1/after.log.yaml": "fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93",
+    "turns/D4-L01-T1/before.log.yaml": "fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93",
+    "turns/D4-L01-T2/30-23a-3 8117_d.las": "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9",
+    "turns/D4-L01-T2/after.log.yaml": "c2ecd653f7ad33d5caf37fd7898703e362f7adb41ed4b856c99838ba8d9acace",
+    "turns/D4-L01-T2/before.log.yaml": "fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93",
+    "turns/D4-L01-T2/render.pdf": "a1c675dec0b0eeef4090b4c946eb761dcabf4660a9c08e17f2f41b94cf04ddf0",
+    "turns/D4-L01-T3/30-23a-3 8117_d.las": "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9",
+    "turns/D4-L01-T3/after.log.yaml": "c2ecd653f7ad33d5caf37fd7898703e362f7adb41ed4b856c99838ba8d9acace",
+    "turns/D4-L01-T3/before.log.yaml": "c2ecd653f7ad33d5caf37fd7898703e362f7adb41ed4b856c99838ba8d9acace",
+    "turns/D4-L01-T4/30-23a-3 8117_d.las": "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9",
+    "turns/D4-L01-T4/after.log.yaml": "c2ecd653f7ad33d5caf37fd7898703e362f7adb41ed4b856c99838ba8d9acace",
+    "turns/D4-L01-T4/before.log.yaml": "c2ecd653f7ad33d5caf37fd7898703e362f7adb41ed4b856c99838ba8d9acace",
+    "turns/D4-L02-T1/30-23a-3 8117_d.las": "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9",
+    "turns/D4-L02-T1/after.log.yaml": "6e88e1dc0032b569ff8e136cf7c6cf6b27b98cc2057f9c88af27b28a51c666e5",
+    "turns/D4-L02-T1/before.log.yaml": "35a3e93efbae52ba3e6fd3afb3b78b2f3315af4ba53906f9d62d8d4ae9a342e5",
+    "turns/D4-L02-T1/render.pdf": "64b3c3aa8793668f44b3b70b17fbe3b57e5f88d37e95fa25f4524696d3c0f3d7",
+    "turns/D4-L02-T2/30-23a-3 8117_d.las": "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9",
+    "turns/D4-L02-T2/after.log.yaml": "6e88e1dc0032b569ff8e136cf7c6cf6b27b98cc2057f9c88af27b28a51c666e5",
+    "turns/D4-L02-T2/before.log.yaml": "6e88e1dc0032b569ff8e136cf7c6cf6b27b98cc2057f9c88af27b28a51c666e5",
+    "turns/D4-L03-C01/30-23a-3 8117_d.las": "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9",
+    "turns/D4-L03-C01/after.log.yaml": "fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93",
+    "turns/D4-L03-C01/before.log.yaml": "fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93",
+    "turns/D4-L04-C01/30-23a-3 8117_d.las": "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9",
+    "turns/D4-L04-C01/after.log.yaml": "fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93",
+    "turns/D4-L04-C01/before.log.yaml": "fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93"
+  },
+  "analysis_endpoint_provider_model_calls": 0,
+  "authority": "WELLPLOT-D5-5I-LIVE-FAILURE-ADJUDICATION-WORKPACKET-AUTH-001",
+  "calls": [
+    {
+      "http_status": 200,
+      "index": 1,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "6d5ef929963a074c33fb3f80e4b38d98e9832d03b0c22867ce9b955590ecfee5",
+      "response_sha256": "bea5672ca80f4f9a91f0a4920394f6008a7ef47d3a0f70143ce9cba98e1fd331",
+      "role": "planner",
+      "schema_sha256": "0dc2885ddbf0ab215d189b7f6da0065f7ecd781c153917554d3a9de3d23512e9",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 1,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "planner",
+        "turn_id": "D4-C01:C01",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-C01:C01",
+      "wire_lines": [
+        1,
+        2
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 2,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "60fea5d98fba0554276ec15b80954bb85b0d37fe45a59c6900946e9f00f0fd4b",
+      "response_sha256": "a4279b95027301894455ff976882b6aef0fed221f8802e3b258dccf7f29f9e45",
+      "role": "report_worker",
+      "schema_sha256": "5d0449047945efae6a874d0dff47bee205313ec13af8409dcfcd074c806f62b8",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 2,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "report_worker",
+        "turn_id": "D4-C01:C01",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-C01:C01",
+      "wire_lines": [
+        4,
+        11
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 3,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "024d1985255647e7dd06056592390339c6729ef073a3af4d30a9d7908cfad38e",
+      "response_sha256": "e6d0004c9613200ab970c5c2d4bfa9a6e2a2b75582db5b99052c14b9e1a0867e",
+      "role": "section_worker",
+      "schema_sha256": "d3e2321ae50f721aad57c4bb1b6fc98bf719c4aa9d11b49df300f10070dbfa53",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 3,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "section_worker",
+        "turn_id": "D4-C01:C01",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-C01:C01",
+      "wire_lines": [
+        5,
+        9
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 4,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "ec9390059a7674795455328d2bcc0cefb7ca29d5525bb21c5f595ab1b6ccebf5",
+      "response_sha256": "b0b812896496f4605d6fee7d05e66c5787281c7c0bb2d598d8dac0e06d558c92",
+      "role": "section_worker",
+      "schema_sha256": "d3e2321ae50f721aad57c4bb1b6fc98bf719c4aa9d11b49df300f10070dbfa53",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 4,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "section_worker",
+        "turn_id": "D4-C01:C01",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-C01:C01",
+      "wire_lines": [
+        6,
+        7
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 5,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "c0ba9daed160da6d6d9fb413deb3139f9abbcd5087c7d2a2d96734db3afce039",
+      "response_sha256": "3f12795cb4d9c6ac8cd41e8eed6c2048c37cc8bf0ebaba58d9dcf6116c3b9cb4",
+      "role": "planner",
+      "schema_sha256": "0dc2885ddbf0ab215d189b7f6da0065f7ecd781c153917554d3a9de3d23512e9",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 5,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "planner",
+        "turn_id": "D4-L01:T1",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L01:T1",
+      "wire_lines": [
+        13,
+        14
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 6,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "b4b757dcf7ecab956f4f7da303221a4ac91add910b024a140255252f865c3e2b",
+      "response_sha256": "e2317a39e9b7a32526b956de4d7b294dc2f5aa39c83f35645261fc9175e43e9f",
+      "role": "report_worker",
+      "schema_sha256": "5d0449047945efae6a874d0dff47bee205313ec13af8409dcfcd074c806f62b8",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 6,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "report_worker",
+        "turn_id": "D4-L01:T1",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L01:T1",
+      "wire_lines": [
+        16,
+        17
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 7,
+      "json_decode": "PASS",
+      "python_model_errors": [
+        {
+          "path": [],
+          "type": "value_error"
+        }
+      ],
+      "request_sha256": "f1734a16249f332107c1b3987fd6368acb08420556b5a21b04ad8c771556dcea",
+      "response_sha256": "578d32601856c303e44e98483a97cce8d4e45daec95ba02262d2bc47830e9c65",
+      "role": "report_worker",
+      "schema_sha256": "5d0449047945efae6a874d0dff47bee205313ec13af8409dcfcd074c806f62b8",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "failure",
+        "event": "logical_call_result",
+        "failure_category": "invalid_response",
+        "logical_call_index": 7,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": "schema_validation",
+        "role": "report_worker",
+        "turn_id": "D4-L01:T1",
+        "validation_shape": {
+          "issue_count": 1,
+          "issues": [
+            {
+              "error_type": "value_error",
+              "location": [
+                "$root"
+              ]
+            }
+          ],
+          "truncated": false
+        }
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L01:T1",
+      "wire_lines": [
+        19,
+        20
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 8,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "7552d5817d9725183bc325cc8f69312fbed7eade8e0838120bcfbb38cb058269",
+      "response_sha256": "d985cb9354ca8c6316ec8b57ed9e5da78f39b6e8e3fe3057ff459a8638f77a43",
+      "role": "planner",
+      "schema_sha256": "0dc2885ddbf0ab215d189b7f6da0065f7ecd781c153917554d3a9de3d23512e9",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 8,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "planner",
+        "turn_id": "D4-L01:T2",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L01:T2",
+      "wire_lines": [
+        22,
+        23
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 9,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "7210442a3610c91ad84ad4febf335ad3ff6a7965585484466f9dc7d1ab25404a",
+      "response_sha256": "0d936bb58e42227aed87760165b49308ea9d68f24ebc5dceb333ac2b6b67ab56",
+      "role": "section_worker",
+      "schema_sha256": "d3e2321ae50f721aad57c4bb1b6fc98bf719c4aa9d11b49df300f10070dbfa53",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 9,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "section_worker",
+        "turn_id": "D4-L01:T2",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L01:T2",
+      "wire_lines": [
+        25,
+        26
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 10,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "9d502acea7413d753a2a88baeb09b316b23a73385ad4434db51fe9ceaf8c97be",
+      "response_sha256": "e16e7842edd0e5c670468be72712563cbabea2d22f80df22601ca57d389603a9",
+      "role": "planner",
+      "schema_sha256": "0dc2885ddbf0ab215d189b7f6da0065f7ecd781c153917554d3a9de3d23512e9",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 10,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "planner",
+        "turn_id": "D4-L01:T3",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L01:T3",
+      "wire_lines": [
+        28,
+        29
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 11,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "73177cf121bbcc92fbd72219b6f1e26b1412414dff0c4c3db92663ff51412346",
+      "response_sha256": "7f8b68e5532d6680726f879a590f58a326796f5049848478f396ce3889079e50",
+      "role": "section_worker",
+      "schema_sha256": "d3e2321ae50f721aad57c4bb1b6fc98bf719c4aa9d11b49df300f10070dbfa53",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 11,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "section_worker",
+        "turn_id": "D4-L01:T3",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L01:T3",
+      "wire_lines": [
+        31,
+        32
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 12,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "97f57d0b745ac8024f16125101a7c63fffcbcda319082a0eb08755061a3b4cf4",
+      "response_sha256": "3e1af7c24b299ae602f75e5535dec6c4dc249d1fa07a8e396a29005a2e2df15e",
+      "role": "planner",
+      "schema_sha256": "0dc2885ddbf0ab215d189b7f6da0065f7ecd781c153917554d3a9de3d23512e9",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 12,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "planner",
+        "turn_id": "D4-L01:T4",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L01:T4",
+      "wire_lines": [
+        34,
+        35
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 13,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "b925d20907851590d9c4dfb2b978ceb1a03356c3e2284869f6dc480bc04175d4",
+      "response_sha256": "70c86a1e260f63ddcd560a30884b070c87608690f702bfd4f66e2b5ca10eba05",
+      "role": "planner",
+      "schema_sha256": "0dc2885ddbf0ab215d189b7f6da0065f7ecd781c153917554d3a9de3d23512e9",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 13,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "planner",
+        "turn_id": "D4-L01:T4",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L01:T4",
+      "wire_lines": [
+        37,
+        38
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 14,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "6565300ac09d0db8aa890ea80891ef4ae367852f4c1df988155b40e162c4f653",
+      "response_sha256": "747ce516e7c72835f810a643e7e304cb2400021b4c512d6c28741d4c43202158",
+      "role": "planner",
+      "schema_sha256": "0dc2885ddbf0ab215d189b7f6da0065f7ecd781c153917554d3a9de3d23512e9",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 14,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "planner",
+        "turn_id": "D4-L02:T1",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L02:T1",
+      "wire_lines": [
+        40,
+        41
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 15,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "3fd641848f14505914784b2671584c5d4a77966d5f23ece454dc32b5476f5b18",
+      "response_sha256": "ddb971a230837bde105ee43f857ca41faa95696fb44f81af5b705e5c2c2c6730",
+      "role": "section_worker",
+      "schema_sha256": "d3e2321ae50f721aad57c4bb1b6fc98bf719c4aa9d11b49df300f10070dbfa53",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 15,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "section_worker",
+        "turn_id": "D4-L02:T1",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L02:T1",
+      "wire_lines": [
+        43,
+        47
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 16,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "11ec1007e501ce713f05997785bac787f713a6983ad6b0bcda1caabf6594a195",
+      "response_sha256": "d8e2384d896a8bd7c50d37cda7c011bd4f3efa5de0415675841511caefa9ddb6",
+      "role": "section_worker",
+      "schema_sha256": "d3e2321ae50f721aad57c4bb1b6fc98bf719c4aa9d11b49df300f10070dbfa53",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 16,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "section_worker",
+        "turn_id": "D4-L02:T1",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L02:T1",
+      "wire_lines": [
+        44,
+        45
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 17,
+      "json_decode": "PASS",
+      "python_model_errors": [
+        {
+          "path": [],
+          "type": "value_error"
+        }
+      ],
+      "request_sha256": "d699cccc5b26ada07a7f16f5222c8c0cb862b294818ee202525a50c607e62c02",
+      "response_sha256": "b820e3e2baf2d4172178b445276f46c406736cfadccaad34fba840ec75bebd01",
+      "role": "planner",
+      "schema_sha256": "0dc2885ddbf0ab215d189b7f6da0065f7ecd781c153917554d3a9de3d23512e9",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "failure",
+        "event": "logical_call_result",
+        "failure_category": "invalid_response",
+        "logical_call_index": 17,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": "schema_validation",
+        "role": "planner",
+        "turn_id": "D4-L02:T2",
+        "validation_shape": {
+          "issue_count": 1,
+          "issues": [
+            {
+              "error_type": "value_error",
+              "location": [
+                "$root"
+              ]
+            }
+          ],
+          "truncated": false
+        }
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L02:T2",
+      "wire_lines": [
+        49,
+        50
+      ],
+      "wire_schema_errors": [
+        {
+          "keyword": "anyOf",
+          "path": []
+        }
+      ]
+    },
+    {
+      "http_status": 200,
+      "index": 18,
+      "json_decode": "PASS",
+      "python_model_errors": [
+        {
+          "path": [],
+          "type": "value_error"
+        }
+      ],
+      "request_sha256": "abee0903b995f1cec2a42906eca1d1db1c7c929d91b3a7b6298907b57de14a9e",
+      "response_sha256": "958c8cf4c5e9c4f6078463a1cf6c39a5d6d1f01340b8709794066e94ed2f695a",
+      "role": "planner",
+      "schema_sha256": "0dc2885ddbf0ab215d189b7f6da0065f7ecd781c153917554d3a9de3d23512e9",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "failure",
+        "event": "logical_call_result",
+        "failure_category": "invalid_response",
+        "logical_call_index": 18,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": "schema_validation",
+        "role": "planner",
+        "turn_id": "D4-L02:T2",
+        "validation_shape": {
+          "issue_count": 1,
+          "issues": [
+            {
+              "error_type": "value_error",
+              "location": [
+                "$root"
+              ]
+            }
+          ],
+          "truncated": false
+        }
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L02:T2",
+      "wire_lines": [
+        52,
+        53
+      ],
+      "wire_schema_errors": [
+        {
+          "keyword": "anyOf",
+          "path": []
+        }
+      ]
+    },
+    {
+      "http_status": 200,
+      "index": 19,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "1ee2ac51a5c9e67f85aebf700443e905bd2f709e99f86c06a0d19cea45d57039",
+      "response_sha256": "b395ae3a25db591c8751fdd2eb64fd0fb590b6453f394da252b4f453cfea8ebe",
+      "role": "planner",
+      "schema_sha256": "0dc2885ddbf0ab215d189b7f6da0065f7ecd781c153917554d3a9de3d23512e9",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 19,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "planner",
+        "turn_id": "D4-L03:C01",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L03:C01",
+      "wire_lines": [
+        55,
+        56
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 20,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "292fc3709b3a98fb58a540dd32fbd95a560d12b4e2030d6da83ddddeecc0eee7",
+      "response_sha256": "acba7935d412eefc7c7ebfec3adee267679c11e47f05909ca273f168a5578b34",
+      "role": "planner",
+      "schema_sha256": "0dc2885ddbf0ab215d189b7f6da0065f7ecd781c153917554d3a9de3d23512e9",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 20,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "planner",
+        "turn_id": "D4-L04:C01",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L04:C01",
+      "wire_lines": [
+        58,
+        59
+      ],
+      "wire_schema_errors": []
+    },
+    {
+      "http_status": 200,
+      "index": 21,
+      "json_decode": "PASS",
+      "python_model_errors": [],
+      "request_sha256": "00146a30eecc46f408ae1c6603df8bc8323fe5b20aa214d03a554322344ff868",
+      "response_sha256": "8bd985a9130cbf7680be45cd7e771cfb01039f4bcdb6ebbb0df8705024835b02",
+      "role": "section_worker",
+      "schema_sha256": "d3e2321ae50f721aad57c4bb1b6fc98bf719c4aa9d11b49df300f10070dbfa53",
+      "sealed_logical_result": {
+        "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+        "campaign_id": "d5-5i-qwen-live-002",
+        "engine_outcome": "success",
+        "event": "logical_call_result",
+        "failure_category": null,
+        "logical_call_index": 21,
+        "model": "qwen3.6-35b-a3b",
+        "response_reason": null,
+        "role": "section_worker",
+        "turn_id": "D4-L04:C01",
+        "validation_shape": null
+      },
+      "thinking_control": "EXACT_MATCH",
+      "turn_id": "D4-L04:C01",
+      "wire_lines": [
+        61,
+        62
+      ],
+      "wire_schema_errors": []
+    }
+  ],
+  "campaign": "d5-5i-qwen-live-002",
+  "custody_digests": {
+    "evidence_sha256": "7acdb2e970b8be9eeabfa818bf861ad21f9d991d15b36ba50ad7c0158f9200b8",
+    "journal_sha256": "7ed0994a58feb0ef944f0d6bd8be807f19499afa14cff05fe67016e56f68c311",
+    "model_io_sha256": "d877c087f3469b77e1f86295dd78bc713c530eb15693d01e6c44f5983f5495b7",
+    "state_sha256": "43eea8fdcd715091ab02b2db1e66b40beee329fcc0d2f9805e1849a6ea4506e9",
+    "terminal_sha256": "fbd53f983e22ae672f7a1f96a18e84f352883a876d84a767f0a1f94add22565d"
+  },
+  "integrity": "PASS",
+  "method": "Hash verification, JSON/YAML parsing, exact captured JSON Schema and existing Python model validation only; no worker, planner, lowerer, reconciler, executor, renderer or campaign invoked.",
+  "scientific_checkpoint": "fa3bfe59819d9b5e4cac9821b7770d7f4b4b3a0b",
+  "sealed_files_unchanged_after_analysis": true,
+  "sealed_turn_rows_with_offline_joins": [
+    {
+      "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+      "call_indices": [
+        1,
+        2,
+        3,
+        4
+      ],
+      "case_id": "D4-C01",
+      "contract_or_input_failure": false,
+      "correction_preservation": {
+        "status": "NOT_APPLICABLE"
+      },
+      "diagnostics": [
+        "verifier requirement failed: CBL-01",
+        "verifier requirement failed: CBL-02",
+        "verifier requirement failed: CBL-04",
+        "verifier requirement failed: CBL-05",
+        "verifier requirement failed: CBL-06",
+        "verifier requirement failed: CBL-08",
+        "verifier requirement failed: CBL-09",
+        "cbl_persistence_not_proven",
+        "cbl_render_not_proven",
+        "cbl_rendered_wrong_artifact",
+        "cbl_verifier_failed"
+      ],
+      "duration_seconds": 416.56243,
+      "ending_artifact_sha256": "f1f8f6d1279a910dc06b0efefe889812f5e54ec46549a9844996e9e0c152c6e5",
+      "evidence_dimensions": {
+        "capability": "NOT_ESTABLISHED",
+        "correction_preservation": "NOT_ESTABLISHED",
+        "deterministic_grading": "FAIL",
+        "mutation": "PASS",
+        "persistence_reload_render": "FAIL",
+        "planner_structural": "PASS",
+        "provider_structured": "PASS",
+        "safe_negative": "NOT_ESTABLISHED",
+        "semantic": "NOT_ESTABLISHED",
+        "source_channel_grounding": "NOT_ESTABLISHED",
+        "target_grounding": "NOT_ESTABLISHED"
+      },
+      "execution_index": 1,
+      "experiment_version": "WELLPLOT-NLP-D5-5I",
+      "failure_category": null,
+      "first_divergence": "PERSISTENCE_RELOAD_RENDER",
+      "grader_status": "FAIL",
+      "infrastructure_failure": false,
+      "logical_generation_calls": 4,
+      "model": "qwen3.6-35b-a3b",
+      "offline_yaml_changed_paths": [
+        "/document/bindings/on_missing",
+        "/document/layout/heading/general_fields/0/aliases",
+        "/document/layout/heading/general_fields/1/aliases",
+        "/document/layout/heading/general_fields/2/aliases",
+        "/document/layout/heading/general_fields/3/aliases",
+        "/document/layout/heading/general_fields/4/aliases",
+        "/document/layout/heading/general_fields/5/aliases",
+        "/document/layout/heading/general_fields/6/aliases",
+        "/document/layout/heading/general_fields/8/aliases",
+        "/document/layout/heading/general_fields/9/aliases",
+        "/document/layout/heading/general_fields/10/aliases",
+        "/document/layout/heading/general_fields/11/aliases",
+        "/document/layout/heading/general_fields/12/aliases",
+        "/document/layout/heading/general_fields/13/aliases",
+        "/document/layout/heading/general_fields/14/aliases",
+        "/document/layout/heading/general_fields/15/aliases",
+        "/document/layout/heading/general_fields/16/aliases",
+        "/document/layout/heading/general_fields/17/aliases",
+        "/document/layout/heading/general_fields/18/aliases",
+        "/document/layout/heading/general_fields/19/aliases",
+        "/document/layout/heading/general_fields/20/aliases",
+        "/document/layout/heading/general_fields/21/aliases",
+        "/document/layout/heading/general_fields/22/aliases",
+        "/document/layout/heading/general_fields/23/aliases",
+        "/document/layout/heading/general_fields/24/aliases",
+        "/document/layout/heading/general_fields/25/aliases",
+        "/document/layout/heading/general_fields/26/aliases",
+        "/document/layout/heading/service_titles/0/auto_adjust",
+        "/document/layout/heading/service_titles/0/italic",
+        "/document/layout/heading/service_titles/1/auto_adjust",
+        "/document/layout/heading/service_titles/1/bold",
+        "/document/layout/heading/service_titles/1/italic",
+        "/document/layout/heading/service_titles/2/auto_adjust",
+        "/document/layout/heading/service_titles/2/bold",
+        "/document/layout/heading/service_titles/2/italic",
+        "/document/layout/heading/tail_enabled",
+        "/document/layout/log_sections/0/tracks/0/grid",
+        "/document/layout/log_sections/0/tracks/0/track_header",
+        "/document/layout/log_sections/1/tracks/0/grid",
+        "/document/layout/log_sections/1/tracks/0/track_header"
+      ],
+      "outcome": "FAIL",
+      "persisted": false,
+      "physical_attempts": 4,
+      "provider": "openai_compat",
+      "render_sha256": null,
+      "rendered": false,
+      "request_sha256": "5ef3a1e528b2e539dcd895ec09767547151a7706eff911a99cc050c61d7d8f3c",
+      "result_status": "FAIL",
+      "scientific_terminal": "FAIL / RESIDUAL_SEMANTIC",
+      "starting_artifact_sha256": "ef659a71042a06039afddc142d8d6ebb46f30f8d1f40c1c130b60c74778905a1",
+      "turn_id": "D4-C01:C01",
+      "verifier_requirements": [
+        {
+          "id": "CBL-01",
+          "status": "FAIL"
+        },
+        {
+          "id": "CBL-02",
+          "status": "FAIL"
+        },
+        {
+          "id": "CBL-03",
+          "status": "PASS"
+        },
+        {
+          "id": "CBL-04",
+          "status": "FAIL"
+        },
+        {
+          "id": "CBL-05",
+          "status": "FAIL"
+        },
+        {
+          "id": "CBL-06",
+          "status": "FAIL"
+        },
+        {
+          "id": "CBL-07",
+          "status": "PASS"
+        },
+        {
+          "id": "CBL-08",
+          "status": "FAIL"
+        },
+        {
+          "id": "CBL-09",
+          "status": "FAIL"
+        }
+      ]
+    },
+    {
+      "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+      "call_indices": [
+        5,
+        6,
+        7
+      ],
+      "case_id": "D4-L01",
+      "contract_or_input_failure": false,
+      "correction_preservation": {
+        "status": "NOT_APPLICABLE"
+      },
+      "diagnostics": [
+        "verifier requirement failed: LAS-02",
+        "verifier requirement failed: LAS-09",
+        "after_assertion_failed: /title",
+        "required_scientific_change_missing",
+        "persistence_not_proven",
+        "render_not_proven",
+        "verifier_failed"
+      ],
+      "duration_seconds": 33.642794,
+      "ending_artifact_sha256": "fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93",
+      "evidence_dimensions": {
+        "capability": "NOT_ESTABLISHED",
+        "correction_preservation": "NOT_ESTABLISHED",
+        "deterministic_grading": "FAIL",
+        "mutation": "PASS",
+        "persistence_reload_render": "FAIL",
+        "planner_structural": "PASS",
+        "provider_structured": "PASS",
+        "safe_negative": "NOT_ESTABLISHED",
+        "semantic": "NOT_ESTABLISHED",
+        "source_channel_grounding": "NOT_ESTABLISHED",
+        "target_grounding": "NOT_ESTABLISHED"
+      },
+      "execution_index": 2,
+      "experiment_version": "WELLPLOT-NLP-D5-5I",
+      "failure_category": null,
+      "first_divergence": "PERSISTENCE_RELOAD_RENDER",
+      "grader_status": "FAIL",
+      "infrastructure_failure": false,
+      "logical_generation_calls": 3,
+      "model": "qwen3.6-35b-a3b",
+      "offline_yaml_changed_paths": [],
+      "outcome": "FAIL",
+      "persisted": false,
+      "physical_attempts": 3,
+      "provider": "openai_compat",
+      "render_sha256": null,
+      "rendered": false,
+      "request_sha256": "0ffe99d4e0131f2649370730e913cd5147f73dccff24ed0f2d1ce928b2f41a34",
+      "result_status": "FAIL",
+      "scientific_terminal": "FAIL / RESIDUAL_SEMANTIC",
+      "starting_artifact_sha256": "fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93",
+      "turn_id": "D4-L01:T1",
+      "verifier_requirements": [
+        {
+          "id": "LAS-01",
+          "status": "PASS"
+        },
+        {
+          "id": "LAS-02",
+          "status": "FAIL"
+        },
+        {
+          "id": "LAS-03",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-04",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-05",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-06",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-07",
+          "status": "PASS"
+        },
+        {
+          "id": "LAS-08",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-09",
+          "status": "FAIL"
+        }
+      ]
+    },
+    {
+      "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+      "call_indices": [
+        8,
+        9
+      ],
+      "case_id": "D4-L01",
+      "contract_or_input_failure": false,
+      "correction_preservation": {
+        "status": "NOT_APPLICABLE"
+      },
+      "diagnostics": [],
+      "duration_seconds": 59.81706,
+      "ending_artifact_sha256": "c2ecd653f7ad33d5caf37fd7898703e362f7adb41ed4b856c99838ba8d9acace",
+      "evidence_dimensions": {
+        "capability": "PASS",
+        "correction_preservation": "NOT_ESTABLISHED",
+        "deterministic_grading": "PASS",
+        "mutation": "FAIL",
+        "persistence_reload_render": "PASS",
+        "planner_structural": "PASS",
+        "provider_structured": "PASS",
+        "safe_negative": "NOT_ESTABLISHED",
+        "semantic": "PASS",
+        "source_channel_grounding": "PASS",
+        "target_grounding": "PASS"
+      },
+      "execution_index": 3,
+      "experiment_version": "WELLPLOT-NLP-D5-5I",
+      "failure_category": null,
+      "first_divergence": "NONE",
+      "grader_status": "PASS",
+      "infrastructure_failure": false,
+      "logical_generation_calls": 2,
+      "model": "qwen3.6-35b-a3b",
+      "offline_yaml_changed_paths": [
+        "/document/bindings/channels/0/scale/max",
+        "/document/bindings/channels/0/scale/min",
+        "/render/matplotlib"
+      ],
+      "outcome": "PASS",
+      "persisted": true,
+      "physical_attempts": 2,
+      "provider": "openai_compat",
+      "render_sha256": "a1c675dec0b0eeef4090b4c946eb761dcabf4660a9c08e17f2f41b94cf04ddf0",
+      "rendered": true,
+      "request_sha256": "866ff67469139034c2062f1c668283c5532d0fc69fd711ed8e55e6c71d12d5f8",
+      "result_status": "PASS",
+      "scientific_terminal": "PASS",
+      "starting_artifact_sha256": "fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93",
+      "turn_id": "D4-L01:T2",
+      "verifier_requirements": [
+        {
+          "id": "LAS-01",
+          "status": "PASS"
+        },
+        {
+          "id": "LAS-02",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-03",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-04",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-05",
+          "status": "PASS"
+        },
+        {
+          "id": "LAS-06",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-07",
+          "status": "PASS"
+        },
+        {
+          "id": "LAS-08",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-09",
+          "status": "PASS"
+        }
+      ]
+    },
+    {
+      "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+      "call_indices": [
+        10,
+        11
+      ],
+      "case_id": "D4-L01",
+      "contract_or_input_failure": false,
+      "correction_preservation": {
+        "status": "NOT_APPLICABLE"
+      },
+      "diagnostics": [
+        "verifier requirement failed: LAS-03",
+        "verifier requirement failed: LAS-09",
+        "after_assertion_failed: /sections/0/tracks/3/title",
+        "after_assertion_failed: /sections/0/tracks/3/kind",
+        "after_assertion_failed: /sections/0/tracks/3/width_mm",
+        "after_assertion_failed: /sections/0/tracks/3/bindings/0/label",
+        "after_assertion_failed: /sections/0/tracks/3/bindings/0/channel",
+        "after_assertion_failed: /sections/0/tracks/3/bindings/0/scale/kind",
+        "after_assertion_failed: /sections/0/tracks/3/bindings/0/scale/minimum",
+        "after_assertion_failed: /sections/0/tracks/3/bindings/0/scale/maximum",
+        "required_scientific_change_missing",
+        "persistence_not_proven",
+        "render_not_proven",
+        "verifier_failed"
+      ],
+      "duration_seconds": 55.273006,
+      "ending_artifact_sha256": "c2ecd653f7ad33d5caf37fd7898703e362f7adb41ed4b856c99838ba8d9acace",
+      "evidence_dimensions": {
+        "capability": "NOT_ESTABLISHED",
+        "correction_preservation": "NOT_ESTABLISHED",
+        "deterministic_grading": "FAIL",
+        "mutation": "PASS",
+        "persistence_reload_render": "FAIL",
+        "planner_structural": "PASS",
+        "provider_structured": "PASS",
+        "safe_negative": "NOT_ESTABLISHED",
+        "semantic": "NOT_ESTABLISHED",
+        "source_channel_grounding": "NOT_ESTABLISHED",
+        "target_grounding": "NOT_ESTABLISHED"
+      },
+      "execution_index": 4,
+      "experiment_version": "WELLPLOT-NLP-D5-5I",
+      "failure_category": null,
+      "first_divergence": "PERSISTENCE_RELOAD_RENDER",
+      "grader_status": "FAIL",
+      "infrastructure_failure": false,
+      "logical_generation_calls": 2,
+      "model": "qwen3.6-35b-a3b",
+      "offline_yaml_changed_paths": [],
+      "outcome": "FAIL",
+      "persisted": false,
+      "physical_attempts": 2,
+      "provider": "openai_compat",
+      "render_sha256": null,
+      "rendered": false,
+      "request_sha256": "49405cb494cc3cead9cc015c99ef6e0e048583d716be3421930c39d995b95136",
+      "result_status": "FAIL",
+      "scientific_terminal": "FAIL / RESIDUAL_SEMANTIC",
+      "starting_artifact_sha256": "c2ecd653f7ad33d5caf37fd7898703e362f7adb41ed4b856c99838ba8d9acace",
+      "turn_id": "D4-L01:T3",
+      "verifier_requirements": [
+        {
+          "id": "LAS-01",
+          "status": "PASS"
+        },
+        {
+          "id": "LAS-02",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-03",
+          "status": "FAIL"
+        },
+        {
+          "id": "LAS-04",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-05",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-06",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-07",
+          "status": "PASS"
+        },
+        {
+          "id": "LAS-08",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-09",
+          "status": "FAIL"
+        }
+      ]
+    },
+    {
+      "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+      "call_indices": [
+        12,
+        13
+      ],
+      "case_id": "D4-L01",
+      "contract_or_input_failure": false,
+      "correction_preservation": {
+        "status": "NOT_APPLICABLE"
+      },
+      "diagnostics": [
+        "verifier requirement failed: LAS-06",
+        "verifier requirement failed: LAS-09",
+        "after_assertion_failed: /sections/0/tracks/1/fills/0/kind",
+        "after_assertion_failed: /sections/0/tracks/1/fills/0/binding_id",
+        "after_assertion_failed: /sections/0/tracks/1/fills/0/color",
+        "after_assertion_failed: /sections/0/tracks/1/fills/0/alpha",
+        "required_scientific_change_missing",
+        "persistence_not_proven",
+        "render_not_proven",
+        "verifier_failed"
+      ],
+      "duration_seconds": 52.553979,
+      "ending_artifact_sha256": "c2ecd653f7ad33d5caf37fd7898703e362f7adb41ed4b856c99838ba8d9acace",
+      "evidence_dimensions": {
+        "capability": "NOT_ESTABLISHED",
+        "correction_preservation": "NOT_ESTABLISHED",
+        "deterministic_grading": "FAIL",
+        "mutation": "PASS",
+        "persistence_reload_render": "FAIL",
+        "planner_structural": "PASS",
+        "provider_structured": "PASS",
+        "safe_negative": "NOT_ESTABLISHED",
+        "semantic": "NOT_ESTABLISHED",
+        "source_channel_grounding": "NOT_ESTABLISHED",
+        "target_grounding": "NOT_ESTABLISHED"
+      },
+      "execution_index": 5,
+      "experiment_version": "WELLPLOT-NLP-D5-5I",
+      "failure_category": null,
+      "first_divergence": "PERSISTENCE_RELOAD_RENDER",
+      "grader_status": "FAIL",
+      "infrastructure_failure": false,
+      "logical_generation_calls": 2,
+      "model": "qwen3.6-35b-a3b",
+      "offline_yaml_changed_paths": [],
+      "outcome": "FAIL",
+      "persisted": false,
+      "physical_attempts": 2,
+      "provider": "openai_compat",
+      "render_sha256": null,
+      "rendered": false,
+      "request_sha256": "0819dd6cb0964cc61752c96682aa4fa2b8924c6a47bb57e7897bd0b5ec52557b",
+      "result_status": "FAIL",
+      "scientific_terminal": "FAIL / RESIDUAL_SEMANTIC",
+      "starting_artifact_sha256": "c2ecd653f7ad33d5caf37fd7898703e362f7adb41ed4b856c99838ba8d9acace",
+      "turn_id": "D4-L01:T4",
+      "verifier_requirements": [
+        {
+          "id": "LAS-01",
+          "status": "PASS"
+        },
+        {
+          "id": "LAS-02",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-03",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-04",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-05",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-06",
+          "status": "FAIL"
+        },
+        {
+          "id": "LAS-07",
+          "status": "PASS"
+        },
+        {
+          "id": "LAS-08",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-09",
+          "status": "FAIL"
+        }
+      ]
+    },
+    {
+      "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+      "call_indices": [
+        14,
+        15,
+        16
+      ],
+      "case_id": "D4-L02",
+      "contract_or_input_failure": false,
+      "correction_preservation": {
+        "status": "NOT_APPLICABLE"
+      },
+      "diagnostics": [
+        "failure_mutated_artifact",
+        "failure_bytes_changed",
+        "failure_persisted_artifact",
+        "failure_canonical_state_changed",
+        "failure_applied_intent",
+        "failure_flag_not_false: intent_applied",
+        "failure_flag_not_false: persisted",
+        "failure_flag_not_false: rendered"
+      ],
+      "duration_seconds": 52.572759,
+      "ending_artifact_sha256": "6e88e1dc0032b569ff8e136cf7c6cf6b27b98cc2057f9c88af27b28a51c666e5",
+      "evidence_dimensions": {
+        "capability": "NOT_APPLICABLE",
+        "correction_preservation": "NOT_ESTABLISHED",
+        "deterministic_grading": "FAIL",
+        "mutation": "FAIL",
+        "persistence_reload_render": "PASS",
+        "planner_structural": "PASS",
+        "provider_structured": "PASS",
+        "safe_negative": "FAIL",
+        "semantic": "NOT_APPLICABLE",
+        "source_channel_grounding": "NOT_APPLICABLE",
+        "target_grounding": "NOT_APPLICABLE"
+      },
+      "execution_index": 6,
+      "experiment_version": "WELLPLOT-NLP-D5-5I",
+      "failure_category": null,
+      "first_divergence": "CORRECTION_PRESERVATION",
+      "grader_status": "FAIL",
+      "infrastructure_failure": false,
+      "logical_generation_calls": 3,
+      "model": "qwen3.6-35b-a3b",
+      "offline_yaml_changed_paths": [
+        "/document/bindings/channels/0/scale/max",
+        "/document/bindings/channels/0/scale/min",
+        "/document/bindings/channels/2/scale/max",
+        "/document/bindings/channels/2/scale/min",
+        "/render/matplotlib"
+      ],
+      "outcome": "FAIL",
+      "persisted": true,
+      "physical_attempts": 3,
+      "provider": "openai_compat",
+      "render_sha256": "64b3c3aa8793668f44b3b70b17fbe3b57e5f88d37e95fa25f4524696d3c0f3d7",
+      "rendered": true,
+      "request_sha256": "6bc23defbb254104f567c7a3c2caf33b77ad06f6d0dd124c3dc9b796f3fda541",
+      "result_status": "FAIL",
+      "scientific_terminal": "FAIL / RESIDUAL_SEMANTIC",
+      "starting_artifact_sha256": "35a3e93efbae52ba3e6fd3afb3b78b2f3315af4ba53906f9d62d8d4ae9a342e5",
+      "turn_id": "D4-L02:T1",
+      "verifier_requirements": []
+    },
+    {
+      "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+      "call_indices": [
+        17,
+        18
+      ],
+      "case_id": "D4-L02",
+      "contract_or_input_failure": false,
+      "correction_preservation": {
+        "status": "NOT_APPLICABLE"
+      },
+      "diagnostics": [
+        "verifier requirement failed: LAS-01",
+        "verifier requirement failed: LAS-05",
+        "verifier requirement failed: LAS-09",
+        "before_assertion_failed: /sections/1/tracks/1/bindings/0/scale/minimum",
+        "after_assertion_failed: /sections/1/tracks/1/bindings/0/scale/minimum",
+        "after_assertion_failed: /sections/1/tracks/1/bindings/0/scale/maximum",
+        "required_scientific_change_missing",
+        "persistence_not_proven",
+        "render_not_proven",
+        "verifier_failed"
+      ],
+      "duration_seconds": 31.197945,
+      "ending_artifact_sha256": "6e88e1dc0032b569ff8e136cf7c6cf6b27b98cc2057f9c88af27b28a51c666e5",
+      "evidence_dimensions": {
+        "capability": "NOT_ESTABLISHED",
+        "correction_preservation": "NOT_ESTABLISHED",
+        "deterministic_grading": "FAIL",
+        "mutation": "PASS",
+        "persistence_reload_render": "FAIL",
+        "planner_structural": "PASS",
+        "provider_structured": "PASS",
+        "safe_negative": "NOT_ESTABLISHED",
+        "semantic": "NOT_ESTABLISHED",
+        "source_channel_grounding": "NOT_ESTABLISHED",
+        "target_grounding": "NOT_ESTABLISHED"
+      },
+      "execution_index": 7,
+      "experiment_version": "WELLPLOT-NLP-D5-5I",
+      "failure_category": null,
+      "first_divergence": "PERSISTENCE_RELOAD_RENDER",
+      "grader_status": "FAIL",
+      "infrastructure_failure": false,
+      "logical_generation_calls": 2,
+      "model": "qwen3.6-35b-a3b",
+      "offline_yaml_changed_paths": [],
+      "outcome": "FAIL",
+      "persisted": false,
+      "physical_attempts": 2,
+      "provider": "openai_compat",
+      "render_sha256": null,
+      "rendered": false,
+      "request_sha256": "eee91c864757d6a4d8f23d906928964318868c8063f5e61e3afba4c794ee32c9",
+      "result_status": "FAIL",
+      "scientific_terminal": "FAIL / RESIDUAL_SEMANTIC",
+      "starting_artifact_sha256": "6e88e1dc0032b569ff8e136cf7c6cf6b27b98cc2057f9c88af27b28a51c666e5",
+      "turn_id": "D4-L02:T2",
+      "verifier_requirements": [
+        {
+          "id": "LAS-01",
+          "status": "FAIL"
+        },
+        {
+          "id": "LAS-02",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-03",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-04",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-05",
+          "status": "FAIL"
+        },
+        {
+          "id": "LAS-06",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-07",
+          "status": "PASS"
+        },
+        {
+          "id": "LAS-08",
+          "status": "NOT_CHECKABLE"
+        },
+        {
+          "id": "LAS-09",
+          "status": "FAIL"
+        }
+      ]
+    },
+    {
+      "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+      "call_indices": [
+        19
+      ],
+      "case_id": "D4-L03",
+      "contract_or_input_failure": false,
+      "correction_preservation": {
+        "status": "NOT_APPLICABLE"
+      },
+      "diagnostics": [],
+      "duration_seconds": 34.892983,
+      "ending_artifact_sha256": "fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93",
+      "evidence_dimensions": {
+        "capability": "NOT_APPLICABLE",
+        "correction_preservation": "NOT_ESTABLISHED",
+        "deterministic_grading": "PASS",
+        "mutation": "PASS",
+        "persistence_reload_render": "FAIL",
+        "planner_structural": "PASS",
+        "provider_structured": "PASS",
+        "safe_negative": "PASS",
+        "semantic": "NOT_APPLICABLE",
+        "source_channel_grounding": "NOT_APPLICABLE",
+        "target_grounding": "NOT_APPLICABLE"
+      },
+      "execution_index": 8,
+      "experiment_version": "WELLPLOT-NLP-D5-5I",
+      "failure_category": null,
+      "first_divergence": "NONE",
+      "grader_status": "PASS",
+      "infrastructure_failure": false,
+      "logical_generation_calls": 1,
+      "model": "qwen3.6-35b-a3b",
+      "offline_yaml_changed_paths": [],
+      "outcome": "PASS",
+      "persisted": false,
+      "physical_attempts": 1,
+      "provider": "openai_compat",
+      "render_sha256": null,
+      "rendered": false,
+      "request_sha256": "ee73de7b557d7f624125cb2c469ce0df1d27c9a6a6c0a21545f28bee98d3d237",
+      "result_status": "PASS",
+      "scientific_terminal": "PASS",
+      "starting_artifact_sha256": "fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93",
+      "turn_id": "D4-L03:C01",
+      "verifier_requirements": []
+    },
+    {
+      "authorization_id": "WELLPLOT-D5-5I-LIVE-RUN-AUTH-002",
+      "call_indices": [
+        20,
+        21
+      ],
+      "case_id": "D4-L04",
+      "contract_or_input_failure": false,
+      "correction_preservation": {
+        "status": "NOT_APPLICABLE"
+      },
+      "diagnostics": [
+        "failure_applied_intent",
+        "failure_flag_not_false: intent_applied"
+      ],
+      "duration_seconds": 52.315661,
+      "ending_artifact_sha256": "fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93",
+      "evidence_dimensions": {
+        "capability": "NOT_APPLICABLE",
+        "correction_preservation": "NOT_ESTABLISHED",
+        "deterministic_grading": "FAIL",
+        "mutation": "PASS",
+        "persistence_reload_render": "FAIL",
+        "planner_structural": "PASS",
+        "provider_structured": "PASS",
+        "safe_negative": "FAIL",
+        "semantic": "NOT_APPLICABLE",
+        "source_channel_grounding": "NOT_APPLICABLE",
+        "target_grounding": "NOT_APPLICABLE"
+      },
+      "execution_index": 9,
+      "experiment_version": "WELLPLOT-NLP-D5-5I",
+      "failure_category": null,
+      "first_divergence": "SEMANTIC",
+      "grader_status": "FAIL",
+      "infrastructure_failure": false,
+      "logical_generation_calls": 2,
+      "model": "qwen3.6-35b-a3b",
+      "offline_yaml_changed_paths": [],
+      "outcome": "FAIL",
+      "persisted": false,
+      "physical_attempts": 2,
+      "provider": "openai_compat",
+      "render_sha256": null,
+      "rendered": false,
+      "request_sha256": "bb38915973039b15a8b266b7ca2b7ad6faed2599eb8d8465d60bee662dce7ed6",
+      "result_status": "FAIL",
+      "scientific_terminal": "FAIL / RESIDUAL_SEMANTIC",
+      "starting_artifact_sha256": "fb20891eba8b072cd86c815970213a3a72623e08de9c9181a6be323b080a2c93",
+      "turn_id": "D4-L04:C01",
+      "verifier_requirements": []
+    }
+  ],
+  "turn_execution_or_replay": false
+}
