@@ -187,9 +187,22 @@ class DiagnosticEvidencePaths:
         return self.state, self.journal, self.terminal, self.summary
 
 
+def _redaction_projection(value: object) -> object:
+    """Exclude one known-safe credential-loader label from secret scanning."""
+    if isinstance(value, Mapping):
+        return {
+            key: _redaction_projection(item)
+            for key, item in value.items()
+            if not (key == "credential_resolution" and item == EXPECTED_CREDENTIAL_RESOLUTION)
+        }
+    if isinstance(value, list):
+        return [_redaction_projection(item) for item in value]
+    return value
+
+
 def _atomic_json(path: Path, value: Mapping[str, Any], *, exclusive: bool = False) -> None:
     """Write one redacted JSON artifact atomically."""
-    if not d5.evidence_is_redacted(value):
+    if not d5.evidence_is_redacted(_redaction_projection(value)):
         raise DiagnosticToolError("diagnostic evidence redaction failed")
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")
@@ -202,7 +215,7 @@ def _atomic_json(path: Path, value: Mapping[str, Any], *, exclusive: bool = Fals
 
 def _append_event(path: Path, event: Mapping[str, Any], *, exclusive: bool = False) -> None:
     """Append one bounded redacted event."""
-    if not d5.evidence_is_redacted(event):
+    if not d5.evidence_is_redacted(_redaction_projection(event)):
         raise DiagnosticToolError("diagnostic journal redaction failed")
     if exclusive and path.exists():
         raise DiagnosticToolError("diagnostic journal already exists")
@@ -254,7 +267,10 @@ def _verify_failed_probe_join(
     state = _load_json(paths.state)
     terminal = _load_json(paths.terminal)
     if (
-        state.get("status") != "TERMINAL"
+        state.get("authorization_id") != authorization.failed_probe_authorization_id
+        or terminal.get("authorization_id") != authorization.failed_probe_authorization_id
+        or summary.get("authorization_id") != authorization.failed_probe_authorization_id
+        or state.get("status") != "TERMINAL"
         or state.get("consumed") is not True
         or state.get("endpoint_attempts") != 1
         or terminal.get("outcome") != "AUTHENTICATION_OR_TRANSPORT_FAILURE"
@@ -270,7 +286,12 @@ def _verify_failed_probe_join(
         if line.strip()
     ]
     issued = [event for event in events if event.get("event") == "probe_endpoint_issued"]
-    if len(issued) != 1 or issued[0].get("endpoint") != "/v1/models":
+    if len(issued) != 1 or issued[0] != {
+        "event": "probe_endpoint_issued",
+        "method": "GET",
+        "endpoint": "/v1/models",
+        "attempt": 1,
+    }:
         raise DiagnosticPreflightError("failed-probe request sequence drifted")
     return digests
 
@@ -369,6 +390,11 @@ class DiagnosticCustody:
             paths.state,
             {
                 "authorization_id": authorization.authorization_id,
+                "scientific_checkpoint": authorization.scientific_checkpoint,
+                "failed_probe_tooling_checkpoint": authorization.failed_probe_tooling_checkpoint,
+                "diagnostic_tooling_checkpoint": authorization.diagnostic_tooling_checkpoint,
+                "target_url": authorization.target_url,
+                "credential_resolution": authorization.credential_resolution,
                 "status": "READY",
                 "consumed": False,
                 "endpoint_attempts": 0,
@@ -404,6 +430,7 @@ class DiagnosticCustody:
             self.paths.journal,
             {
                 "event": "diagnostic_endpoint_issued",
+                "method": "GET",
                 "endpoint": "/v1/models",
                 "attempt": 1,
             },
@@ -416,10 +443,16 @@ class DiagnosticCustody:
             raise DiagnosticToolError("diagnostic terminal already exists")
         state = self._state()
         record = {
+            **dict(terminal),
             "authorization_id": self.authorization.authorization_id,
+            "scientific_checkpoint": self.authorization.scientific_checkpoint,
+            "failed_probe_tooling_checkpoint": self.authorization.failed_probe_tooling_checkpoint,
+            "diagnostic_tooling_checkpoint": self.authorization.diagnostic_tooling_checkpoint,
+            "target_url": self.authorization.target_url,
+            "credential_resolution": self.authorization.credential_resolution,
+            "auth001_replayed": False,
             "provider_calls": 0,
             "model_calls": 0,
-            **dict(terminal),
         }
         _atomic_json(self.paths.terminal, record, exclusive=True)
         _append_event(
@@ -441,8 +474,11 @@ class DiagnosticCustody:
         _atomic_json(self.paths.state, final_state)
         summary = {
             "authorization_id": self.authorization.authorization_id,
+            "target_url": self.authorization.target_url,
             "classification": record.get("classification"),
             "endpoint_attempts": final_state.get("endpoint_attempts", 0),
+            "consumed": final_state.get("consumed", False),
+            "auth001_replayed": False,
             "provider_calls": 0,
             "model_calls": 0,
             "state_sha256": _sha256_file(self.paths.state),
@@ -588,6 +624,7 @@ def run_diagnostic(
                 "reason": str(error),
                 "network_request_issued": False,
                 "http_status": "NOT_REACHED",
+                "redirect_followed": False,
                 "endpoint_attempts": 0,
                 "authority_consumed": False,
             }
@@ -602,6 +639,7 @@ def run_diagnostic(
                 "reason": "CREDENTIAL_UNAVAILABLE",
                 "network_request_issued": False,
                 "http_status": "NOT_REACHED",
+                "redirect_followed": False,
                 "endpoint_attempts": 0,
                 "authority_consumed": False,
             }
@@ -627,6 +665,7 @@ def run_diagnostic(
                 "reason": "NORMALIZED_TRANSPORT_FAILURE",
                 "network_request_issued": True,
                 "http_status": "NOT_RECEIVED",
+                "redirect_followed": False,
                 "endpoint_attempts": 1,
                 "authority_consumed": True,
             }
@@ -636,13 +675,18 @@ def run_diagnostic(
     return custody.seal(result)
 
 
-def verify_diagnostic_custody(paths: DiagnosticEvidencePaths) -> dict[str, str]:
-    """Verify one sealed diagnostic without changing it."""
+def verify_diagnostic_custody(
+    repo_root: Path,
+    paths: DiagnosticEvidencePaths,
+    authorization: DiagnosticAuthorization,
+) -> dict[str, str]:
+    """Verify one sealed diagnostic and its unchanged failed-probe join."""
     required = paths.all_paths()
     if not all(path.is_file() for path in required):
         raise DiagnosticToolError("diagnostic custody is incomplete")
     state = _load_json(paths.state)
     terminal = _load_json(paths.terminal)
+    journal = paths.journal.read_text(encoding="utf-8").splitlines()
     summary = _load_json(paths.summary)
     if state.get("status") != "TERMINAL":
         raise DiagnosticToolError("diagnostic custody is not terminal")
@@ -651,6 +695,54 @@ def verify_diagnostic_custody(paths: DiagnosticEvidencePaths) -> dict[str, str]:
         for item in (state, terminal, summary)
     ):
         raise DiagnosticToolError("diagnostic authorization join failed")
+    expected_terminal = {
+        "authorization_id": authorization.authorization_id,
+        "scientific_checkpoint": authorization.scientific_checkpoint,
+        "failed_probe_tooling_checkpoint": authorization.failed_probe_tooling_checkpoint,
+        "diagnostic_tooling_checkpoint": authorization.diagnostic_tooling_checkpoint,
+        "target_url": authorization.target_url,
+        "credential_resolution": authorization.credential_resolution,
+        "auth001_replayed": False,
+        "provider_calls": 0,
+        "model_calls": 0,
+    }
+    if any(terminal.get(key) != value for key, value in expected_terminal.items()):
+        raise DiagnosticToolError("diagnostic terminal authority claims drifted")
+    if (
+        state.get("target_url") != authorization.target_url
+        or state.get("credential_resolution") != authorization.credential_resolution
+        or state.get("provider_calls") != 0
+        or state.get("model_calls") != 0
+        or summary.get("target_url") != authorization.target_url
+        or summary.get("consumed") != state.get("consumed")
+        or summary.get("auth001_replayed") is not False
+        or summary.get("provider_calls") != 0
+        or summary.get("model_calls") != 0
+    ):
+        raise DiagnosticToolError("diagnostic custody claims drifted")
+    events = [json.loads(line) for line in journal if line.strip()]
+    issued = [event for event in events if event.get("event") == "diagnostic_endpoint_issued"]
+    attempts = state.get("endpoint_attempts")
+    if attempts == 0:
+        if state.get("consumed") is not False or issued:
+            raise DiagnosticToolError("zero-attempt diagnostic sequence drifted")
+        if terminal.get("classification") != "LOCAL_PRECONDITION":
+            raise DiagnosticToolError("zero-attempt diagnostic classification drifted")
+    elif attempts == 1:
+        if state.get("consumed") is not True or len(issued) != 1:
+            raise DiagnosticToolError("one-shot diagnostic sequence drifted")
+        if issued[0] != {
+            "event": "diagnostic_endpoint_issued",
+            "method": "GET",
+            "endpoint": "/v1/models",
+            "attempt": 1,
+        }:
+            raise DiagnosticToolError("diagnostic request tuple drifted")
+        if terminal.get("classification") == "LOCAL_PRECONDITION":
+            raise DiagnosticToolError("network diagnostic classification drifted")
+    else:
+        raise DiagnosticToolError("diagnostic endpoint attempt count drifted")
+    _verify_failed_probe_join(repo_root, authorization)
     digests = {
         "state_sha256": _sha256_file(paths.state),
         "journal_sha256": _sha256_file(paths.journal),

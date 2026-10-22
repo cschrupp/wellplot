@@ -114,6 +114,16 @@ def test_bounded_http_terminals_consume_one_request(
     assert result["authority_consumed"] is True
     assert len(calls) == 1
     assert calls[0] == (diagnostic.TARGET_URL, "secret-token")
+    terminal = json.loads(
+        (
+            Path(authorization.artifact_root) / f"{authorization.authorization_id}.terminal.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert terminal["target_url"] == diagnostic.TARGET_URL
+    assert terminal["credential_resolution"] == diagnostic.EXPECTED_CREDENTIAL_RESOLUTION
+    assert terminal["redirect_followed"] is False
+    assert terminal["auth001_replayed"] is False
+    assert terminal["scientific_checkpoint"] == diagnostic.SCIENTIFIC_CHECKPOINT
 
 
 def test_transport_failure_is_tcp_unreachable(tmp_path: Path) -> None:
@@ -311,18 +321,25 @@ def test_failed_probe_join_checks_actual_digest_files(tmp_path: Path) -> None:
     root.mkdir()
     auth_id = diagnostic.FAILED_PROBE_AUTHORIZATION_ID
     state = {
+        "authorization_id": auth_id,
         "status": "TERMINAL",
         "consumed": True,
         "endpoint_attempts": 1,
     }
     terminal = {
+        "authorization_id": auth_id,
         "outcome": "AUTHENTICATION_OR_TRANSPORT_FAILURE",
         "reason": "FIRST_IDENTITY_GET_FAILED",
         "endpoint_attempts": 1,
         "provider_calls": 0,
         "model_calls": 0,
     }
-    journal = {"event": "probe_endpoint_issued", "endpoint": "/v1/models"}
+    journal = {
+        "event": "probe_endpoint_issued",
+        "method": "GET",
+        "endpoint": "/v1/models",
+        "attempt": 1,
+    }
     paths = diagnostic.DiagnosticEvidencePaths(root, auth_id)
     paths.state.write_text(json.dumps(state), encoding="utf-8")
     paths.terminal.write_text(json.dumps(terminal), encoding="utf-8")
@@ -332,7 +349,7 @@ def test_failed_probe_join_checks_actual_digest_files(tmp_path: Path) -> None:
         "journal_sha256": hashlib.sha256(paths.journal.read_bytes()).hexdigest(),
         "terminal_sha256": hashlib.sha256(paths.terminal.read_bytes()).hexdigest(),
     }
-    summary = dict(digests)
+    summary = {"authorization_id": auth_id, **digests}
     paths.summary.write_text(json.dumps(summary), encoding="utf-8")
     authorization = _authorization(tmp_path)
     authorization = replace(
@@ -341,3 +358,15 @@ def test_failed_probe_join_checks_actual_digest_files(tmp_path: Path) -> None:
         failed_probe_custody_digests=digests,
     )
     assert diagnostic._verify_failed_probe_join(Path("/scientific"), authorization) == digests
+    result = _run(
+        authorization,
+        lambda url, token: diagnostic.DiagnosticHttpResponse(None, 401),
+    )
+    assert result["classification"] == "HTTP_REACHABLE_AUTH_FAILURE"
+    diagnostic_paths = diagnostic.DiagnosticEvidencePaths(
+        Path(authorization.artifact_root), authorization.authorization_id
+    )
+    verified = diagnostic.verify_diagnostic_custody(
+        Path("/scientific"), diagnostic_paths, authorization
+    )
+    assert verified["terminal_sha256"]
