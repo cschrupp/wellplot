@@ -91,20 +91,44 @@ chat_template_kwargs:
 ```
 
 or another documented equivalent accepted by the frozen server/model contract.
-The exact wire field, value, and serialization must be frozen before
-implementation. Every planner, report-worker, section-worker, and authorized
-correction generation request must use the same control; omission is a
-contract failure, not an environmental assumption.
+The accepted provider/composition boundary already supports this generic path:
+`OpenAICompatibleBackendV2.request_options` is serialized as `extra_body`,
+the shared `create_provider_backend()` forwards it, and D5-5I's
+`create_live_adapter()` accepts it. No `src/wellplot/agent/providers/*`
+capability change is implied.
+
+The current gap is D5-5I executable wiring: its default live provider factory
+does not yet supply the request options. The bounded implementation scope is
+therefore harness/executable configuration only, unless implementation
+evidence proves the existing generic path insufficient.
+
+The implementation must freeze one canonical request-control contract:
+
+```yaml
+thinking_control:
+  mechanism: chat_template_kwargs.enable_thinking
+  value: false
+  canonical_request_options:
+    chat_template_kwargs:
+      enable_thinking: false
+  canonical_request_options_sha256: FROZEN_BY_IMPLEMENTATION
+```
+
+The digest must be computed from the canonical serialized request-options
+object and recorded in the new executable checkpoint and later authorization.
+Every planner, report-worker, section-worker, and authorized correction
+request, including every SDK retry, must contain the exact control and digest-
+bound value. Omission or mutation is a contract failure, not an environmental
+assumption.
 
 **Advantages:** the control is deterministic, visible in exact wire custody,
 and directly bound to each generation request. It does not require trust in an
 unobservable server launch environment.
 
-**Risks:** the current WellPlot provider boundary does not send this control;
-adopting it requires a bounded production/provider-boundary implementation
-change, a new executable checkpoint, provider-free request-custody tests, and
-independent review before Gate-B. The documented control must also be verified
-against the exact `.141` build and Qwen template.
+**Risks:** the D5-5I executable must wire the already-supported option, create a
+new executable checkpoint, and pass provider-free request-custody tests before
+independent review and Gate-B rebinding. The documented control must also be
+verified against the exact `.141` build and Qwen template.
 
 **Status:** preferred if serving-configuration attestation cannot be made
 independently inspectable, but implementation is not authorized by this
@@ -129,6 +153,21 @@ The absence of a `/props` Boolean cannot be converted into success by relying
 on model name, historical behavior, absence of `<think>` output, template
 inspection alone, or an omitted request parameter.
 
+If Approach B is selected, `thinking_off` is established by the frozen request
+contract, not by `/props`. The readiness invariant becomes:
+
+```text
+authorized canonical request-options digest matches the executable's
+static request-control contract, and wire custody proves the exact control
+on every generation role and every issued retry
+```
+
+`/props` remains responsible only for observed model, runtime, template,
+context, slots, build, and default-generation identity. It does not establish
+thinking mode. The new executable checkpoint must be recorded before any
+Gate-B authorization record is prepared; the old `661a7eee...` checkpoint
+cannot remain the executable target after this implementation.
+
 ## Required Evidence For Either Path
 
 The future authority must preserve:
@@ -139,6 +178,8 @@ The future authority must preserve:
 - a deterministic `thinking_off: true` predicate;
 - zero generation during any metadata/attestation preparation;
 - exact request custody if Approach B is selected;
+- provider-free proof for planner, report-worker, section-worker, and
+  correction requests, including SDK retries;
 - no silent substitution between controls.
 
 If the selected control cannot be proven before scientific generation, the
@@ -162,13 +203,14 @@ and request boundary, including `--reasoning off`,
 
 **Selected direction:** Prefer Approach B when Approach A cannot be made
 independently inspectable. This is a design preference, not implementation
-authorization.
+authorization. The existing generic provider boundary is reused; only the
+D5-5I executable wiring and its attestation/tests are in scope.
 
 **Reversible:** YES before implementation and live readiness.
 
 **Stop condition:** Missing trusted serving evidence, unspecified request
-control, exact-build incompatibility, or any ambiguity about effective
-thinking mode blocks Gate-B.
+control, digest mismatch, missing role/retry wire proof, exact-build
+incompatibility, or any ambiguity about effective thinking mode blocks Gate-B.
 
 ## Current State
 
@@ -177,6 +219,8 @@ thinking_off_control_design: READY_FOR_INDEPENDENT_REVIEW
 approach_a_serving_attestation: NOT_AVAILABLE
 approach_b_request_control: PREFERRED_IF_A_UNAVAILABLE
 current_executable_checkpoint: 661a7eeeabcfa4e6364aeb3e74bf55859ac48539
+approach_b_provider_boundary_change: NO
+approach_b_d5i_executable_wiring: REQUIRED_IF_SELECTED
 implementation: NOT_AUTHORIZED
 metadata_endpoint_execution: NOT_AUTHORIZED
 gate_b_authorization_record: BLOCKED
