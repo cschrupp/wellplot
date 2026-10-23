@@ -101,6 +101,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
         plan = SemanticPlan.model_validate(state["plan"])
         context = dependencies.enricher.enrich(
             plan=plan,
+            request=state["request"],
             document=_document(state),
             mode=state.get("mode", "reconstruct"),
             source_candidates=tuple(

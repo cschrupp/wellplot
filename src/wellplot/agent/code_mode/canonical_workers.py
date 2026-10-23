@@ -27,6 +27,7 @@ from ..providers.base import (
 )
 from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics
 from .enrichment import ReportContext, ResolvedSectionContext
+from .obligations import validate_report_obligations
 from .planner import ReportTask
 from .semantic_actions import SectionSemanticAction
 from .worker_contracts import CanonicalWorkerResult
@@ -67,6 +68,35 @@ class ReportRemark(_SemanticModel):
         return self
 
 
+def _add_report_nonempty_schema_constraint(schema: dict[str, object]) -> None:
+    """Encode the sparse-response non-empty invariant for JSON-schema clients."""
+    properties = schema.setdefault("properties", {})
+    if not isinstance(properties, dict):
+        return
+    alternatives: list[dict[str, object]] = []
+    for name in ("title", "subtitle", "page_size", "depth_unit"):
+        alternatives.append(
+            {"required": [name], "properties": {name: {"type": "string", "minLength": 1}}}
+        )
+    for name in ("general_fields", "service_titles", "detail_fields", "remarks"):
+        alternatives.append(
+            {"required": [name], "properties": {name: {"type": "array", "minItems": 1}}}
+        )
+    alternatives.append(
+        {
+            "required": ["page_orientation"],
+            "properties": {"page_orientation": {"type": "string", "minLength": 1}},
+        }
+    )
+    alternatives.append(
+        {"required": ["tail_enabled"], "properties": {"tail_enabled": {"type": "boolean"}}}
+    )
+    alternatives.append(
+        {"required": ["depth_scale"], "properties": {"depth_scale": {"type": ["string", "number"]}}}
+    )
+    schema.setdefault("allOf", []).append({"anyOf": alternatives})
+
+
 class ReportSemanticResponse(_SemanticModel):
     """Sparse report semantics; omitted fields preserve the document."""
 
@@ -81,6 +111,13 @@ class ReportSemanticResponse(_SemanticModel):
     depth_unit: str | None = Field(default=None, min_length=1)
     depth_scale: str | float | None = None
     tail_enabled: bool | None = None
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        str_strip_whitespace=True,
+        json_schema_extra=_add_report_nonempty_schema_constraint,
+    )
 
     @model_validator(mode="after")
     def validate_nonempty(self) -> ReportSemanticResponse:
@@ -193,9 +230,10 @@ class CanonicalReportWorker:
                     authoritative_request=authoritative_request,
                     task_requirements=task.requirements,
                 )
+                validate_report_obligations(response, task.obligations)
                 intent = _lower_report(response, report_context)
                 return CanonicalWorkerResult(True, intent, (), SemanticMetrics())
-            except (_ReportCorrectionRequired, ValidationError) as error:
+            except (_ReportCorrectionRequired, ValidationError, ValueError) as error:
                 if attempt:
                     return _failure(
                         "semantic_context_validation_failure",
@@ -219,11 +257,6 @@ class CanonicalReportWorker:
                     timeout_seconds=timeout_seconds,
                     temperature=temperature,
                     max_output_tokens=max_output_tokens,
-                )
-            except ValueError:
-                return _failure(
-                    "semantic_context_validation_failure",
-                    "Report semantics could not be validated against host context.",
                 )
             except Exception:
                 return _failure(

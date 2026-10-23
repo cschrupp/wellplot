@@ -17,6 +17,7 @@ from ..logfile import load_logfile, resolve_section_data_sources_for_logfile
 from ..mcp import service as mcp_service
 from ..model.authoring import AuthoringDocumentSpec
 from .code_mode.enrichment import LoadedSource
+from .code_mode.obligations import verify_document_obligations
 from .code_mode.source_loader import LogfileSourceLoader
 from .composition import create_canonical_compile_facade, create_provider_backend
 from .results import AuthoringResult, AuthoringRunState, AuthoringUserReport
@@ -230,6 +231,10 @@ def _apply_result(
         return False, False, True, list(validation.errors), "validation_failed"
 
     accepted = private_service.document
+    try:
+        verify_document_obligations(accepted, result.obligations)
+    except ValueError as error:
+        return False, False, True, [str(error)], "post_lowering_obligation_failed"
     changed = context.document.model_dump(mode="json") != accepted.model_dump(mode="json")
     if changed:
         mcp_service.persist_authoring_document(

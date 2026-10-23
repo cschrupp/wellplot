@@ -18,6 +18,7 @@ from ..inspection import (
     ChannelInspectionSummary,
     HeaderSlotInspectionSummary,
 )
+from .obligations import ObligationKind, extract_supported_obligations
 from .planner import CompilationMode, SectionTask, SemanticPlan
 
 SourceFormat = Literal["las", "dlis"]
@@ -154,6 +155,7 @@ class EnrichmentErrorCode(StrEnum):
     SECTION_HINT_UNRESOLVED = "section_hint_unresolved"
     SECTION_HINT_AMBIGUOUS = "section_hint_ambiguous"
     SECTION_TARGET_DUPLICATE = "section_target_duplicate"
+    SECTION_TARGET_CARDINALITY_AMBIGUOUS = "section_target_cardinality_ambiguous"
 
 
 class SemanticEnrichmentError(ValueError):
@@ -194,11 +196,23 @@ class SemanticEnricher:
         self,
         *,
         plan: SemanticPlan,
+        request: str | None = None,
         document: AuthoringDocumentSpec,
         source_candidates: Sequence[SourceCandidate],
         mode: CompilationMode = "reconstruct",
     ) -> EnrichedSemanticContext:
         """Enrich one plan without changing it or mutating the document."""
+        if request is not None:
+            target_obligations = tuple(
+                item
+                for item in extract_supported_obligations(request)
+                if item.kind is ObligationKind.TARGET_REFERENCE
+            )
+            if len(target_obligations) == 1 and len(plan.section_tasks) > 1:
+                raise SemanticEnrichmentError(
+                    EnrichmentErrorCode.SECTION_TARGET_CARDINALITY_AMBIGUOUS,
+                    "One request target cannot authorize multiple section tasks.",
+                )
         resolved_section_ids: list[str | None] = []
         warnings: list[EnrichmentWarning] = []
         for task_index, task in enumerate(plan.section_tasks):

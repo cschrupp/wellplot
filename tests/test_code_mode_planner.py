@@ -524,7 +524,6 @@ def _invalid_plan_payload(kind: str) -> dict[str, object]:
         "unknown_capability",
         "noncanonical_capability",
         "wrong_task_category",
-        "missing_section_capability",
     ),
 )
 def test_planner_corrects_each_typed_semantic_error_once(kind: str) -> None:
@@ -1075,20 +1074,20 @@ def test_semantic_plan_rejects_unknown_and_wrong_category_capabilities() -> None
             registry,
         )
 
-    with pytest.raises(ValueError, match="section capability"):
-        validate_semantic_plan(
-            SemanticPlan(
-                summary="Invalid section plan",
-                section_tasks=(
-                    SectionTask(
-                        goal="Show a track.",
-                        capability_ids=("track.normal",),
-                        existing_section_hint=None,
-                    ),
+    closed = validate_semantic_plan(
+        SemanticPlan(
+            summary="Closed section plan",
+            section_tasks=(
+                SectionTask(
+                    goal="Show a track.",
+                    capability_ids=("track.normal",),
+                    existing_section_hint=None,
                 ),
             ),
-            registry,
-        )
+        ),
+        registry,
+    )
+    assert closed.section_tasks[0].capability_ids == ("track.normal", "section.log_plot")
 
 
 def test_revision_plan_requires_existing_section_hint() -> None:

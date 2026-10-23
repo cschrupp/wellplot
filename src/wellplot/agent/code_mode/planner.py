@@ -21,6 +21,11 @@ from ..providers.response_diagnostics import (
     ProviderResponseFailureReason,
     StructuredResponseProviderError,
 )
+from .obligations import (
+    RequestObligation,
+    extract_supported_obligations,
+    verify_obligation_spans,
+)
 
 CompilationMode = Literal["reconstruct", "revise"]
 
@@ -50,6 +55,7 @@ class ReportTask(_SemanticModel):
     capability_ids: tuple[str, ...] = ()
     requirements: tuple[str, ...] = ()
     constraints: tuple[str, ...] = ()
+    obligations: tuple[RequestObligation, ...] = ()
 
     @field_validator("capability_ids", "requirements", "constraints")
     @classmethod
@@ -59,6 +65,13 @@ class ReportTask(_SemanticModel):
         return values
 
 
+def _require_section_hint_in_schema(schema: dict[str, object]) -> None:
+    """Keep direct Python fixtures ergonomic while requiring provider key presence."""
+    required = schema.setdefault("required", [])
+    if isinstance(required, list) and "existing_section_hint" not in required:
+        required.append("existing_section_hint")
+
+
 class SectionTask(_SemanticModel):
     """Semantic requirements for one independently compilable section task."""
 
@@ -66,10 +79,18 @@ class SectionTask(_SemanticModel):
     capability_ids: tuple[str, ...] = Field(min_length=1)
     # The key is part of the provider contract even when reconstruction has no
     # existing target.  Revisions reject the explicit null during validation.
-    existing_section_hint: str | None = Field(min_length=1)
+    existing_section_hint: str | None = Field(default=None, min_length=1)
     source_hints: tuple[str, ...] = ()
     requirements: tuple[str, ...] = ()
     constraints: tuple[str, ...] = ()
+    obligations: tuple[RequestObligation, ...] = ()
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        str_strip_whitespace=True,
+        json_schema_extra=_require_section_hint_in_schema,
+    )
 
     @classmethod
     def model_validate(cls, obj: object, **kwargs: object) -> SectionTask:
@@ -120,6 +141,7 @@ class SemanticPlan(_SemanticModel):
     report_task: ReportTask | None = None
     section_tasks: tuple[SectionTask, ...] = ()
     unresolved_requirements: tuple[str, ...] = ()
+    obligations: tuple[RequestObligation, ...] = ()
 
     model_config = ConfigDict(
         extra="forbid",
@@ -208,6 +230,8 @@ def _default_repair_scope(code: str) -> tuple[str, ...]:
         "wrong_task_category",
     }:
         return ("/report_task/capability_ids", "/section_tasks/*/capability_ids")
+    if code == "planner_extraction_coverage":
+        return ("/report_task/requirements", "/section_tasks/*/requirements")
     return ()
 
 
@@ -343,7 +367,9 @@ class SemanticPlanner:
                 response_model=SemanticPlan,
             )
         plan = SemanticPlan.model_validate(generated.value)
+        plan = _attach_request_obligations(plan, request)
         try:
+            _validate_extraction_coverage(plan)
             return validate_semantic_plan(plan, self.registry, mode=mode)
         except PlannerSemanticError as first_error:
             if invalid_response_retry_used:
@@ -367,17 +393,69 @@ class SemanticPlanner:
                 response_model=SemanticPlan,
             )
             corrected_plan = SemanticPlan.model_validate(corrected.value)
+            corrected_plan = _attach_request_obligations(corrected_plan, request)
             try:
                 _assert_correction_scope(plan, corrected_plan, first_error)
             except PlannerSemanticFailure:
                 raise
             try:
+                _validate_extraction_coverage(corrected_plan)
                 return validate_semantic_plan(corrected_plan, self.registry, mode=mode)
             except PlannerSemanticError as second_error:
                 raise PlannerSemanticFailure(
                     second_error.code,
                     "Planner returned a semantically invalid plan after one correction.",
                 ) from second_error
+
+
+def _attach_request_obligations(plan: SemanticPlan, request: str) -> SemanticPlan:
+    """Attach host-extracted obligations without trusting provider restatement."""
+    obligations = extract_supported_obligations(request)
+    verify_obligation_spans(request, obligations)
+    report = plan.report_task
+    if report is not None:
+        report = report.model_copy(
+            update={
+                "obligations": tuple(
+                    item for item in obligations if item.owner_kind.value == "report"
+                )
+            }
+        )
+    section_obligations = tuple(item for item in obligations if item.owner_kind.value != "report")
+    sections = tuple(
+        task.model_copy(update={"obligations": section_obligations}) for task in plan.section_tasks
+    )
+    return plan.model_copy(
+        update={"report_task": report, "section_tasks": sections, "obligations": obligations}
+    )
+
+
+def _validate_extraction_coverage(plan: SemanticPlan) -> None:
+    """Reject plans that silently drop host-extracted supported values."""
+    searchable = " ".join(
+        (
+            plan.summary,
+            *plan.unresolved_requirements,
+            *(plan.report_task.requirements if plan.report_task else ()),
+            *(task.goal for task in plan.section_tasks),
+            *(item for task in plan.section_tasks for item in task.requirements),
+        )
+    ).casefold()
+    for obligation in plan.obligations:
+        if obligation.value is None:
+            continue
+        value = str(obligation.value).casefold()
+        if value in searchable:
+            continue
+        if obligation.field == "width_mm" and re.search(
+            rf"\b{re.escape(value.rstrip('0').rstrip('.'))}\s*mm\b", searchable
+        ):
+            continue
+        raise PlannerSemanticError(
+            "planner_extraction_coverage",
+            "Planner output did not retain a supported request obligation.",
+            affected_paths=("/report_task/requirements", "/section_tasks/*/requirements"),
+        )
 
 
 def validate_semantic_plan(
@@ -415,9 +493,19 @@ def validate_semantic_plan(
                     "natural-language hint."
                 ),
             )
-        specs = _validate_capabilities(task.capability_ids, registry, task_kind="section")
+        _validate_capabilities(task.capability_ids, registry, task_kind="section")
         _validate_unique_capabilities(task.capability_ids)
-        categories = {spec.category for spec in specs}
+        closed_capabilities = _close_capability_parents(
+            task.capability_ids,
+            registry,
+            task_path="/section_tasks/*/capability_ids",
+        )
+        closed_specs = _validate_capabilities(
+            closed_capabilities,
+            registry,
+            task_kind="section",
+        )
+        categories = {spec.category for spec in closed_specs}
         if "section" not in categories:
             raise PlannerSemanticError(
                 "missing_section_capability",
@@ -428,11 +516,6 @@ def validate_semantic_plan(
                 "wrong_task_category",
                 "SectionTask selected a report capability.",
             )
-        closed_capabilities = _close_capability_parents(
-            task.capability_ids,
-            registry,
-            task_path="/section_tasks/*/capability_ids",
-        )
         closed_section_tasks.append(task.model_copy(update={"capability_ids": closed_capabilities}))
     if closed_report_task is None and not closed_section_tasks:
         return plan

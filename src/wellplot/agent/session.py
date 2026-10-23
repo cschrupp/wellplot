@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from ..model.authoring import AuthoringDocumentSpec
 from ..model.intent import AuthoringDocumentIntent
 from .code_mode.enrichment import ChannelContext, SourceCandidate
+from .code_mode.obligations import RequestObligation
 
 CompilationMode = Literal["reconstruct", "revise"]
 
@@ -161,6 +162,7 @@ class AgentSessionResult(_SessionModel):
     diagnostics: tuple[AgentDiagnostic, ...] = ()
     workers: tuple[AgentWorkerEvidence, ...] = ()
     metrics: AgentMetrics
+    obligations: tuple[RequestObligation, ...] = ()
 
     @model_validator(mode="after")
     def validate_result_evidence(self) -> AgentSessionResult:
@@ -245,6 +247,7 @@ class _CompileResultLike(Protocol):
     diagnostics: Sequence[_DiagnosticLike]
     workers: Sequence[_WorkerLike]
     metrics: _AggregateMetricsLike
+    obligations: Sequence[RequestObligation]
 
 
 class _CompileFacadeProtocol(Protocol):
@@ -338,6 +341,7 @@ def _project_result(result: _CompileResultLike, *, mode: CompilationMode) -> Age
         diagnostics=tuple(_project_diagnostic(item) for item in result.diagnostics),
         workers=workers,
         metrics=_project_metrics(result.metrics),
+        obligations=result.obligations,
     )
 
 

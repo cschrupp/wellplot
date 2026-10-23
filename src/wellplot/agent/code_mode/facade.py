@@ -29,6 +29,7 @@ from .enrichment import (
     SemanticEnrichmentError,
     SourceCandidate,
 )
+from .obligations import RequestObligation
 from .planner import CompilationMode, PlannerSemanticFailure, SemanticPlan
 from .report_boundary_safety import (
     ReportBoundarySafetyEvidence,
@@ -123,6 +124,7 @@ class CodeModeCompileResult(_CompileModel):
     diagnostics: tuple[CompileDiagnostic, ...] = ()
     workers: tuple[CompileWorkerEvidence, ...] = ()
     metrics: CompileMetrics
+    obligations: tuple[RequestObligation, ...] = ()
 
     @model_validator(mode="after")
     def validate_result_evidence(self) -> CodeModeCompileResult:
@@ -219,6 +221,7 @@ def _project_graph_result(state: dict[str, object]) -> CodeModeCompileResult:
             diagnostics=diagnostics,
             workers=workers,
             metrics=metrics,
+            obligations=plan.obligations,
         )
 
     merged_payload = state.get("merged_intent")
@@ -228,6 +231,7 @@ def _project_graph_result(state: dict[str, object]) -> CodeModeCompileResult:
     return CodeModeCompileResult(
         success=True,
         merged_intent=merged_intent,
+        obligations=plan.obligations,
         diagnostics=diagnostics,
         workers=workers,
         metrics=metrics,

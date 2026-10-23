@@ -24,6 +24,7 @@ from ..providers.base import (
 from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics
 from .canonical_workers import SectionSemanticActionResponse
 from .enrichment import ResolvedSectionContext
+from .obligations import validate_section_obligations
 from .planner import CompilationMode, SectionTask
 from .section_semantics import (
     SectionSemanticDraft,
@@ -407,6 +408,7 @@ class CanonicalSectionWorker:
                     authoritative_request=authoritative_request,
                 )
                 _validate_reconstruct_completeness(action, task, section_context)
+                validate_section_obligations(action, task.obligations)
                 intent = lower_section_action(action, context=section_context, document=document)
                 return CanonicalWorkerResult(True, intent, (), SemanticMetrics())
             except ValidationError:
@@ -452,11 +454,40 @@ class CanonicalSectionWorker:
                         "Section correction did not match the canonical semantic schema.",
                     )
                 action = corrected.value.root
-            except ValueError as error:
-                return _canonical_failure(
-                    getattr(error, "code", "semantic_context_validation_failure"),
-                    "Section semantics could not be validated safely.",
-                )
+            except ValueError:
+                if attempt:
+                    return _canonical_failure(
+                        "worker_obligation_unsatisfied",
+                        "Section semantics did not satisfy a supported request obligation.",
+                    )
+                correction_payload = {
+                    **payload,
+                    "correction": "A supported request obligation was not satisfied. "
+                    "Return the same target and source while restoring the requested value.",
+                }
+                try:
+                    corrected = await self.backend.generate_structured(
+                        StructuredGenerationRequest(
+                            system_prompt=(
+                                "Correct only the bounded obligation violation. "
+                                "Do not change target, source, or unrelated fields."
+                            ),
+                            user_prompt=_json_payload(correction_payload),
+                            timeout_seconds=timeout_seconds,
+                            temperature=temperature,
+                            max_output_tokens=max_output_tokens,
+                        ),
+                        response_model=SectionSemanticActionResponse,
+                    )
+                except ProviderRequestError:
+                    raise
+                except ValidationError:
+                    return _canonical_failure(
+                        "structured_schema_validation_failure",
+                        "Section correction did not match the canonical semantic action schema.",
+                    )
+                action = corrected.value.root
+                continue
             except Exception:
                 return _canonical_failure(
                     "semantic_lowering_failure",
