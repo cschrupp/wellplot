@@ -66,6 +66,9 @@ The final commit must be inspected as a descendant of the authorized parent.
 The local checkout used for this work contains no live campaign evidence and no
 provider credentials.
 
+The D5 single-engine production manifest was rebaselined after the canonical
+source changes and passes `scripts/d5_single_engine_attestation.py --check`.
+
 ## Boundaries
 
 This result does not claim that every natural-language request is extracted.
