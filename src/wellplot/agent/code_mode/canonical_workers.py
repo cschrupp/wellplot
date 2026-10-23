@@ -25,9 +25,9 @@ from ..providers.base import (
     ProviderRequestError,
     StructuredGenerationRequest,
 )
-from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics
+from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
 from .enrichment import ReportContext, ResolvedSectionContext
-from .obligations import validate_report_obligations
+from .obligations import validate_report_obligations, verify_worker_correction_scope
 from .planner import ReportTask
 from .semantic_actions import SectionSemanticAction
 from .worker_contracts import CanonicalWorkerResult
@@ -210,6 +210,10 @@ class CanonicalReportWorker:
             temperature=temperature,
             max_output_tokens=max_output_tokens,
         )
+        previous_response: ReportSemanticResponse | None = None
+        allowed_fields = frozenset(
+            item.field for item in task.obligations if item.state.value == "SET"
+        )
         for attempt in range(2):
             try:
                 generated = await self.backend.generate_structured(
@@ -218,6 +222,11 @@ class CanonicalReportWorker:
                 )
             except ProviderRequestError:
                 raise
+            except IndexError:
+                return _failure(
+                    "semantic_context_validation_failure",
+                    "Report semantics could not be validated safely.",
+                )
             except ValidationError:
                 return _failure(
                     "structured_schema_validation_failure",
@@ -230,9 +239,27 @@ class CanonicalReportWorker:
                     authoritative_request=authoritative_request,
                     task_requirements=task.requirements,
                 )
+                if previous_response is not None and allowed_fields:
+                    verify_worker_correction_scope(
+                        previous_response,
+                        response,
+                        allowed_fields,
+                    )
                 validate_report_obligations(response, task.obligations)
                 intent = _lower_report(response, report_context)
-                return CanonicalWorkerResult(True, intent, (), SemanticMetrics())
+                return CanonicalWorkerResult(
+                    True,
+                    intent,
+                    (),
+                    SemanticMetrics(),
+                    SemanticStageEvidence(
+                        provider_wire="PASS",
+                        python_validation="PASS",
+                        worker_obligation="PASS",
+                        semantic_lowering="PASS",
+                        correction="PASS" if attempt else "NOT_REACHED",
+                    ),
+                )
             except (_ReportCorrectionRequired, ValidationError, ValueError) as error:
                 if attempt:
                     return _failure(
@@ -258,6 +285,7 @@ class CanonicalReportWorker:
                     temperature=temperature,
                     max_output_tokens=max_output_tokens,
                 )
+                previous_response = response if "response" in locals() else None
             except Exception:
                 return _failure(
                     "semantic_lowering_failure",

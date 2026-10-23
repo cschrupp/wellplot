@@ -9,11 +9,13 @@ import pytest
 from wellplot.agent.code_mode.canonical_workers import ReportSemanticResponse
 from wellplot.agent.code_mode.obligations import (
     ObligationKind,
+    ObligationState,
     OwnerKind,
     extract_supported_obligations,
     validate_report_obligations,
     validate_section_obligations,
     verify_obligation_spans,
+    verify_worker_correction_scope,
 )
 from wellplot.agent.code_mode.planner import (
     PlannerSemanticError,
@@ -43,6 +45,64 @@ def test_obligation_span_tampering_fails_closed() -> None:
 
     with pytest.raises(ValueError, match="span digest"):
         verify_obligation_spans(request, (tampered,))
+
+
+def test_unicode_request_offsets_are_utf8_byte_offsets() -> None:
+    """Offsets remain valid when multibyte text precedes an obligation."""
+    request = 'Use the "Señal" report title and rename the report "North Star".'
+    obligation = extract_supported_obligations(request)[0]
+
+    assert obligation.start_byte > request.index("rename the report")
+    verify_obligation_spans(request, (obligation,))
+
+
+def test_paraphrased_add_track_extracts_only_supported_semantics() -> None:
+    """Natural add-track wording produces typed facts without prose tokens."""
+    request = (
+        'In the Main Log section, add a new normal track titled "Caliper QC" '
+        "with width 28 mm and plot the CALI curve with a linear scale from 6 to 12."
+    )
+    obligations = extract_supported_obligations(request)
+
+    assert {(item.field, item.value) for item in obligations} >= {
+        ("kind", "normal"),
+        ("width_mm", 28.0),
+        ("target", "Main Log"),
+        ("channel", "CALI"),
+        ("scale_kind", "linear"),
+        ("scale_minimum", 6.0),
+        ("scale_maximum", 12.0),
+    }
+    assert not {str(item.value).casefold() for item in obligations} & {
+        "these",
+        "the",
+        "four",
+        "a",
+        "only",
+    }
+
+
+def test_negation_and_conflict_states_are_explicit() -> None:
+    """Forbidden and contradictory facts cannot be silently treated as SET."""
+    forbidden = extract_supported_obligations("Do not use GR.")
+    assert forbidden[0].state is ObligationState.FORBIDDEN
+
+    conflicting = extract_supported_obligations(
+        "Track gamma: normal, width 30 mm. Track gamma: normal, width 32 mm."
+    )
+    assert {item.state for item in conflicting if item.field == "width_mm"} == {
+        ObligationState.CONFLICTING
+    }
+
+
+def test_percentage_alpha_span_accepts_normalized_fraction() -> None:
+    """Percentage request syntax remains valid after alpha normalization."""
+    request = "Fill the track using #f2e8a0 at 20% opacity."
+    obligations = extract_supported_obligations(request)
+    alpha = next(item for item in obligations if item.field == "alpha")
+
+    assert alpha.value == 0.2
+    verify_obligation_spans(request, (alpha,))
 
 
 def test_repeated_numeric_values_keep_distinct_track_owners() -> None:
@@ -89,6 +149,35 @@ def test_planner_coverage_rejects_dropped_explicit_width() -> None:
         _validate_extraction_coverage(attached)
 
 
+def test_section_obligations_are_partitioned_by_target() -> None:
+    """Request-owned facts are assigned to one matching section, not broadcast."""
+    plan = SemanticPlan(
+        summary="Update two sections.",
+        section_tasks=(
+            SectionTask(
+                goal="Main Log GR",
+                capability_ids=("section.log_plot",),
+                requirements=("Main Log", "GR"),
+            ),
+            SectionTask(
+                goal="Repeat Log CBL",
+                capability_ids=("section.log_plot",),
+                requirements=("Repeat Log", "CBL"),
+            ),
+        ),
+    )
+    attached = _attach_request_obligations(
+        plan,
+        "In the Main Log section, plot GR. In the Repeat Log section, plot CBL.",
+    )
+
+    assert [
+        [item.value for item in task.obligations if item.field == "channel"]
+        for task in attached.section_tasks
+    ] == [["GR"], ["CBL"]]
+    _validate_extraction_coverage(attached)
+
+
 def test_worker_satisfaction_rejects_wrong_channel_and_accepts_exact_channel() -> None:
     """Worker validation checks the requested channel rather than inventory presence."""
     obligations = extract_supported_obligations("Use GR.")
@@ -112,6 +201,22 @@ def test_worker_satisfaction_rejects_wrong_channel_and_accepts_exact_channel() -
     validate_section_obligations(valid_action, obligations)
 
 
+def test_worker_satisfaction_reads_nested_section_tracks() -> None:
+    """Canonical reconstruction actions expose tracks under their section."""
+    obligations = extract_supported_obligations("Use GR.")
+    action = SimpleNamespace(
+        section=SimpleNamespace(
+            tracks=(
+                SimpleNamespace(
+                    bindings=(SimpleNamespace(channel="GR"),),
+                ),
+            )
+        )
+    )
+
+    validate_section_obligations(action, obligations)
+
+
 def test_report_schema_has_nonempty_mutation_alternatives() -> None:
     """The provider-facing report schema carries the non-empty response rule."""
     schema = ReportSemanticResponse.model_json_schema()
@@ -124,3 +229,12 @@ def test_report_obligation_requires_top_level_title() -> None:
     with pytest.raises(ValueError, match="report title"):
         validate_report_obligations(SimpleNamespace(title=None), (obligation,))
     validate_report_obligations(SimpleNamespace(title="North Star"), (obligation,))
+
+
+def test_correction_scope_rejects_unrelated_mutation() -> None:
+    """A correction cannot change fields outside the violated obligation set."""
+    before = SimpleNamespace(model_dump=lambda mode: {"width_mm": 30, "color": "blue"})
+    after = SimpleNamespace(model_dump=lambda mode: {"width_mm": 32, "color": "red"})
+
+    with pytest.raises(ValueError, match="unauthorized"):
+        verify_worker_correction_scope(before, after, frozenset({"width_mm"}))

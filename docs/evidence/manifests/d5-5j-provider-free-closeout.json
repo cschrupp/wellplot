@@ -1,0 +1,24 @@
+{
+  "archive": ".wellplot/governed-evidence/d5-5j-provider-free-closeout.tar.gz",
+  "archive_bytes": 518,
+  "archive_sha256": "b063f309832da3b6e8f36be4f07237b3c3ab6c6155aa958e470a09697297b2ae",
+  "authority": "WELLPLOT-D5-5J-CANONICAL-REQUEST-OBLIGATION-PRESERVATION-IMPL-REWORK-AUTH-001",
+  "confidentiality": "private-local-evidence",
+  "created_at": "2026-10-23T18:59:39.771130+00:00",
+  "environment": {
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.7",
+    "uv": "uv 0.11.18 (x86_64-unknown-linux-gnu)",
+    "uv_lock_sha256": "0076359f8f68da82efa5e800d61ef38032fad72742340f51b78b6d8e969ff1b6"
+  },
+  "files": [
+    {
+      "bytes": 612,
+      "path": "result.json",
+      "sha256": "75cf31c3dc7d286b83a7a51634442aabe46614833ab3af0007f4d181a33631c1"
+    }
+  ],
+  "restoration": "RESTORATION_CHECK_PASS",
+  "scientific_checkpoint": "a225fbfdeb4ee8ff635de2bed8305487704027f4",
+  "source_root": "/tmp/wellplot-d5-5j/.wellplot/governed-evidence/d5-5j-provider-free-closeout"
+}

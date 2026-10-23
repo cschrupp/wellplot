@@ -21,10 +21,10 @@ from ..providers.base import (
     ProviderRequestError,
     StructuredGenerationRequest,
 )
-from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics
+from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
 from .canonical_workers import SectionSemanticActionResponse
 from .enrichment import ResolvedSectionContext
-from .obligations import validate_section_obligations
+from .obligations import validate_section_obligations, verify_worker_correction_scope
 from .planner import CompilationMode, SectionTask
 from .section_semantics import (
     SectionSemanticDraft,
@@ -410,7 +410,19 @@ class CanonicalSectionWorker:
                 _validate_reconstruct_completeness(action, task, section_context)
                 validate_section_obligations(action, task.obligations)
                 intent = lower_section_action(action, context=section_context, document=document)
-                return CanonicalWorkerResult(True, intent, (), SemanticMetrics())
+                return CanonicalWorkerResult(
+                    True,
+                    intent,
+                    (),
+                    SemanticMetrics(),
+                    SemanticStageEvidence(
+                        provider_wire="PASS",
+                        python_validation="PASS",
+                        worker_obligation="PASS",
+                        semantic_lowering="PASS",
+                        correction="PASS" if attempt else "NOT_REACHED",
+                    ),
+                )
             except ValidationError:
                 return _canonical_failure(
                     "semantic_context_validation_failure",
@@ -453,7 +465,13 @@ class CanonicalSectionWorker:
                         "structured_schema_validation_failure",
                         "Section correction did not match the canonical semantic schema.",
                     )
-                action = corrected.value.root
+                corrected_action = corrected.value.root
+                allowed_fields = frozenset(
+                    item.field for item in task.obligations if item.state.value == "SET"
+                )
+                if allowed_fields:
+                    verify_worker_correction_scope(action, corrected_action, allowed_fields)
+                action = corrected_action
             except ValueError:
                 if attempt:
                     return _canonical_failure(
@@ -486,7 +504,13 @@ class CanonicalSectionWorker:
                         "structured_schema_validation_failure",
                         "Section correction did not match the canonical semantic action schema.",
                     )
-                action = corrected.value.root
+                corrected_action = corrected.value.root
+                allowed_fields = frozenset(
+                    item.field for item in task.obligations if item.state.value == "SET"
+                )
+                if allowed_fields:
+                    verify_worker_correction_scope(action, corrected_action, allowed_fields)
+                action = corrected_action
                 continue
             except Exception:
                 return _canonical_failure(

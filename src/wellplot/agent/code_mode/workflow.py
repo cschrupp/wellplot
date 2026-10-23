@@ -20,7 +20,7 @@ from ..providers.response_diagnostics import (
     ProviderResponseFailureReason,
     StructuredResponseProviderError,
 )
-from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics
+from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
 from .capability_safety import enforce_capability_safety
 from .enrichment import (
     EnrichedSemanticContext,
@@ -240,6 +240,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
             intent_fragment=intent_fragment if result.success else None,
             diagnostics=_semantic_diagnostics(result.diagnostics),
             metrics=_semantic_metrics(result.metrics),
+            stage_evidence=getattr(result, "stage_evidence", SemanticStageEvidence()),
         )
         return _outcome_state(outcome)
 

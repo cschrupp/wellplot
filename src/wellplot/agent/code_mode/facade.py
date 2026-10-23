@@ -18,7 +18,7 @@ from ..providers.response_diagnostics import (
     ProviderResponseFailureReason,
     StructuredResponseProviderError,
 )
-from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics
+from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
 from .capability_safety import (
     CapabilitySafetyEvidence,
     CapabilitySafetyFailure,
@@ -77,6 +77,7 @@ class CompileWorkerEvidence(_CompileModel):
     success: bool
     diagnostics: tuple[CompileDiagnostic, ...] = ()
     metrics: SemanticMetrics = Field(default_factory=SemanticMetrics)
+    stage_evidence: SemanticStageEvidence = Field(default_factory=SemanticStageEvidence)
 
     @model_validator(mode="before")
     @classmethod
@@ -253,6 +254,7 @@ def _worker_evidence(outcome: WorkerOutcome) -> CompileWorkerEvidence:
             for diagnostic in outcome.diagnostics
         ),
         metrics=outcome.metrics,
+        stage_evidence=outcome.stage_evidence,
     )
 
 

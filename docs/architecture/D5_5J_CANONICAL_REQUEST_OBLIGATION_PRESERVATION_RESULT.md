@@ -39,30 +39,34 @@ boundaries. Existing historical D5-5I evidence is not rewritten.
 
 Private governed evidence belongs under `.wellplot/governed-evidence/`; raw
 content is ignored by Git. `scripts/archive_governed_run.py` creates a
-deterministic inventory, archive digest, environment summary, and independent
-restore verification. The legacy D5-5I migration source was unavailable in this
-environment and was recorded as unavailable rather than reconstructed.
+reproducible inventory, archive digest, environment summary, and independent
+restore verification. Credential-like files are refused case-insensitively.
+The D5-5J provider-free closeout archive and restoration manifest are recorded
+in `docs/evidence/manifests/d5-5j-provider-free-closeout.json`.
 
 ## Provider-free validation
 
-The focused obligation tests cover exact request/span custody, tamper rejection,
-repeated values on distinct owners, dropped explicit widths, wrong channels,
-report field ownership, non-empty response schema, and the closed vocabulary.
-Existing worker, planner, enrichment, workflow, and graph tests remain the
-regression surface. No endpoint, provider, model, or live campaign calls were
-made for D5-5J.
+The focused obligation/archive tests cover exact request/span custody,
+UTF-8 byte offsets, tamper rejection, paraphrased add-track extraction,
+negation/conflict states, one-to-one multi-section partitioning, correction
+scope containment, deterministic archive bytes, and secret-name rejection.
+The focused obligation/archive/session suite passes 34 tests. The canonical
+Code Mode/planner/enrichment/workflow/graph and provider-free lane regression
+surface passes 275 tests. No endpoint, provider, model, or live campaign calls
+were made for D5-5J.
 
 ## Checkpoint lineage
 
-The implementation was kept in four reviewable implementation checkpoints,
-followed by a hash-only attestation closeout:
+The implementation was kept in reviewable implementation checkpoints,
+followed by this bounded corrective rework and attestation closeout:
 
 1. durable evidence and prospective stage observability;
 2. canonical obligation extraction, capability closure, worker checks, and
    pre-persistence candidate verification;
 3. provider-free obligation qualification;
-4. this result/provenance closeout;
-5. production-manifest rebaseline and attestation verification.
+4. result/provenance closeout;
+5. request-obligation rework and evidence hardening;
+6. production-manifest rebaseline and attestation verification.
 
 The final commit must be inspected as a descendant of the authorized parent.
 The local checkout used for this work contains no live campaign evidence and no

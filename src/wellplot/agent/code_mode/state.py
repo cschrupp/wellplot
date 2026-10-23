@@ -8,7 +8,7 @@ from typing import Annotated, Any, Literal, NotRequired, TypedDict
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ...model.intent import AuthoringDocumentIntent
-from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics
+from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
 from .planner import CompilationMode
 
 
@@ -31,6 +31,7 @@ class WorkerOutcome(BaseModel):
     intent_fragment: AuthoringDocumentIntent | None = None
     diagnostics: tuple[SemanticDiagnostic, ...] = ()
     metrics: SemanticMetrics = Field(default_factory=SemanticMetrics)
+    stage_evidence: SemanticStageEvidence = Field(default_factory=SemanticStageEvidence)
 
     @model_validator(mode="after")
     def validate_evidence(self) -> WorkerOutcome:

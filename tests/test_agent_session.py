@@ -202,8 +202,9 @@ def test_revise_uses_revise_mode_and_projects_bounded_inspection(
     assert compiler.calls[0]["mode"] == "revise"
     inspection = result.inspection()
     assert inspection["intent_present"] is True
+    assert inspection["workers"][0]["stage_evidence"]["provider_wire"] == "NOT_REACHED"
     serialized = repr(inspection)
-    assert "provider" not in serialized
+    assert "raw provider response" not in serialized
     assert "wp.report" not in serialized
     assert "generated authoring source" not in serialized
     assert "LangGraph" not in serialized

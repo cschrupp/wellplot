@@ -14,6 +14,7 @@ from ..model.authoring import AuthoringDocumentSpec
 from ..model.intent import AuthoringDocumentIntent
 from .code_mode.enrichment import ChannelContext, SourceCandidate
 from .code_mode.obligations import RequestObligation
+from .semantic_runtime import SemanticStageEvidence
 
 CompilationMode = Literal["reconstruct", "revise"]
 
@@ -151,6 +152,7 @@ class AgentWorkerEvidence(_SessionModel):
     success: bool
     diagnostics: tuple[AgentDiagnostic, ...] = ()
     metrics: AgentWorkerMetrics = Field(default_factory=AgentWorkerMetrics)
+    stage_evidence: SemanticStageEvidence = Field(default_factory=SemanticStageEvidence)
 
 
 class AgentSessionResult(_SessionModel):
@@ -237,6 +239,7 @@ class _WorkerLike(Protocol):
     success: bool
     diagnostics: Sequence[_DiagnosticLike]
     metrics: _WorkerMetricsLike
+    stage_evidence: SemanticStageEvidence
 
 
 class _CompileResultLike(Protocol):
@@ -388,6 +391,7 @@ def _project_worker(worker: _WorkerLike) -> AgentWorkerEvidence:
         success=worker.success,
         diagnostics=tuple(_project_diagnostic(item) for item in worker.diagnostics),
         metrics=_project_worker_metrics(worker.metrics),
+        stage_evidence=worker.stage_evidence,
     )
 
 

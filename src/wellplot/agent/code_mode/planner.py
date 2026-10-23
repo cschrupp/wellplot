@@ -421,35 +421,97 @@ def _attach_request_obligations(plan: SemanticPlan, request: str) -> SemanticPla
                 )
             }
         )
-    section_obligations = tuple(item for item in obligations if item.owner_kind.value != "report")
+    non_report = tuple(item for item in obligations if item.owner_kind.value != "report")
+    section_count = len(plan.section_tasks)
     sections = tuple(
-        task.model_copy(update={"obligations": section_obligations}) for task in plan.section_tasks
+        task.model_copy(
+            update={
+                "obligations": _partition_task_obligations(
+                    task,
+                    non_report,
+                    section_count=section_count,
+                )
+            }
+        )
+        for task in plan.section_tasks
     )
     return plan.model_copy(
         update={"report_task": report, "section_tasks": sections, "obligations": obligations}
     )
 
 
-def _validate_extraction_coverage(plan: SemanticPlan) -> None:
-    """Reject plans that silently drop host-extracted supported values."""
-    searchable = " ".join(
+def _partition_task_obligations(
+    task: SectionTask,
+    obligations: tuple[RequestObligation, ...],
+    *,
+    section_count: int,
+) -> tuple[RequestObligation, ...]:
+    """Bind facts to one task without broadcasting request-wide assertions."""
+    task_text = " ".join(
         (
-            plan.summary,
-            *plan.unresolved_requirements,
+            task.goal,
+            task.existing_section_hint or "",
+            *task.source_hints,
+            *task.requirements,
+            *task.constraints,
+        )
+    ).casefold()
+    selected: list[RequestObligation] = []
+    for item in obligations:
+        owner = item.owner_ref.casefold()
+        value = "" if item.value is None else str(item.value).casefold()
+        if item.scope == "global":
+            selected.append(item)
+        elif owner == "request":
+            if section_count == 1 or value in task_text:
+                selected.append(item)
+        elif owner in task_text or value in task_text:
+            selected.append(item)
+    return tuple(selected)
+
+
+def _validate_extraction_coverage(plan: SemanticPlan) -> None:
+    """Reject plans that drop a supported value or its request-local owner."""
+    report_text = " ".join(
+        (
+            plan.report_task.goal if plan.report_task else "",
             *(plan.report_task.requirements if plan.report_task else ()),
-            *(task.goal for task in plan.section_tasks),
-            *(item for task in plan.section_tasks for item in task.requirements),
+            *(plan.report_task.constraints if plan.report_task else ()),
         )
     ).casefold()
     for obligation in plan.obligations:
-        if obligation.value is None:
+        if obligation.owner_kind.value == "report":
+            if obligation not in (plan.report_task.obligations if plan.report_task else ()):
+                raise PlannerSemanticError(
+                    "planner_extraction_coverage",
+                    "Planner report ownership was missing or ambiguous.",
+                    affected_paths=("/report_task/requirements",),
+                )
+            searchable = report_text
+        else:
+            assigned = [task for task in plan.section_tasks if obligation in task.obligations]
+            expected_assignments = len(plan.section_tasks) if obligation.scope == "global" else 1
+            if len(assigned) != expected_assignments:
+                raise PlannerSemanticError(
+                    "planner_extraction_coverage",
+                    "Planner obligation ownership was missing or ambiguous.",
+                    affected_paths=("/section_tasks/*/requirements",),
+                )
+            task = assigned[0]
+            searchable = " ".join(
+                (
+                    task.goal,
+                    task.existing_section_hint or "",
+                    *task.source_hints,
+                    *task.requirements,
+                    *task.constraints,
+                )
+            ).casefold()
+        value = "" if obligation.value is None else str(obligation.value).casefold()
+        owner = obligation.owner_ref.casefold()
+        if owner == "request" or obligation.scope == "global":
             continue
-        value = str(obligation.value).casefold()
-        if value in searchable:
-            continue
-        if obligation.field == "width_mm" and re.search(
-            rf"\b{re.escape(value.rstrip('0').rstrip('.'))}\s*mm\b", searchable
-        ):
+        if owner in searchable and (not value or value in searchable):
             continue
         raise PlannerSemanticError(
             "planner_extraction_coverage",
