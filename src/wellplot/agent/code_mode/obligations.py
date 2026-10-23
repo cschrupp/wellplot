@@ -463,8 +463,7 @@ def verify_anchor_coverage(
     anchors = extract_supported_anchors(request)
     for anchor in anchors:
         if not any(
-            item.start_byte <= anchor.start_byte
-            and item.end_byte >= anchor.end_byte
+            item.start_byte <= anchor.start_byte and item.end_byte >= anchor.end_byte
             for item in obligations
         ):
             raise ValueError("Supported request anchor was not converted to an obligation.")
@@ -492,6 +491,9 @@ def _identity_matches(value: Mapping[str, Any], object_id: str) -> bool:
             "section_id",
             "track_id",
             "binding_id",
+            "slot_id",
+            "key",
+            "remark_id",
             "title",
             "channel",
             "label",
@@ -589,6 +591,10 @@ def verify_document_preservation(
                 allowed.update(prefix + (str(key),) for key in patch)
             else:
                 allowed.add(prefix)
+                # Collection creates/removes are represented by a changed list
+                # at the parent path, not by the newly addressed item path.
+                if action in {"create", "remove", "move"} and prefix:
+                    allowed.add(prefix[:-1])
     if any(not any(path[: len(prefix)] == prefix for prefix in allowed) for path in changed):
         raise ValueError(
             "Candidate document changed outside the authorized reconciliation envelope."

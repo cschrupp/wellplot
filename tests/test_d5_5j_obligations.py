@@ -257,6 +257,36 @@ def test_final_document_preservation_rejects_unrelated_binding_mutation() -> Non
     verify_document_preservation(before, valid, (operation,))
 
 
+def test_document_preservation_allows_authorized_collection_create() -> None:
+    """A created remark may change its canonical collection, but not unrelated data."""
+    before = {"remarks": [], "title": "unchanged"}
+    after = {
+        "remarks": [
+            {
+                "remark_id": "scope",
+                "title": "Scope",
+                "lines": ["Supported scope"],
+            }
+        ],
+        "title": "unchanged",
+    }
+    operation = SimpleNamespace(
+        object_kind="remark",
+        object_id="scope",
+        action="create",
+        payload={"object": after["remarks"][0]},
+    )
+
+    verify_document_preservation(before, after, (operation,))
+
+    invalid = {
+        **after,
+        "title": "unexpected mutation",
+    }
+    with pytest.raises(ValueError, match="authorized reconciliation envelope"):
+        verify_document_preservation(before, invalid, (operation,))
+
+
 def test_worker_satisfaction_rejects_wrong_channel_and_accepts_exact_channel() -> None:
     """Worker validation checks the requested channel rather than inventory presence."""
     obligations = extract_supported_obligations("Use GR.")
