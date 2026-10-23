@@ -54,13 +54,15 @@ made for D5-5J.
 
 ## Checkpoint lineage
 
-The implementation was kept in four reviewable checkpoints:
+The implementation was kept in four reviewable implementation checkpoints,
+followed by a hash-only attestation closeout:
 
 1. durable evidence and prospective stage observability;
 2. canonical obligation extraction, capability closure, worker checks, and
    pre-persistence candidate verification;
 3. provider-free obligation qualification;
-4. this result/provenance closeout.
+4. this result/provenance closeout;
+5. production-manifest rebaseline and attestation verification.
 
 The final commit must be inspected as a descendant of the authorized parent.
 The local checkout used for this work contains no live campaign evidence and no
