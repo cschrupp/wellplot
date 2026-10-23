@@ -18,7 +18,7 @@
     "src/wellplot/agent/code_mode/capability_safety.py": "569503a5cc0ecf57ba04e47dba57ca3e5b57e6dd5f6af3d2d4945eb799e38568",
     "src/wellplot/agent/code_mode/enrichment.py": "6c56bec3128d4e6efe9a381ee4556725639a555e2475b7efbee67f0823a8ec8e",
     "src/wellplot/agent/code_mode/facade.py": "eefe780402379e853af15261509e55d477085d8966efad6a30cf6fd87a880089",
-    "src/wellplot/agent/code_mode/obligations.py": "a907aed34afa694cb249ed55c16158fad86095bf1daa7dc6f6bef9a1650b46dc",
+    "src/wellplot/agent/code_mode/obligations.py": "ea2b5ba3671431f947b60cafd748a54d64b2239ba94072bd197b643647753e51",
     "src/wellplot/agent/code_mode/planner.py": "3027da6d8e3e3cc84aae71d31b320fc8853a09e76a574600047d8ca5e661164b",
     "src/wellplot/agent/code_mode/report_boundary_safety.py": "cc94431bdc9c0d8b7e582de4f931aabf3bd4bea61bbd847051658abf86135c46",
     "src/wellplot/agent/code_mode/section_leaf_safety.py": "008cf45794cfb1372f77b7e300db311d8dc58123de0c429146057f6fc51331b4",
