@@ -971,7 +971,10 @@ def verify_worker_correction_scope(
 
 
 def verify_document_obligations(
-    document: object, obligations: tuple[RequestObligation, ...]
+    document: object,
+    obligations: tuple[RequestObligation, ...],
+    *,
+    grounded_operations: Sequence[object] = (),
 ) -> None:
     """Verify the reconciled candidate before persistence."""
     dump = document.model_dump(mode="json")
@@ -980,6 +983,14 @@ def verify_document_obligations(
     sections = dump.get("sections", ())
     if not isinstance(sections, list):
         raise ValueError("Candidate document has no section inventory.")
+    updated_binding_ids = set()
+    for operation in grounded_operations:
+        object_kind = str(getattr(operation, "object_kind", "")).casefold()
+        object_kind = object_kind.rsplit(".", 1)[-1]
+        action = str(getattr(operation, "action", "")).casefold()
+        action = action.rsplit(".", 1)[-1]
+        if object_kind == "curve_binding" and action == "update":
+            updated_binding_ids.add(str(getattr(operation, "object_id", "")))
     for item in obligations:
         if item.state in {ObligationState.CONFLICTING, ObligationState.UNRESOLVED}:
             raise ValueError("Candidate contains unresolved request obligations.")
@@ -1022,13 +1033,18 @@ def verify_document_obligations(
                         str(track.get("semantic_id", "")).casefold(),
                     }
                     for binding in track.get("bindings", ()):
+                        binding_id = str(binding.get("binding_id", binding.get("id", "")))
                         binding_identity = {
-                            str(binding.get("id", "")).casefold(),
+                            binding_id.casefold(),
                             str(binding.get("channel", "")).casefold(),
                             str(binding.get("label", "")).casefold(),
                         }
                         if (
-                            (owner == "request" and binding.get("channel") == item.value)
+                            (
+                                owner == "request"
+                                and (not updated_binding_ids or binding_id in updated_binding_ids)
+                                and binding.get("channel") == item.value
+                            )
                             or owner in track_identity
                             or owner in binding_identity
                         ):
@@ -1050,13 +1066,17 @@ def verify_document_obligations(
                         str(track.get("semantic_id", "")).casefold(),
                     }
                     for binding in track.get("bindings", ()):
+                        binding_id = str(binding.get("binding_id", binding.get("id", "")))
                         binding_identity = {
-                            str(binding.get("id", "")).casefold(),
+                            binding_id.casefold(),
                             str(binding.get("channel", "")).casefold(),
                             str(binding.get("label", "")).casefold(),
                         }
                         if (
-                            owner == "request"
+                            (
+                                owner == "request"
+                                and (not updated_binding_ids or binding_id in updated_binding_ids)
+                            )
                             or owner in track_identity
                             or owner in binding_identity
                         ):

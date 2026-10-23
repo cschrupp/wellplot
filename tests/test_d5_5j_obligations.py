@@ -17,6 +17,7 @@ from wellplot.agent.code_mode.obligations import (
     validate_report_obligations,
     validate_section_obligations,
     verify_anchor_coverage,
+    verify_document_obligations,
     verify_document_preservation,
     verify_lowered_existing_curve_obligations,
     verify_obligation_spans,
@@ -35,6 +36,7 @@ from wellplot.agent.code_mode.semantic_actions import (
     SemanticActionError,
     UpdateCurveScaleAction,
 )
+from wellplot.model import AuthoringDocumentSpec
 from wellplot.model.intent import AuthoringCurveBindingIntent, AuthoringDocumentIntent
 
 
@@ -503,6 +505,68 @@ def test_existing_curve_post_lowering_rejects_arbitrary_binding_identity() -> No
             wrong_intent,
             obligations,
             section_context=_existing_gr_context(),
+        )
+
+
+def test_post_lowering_scale_uses_reconciliation_binding_identity() -> None:
+    """A sparse update selects its reconciliation binding among duplicate scales."""
+    document = AuthoringDocumentSpec(
+        name="identity-test",
+        sections=[
+            {
+                "id": "main-log",
+                "title": "Main Log",
+                "tracks": [
+                    {
+                        "id": "gr-track",
+                        "title": "Gamma Ray",
+                        "kind": "normal",
+                        "width_mm": 25,
+                        "bindings": [
+                            {
+                                "binding_id": "main.gr.GR.1",
+                                "channel": "GR",
+                                "scale": {
+                                    "kind": "linear",
+                                    "minimum": 5,
+                                    "maximum": 125,
+                                },
+                            },
+                            {
+                                "binding_id": "other.binding",
+                                "channel": "RT",
+                                "scale": {
+                                    "kind": "linear",
+                                    "minimum": 0,
+                                    "maximum": 150,
+                                },
+                            },
+                        ],
+                    }
+                ],
+            }
+        ],
+    )
+    operation = SimpleNamespace(
+        object_kind="curve_binding",
+        object_id="main.gr.GR.1",
+        action="update",
+    )
+    obligations = extract_supported_obligations(
+        "In Main Log, set the Gamma Ray curve to a linear 5–125 scale."
+    )
+    verify_document_obligations(document, obligations, grounded_operations=(operation,))
+
+    wrong_operation = SimpleNamespace(
+        object_kind="curve_binding",
+        object_id="other.binding",
+        action="update",
+    )
+    with pytest.raises(ValueError, match="Post-lowering scale"):
+        verify_document_obligations(
+            document,
+            obligations,
+            grounded_operations=(wrong_operation,),
         )
 
 

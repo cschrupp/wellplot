@@ -260,7 +260,11 @@ def _apply_result(
 
     accepted = private_service.document
     try:
-        verify_document_obligations(accepted, result.obligations)
+        verify_document_obligations(
+            accepted,
+            result.obligations,
+            grounded_operations=plan.operations,
+        )
         stages["post_lowering_obligation"] = "PASS"
         verify_document_preservation(context.document, accepted, plan.operations)
         stages["preservation"] = "PASS"
