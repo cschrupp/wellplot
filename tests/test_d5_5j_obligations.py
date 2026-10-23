@@ -14,6 +14,7 @@ from wellplot.agent.code_mode.obligations import (
     extract_supported_obligations,
     validate_report_obligations,
     validate_section_obligations,
+    verify_anchor_coverage,
     verify_document_preservation,
     verify_obligation_spans,
     verify_worker_correction_scope,
@@ -36,6 +37,7 @@ def test_obligations_use_exact_request_and_utf8_spans() -> None:
     assert {item.owner_kind for item in obligations} == {OwnerKind.REPORT, OwnerKind.TRACK}
     assert {item.field for item in obligations} == {"title", "kind", "width_mm"}
     verify_obligation_spans(request, obligations)
+    verify_anchor_coverage(request, obligations)
 
 
 def test_obligation_span_tampering_fails_closed() -> None:
@@ -198,7 +200,7 @@ def test_targeted_channels_remain_bound_to_their_grounded_task() -> None:
     )
     attached = _attach_request_obligations(
         plan,
-        "On cbl: plot CBL. On vdl: plot VDL.",
+        "On cbl, plot CBL. On vdl, plot VDL.",
     )
 
     assert [

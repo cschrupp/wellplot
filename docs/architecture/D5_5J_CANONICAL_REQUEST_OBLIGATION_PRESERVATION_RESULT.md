@@ -3,7 +3,7 @@
 ## Status
 
 This document records the provider-free implementation checkpoint for
-`WELLPLOT-D5-5J-CANONICAL-REQUEST-OBLIGATION-PRESERVATION-IMPL-AUTH-001`.
+`WELLPLOT-D5-5J-CANONICAL-REQUEST-OBLIGATION-PRESERVATION-IMPL-REWORK2-AUTH-001`.
 It does not authorize provider, endpoint, or model execution.
 
 The implementation remains on the existing path:
@@ -30,6 +30,17 @@ Target cardinality is checked before enrichment when one explicit request
 target would otherwise authorize multiple section tasks. This is a safety
 boundary, not a hard-coded section-name rule.
 
+Targeted channel obligations remain task-local; only genuinely request-wide
+facts are global. Every supported lexical anchor is independently checked for
+conversion into an exact-span obligation before planner validation.
+
+The direct-notebook host transaction now verifies the baseline-to-candidate
+document diff against the canonical reconciliation operation set before
+persistence. Unrelated mutations are rejected even when the requested fact is
+present. Host-owned reconciliation, private execution, canonical validation,
+post-lowering obligation, preservation, persistence, reload, and render stages
+are emitted separately in the result evidence.
+
 ## Evidence
 
 Prospective worker results expose a `SemanticStageEvidence` contract for the
@@ -37,20 +48,24 @@ provider wire, Python validation, planner, worker, lowering, reconciliation,
 execution, post-lowering, preservation, persistence, reload, and render
 boundaries. Existing historical D5-5I evidence is not rewritten.
 
-Private governed evidence belongs under `.wellplot/governed-evidence/`; raw
-content is ignored by Git. `scripts/archive_governed_run.py` creates a
-reproducible inventory, archive digest, environment summary, and independent
-restore verification. Credential-like files are refused case-insensitively.
-The D5-5J provider-free closeout archive and restoration manifest are recorded
-in `docs/evidence/manifests/d5-5j-provider-free-closeout.json`.
+Private governed evidence is staged under `.wellplot/governed-evidence/`, but
+the closeout archive is copied and digest-verified under the persistent project
+storage path `/home/user/projects/well_log_os/.wellplot/governed-evidence/`.
+`scripts/archive_governed_run.py` now requires that separate durable
+destination and independently restore-checks the published archive.
+Credential-like files are refused case-insensitively. The resulting archive
+digest and source inventory are recorded in
+`docs/evidence/manifests/d5-5j-provider-free-closeout.json`.
 
 ## Provider-free validation
 
 The focused obligation/archive tests cover exact request/span custody,
 UTF-8 byte offsets, tamper rejection, paraphrased add-track extraction,
-negation/conflict states, one-to-one multi-section partitioning, correction
-scope containment, deterministic archive bytes, and secret-name rejection.
-The focused obligation/archive/session suite passes 34 tests. The canonical
+negation/conflict states, one-to-one and targeted multi-section partitioning,
+independent anchor coverage, final preservation containment, correction-scope
+containment, deterministic archive bytes, durable-copy verification, and
+secret-name rejection. The focused obligation/archive/session suite passes 37
+tests. The canonical
 Code Mode/planner/enrichment/workflow/graph and provider-free lane regression
 surface passes 275 tests. No endpoint, provider, model, or live campaign calls
 were made for D5-5J.
@@ -66,7 +81,9 @@ followed by this bounded corrective rework and attestation closeout:
 3. provider-free obligation qualification;
 4. result/provenance closeout;
 5. request-obligation rework and evidence hardening;
-6. production-manifest rebaseline and attestation verification.
+6. production-manifest rebaseline and attestation verification;
+7. bounded rework for task ownership, final preservation, host-stage evidence,
+   and durable archive publication.
 
 The final commit must be inspected as a descendant of the authorized parent.
 The local checkout used for this work contains no live campaign evidence and no
