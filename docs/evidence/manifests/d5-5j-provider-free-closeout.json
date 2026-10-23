@@ -1,10 +1,10 @@
 {
   "archive": "/home/user/projects/well_log_os/.wellplot/governed-evidence/d5-5j-provider-free-closeout.tar.gz",
-  "archive_bytes": 640,
-  "archive_sha256": "2baab69000510e8ade249da30841e2c5c1bee0356df203b1e26bae9c15063a38",
+  "archive_bytes": 631,
+  "archive_sha256": "f7b5370706f281846e2770c0958077b000cecc8c585ece6c1b7445b72e131fda",
   "authority": "WELLPLOT-D5-5J-CANONICAL-REQUEST-OBLIGATION-PRESERVATION-IMPL-REWORK2-AUTH-001",
   "confidentiality": "private-local-evidence",
-  "created_at": "2026-10-23T20:17:47.246010+00:00",
+  "created_at": "2026-10-23T20:18:10.149893+00:00",
   "environment": {
     "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
     "python": "3.12.7",
@@ -13,9 +13,9 @@
   },
   "files": [
     {
-      "bytes": 864,
+      "bytes": 853,
       "path": "result.json",
-      "sha256": "e60656fd39557d24cbadd81da9861e99287595d54ab727ecbd79f35c6ed597de"
+      "sha256": "9f39dc537c6dc5f1f3c879f486b6482dcebff7806b529074b9eed70ad136c91b"
     }
   ],
   "restoration": "RESTORATION_CHECK_PASS",

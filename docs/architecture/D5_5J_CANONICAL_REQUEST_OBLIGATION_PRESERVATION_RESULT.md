@@ -69,8 +69,8 @@ tests. The comparative static/entrypoint checks pass 11 tests. The exact
 canonical nine-turn route was then reproduced 9/9 for each Qwen and DeepSeek
 lane configuration, including the real CBL render and cumulative LAS
 persistence/reload path, with zero provider/model/endpoint calls. The broader
-canonical Code Mode/planner/enrichment/workflow/graph surface passes 283 tests
-with one pre-existing skip. No endpoint, provider, model, or live campaign
+canonical Code Mode/planner/enrichment/workflow/graph surface passes 286 tests.
+No endpoint, provider, model, or live campaign
 calls were made for D5-5J.
 
 ## Checkpoint lineage
