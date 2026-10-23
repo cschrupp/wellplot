@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ...model.intent import AuthoringDocumentIntent
-from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics
+from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,6 +16,7 @@ class CanonicalWorkerResult:
     intent_fragment: AuthoringDocumentIntent | None
     diagnostics: tuple[SemanticDiagnostic, ...]
     metrics: SemanticMetrics
+    stage_evidence: SemanticStageEvidence = SemanticStageEvidence()
 
 
 __all__ = ["CanonicalWorkerResult"]

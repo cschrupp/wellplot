@@ -44,4 +44,30 @@ class SemanticMetrics(SemanticModel):
     created_objects: int = Field(default=0, ge=0)
 
 
-__all__ = ["SemanticDiagnostic", "SemanticDiagnosticSeverity", "SemanticMetrics"]
+class SemanticStageEvidence(SemanticModel):
+    """Independent stage statuses for prospective canonical-run inspection."""
+
+    provider_wire: str = "NOT_REACHED"
+    python_validation: str = "NOT_REACHED"
+    planner_extraction: str = "NOT_REACHED"
+    planner_provenance: str = "NOT_REACHED"
+    target_grounding: str = "NOT_REACHED"
+    worker_obligation: str = "NOT_REACHED"
+    correction: str = "NOT_REACHED"
+    semantic_lowering: str = "NOT_REACHED"
+    reconciliation: str = "NOT_REACHED"
+    private_execution: str = "NOT_REACHED"
+    canonical_validation: str = "NOT_REACHED"
+    post_lowering_obligation: str = "NOT_REACHED"
+    preservation: str = "NOT_REACHED"
+    persistence: str = "NOT_REACHED"
+    reload: str = "NOT_REACHED"
+    render: str = "NOT_REACHED"
+
+
+__all__ = [
+    "SemanticDiagnostic",
+    "SemanticDiagnosticSeverity",
+    "SemanticMetrics",
+    "SemanticStageEvidence",
+]

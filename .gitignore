@@ -31,3 +31,6 @@ dist/
 
 # Legacy scratch workspace kept locally only
 splice-main/
+# Governed evidence is private local storage; tracked manifests are published.
+.wellplot/governed-evidence/*
+!.wellplot/governed-evidence/.gitkeep

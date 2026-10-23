@@ -1,0 +1,11 @@
+{
+  "authority": "WELLPLOT-D5-5J-CANONICAL-REQUEST-OBLIGATION-PRESERVATION-IMPL-AUTH-001",
+  "campaign": "d5-5i-qwen-live-002",
+  "status": "LEGACY_MIGRATION_SOURCE_UNAVAILABLE",
+  "source_root": null,
+  "archive": null,
+  "archive_sha256": null,
+  "restoration": "NOT_PERFORMED_SOURCE_BYTES_UNAVAILABLE",
+  "note": "The surviving ignored campaign directory was not available in this execution environment; no historical bytes were reconstructed.",
+  "provider_model_calls": 0
+}
