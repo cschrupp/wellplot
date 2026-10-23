@@ -24,7 +24,11 @@ from ..providers.base import (
 from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
 from .canonical_workers import SectionSemanticActionResponse
 from .enrichment import ResolvedSectionContext
-from .obligations import validate_section_obligations, verify_worker_correction_scope
+from .obligations import (
+    validate_section_obligations,
+    verify_lowered_existing_curve_obligations,
+    verify_worker_correction_scope,
+)
 from .planner import CompilationMode, SectionTask
 from .section_semantics import (
     SectionSemanticDraft,
@@ -408,8 +412,18 @@ class CanonicalSectionWorker:
                     authoritative_request=authoritative_request,
                 )
                 _validate_reconstruct_completeness(action, task, section_context)
-                validate_section_obligations(action, task.obligations)
+                validate_section_obligations(
+                    action,
+                    task.obligations,
+                    section_context=section_context,
+                )
                 intent = lower_section_action(action, context=section_context, document=document)
+                verify_lowered_existing_curve_obligations(
+                    action,
+                    intent,
+                    task.obligations,
+                    section_context=section_context,
+                )
                 return CanonicalWorkerResult(
                     True,
                     intent,

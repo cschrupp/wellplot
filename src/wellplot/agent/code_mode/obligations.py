@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 if TYPE_CHECKING:
+    from ...model.intent import AuthoringDocumentIntent
+    from .enrichment import ResolvedSectionContext
     from .semantic_actions import SectionSemanticAction
 
 
@@ -736,9 +738,22 @@ def validate_report_obligations(
 
 
 def validate_section_obligations(
-    action: SectionSemanticAction, obligations: tuple[RequestObligation, ...]
+    action: SectionSemanticAction,
+    obligations: tuple[RequestObligation, ...],
+    *,
+    section_context: ResolvedSectionContext | None = None,
 ) -> None:
     """Require every supported section obligation before canonical lowering."""
+    if getattr(action, "action", None) == "update_curve_scale":
+        if section_context is None:
+            raise ValueError("Existing-object obligations require resolved section context.")
+        _validate_existing_curve_scale_obligations(
+            action,
+            obligations,
+            section_context=section_context,
+        )
+        return
+
     section = getattr(action, "section", None)
     tracks = list(getattr(section, "tracks", ()) or ())
     tracks.extend(list(getattr(action, "tracks", ()) or ()))
@@ -839,6 +854,100 @@ def validate_section_obligations(
             and (section is None or getattr(section, "title", None) != item.value)
         ):
             raise ValueError("Requested section target was not satisfied.")
+
+
+def _validate_existing_curve_scale_obligations(
+    action: SectionSemanticAction,
+    obligations: tuple[RequestObligation, ...],
+    *,
+    section_context: ResolvedSectionContext,
+) -> None:
+    """Validate sparse existing-curve updates against host-owned identity."""
+    from .semantic_actions import resolve_existing_curve
+
+    target = resolve_existing_curve(action.target, section_context)
+    identities = {
+        target.binding_id.casefold(),
+        target.channel.casefold(),
+        (target.label or "").casefold(),
+        target.track_id.casefold(),
+        target.track_title.casefold(),
+    }
+    scale_values = {
+        "scale_kind": action.scale.kind.value,
+        "scale_minimum": float(action.scale.minimum),
+        "scale_maximum": float(action.scale.maximum),
+    }
+    for item in obligations:
+        if item.state in {ObligationState.CONFLICTING, ObligationState.UNRESOLVED}:
+            raise ValueError("Request obligation is unresolved or conflicting.")
+        if item.state is ObligationState.FORBIDDEN:
+            if (
+                item.owner_kind is OwnerKind.BINDING
+                and item.field == "channel"
+                and item.value == target.channel
+            ):
+                raise ValueError(f"Forbidden channel {item.value} was emitted.")
+            continue
+        if item.owner_kind is not OwnerKind.BINDING:
+            raise ValueError("Existing-curve update cannot satisfy this obligation kind.")
+        owner = item.owner_ref.casefold()
+        if owner != "request" and owner not in identities:
+            raise ValueError("Requested binding identity is unresolved or ambiguous.")
+        if item.field in scale_values:
+            actual = scale_values[item.field]
+        elif item.field == "channel":
+            actual = target.channel
+        elif item.field == "label":
+            actual = target.label
+        else:
+            raise ValueError(f"Existing-curve update cannot satisfy {item.field}.")
+        expected = item.value
+        if item.field == "scale_kind" and actual is not None:
+            actual = str(actual).casefold()
+        if item.field in {"scale_minimum", "scale_maximum"} and actual is not None:
+            actual = float(actual)
+        if actual != expected:
+            raise ValueError(f"Requested binding {item.field} was not satisfied.")
+
+
+def verify_lowered_existing_curve_obligations(
+    action: SectionSemanticAction,
+    intent: AuthoringDocumentIntent,
+    obligations: tuple[RequestObligation, ...],
+    *,
+    section_context: ResolvedSectionContext,
+) -> None:
+    """Verify an existing-curve update remains bound to its resolved identity."""
+    if getattr(action, "action", None) != "update_curve_scale":
+        return
+    from .semantic_actions import resolve_existing_curve
+
+    target = resolve_existing_curve(action.target, section_context)
+    matches = [
+        binding
+        for binding in intent.curve_bindings
+        if binding.binding_id == target.binding_id
+        and binding.section_id == section_context.section_id
+        and binding.track_id == target.track_id
+    ]
+    if len(matches) != 1:
+        raise ValueError("Lowered existing-curve update lost its resolved binding identity.")
+    binding = matches[0]
+    if binding.scale is None:
+        raise ValueError("Lowered existing-curve update omitted its requested scale.")
+    actual = {
+        "scale_kind": str(binding.scale.kind).casefold(),
+        "scale_minimum": float(binding.scale.minimum),
+        "scale_maximum": float(binding.scale.maximum),
+    }
+    for item in obligations:
+        if item.owner_kind is OwnerKind.BINDING and item.field in actual:
+            expected = item.value
+            if item.field == "scale_kind":
+                expected = str(expected).casefold()
+            if actual[item.field] != expected:
+                raise ValueError(f"Post-lowering scale {item.field} obligation failed.")
 
 
 def verify_worker_correction_scope(

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from wellplot.agent.code_mode.canonical_workers import ReportSemanticResponse
+from wellplot.agent.code_mode.enrichment import ExistingCurveContext, ResolvedSectionContext
 from wellplot.agent.code_mode.obligations import (
     ObligationKind,
     ObligationState,
@@ -17,6 +18,7 @@ from wellplot.agent.code_mode.obligations import (
     validate_section_obligations,
     verify_anchor_coverage,
     verify_document_preservation,
+    verify_lowered_existing_curve_obligations,
     verify_obligation_spans,
     verify_worker_correction_scope,
 )
@@ -27,6 +29,13 @@ from wellplot.agent.code_mode.planner import (
     _attach_request_obligations,
     _validate_extraction_coverage,
 )
+from wellplot.agent.code_mode.section_semantics import SemanticScale
+from wellplot.agent.code_mode.semantic_actions import (
+    ExistingCurveSelector,
+    SemanticActionError,
+    UpdateCurveScaleAction,
+)
+from wellplot.model.intent import AuthoringCurveBindingIntent, AuthoringDocumentIntent
 
 
 def test_obligations_use_exact_request_and_utf8_spans() -> None:
@@ -372,6 +381,159 @@ def test_worker_satisfaction_reads_nested_section_tracks() -> None:
     )
 
     validate_section_obligations(action, obligations)
+
+
+def _existing_gr_context() -> ResolvedSectionContext:
+    """Build the host-owned identity used by the frozen D4 scale update."""
+    return ResolvedSectionContext(
+        task_index=0,
+        section_id="main-log",
+        existing_curves=(
+            ExistingCurveContext(
+                track_id="gr-track",
+                track_title="Gamma Ray",
+                track_kind="normal",
+                binding_id="main.gr.GR.1",
+                channel="GR",
+                label="Gamma Ray",
+                scale_kind="linear",
+                scale_minimum=0.0,
+                scale_maximum=150.0,
+            ),
+        ),
+    )
+
+
+def _existing_gr_scale_action(
+    *, kind: str = "linear", maximum: float = 125.0
+) -> UpdateCurveScaleAction:
+    """Build the sparse existing-object action for D4-L01:T2."""
+    return UpdateCurveScaleAction(
+        action="update_curve_scale",
+        target=ExistingCurveSelector(handle="curve-1"),
+        scale=SemanticScale(kind=kind, minimum=5.0, maximum=maximum),
+    )
+
+
+def test_existing_curve_scale_obligation_uses_host_grounded_selector() -> None:
+    """The exact D4-L01:T2 sparse action satisfies the selected GR obligations."""
+    request = "In Main Log, set the Gamma Ray curve to a linear 5–125 scale."
+    obligations = extract_supported_obligations(request)
+    context = _existing_gr_context()
+    action = _existing_gr_scale_action()
+
+    validate_section_obligations(action, obligations, section_context=context)
+    intent = AuthoringDocumentIntent(
+        curve_bindings=[
+            AuthoringCurveBindingIntent(
+                kind="curve",
+                binding_id="main.gr.GR.1",
+                section_id="main-log",
+                track_id="gr-track",
+                scale={"kind": "linear", "minimum": 5.0, "maximum": 125.0},
+            )
+        ]
+    )
+    verify_lowered_existing_curve_obligations(
+        action,
+        intent,
+        obligations,
+        section_context=context,
+    )
+
+
+@pytest.mark.parametrize(
+    ("kind", "maximum"),
+    [("linear", 120.0), ("log", 125.0)],
+)
+def test_existing_curve_scale_obligation_rejects_wrong_scale(kind: str, maximum: float) -> None:
+    """Scale kind and bounds remain independently enforced."""
+    request = "In Main Log, set the Gamma Ray curve to a linear 5–125 scale."
+    with pytest.raises(ValueError, match="scale_"):
+        validate_section_obligations(
+            _existing_gr_scale_action(kind=kind, maximum=maximum),
+            extract_supported_obligations(request),
+            section_context=_existing_gr_context(),
+        )
+
+
+def test_existing_curve_scale_obligation_rejects_wrong_selector_and_channel() -> None:
+    """Selector and grounded channel mismatches fail without fuzzy substitution."""
+    context = _existing_gr_context()
+    request = "In Main Log, set the Gamma Ray curve to a linear 5–125 scale."
+    wrong_selector = _existing_gr_scale_action().model_copy(
+        update={"target": ExistingCurveSelector(handle="curve-2")}
+    )
+    with pytest.raises(SemanticActionError, match="No grounded existing curve"):
+        validate_section_obligations(
+            wrong_selector,
+            extract_supported_obligations(request),
+            section_context=context,
+        )
+
+    channel_request = "Plot ILD with a linear 5–125 scale."
+    with pytest.raises(ValueError, match="channel"):
+        validate_section_obligations(
+            _existing_gr_scale_action(),
+            extract_supported_obligations(channel_request),
+            section_context=context,
+        )
+
+
+def test_existing_curve_post_lowering_rejects_arbitrary_binding_identity() -> None:
+    """Post-lowering checks use the selector-resolved binding, not a document scan."""
+    action = _existing_gr_scale_action()
+    obligations = extract_supported_obligations(
+        "In Main Log, set the Gamma Ray curve to a linear 5–125 scale."
+    )
+    wrong_intent = AuthoringDocumentIntent(
+        curve_bindings=[
+            AuthoringCurveBindingIntent(
+                kind="curve",
+                binding_id="other.binding",
+                section_id="main-log",
+                track_id="gr-track",
+                scale={"kind": "linear", "minimum": 5.0, "maximum": 125.0},
+            )
+        ]
+    )
+    with pytest.raises(ValueError, match="resolved binding identity"):
+        verify_lowered_existing_curve_obligations(
+            action,
+            wrong_intent,
+            obligations,
+            section_context=_existing_gr_context(),
+        )
+
+
+def test_existing_curve_update_preservation_rejects_unrelated_label_change() -> None:
+    """An authorized scale update cannot smuggle an unrelated label mutation."""
+    before = {
+        "bindings": [
+            {
+                "id": "main.gr.GR.1",
+                "scale": {"minimum": 0, "maximum": 150},
+                "label": "Gamma Ray",
+            }
+        ]
+    }
+    after = {
+        "bindings": [
+            {
+                "id": "main.gr.GR.1",
+                "scale": {"minimum": 5, "maximum": 125},
+                "label": "Changed",
+            }
+        ]
+    }
+    operation = SimpleNamespace(
+        object_kind="curve_binding",
+        object_id="main.gr.GR.1",
+        action="update",
+        payload={"patch": {"scale": after["bindings"][0]["scale"]}},
+    )
+    with pytest.raises(ValueError, match="authorized reconciliation envelope"):
+        verify_document_preservation(before, after, (operation,))
 
 
 def test_report_schema_has_nonempty_mutation_alternatives() -> None:
