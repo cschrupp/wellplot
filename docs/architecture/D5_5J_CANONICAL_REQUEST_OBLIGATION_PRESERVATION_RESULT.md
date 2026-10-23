@@ -64,11 +64,14 @@ UTF-8 byte offsets, tamper rejection, paraphrased add-track extraction,
 negation/conflict states, one-to-one and targeted multi-section partitioning,
 independent anchor coverage, final preservation containment, correction-scope
 containment, deterministic archive bytes, durable-copy verification, and
-secret-name rejection. The focused obligation/archive/session suite passes 37
-tests. The canonical
-Code Mode/planner/enrichment/workflow/graph and provider-free lane regression
-surface passes 275 tests. No endpoint, provider, model, or live campaign calls
-were made for D5-5J.
+secret-name rejection. The focused obligation/archive contract suite passes 21
+tests. The comparative static/entrypoint checks pass 11 tests. The exact
+canonical nine-turn route was then reproduced 9/9 for each Qwen and DeepSeek
+lane configuration, including the real CBL render and cumulative LAS
+persistence/reload path, with zero provider/model/endpoint calls. The broader
+canonical Code Mode/planner/enrichment/workflow/graph surface passes 283 tests
+with one pre-existing skip. No endpoint, provider, model, or live campaign
+calls were made for D5-5J.
 
 ## Checkpoint lineage
 
@@ -85,7 +88,9 @@ followed by this bounded corrective rework and attestation closeout:
 7. bounded rework for task ownership, final preservation, host-stage evidence,
    and durable archive publication.
 
-The final commit must be inspected as a descendant of the authorized parent.
+The final implementation checkpoint is
+`2ac9503df930fb088b69e19713c371a1209c93e5`. The final commit must be inspected
+as a descendant of the authorized parent.
 The local checkout used for this work contains no live campaign evidence and no
 provider credentials.
 

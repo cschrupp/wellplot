@@ -1,10 +1,10 @@
 {
   "archive": "/home/user/projects/well_log_os/.wellplot/governed-evidence/d5-5j-provider-free-closeout.tar.gz",
-  "archive_bytes": 518,
-  "archive_sha256": "b063f309832da3b6e8f36be4f07237b3c3ab6c6155aa958e470a09697297b2ae",
+  "archive_bytes": 640,
+  "archive_sha256": "2baab69000510e8ade249da30841e2c5c1bee0356df203b1e26bae9c15063a38",
   "authority": "WELLPLOT-D5-5J-CANONICAL-REQUEST-OBLIGATION-PRESERVATION-IMPL-REWORK2-AUTH-001",
   "confidentiality": "private-local-evidence",
-  "created_at": "2026-10-23T19:19:45.580313+00:00",
+  "created_at": "2026-10-23T20:17:47.246010+00:00",
   "environment": {
     "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
     "python": "3.12.7",
@@ -13,12 +13,12 @@
   },
   "files": [
     {
-      "bytes": 612,
+      "bytes": 864,
       "path": "result.json",
-      "sha256": "75cf31c3dc7d286b83a7a51634442aabe46614833ab3af0007f4d181a33631c1"
+      "sha256": "e60656fd39557d24cbadd81da9861e99287595d54ab727ecbd79f35c6ed597de"
     }
   ],
   "restoration": "RESTORATION_CHECK_PASS",
-  "scientific_checkpoint": "59c1064",
+  "scientific_checkpoint": "2ac9503df930fb088b69e19713c371a1209c93e5",
   "source_root": "/tmp/wellplot-d5-5j/.wellplot/governed-evidence/d5-5j-provider-free-closeout"
 }
