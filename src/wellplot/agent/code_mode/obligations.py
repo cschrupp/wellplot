@@ -121,9 +121,9 @@ _SECTION_TARGET_RE = re.compile(
     re.IGNORECASE,
 )
 _SECTION_TO_TARGET_RE = re.compile(
-    r"\bto\s+(?:the\s+)?(?P<target>[A-Za-z][A-Za-z0-9 _-]{1,48}?)"
+    r"\b(?i:to)\s+(?:(?i:the)\s+)?"
+    r"(?P<target>[A-Z][A-Za-z0-9 _-]{1,48}?)"
     r"(?=\s*(?:[.,;]|$|\b(?:plot|bind|select|use|and)\b))",
-    re.IGNORECASE,
 )
 _TRACK_TARGET_RE = re.compile(
     r"\bon\s+(?:the\s+)?(?P<target>[A-Za-z][A-Za-z0-9 _-]{1,48}?)\s+track\b",
@@ -187,24 +187,45 @@ _INDEPENDENT_ANCHOR_PATTERNS = (
         "kind",
         re.compile(r"\b(?:add|append)\b[^.;\n]*?\b(?:normal|reference|array)\s+track\b", re.I),
     ),
-    ("explicit", "title", re.compile(r"\b(?:named|titled)\s+['\"][^'\"]+['\"]", re.I)),
-    ("explicit", "width_mm", re.compile(r"\b[0-9]+(?:\.[0-9]+)?\s*mm\b", re.I)),
+    (
+        "explicit",
+        "title",
+        re.compile(
+            r"\b(?:add|append)\b[^.;\n]*?\b(?:named|titled)\s+['\"][^'\"]+['\"]",
+            re.I,
+        ),
+    ),
+    (
+        "explicit",
+        "width_mm",
+        re.compile(
+            r"\b(?:add|append)\s+(?:a|an)(?:\s+new)?\s+"
+            r"[0-9]+(?:\.[0-9]+)?\s*mm\b",
+            re.I,
+        ),
+    ),
+    (
+        "explicit",
+        "width_mm",
+        re.compile(r"\bwidth\s+[0-9]+(?:\.[0-9]+)?\s*mm\b", re.I),
+    ),
     (
         "target",
         "target",
         re.compile(
-            r"\b(?:in|within)\s+(?:the\s+)?[^.;\n]+?\s+section\b"
-            r"|\bto\s+(?:the\s+)?[A-Za-z][A-Za-z0-9 _-]{1,48}"
+            r"\b(?i:in|within)\s+(?:(?i:the)\s+)?"
+            r"[A-Z][A-Za-z0-9 _-]{1,48}\s+section\b"
+            r"|\b(?i:to)\s+(?:(?i:the)\s+)?"
+            r"[A-Z][A-Za-z0-9 _-]{1,48}"
             r"(?=\s*(?:[.,;]|$|\b(?:plot|bind|select|use|and)\b))",
-            re.I,
         ),
     ),
     (
         "explicit",
         "channel",
         re.compile(
-            r"\b(?:plot|bind|select|use(?:\s+exact)?)\s+(?:the\s+)?(?:channel\s+)?[A-Z][A-Z0-9_]{1,11}\b",
-            re.I,
+            r"\b(?i:plot|bind|select|use(?:\s+exact)?)\s+"
+            r"(?:(?i:the)\s+)?(?:(?i:channel)\s+)?[A-Z][A-Z0-9_]{1,11}\b",
         ),
     ),
     (
