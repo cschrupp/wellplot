@@ -14,6 +14,7 @@ from wellplot.agent.code_mode.obligations import (
     extract_supported_obligations,
     validate_report_obligations,
     validate_section_obligations,
+    verify_document_preservation,
     verify_obligation_spans,
     verify_worker_correction_scope,
 )
@@ -176,6 +177,82 @@ def test_section_obligations_are_partitioned_by_target() -> None:
         for task in attached.section_tasks
     ] == [["GR"], ["CBL"]]
     _validate_extraction_coverage(attached)
+
+
+def test_targeted_channels_remain_bound_to_their_grounded_task() -> None:
+    """Targeted channel facts are not broadcast to every section worker."""
+    plan = SemanticPlan(
+        summary="Update two tracks.",
+        section_tasks=(
+            SectionTask(
+                goal="Main pass",
+                capability_ids=("section.log_plot",),
+                requirements=("cbl", "CBL"),
+            ),
+            SectionTask(
+                goal="Repeat pass",
+                capability_ids=("section.log_plot",),
+                requirements=("vdl", "VDL"),
+            ),
+        ),
+    )
+    attached = _attach_request_obligations(
+        plan,
+        "On cbl: plot CBL. On vdl: plot VDL.",
+    )
+
+    assert [
+        [item.value for item in task.obligations if item.field == "channel"]
+        for task in attached.section_tasks
+    ] == [["CBL"], ["VDL"]]
+
+
+def test_final_document_preservation_rejects_unrelated_binding_mutation() -> None:
+    """A valid requested track update cannot hide an unrelated binding change."""
+    before = {
+        "sections": [
+            {
+                "id": "main",
+                "tracks": [
+                    {"id": "gamma", "width_mm": 20, "bindings": [{"id": "g", "channel": "GR"}]},
+                    {"id": "depth", "width_mm": 10, "bindings": [{"id": "d", "channel": "DEPTH"}]},
+                ],
+            }
+        ]
+    }
+    after = {
+        "sections": [
+            {
+                "id": "main",
+                "tracks": [
+                    {"id": "gamma", "width_mm": 30, "bindings": [{"id": "g", "channel": "GR"}]},
+                    {"id": "depth", "width_mm": 10, "bindings": [{"id": "d", "channel": "BAD"}]},
+                ],
+            }
+        ]
+    }
+    operation = SimpleNamespace(
+        object_kind="track",
+        object_id="gamma",
+        action="update",
+        payload={"patch": {"width_mm": 30}},
+    )
+
+    with pytest.raises(ValueError, match="authorized reconciliation envelope"):
+        verify_document_preservation(before, after, (operation,))
+
+    valid = {
+        "sections": [
+            {
+                "id": "main",
+                "tracks": [
+                    {"id": "gamma", "width_mm": 30, "bindings": [{"id": "g", "channel": "GR"}]},
+                    {"id": "depth", "width_mm": 10, "bindings": [{"id": "d", "channel": "DEPTH"}]},
+                ],
+            }
+        ]
+    }
+    verify_document_preservation(before, valid, (operation,))
 
 
 def test_worker_satisfaction_rejects_wrong_channel_and_accepts_exact_channel() -> None:

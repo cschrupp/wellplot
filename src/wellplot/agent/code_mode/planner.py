@@ -24,6 +24,7 @@ from ..providers.response_diagnostics import (
 from .obligations import (
     RequestObligation,
     extract_supported_obligations,
+    verify_anchor_coverage,
     verify_obligation_spans,
 )
 
@@ -412,6 +413,7 @@ def _attach_request_obligations(plan: SemanticPlan, request: str) -> SemanticPla
     """Attach host-extracted obligations without trusting provider restatement."""
     obligations = extract_supported_obligations(request)
     verify_obligation_spans(request, obligations)
+    verify_anchor_coverage(request, obligations)
     report = plan.report_task
     if report is not None:
         report = report.model_copy(

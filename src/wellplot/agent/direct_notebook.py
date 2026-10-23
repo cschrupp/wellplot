@@ -17,7 +17,10 @@ from ..logfile import load_logfile, resolve_section_data_sources_for_logfile
 from ..mcp import service as mcp_service
 from ..model.authoring import AuthoringDocumentSpec
 from .code_mode.enrichment import LoadedSource
-from .code_mode.obligations import verify_document_obligations
+from .code_mode.obligations import (
+    verify_document_obligations,
+    verify_document_preservation,
+)
 from .code_mode.source_loader import LogfileSourceLoader
 from .composition import create_canonical_compile_facade, create_provider_backend
 from .results import AuthoringResult, AuthoringRunState, AuthoringUserReport
@@ -205,12 +208,27 @@ def _apply_result(
     context: _NotebookDocumentContext,
     result: AgentSessionResult,
     root: Path,
-) -> tuple[bool, bool, bool, list[str], str]:
+) -> tuple[bool, bool, bool, list[str], str, dict[str, str]]:
     """Apply one v2 intent through a private canonical transaction."""
+    stages = {
+        "reconciliation": "NOT_REACHED",
+        "private_execution": "NOT_REACHED",
+        "canonical_validation": "NOT_REACHED",
+        "post_lowering_obligation": "NOT_REACHED",
+        "preservation": "NOT_REACHED",
+        "persistence": "NOT_REACHED",
+    }
     if not result.success:
-        return False, False, False, _diagnostic_text(result), "compile_failed"
+        return False, False, False, _diagnostic_text(result), "compile_failed", stages
     if result.intent is None:
-        return False, False, False, ["Compilation succeeded without an intent."], "compile_failed"
+        return (
+            False,
+            False,
+            False,
+            ["Compilation succeeded without an intent."],
+            "compile_failed",
+            stages,
+        )
 
     private_service = AuthoringService(context.document)
     plan = reconcile_authoring(
@@ -220,21 +238,34 @@ def _apply_result(
     )
     if not plan.ready:
         errors = [f"{issue.code}: {issue.message}" for issue in plan.issues]
-        return False, False, False, errors, "reconciliation_blocked"
+        return False, False, False, errors, "reconciliation_blocked", stages
+    stages["reconciliation"] = "PASS"
 
     execution = execute_authoring_plan(private_service, plan)
     if not execution.success:
-        return False, False, True, [str(error) for error in execution.errors], "execution_failed"
+        return (
+            False,
+            False,
+            True,
+            [str(error) for error in execution.errors],
+            "execution_failed",
+            stages,
+        )
+    stages["private_execution"] = "PASS"
 
     validation = private_service.validate()
     if not validation.valid:
-        return False, False, True, list(validation.errors), "validation_failed"
+        return False, False, True, list(validation.errors), "validation_failed", stages
+    stages["canonical_validation"] = "PASS"
 
     accepted = private_service.document
     try:
         verify_document_obligations(accepted, result.obligations)
+        stages["post_lowering_obligation"] = "PASS"
+        verify_document_preservation(context.document, accepted, plan.operations)
+        stages["preservation"] = "PASS"
     except ValueError as error:
-        return False, False, True, [str(error)], "post_lowering_obligation_failed"
+        return False, False, True, [str(error)], "post_lowering_obligation_failed", stages
     changed = context.document.model_dump(mode="json") != accepted.model_dump(mode="json")
     if changed:
         mcp_service.persist_authoring_document(
@@ -242,7 +273,8 @@ def _apply_result(
             logfile_path=context.logfile_path,
             root=root,
         )
-    return True, changed, False, [], "persisted" if changed else "no_op"
+    stages["persistence"] = "PASS"
+    return True, changed, False, [], "persisted" if changed else "no_op", stages
 
 
 @dataclass(frozen=True, slots=True)
@@ -345,7 +377,7 @@ class DirectNotebookSession:
                 sources=context.source_candidates,
             )
         )
-        success, changed, rolled_back, errors, apply_status = _apply_result(
+        success, changed, rolled_back, errors, apply_status, host_stage_evidence = _apply_result(
             context=context,
             result=result,
             root=self.server_root,
@@ -363,6 +395,7 @@ class DirectNotebookSession:
             apply_status=apply_status,
             example_id=example_id,
             source_logfile_path=source_logfile_path,
+            host_stage_evidence=host_stage_evidence,
         )
 
     def _project_result(
@@ -380,6 +413,7 @@ class DirectNotebookSession:
         apply_status: str,
         example_id: str | None,
         source_logfile_path: str | None,
+        host_stage_evidence: dict[str, str],
     ) -> AuthoringResult:
         """Build the existing notebook result envelope from bounded v2 evidence."""
         validation = mcp_service.validate_logfile(
@@ -404,6 +438,9 @@ class DirectNotebookSession:
             else report_preview
         )
         inspection = result.inspection()
+        host_stage_evidence = dict(host_stage_evidence)
+        host_stage_evidence["reload"] = "PASS" if success else "NOT_REACHED"
+        host_stage_evidence["render"] = "PASS" if success else "NOT_REACHED"
         report_facts = {
             "engine": "v2",
             "compilation": inspection,
@@ -411,6 +448,7 @@ class DirectNotebookSession:
             "success": success,
             "changed": changed,
             "rolled_back": rolled_back,
+            "host_stage_evidence": host_stage_evidence,
         }
         if success:
             user_report = AuthoringUserReport(

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Mapping, Sequence
 from enum import StrEnum
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -344,7 +345,6 @@ def extract_supported_obligations(request: str) -> tuple[RequestObligation, ...]
                 owner_ref=match.group("target").strip(),
                 field="channel",
                 value=match.group("channel").upper(),
-                scope="global",
             )
         )
     for pattern in (_CHANNEL_RE, _QUOTED_CHANNEL_RE):
@@ -453,6 +453,146 @@ def verify_obligation_spans(request: str, obligations: tuple[RequestObligation, 
                 continue
             if literal not in span_text:
                 raise ValueError("Obligation value is not present in its request span.")
+
+
+def verify_anchor_coverage(
+    request: str,
+    obligations: tuple[RequestObligation, ...],
+) -> None:
+    """Require every independently recognized anchor to have an obligation."""
+    anchors = extract_supported_anchors(request)
+    for anchor in anchors:
+        if not any(
+            item.start_byte <= anchor.start_byte
+            and item.end_byte >= anchor.end_byte
+            for item in obligations
+        ):
+            raise ValueError("Supported request anchor was not converted to an obligation.")
+
+
+def _plain_json(value: object) -> object:
+    """Project model-shaped values into deterministic JSON-compatible data."""
+    if isinstance(value, BaseModel):
+        return _plain_json(value.model_dump(mode="json"))
+    if isinstance(value, Mapping):
+        return {str(key): _plain_json(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_plain_json(item) for item in value]
+    return value
+
+
+def _identity_matches(value: Mapping[str, Any], object_id: str) -> bool:
+    """Match one canonical object without relying on list position."""
+    normalized = object_id.casefold()
+    return normalized in {
+        str(value.get(key, "")).casefold()
+        for key in (
+            "id",
+            "semantic_id",
+            "section_id",
+            "track_id",
+            "binding_id",
+            "title",
+            "channel",
+            "label",
+        )
+    }
+
+
+def _object_paths(
+    value: object,
+    *,
+    object_kind: str,
+    object_id: str,
+    path: tuple[str, ...] = (),
+) -> list[tuple[str, ...]]:
+    """Find canonical object paths in a JSON-shaped document."""
+    if not isinstance(value, Mapping):
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+            paths: list[tuple[str, ...]] = []
+            for index, item in enumerate(value):
+                paths.extend(
+                    _object_paths(
+                        item,
+                        object_kind=object_kind,
+                        object_id=object_id,
+                        path=path + (str(index),),
+                    )
+                )
+            return paths
+        return []
+
+    found: list[tuple[str, ...]] = []
+    if (object_kind == "report" and not path) or _identity_matches(value, object_id):
+        found.append(path)
+    for key, child in value.items():
+        if isinstance(child, (Mapping, list, tuple)):
+            found.extend(
+                _object_paths(
+                    child,
+                    object_kind=object_kind,
+                    object_id=object_id,
+                    path=path + (str(key),),
+                )
+            )
+    return found
+
+
+def _changed_paths(left: object, right: object, path: tuple[str, ...] = ()) -> set[tuple[str, ...]]:
+    """Return changed JSON paths, treating collection shape changes atomically."""
+    if isinstance(left, Mapping) and isinstance(right, Mapping):
+        changed: set[tuple[str, ...]] = set()
+        for key in set(left) | set(right):
+            changed |= _changed_paths(left.get(key), right.get(key), path + (str(key),))
+        return changed
+    if isinstance(left, list) and isinstance(right, list):
+        if len(left) != len(right):
+            return {path}
+        changed: set[tuple[str, ...]] = set()
+        for index, (old, new) in enumerate(zip(left, right, strict=True)):
+            changed |= _changed_paths(old, new, path + (str(index),))
+        return changed
+    if left != right:
+        return {path}
+    return set()
+
+
+def verify_document_preservation(
+    before: object,
+    after: object,
+    operations: Sequence[object],
+) -> None:
+    """Reject candidate changes outside the canonical reconciliation operations."""
+    before_json = _plain_json(before)
+    after_json = _plain_json(after)
+    changed = _changed_paths(before_json, after_json)
+    if not changed:
+        return
+    allowed: set[tuple[str, ...]] = set()
+    for operation in operations:
+        object_kind = str(getattr(operation, "object_kind", "")).casefold()
+        object_kind = object_kind.rsplit(".", 1)[-1]
+        object_id = str(getattr(operation, "object_id", ""))
+        action = str(getattr(operation, "action", "")).casefold().rsplit(".", 1)[-1]
+        payload = getattr(operation, "payload", {})
+        prefixes = _object_paths(before_json, object_kind=object_kind, object_id=object_id)
+        prefixes += _object_paths(after_json, object_kind=object_kind, object_id=object_id)
+        if object_kind == "header":
+            prefixes = [("header",)]
+        if object_kind == "report":
+            prefixes = [()]
+        if not prefixes:
+            continue
+        patch = payload.get("patch") if isinstance(payload, Mapping) else None
+        for prefix in prefixes:
+            if action == "update" and isinstance(patch, Mapping):
+                allowed.update(prefix + (str(key),) for key in patch)
+            else:
+                allowed.add(prefix)
+    if any(not any(path[: len(prefix)] == prefix for prefix in allowed) for path in changed):
+        raise ValueError(
+            "Candidate document changed outside the authorized reconciliation envelope."
+        )
 
 
 def validate_report_obligations(
@@ -739,6 +879,8 @@ __all__ = [
     "extract_supported_obligations",
     "validate_report_obligations",
     "validate_section_obligations",
+    "verify_anchor_coverage",
+    "verify_document_preservation",
     "verify_document_obligations",
     "verify_obligation_spans",
     "verify_worker_correction_scope",

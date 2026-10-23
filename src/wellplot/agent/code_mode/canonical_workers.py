@@ -278,7 +278,8 @@ class CanonicalReportWorker:
                 request = StructuredGenerationRequest(
                     system_prompt=(
                         "You are correcting an incomplete Wellplot report semantic response. "
-                        "Return only explicit values using the exact host-approved slot IDs."
+                        "Preserve the top-level report title and subtitle ownership rule; "
+                        "return only explicit report values in the host-approved slot groups."
                     ),
                     user_prompt=_json_payload(correction_payload),
                     timeout_seconds=timeout_seconds,

@@ -9,6 +9,7 @@ import hashlib
 import io
 import json
 import platform
+import shutil
 import subprocess
 import tarfile
 import tempfile
@@ -90,11 +91,31 @@ def _uv_version() -> str | None:
     return result.stdout.strip() or result.stderr.strip() or None
 
 
+def _publish_durable_archive(staged: Path, durable_root: Path) -> Path:
+    """Copy a verified archive into an explicitly separate project destination."""
+    durable_root = durable_root.resolve()
+    staged = staged.resolve()
+    durable_root.mkdir(parents=True, exist_ok=True)
+    durable = durable_root / staged.name
+    if durable == staged:
+        raise ValueError("Durable archive destination must differ from the staging archive.")
+    shutil.copyfile(staged, durable)
+    if sha256(staged) != sha256(durable):
+        raise SystemExit("DURABLE_ARCHIVE_DIGEST_MISMATCH")
+    return durable
+
+
 def main() -> int:
     """Archive one evidence root and independently restore-check it."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--archive", type=Path, required=True)
+    parser.add_argument(
+        "--durable-root",
+        type=Path,
+        required=True,
+        help="Persistent project storage directory for the published archive.",
+    )
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--authority", required=True)
     parser.add_argument("--checkpoint", required=True)
@@ -105,9 +126,10 @@ def main() -> int:
     files = inventory(source)
     args.archive.parent.mkdir(parents=True, exist_ok=True)
     _write_deterministic_archive(source, args.archive)
-    archive_hash = sha256(args.archive)
+    archive = _publish_durable_archive(args.archive, args.durable_root)
+    archive_hash = sha256(archive)
     with tempfile.TemporaryDirectory(prefix="wellplot-restore-") as restored:
-        with tarfile.open(args.archive, "r:gz") as bundle:
+        with tarfile.open(archive, "r:gz") as bundle:
             bundle.extractall(restored, filter="data")
         restored_files = inventory(Path(restored) / "evidence")
     if restored_files != files:
@@ -116,9 +138,9 @@ def main() -> int:
         "authority": args.authority,
         "scientific_checkpoint": args.checkpoint,
         "source_root": str(source),
-        "archive": str(args.archive),
+        "archive": str(archive),
         "archive_sha256": archive_hash,
-        "archive_bytes": args.archive.stat().st_size,
+        "archive_bytes": archive.stat().st_size,
         "files": files,
         "created_at": datetime.now(UTC).isoformat(),
         "confidentiality": "private-local-evidence",
