@@ -3,7 +3,7 @@
 ## Status
 
 This document records the provider-free implementation checkpoint for
-`WELLPLOT-D5-5J-CANONICAL-REQUEST-OBLIGATION-PRESERVATION-IMPL-REWORK2-AUTH-001`.
+`WELLPLOT-D5-5J-CANONICAL-REQUEST-OBLIGATION-PRESERVATION-IMPL-REWORK3-AUTH-001`.
 It does not authorize provider, endpoint, or model execution.
 
 The implementation remains on the existing path:
@@ -33,6 +33,15 @@ boundary, not a hard-coded section-name rule.
 Targeted channel obligations remain task-local; only genuinely request-wide
 facts are global. Every supported lexical anchor is independently checked for
 conversion into an exact-span obligation before planner validation.
+
+The independent anchor inventory carries the expected semantic field, so a
+track declaration cannot satisfy a missing width, title, kind, target, or
+scale obligation merely because another obligation covers the same sentence.
+The supported generic forms include `append/add` with width before track kind,
+`to <section>` targets, and `linear/logarithmic <min>-<max> scale` clauses.
+The historical `30 mm Resistivity QC` positive request and `24 mm Neutron QC`
+negative request are covered directly before any planner or worker fixture is
+invoked.
 
 The direct-notebook host transaction now verifies the baseline-to-candidate
 document diff against the canonical reconciliation operation set before
@@ -86,11 +95,13 @@ followed by this bounded corrective rework and attestation closeout:
 5. request-obligation rework and evidence hardening;
 6. production-manifest rebaseline and attestation verification;
 7. bounded rework for task ownership, final preservation, host-stage evidence,
-   and durable archive publication.
+   and durable archive publication;
+8. final request-obligation rework for independent field-aware anchors and
+   generic historical request syntax.
 
 The final implementation checkpoint is
-`2ac9503df930fb088b69e19713c371a1209c93e5`. The final commit must be inspected
-as a descendant of the authorized parent.
+`dfa5b809a3bec79be1ec7537c17d91096407e742`. The final commit must be inspected as a descendant of the
+authorized parent.
 The local checkout used for this work contains no live campaign evidence and no
 provider credentials.
 
