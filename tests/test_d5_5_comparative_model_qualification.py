@@ -483,7 +483,7 @@ def test_lane_custody_and_call_caps_are_independent_and_fail_closed(tmp_path: Pa
     logical_index = ledger.calls[0]["logical_call_index"]
     for _ in range(d5.MAX_PHYSICAL_ATTEMPTS):
         ledger.physical_attempt(logical_index)
-    with pytest.raises(d5.D5CallCapExceeded, match="physical attempt ceiling"):
+    with pytest.raises(d5.D5CallCapExceeded, match="physical attempt 136"):
         ledger.physical_attempt(logical_index)
 
 

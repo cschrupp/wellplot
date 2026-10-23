@@ -432,6 +432,7 @@ def _attach_request_obligations(plan: SemanticPlan, request: str) -> SemanticPla
                     task,
                     non_report,
                     section_count=section_count,
+                    authoritative_request=request,
                 )
             }
         )
@@ -447,14 +448,22 @@ def _partition_task_obligations(
     obligations: tuple[RequestObligation, ...],
     *,
     section_count: int,
+    authoritative_request: str,
 ) -> tuple[RequestObligation, ...]:
     """Bind facts to one task without broadcasting request-wide assertions."""
+    repeated_pass_request = bool(
+        re.search(r"\bfor\s+each\s+(?:pass|section)\b", authoritative_request, re.IGNORECASE)
+    )
     task_text = " ".join(
         (
             task.goal,
             task.existing_section_hint or "",
             *task.source_hints,
-            *task.requirements,
+            *(
+                requirement
+                for requirement in task.requirements
+                if requirement.strip().casefold() != authoritative_request.strip().casefold()
+            ),
             *task.constraints,
         )
     ).casefold()
@@ -462,7 +471,11 @@ def _partition_task_obligations(
     for item in obligations:
         owner = item.owner_ref.casefold()
         value = "" if item.value is None else str(item.value).casefold()
-        if item.scope == "global":
+        if item.scope == "global" or (
+            repeated_pass_request
+            and "pass" in task_text
+            and item.owner_kind.value in {"track", "binding"}
+        ):
             selected.append(item)
         elif owner == "request":
             if section_count == 1 or value in task_text:
@@ -493,7 +506,17 @@ def _validate_extraction_coverage(plan: SemanticPlan) -> None:
         else:
             assigned = [task for task in plan.section_tasks if obligation in task.obligations]
             expected_assignments = len(plan.section_tasks) if obligation.scope == "global" else 1
-            if len(assigned) != expected_assignments:
+            repeated_task_assignment = (
+                obligation.scope == "task"
+                and obligation.owner_kind.value in {"track", "binding"}
+                and len(assigned) > 1
+                and all(
+                    "pass"
+                    in f"{task.goal} {task.existing_section_hint or ''}".casefold()
+                    for task in assigned
+                )
+            )
+            if len(assigned) != expected_assignments and not repeated_task_assignment:
                 raise PlannerSemanticError(
                     "planner_extraction_coverage",
                     "Planner obligation ownership was missing or ambiguous.",
