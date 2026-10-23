@@ -96,6 +96,7 @@ class SupportedAnchor(BaseModel):
     start_byte: int = Field(ge=0)
     end_byte: int = Field(gt=0)
     kind: Literal["explicit", "target", "preservation"]
+    field: FieldName
 
 
 _REPORT_TITLE_RE = re.compile(
@@ -103,7 +104,9 @@ _REPORT_TITLE_RE = re.compile(
     re.IGNORECASE,
 )
 _ADD_TRACK_RE = re.compile(
-    r"\badd\s+(?:a|an)(?:\s+new)?\s+(?P<kind>normal|reference|array)\s+track\s+"
+    r"\b(?:add|append)\s+(?:a|an)(?:\s+new)?\s+"
+    r"(?:(?P<width_prefix>[0-9]+(?:\.[0-9]+)?)\s*mm\s+)?"
+    r"(?P<kind>normal|reference|array)\s+track\s+"
     r"(?:titled|named)\s+['\"](?P<title>[^'\"]+)['\"](?P<body>[^.;\n]*)",
     re.IGNORECASE,
 )
@@ -115,6 +118,11 @@ _TRACK_LINE_RE = re.compile(
 )
 _SECTION_TARGET_RE = re.compile(
     r"\b(?:in|within)\s+(?:the\s+)?(?P<target>[A-Za-z][A-Za-z0-9 _-]{1,48}?)\s+section\b",
+    re.IGNORECASE,
+)
+_SECTION_TO_TARGET_RE = re.compile(
+    r"\bto\s+(?:the\s+)?(?P<target>[A-Za-z][A-Za-z0-9 _-]{1,48}?)"
+    r"(?=\s*(?:[.,;]|$|\b(?:plot|bind|select|use|and)\b))",
     re.IGNORECASE,
 )
 _TRACK_TARGET_RE = re.compile(
@@ -155,8 +163,78 @@ _SCALE_CLAUSE_RE = re.compile(
     r"(?P<maximum>-?[0-9]+(?:\.[0-9]+)?)",
     re.IGNORECASE,
 )
+_SCALE_PREFIX_RANGE_RE = re.compile(
+    r"\b(?:with|using|to)\s+(?:a\s+)?(?P<kind>linear|log(?:arithmic)?)\s+"
+    r"(?P<minimum>-?[0-9]+(?:\.[0-9]+)?)\s*"
+    r"(?:to|\.\.|[\u2012\u2013\u2014-])\s*"
+    r"(?P<maximum>-?[0-9]+(?:\.[0-9]+)?)\s+scale\b",
+    re.IGNORECASE,
+)
 _FILL_COLOR_RE = re.compile(r"\busing\s+(?P<color>#[0-9a-f]{6})\b", re.IGNORECASE)
 _FILL_ALPHA_RE = re.compile(r"\bat\s+(?P<alpha>[0-9]+(?:\.[0-9]+)?)%\s+opacity\b", re.IGNORECASE)
+
+# Keep coverage broader and structurally independent from the semantic
+# extraction templates.  An explicit request fact must not disappear merely
+# because the semantic parser does not recognize its sentence form.
+_INDEPENDENT_ANCHOR_PATTERNS = (
+    (
+        "explicit",
+        "title",
+        re.compile(r"\b(?:rename|set|change)\s+(?:this|the)?\s*report\s+['\"][^'\"]+['\"]", re.I),
+    ),
+    (
+        "explicit",
+        "kind",
+        re.compile(r"\b(?:add|append)\b[^.;\n]*?\b(?:normal|reference|array)\s+track\b", re.I),
+    ),
+    ("explicit", "title", re.compile(r"\b(?:named|titled)\s+['\"][^'\"]+['\"]", re.I)),
+    ("explicit", "width_mm", re.compile(r"\b[0-9]+(?:\.[0-9]+)?\s*mm\b", re.I)),
+    (
+        "target",
+        "target",
+        re.compile(
+            r"\b(?:in|within)\s+(?:the\s+)?[^.;\n]+?\s+section\b"
+            r"|\bto\s+(?:the\s+)?[A-Za-z][A-Za-z0-9 _-]{1,48}"
+            r"(?=\s*(?:[.,;]|$|\b(?:plot|bind|select|use|and)\b))",
+            re.I,
+        ),
+    ),
+    (
+        "explicit",
+        "channel",
+        re.compile(
+            r"\b(?:plot|bind|select|use(?:\s+exact)?)\s+(?:the\s+)?(?:channel\s+)?[A-Z][A-Z0-9_]{1,11}\b",
+            re.I,
+        ),
+    ),
+    (
+        "explicit",
+        "scale_kind",
+        re.compile(
+            r"\b(?:linear|log(?:arithmic)?)\s+(?:[0-9]+(?:\.[0-9]+)?\s*(?:to|\.\.|[\u2012\u2013\u2014-])\s*[0-9]+(?:\.[0-9]+)?\s+scale|scale\s+from\s+-?[0-9]+(?:\.[0-9]+)?\s+to\s+-?[0-9]+(?:\.[0-9]+)?)\b",
+            re.I,
+        ),
+    ),
+    (
+        "explicit",
+        "scale_minimum",
+        re.compile(
+            r"\b(?:linear|log(?:arithmic)?)\s+-?[0-9]+(?:\.[0-9]+)?\s*(?:to|\.\.|[\u2012\u2013\u2014-])\s*[0-9]+(?:\.[0-9]+)?\s+scale\b",
+            re.I,
+        ),
+    ),
+    (
+        "explicit",
+        "scale_maximum",
+        re.compile(
+            r"\b(?:linear|log(?:arithmic)?)\s+[0-9]+(?:\.[0-9]+)?\s*(?:to|\.\.|[\u2012\u2013\u2014-])\s*-?[0-9]+(?:\.[0-9]+)?\s+scale\b",
+            re.I,
+        ),
+    ),
+    ("explicit", "source", _SOURCE_RE),
+    ("explicit", "color", _FILL_COLOR_RE),
+    ("explicit", "alpha", _FILL_ALPHA_RE),
+)
 
 
 def _request_identity(request: str) -> tuple[bytes, str]:
@@ -229,12 +307,13 @@ def _append_conflicts(obligations: list[RequestObligation]) -> tuple[RequestObli
 
 
 def _patterns() -> tuple[tuple[str, re.Pattern[str]], ...]:
-    """Return the independent supported-anchor patterns."""
+    """Return the semantic extraction patterns."""
     return (
         ("explicit", _REPORT_TITLE_RE),
         ("explicit", _ADD_TRACK_RE),
         ("explicit", _TRACK_LINE_RE),
         ("target", _SECTION_TARGET_RE),
+        ("target", _SECTION_TO_TARGET_RE),
         ("target", _TRACK_TARGET_RE),
         ("explicit", _TARGET_CHANNEL_RE),
         ("explicit", _CHANNEL_RE),
@@ -243,6 +322,7 @@ def _patterns() -> tuple[tuple[str, re.Pattern[str]], ...]:
         ("explicit", _SOURCE_RE),
         ("explicit", _SCALE_RE),
         ("explicit", _SCALE_CLAUSE_RE),
+        ("explicit", _SCALE_PREFIX_RANGE_RE),
         ("explicit", _FILL_COLOR_RE),
         ("explicit", _FILL_ALPHA_RE),
     )
@@ -252,7 +332,7 @@ def extract_supported_anchors(request: str) -> tuple[SupportedAnchor, ...]:
     """Return the independent, bounded anchor inventory used for coverage."""
     data = request.encode("utf-8")
     anchors: list[SupportedAnchor] = []
-    for kind, pattern in _patterns():
+    for kind, field, pattern in _INDEPENDENT_ANCHOR_PATTERNS:
         for match in pattern.finditer(request):
             start = _byte_offset(request, match.start())
             end = _byte_offset(request, match.end())
@@ -262,6 +342,7 @@ def extract_supported_anchors(request: str) -> tuple[SupportedAnchor, ...]:
                     start_byte=start,
                     end_byte=end,
                     kind=kind,  # type: ignore[arg-type]
+                    field=field,  # type: ignore[arg-type]
                 )
             )
     return tuple(sorted(anchors, key=lambda item: (item.start_byte, item.end_byte, item.kind)))
@@ -289,6 +370,19 @@ def extract_supported_obligations(request: str) -> tuple[RequestObligation, ...]
     for pattern in (_ADD_TRACK_RE, _TRACK_LINE_RE):
         for match in pattern.finditer(request):
             owner = match.groupdict().get("title") or match.group("owner")
+            if match.groupdict().get("title"):
+                obligations.append(
+                    _make_obligation(
+                        request=request,
+                        request_sha256=request_sha256,
+                        match=match,
+                        kind=ObligationKind.EXPLICIT_FIELD,
+                        owner_kind=OwnerKind.TRACK,
+                        owner_ref=owner,
+                        field="title",
+                        value=match.group("title"),
+                    )
+                )
             obligations.append(
                 _make_obligation(
                     request=request,
@@ -315,7 +409,7 @@ def extract_supported_obligations(request: str) -> tuple[RequestObligation, ...]
                         value=float(width.group("width")),
                     )
                 )
-    for pattern in (_SECTION_TARGET_RE, _TRACK_TARGET_RE):
+    for pattern in (_SECTION_TARGET_RE, _SECTION_TO_TARGET_RE, _TRACK_TARGET_RE):
         for match in pattern.finditer(request):
             target = match.group("target").strip()
             obligations.append(
@@ -324,9 +418,9 @@ def extract_supported_obligations(request: str) -> tuple[RequestObligation, ...]
                     request_sha256=request_sha256,
                     match=match,
                     kind=ObligationKind.TARGET_REFERENCE,
-                    owner_kind=OwnerKind.SECTION
-                    if "section" in match.group(0).casefold()
-                    else OwnerKind.TRACK,
+                    owner_kind=(
+                        OwnerKind.TRACK if pattern is _TRACK_TARGET_RE else OwnerKind.SECTION
+                    ),
                     owner_ref=target,
                     field="target",
                     value=target,
@@ -391,11 +485,14 @@ def extract_supported_obligations(request: str) -> tuple[RequestObligation, ...]
                 value=match.group("source"),
             )
         )
-    for pattern in (_SCALE_RE, _SCALE_CLAUSE_RE):
+    for pattern in (_SCALE_RE, _SCALE_CLAUSE_RE, _SCALE_PREFIX_RANGE_RE):
         for match in pattern.finditer(request):
             owner = match.groupdict().get("owner") or "request"
+            scale_kind = match.group("kind").lower()
+            if scale_kind == "logarithmic":
+                scale_kind = "log"
             for field, value in (
-                ("scale_kind", match.group("kind").lower()),
+                ("scale_kind", scale_kind),
                 ("scale_minimum", float(match.group("minimum"))),
                 ("scale_maximum", float(match.group("maximum"))),
             ):
@@ -463,7 +560,9 @@ def verify_anchor_coverage(
     anchors = extract_supported_anchors(request)
     for anchor in anchors:
         if not any(
-            item.start_byte <= anchor.start_byte and item.end_byte >= anchor.end_byte
+            item.field == anchor.field
+            and item.start_byte <= anchor.start_byte
+            and item.end_byte >= anchor.end_byte
             for item in obligations
         ):
             raise ValueError("Supported request anchor was not converted to an obligation.")

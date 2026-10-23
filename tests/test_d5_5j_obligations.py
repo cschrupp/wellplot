@@ -11,6 +11,7 @@ from wellplot.agent.code_mode.obligations import (
     ObligationKind,
     ObligationState,
     OwnerKind,
+    extract_supported_anchors,
     extract_supported_obligations,
     validate_report_obligations,
     validate_section_obligations,
@@ -83,6 +84,53 @@ def test_paraphrased_add_track_extracts_only_supported_semantics() -> None:
         "a",
         "only",
     }
+
+
+def test_historical_append_track_request_preserves_all_explicit_facts() -> None:
+    """The original 30 mm request is fully represented before planning."""
+    request = (
+        'Append a 30 mm normal track named "Resistivity QC" to Main Log. '
+        'Plot ILD on it as "Resistivity QC" with a logarithmic 0.2–2000 scale.'
+    )
+    obligations = extract_supported_obligations(request)
+
+    assert {(item.owner_kind, item.field, item.value) for item in obligations} >= {
+        (OwnerKind.SECTION, "target", "Main Log"),
+        (OwnerKind.TRACK, "title", "Resistivity QC"),
+        (OwnerKind.TRACK, "kind", "normal"),
+        (OwnerKind.TRACK, "width_mm", 30.0),
+        (OwnerKind.BINDING, "channel", "ILD"),
+        (OwnerKind.BINDING, "scale_kind", "log"),
+        (OwnerKind.BINDING, "scale_minimum", 0.2),
+        (OwnerKind.BINDING, "scale_maximum", 2000.0),
+    }
+    verify_obligation_spans(request, obligations)
+    verify_anchor_coverage(request, obligations)
+
+
+def test_historical_negative_track_request_preserves_width_anchor() -> None:
+    """The 24 mm negative case cannot lose its explicit width before planning."""
+    request = (
+        'In Main Log, add a 24 mm normal track titled "Neutron QC" and '
+        "plot NPHI from missing_neutron.las on it with a linear 0–45 scale."
+    )
+    obligations = extract_supported_obligations(request)
+
+    assert (OwnerKind.TRACK, "width_mm", 24.0) in {
+        (item.owner_kind, item.field, item.value) for item in obligations
+    }
+    verify_anchor_coverage(request, obligations)
+
+
+def test_independent_anchor_layer_rejects_dropped_width() -> None:
+    """Coverage fails when a recognized width is removed from semantic facts."""
+    request = 'Append a 30 mm normal track named "Resistivity QC" to Main Log.'
+    obligations = extract_supported_obligations(request)
+    without_width = tuple(item for item in obligations if item.field != "width_mm")
+
+    assert any("30 mm" in anchor.text for anchor in extract_supported_anchors(request))
+    with pytest.raises(ValueError, match="Supported request anchor"):
+        verify_anchor_coverage(request, without_width)
 
 
 def test_negation_and_conflict_states_are_explicit() -> None:

@@ -270,9 +270,7 @@ class CanonicalReportWorker:
                     **payload,
                     "correction": str(error),
                     "rules": (
-                        payload["rules"]
-                        + " Return only host-approved slot IDs. Do not emit unsupported "
-                        "fields, duplicate aliases, or values outside the listed slot groups."
+                        payload["rules"] + " Do not emit unsupported fields or duplicate aliases."
                     ),
                 }
                 request = StructuredGenerationRequest(
