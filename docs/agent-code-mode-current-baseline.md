@@ -131,6 +131,32 @@ execution path is outside the active architecture.
 - **Reopen:** only if the original artifact is recovered or a new accepted
   decision explicitly supersedes the custody record.
 
+### K-06 - Live scientific STARTED requires accepted environment and smoke gates
+
+- **Status:** `SETTLED_ARCHITECTURAL_INVARIANT`
+- **Evidence:** `EMPIRICALLY_SUPPORTED`
+- **Provenance:** the closed `d5-5j-qwen-live-001` campaign reached
+  `LIVE_READY` and then `STARTED`, but failed `INCONCLUSIVE / HARNESS`
+  before turn 1 with zero logical generation calls, zero physical generation
+  attempts, and zero provider/model calls. The campaign namespace was consumed
+  without a scientific observation.
+- **Boundary:** all live provider, scientific, benchmark, acceptance, and
+  one-shot campaigns.
+- **Finding:** static/provider-free qualification and metadata readiness do not
+  establish that the actual sandbox/LAN/provider/harness execution path works.
+- **Consequence:** before scientific authority is issued, first qualify the
+  actual execution environment, then run and independently accept a separate
+  non-scientific live smoke under its own authority and namespace.
+- **Regression/governance consequence:** a scientific authorization must cite
+  an accepted smoke record for the exact executable/runtime/execution
+  environment. `STARTED` is forbidden when that prerequisite is absent.
+- **Classification:** sandbox/LAN/DNS/credential/filesystem/provider-
+  construction/harness-bootstrap failures are environment/harness evidence,
+  not model-capability or scientific evidence.
+- **Reopen:** only through an explicit governance review demonstrating a
+  mechanically equivalent pre-START qualification that preserves the same
+  separation of environment, smoke, and science.
+
 ## 4. Implementation Requirements
 
 ### R-01 - Provider-visible input sufficiency
@@ -471,6 +497,7 @@ of current authority.
 
 ### Promoted
 
+- Live scientific campaigns now require an execution-environment gate and a separately authorized, independently accepted live smoke before scientific `STARTED`.
 - The CM/TW/D5 findings listed in sections 3-5 are now active project
   constraints rather than archive-only observations.
 - Schema/input/grading defects must be repaired or bounded before model
@@ -487,6 +514,7 @@ of current authority.
 
 ### Changed
 
+- The closed `d5-5j-qwen-live-001` result is classified as `INCONCLUSIVE / HARNESS`: readiness passed, but the campaign failed before turn 1 with zero generation calls. It does not weaken D5-5J semantic acceptance and does not provide Qwen scientific evidence.
 - Evidence strength is now explicitly separate from project knowledge status.
 - Accepted results require a Knowledge Delta and active-baseline update before
   dependent slices proceed.
@@ -495,6 +523,8 @@ of current authority.
 
 ### Superseded
 
+- Direct progression from readiness into an irreversible scientific `STARTED` without a separately accepted live smoke.
+- Treating project-level endpoint authorization as proof that the actual sandbox/LAN execution context has the required network, credential, filesystem, and runtime permissions.
 - Archive-first progression from accepted result directly to another dependent
   experiment.
 - The pre-baseline assumption that an unpublished implementation candidate can
@@ -516,6 +546,7 @@ of current authority.
 
 ### Required baseline/regression updates
 
+- Every future scientific live authority must reference an accepted smoke campaign/evidence digest for the exact executable/runtime/execution environment; otherwise `STARTED` is forbidden.
 - Future contract work must preserve and exercise the accepted H schema parity,
   inventory, preservation, causal-negative, and request/verifier consistency
   regressions before qualification.
