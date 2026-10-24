@@ -3,7 +3,7 @@
 ## Status
 
 This document records the provider-free implementation checkpoint for
-`WELLPLOT-D5-5J-CANONICAL-REQUEST-OBLIGATION-PRESERVATION-IMPL-REWORK2-AUTH-001`.
+`WELLPLOT-D5-5J-EXISTING-OBJECT-OBLIGATION-GROUNDING-REWORK-AUTH-001`.
 It does not authorize provider, endpoint, or model execution.
 
 The implementation remains on the existing path:
@@ -29,6 +29,14 @@ bounded correction opportunity; no retry loop was introduced.
 Target cardinality is checked before enrichment when one explicit request
 target would otherwise authorize multiple section tasks. This is a safety
 boundary, not a hard-coded section-name rule.
+
+Sparse existing-object actions are validated against host-owned context. For
+`update_curve_scale`, the existing-curve selector is resolved through the
+canonical `resolve_existing_curve()` path; scale obligations are checked
+against the action's scale and target/channel/label obligations are checked
+against the resolved existing-curve context. The resolved canonical binding
+identity is carried through lowering and post-lowering verification rather
+than inferred from an arbitrary document-wide match.
 
 Targeted channel obligations remain task-local; only genuinely request-wide
 facts are global. Every supported lexical anchor is independently checked for
@@ -59,19 +67,14 @@ digest and source inventory are recorded in
 
 ## Provider-free validation
 
-The focused obligation/archive tests cover exact request/span custody,
-UTF-8 byte offsets, tamper rejection, paraphrased add-track extraction,
-negation/conflict states, one-to-one and targeted multi-section partitioning,
-independent anchor coverage, final preservation containment, correction-scope
-containment, deterministic archive bytes, durable-copy verification, and
-secret-name rejection. The focused obligation/archive contract suite passes 21
-tests. The comparative static/entrypoint checks pass 11 tests. The exact
-canonical nine-turn route was then reproduced 9/9 for each Qwen and DeepSeek
-lane configuration, including the real CBL render and cumulative LAS
-persistence/reload path, with zero provider/model/endpoint calls. The broader
-canonical Code Mode/planner/enrichment/workflow/graph surface passes 286 tests.
-No endpoint, provider, model, or live campaign
-calls were made for D5-5J.
+The focused D5-5J/obligation and comparative suite passes 39 tests with 2
+slow tests deselected. The adjacent D4 regression suite passes 79 tests. The
+exact canonical nine-turn route was reproduced 9/9 for both the Qwen and
+DeepSeek fixture lanes, including the CBL render and cumulative LAS
+persistence/reload path; each lane used 18 logical and 18 physical fixture
+calls and made zero provider, endpoint, or model calls. The frozen LAS/DLIS
+asset identities were rechecked, and the D5 single-engine attestation passes.
+No live campaign was started.
 
 ## Checkpoint lineage
 
@@ -88,9 +91,11 @@ followed by this bounded corrective rework and attestation closeout:
 7. bounded rework for task ownership, final preservation, host-stage evidence,
    and durable archive publication.
 
-The final implementation checkpoint is
-`2ac9503df930fb088b69e19713c371a1209c93e5`. The final commit must be inspected
-as a descendant of the authorized parent.
+The accepted executable implementation checkpoint is
+`3b888b9c1fa71dddddd37a316031662b876468ab`, a descendant of the authorized
+`dfa5b809a3bec79be1ec7537c17d91096407e742` base. The final review tip may
+include this bounded documentation closeout and the durable evidence manifest,
+but live execution must not use a later unreviewed executable checkpoint.
 The local checkout used for this work contains no live campaign evidence and no
 provider credentials.
 
@@ -101,6 +106,6 @@ source changes and passes `scripts/d5_single_engine_attestation.py --check`.
 
 This result does not claim that every natural-language request is extracted.
 Only the bounded supported vocabulary is covered. Unknown, ambiguous, negated,
-or conflicting semantics must remain unresolved or fail closed. The next
-independent review must inspect the worker action shapes and post-lowering
-verification coverage before any live qualification is considered.
+or conflicting semantics must remain unresolved or fail closed. This
+provider-free rework is ready for independent review; no live qualification is
+authorized by this result.
