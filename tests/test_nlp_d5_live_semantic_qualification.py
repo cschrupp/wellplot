@@ -1726,6 +1726,18 @@ def test_provider_free_smoke_uses_canonical_adapter_without_scientific_runner(
         assert body["response_format"]["type"] == "json_schema"
         assert body["messages"][0]["content"] == d5.SMOKE_SYSTEM_PROMPT
         assert body["messages"][1]["content"] == d5.SMOKE_USER_PROMPT
+        model_io_path = tmp_path / "smoke" / "d5-5j-smoke-provider-free.model-io.jsonl"
+        model_io_rows = [
+            json.loads(line) for line in model_io_path.read_text(encoding="utf-8").splitlines()
+        ]
+        request_rows = [row for row in model_io_rows if row["event"] == "physical_request"]
+        response_rows = [row for row in model_io_rows if row["event"] == "physical_response"]
+        logical_rows = [row for row in model_io_rows if row["event"] == "logical_call_result"]
+        assert len(request_rows) == len(response_rows) == len(logical_rows) == 1
+        assert request_rows[0]["request_json"]["chat_template_kwargs"] == {"enable_thinking": False}
+        assert request_rows[0]["request_sha256"]
+        assert response_rows[0]["response_sha256"]
+        assert logical_rows[0]["logical_call_index"] == 1
     finally:
         assert clients
 
@@ -1754,8 +1766,8 @@ def test_provider_free_smoke_invalid_structured_response_is_inconclusive(tmp_pat
         assert clients
 
 
-def test_provider_free_smoke_transport_failure_is_environment_blocked(tmp_path: Path) -> None:
-    """A transport failure remains distinct from structured/provider evidence."""
+def test_provider_free_smoke_transport_failure_is_provider_inconclusive(tmp_path: Path) -> None:
+    """A generic transport failure is not asserted to be sandbox denial."""
     requests: list[httpx.Request] = []
     clients: list[httpx.AsyncClient] = []
 
@@ -1807,10 +1819,111 @@ def test_provider_free_smoke_transport_failure_is_environment_blocked(tmp_path: 
         provider_factory=provider_factory,
     )
     try:
-        assert result["status"] == "SMOKE_ENVIRONMENT_BLOCKED"
+        assert result["status"] == "SMOKE_PROVIDER_INCONCLUSIVE"
         assert len(requests) == 3
     finally:
         assert clients
+
+
+@pytest.mark.parametrize(
+    ("endpoint_failure", "expected_calls"),
+    [
+        ("credential", 0),
+        ("first_get", 1),
+        ("second_get", 2),
+    ],
+)
+def test_smoke_readiness_failure_is_pre_start_and_truthful(
+    tmp_path: Path,
+    endpoint_failure: str,
+    expected_calls: int,
+) -> None:
+    """Readiness failures seal without creating SMOKE_STARTED state."""
+    artifact_root = tmp_path / f"pre-smoke-{endpoint_failure}"
+    authorization = _authorization(
+        campaign_id=f"d5-5j-smoke-{endpoint_failure}",
+        artifact_root=str(artifact_root),
+    )
+    provider_calls: list[str] = []
+
+    def endpoint_get(url: str, token: str) -> object:
+        del token
+        if endpoint_failure == "first_get":
+            raise d5.D5ReadinessError("endpoint_authentication_failed", 1)
+        if endpoint_failure == "second_get" and url == PROJECT_CONFIG.props_url:
+            raise d5.D5ReadinessError("endpoint_server_error", 2)
+        if url == PROJECT_CONFIG.model_catalog_url:
+            return {"data": [{"id": d5.EXPECTED_MODEL}]}
+        return _props()
+
+    result = d5.execute_live_smoke(
+        repo_root=REPO_ROOT,
+        authorization=authorization,
+        artifact_root=artifact_root,
+        endpoint_get=endpoint_get,
+        api_key_loader=(
+            (lambda: "") if endpoint_failure == "credential" else (lambda: "provider-free-token")
+        ),
+        static_checker=lambda repo, checked, paths: {"status": "PASS"},
+        provider_factory=lambda repo, root, token: (
+            provider_calls.append(token) or _WrongSemanticAdapter()
+        ),
+    )
+
+    assert result["status"] == "SMOKE_NOT_READY"
+    assert result["terminal"]["endpoint_calls"] == expected_calls
+    assert result["readiness"]["endpoint_calls"] == expected_calls
+    assert provider_calls == []
+    state = json.loads(
+        (artifact_root / f"{authorization.campaign_id}.state.json").read_text(encoding="utf-8")
+    )
+    journal = (artifact_root / f"{authorization.campaign_id}.journal.jsonl").read_text(
+        encoding="utf-8"
+    )
+    assert state["status"] == "SMOKE_TERMINAL"
+    assert "SMOKE_STARTED" not in journal
+    assert "smoke_not_started" in journal
+
+
+def test_smoke_provider_construction_failure_is_pre_start(tmp_path: Path) -> None:
+    """Provider construction failure cannot create SMOKE_STARTED custody."""
+    artifact_root = tmp_path / "provider-construction"
+    authorization = _authorization(
+        campaign_id="d5-5j-smoke-provider-construction",
+        artifact_root=str(artifact_root),
+    )
+
+    def fail_provider(repo: Path, root: Path, token: str) -> object:
+        del repo, root, token
+        raise RuntimeError("provider unavailable")
+
+    result = d5.execute_live_smoke(
+        repo_root=REPO_ROOT,
+        authorization=authorization,
+        artifact_root=artifact_root,
+        endpoint_get=lambda url, token: (
+            {"data": [{"id": d5.EXPECTED_MODEL}]}
+            if url == PROJECT_CONFIG.model_catalog_url
+            else _props()
+        ),
+        api_key_loader=lambda: "provider-free-token",
+        static_checker=lambda repo, checked, paths: {"status": "PASS"},
+        provider_factory=fail_provider,
+    )
+
+    assert result["status"] == "SMOKE_NOT_READY"
+    assert result["terminal"]["endpoint_calls"] == 2
+    journal = (artifact_root / f"{authorization.campaign_id}.journal.jsonl").read_text(
+        encoding="utf-8"
+    )
+    assert "SMOKE_STARTED" not in journal
+
+
+def test_smoke_static_contract_inspects_installed_sdk() -> None:
+    """The shared SDK inspection enforces the installed smoke contract."""
+    version, retries = d5._inspect_openai_sdk()
+    assert version == d5.EXPECTED_OPENAI_VERSION
+    assert retries == d5.EXPECTED_SDK_MAX_RETRIES
 
 
 def test_smoke_ledger_rejects_second_logical_and_fourth_physical_call() -> None:

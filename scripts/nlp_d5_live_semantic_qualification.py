@@ -473,6 +473,20 @@ def _run_static_attestation(repo_root: Path) -> dict[str, Any]:
     return {"status": "PASS", "checks": results}
 
 
+def _inspect_openai_sdk() -> tuple[str, int]:
+    """Inspect the installed SDK version and constructor retry default."""
+    try:
+        version = importlib.metadata.version("openai")
+        from openai import AsyncOpenAI
+
+        retries = inspect.signature(AsyncOpenAI).parameters["max_retries"].default
+    except (ImportError, KeyError, TypeError, ValueError, importlib.metadata.PackageNotFoundError):
+        raise D5StaticPreflightError("OpenAI SDK retry contract cannot be inspected") from None
+    if version != EXPECTED_OPENAI_VERSION or retries != EXPECTED_SDK_MAX_RETRIES:
+        raise D5StaticPreflightError("OpenAI SDK version/retry contract drifted")
+    return version, retries
+
+
 def _default_static_checks(
     repo_root: Path,
     authorization: D5Authorization,
@@ -571,15 +585,7 @@ def _default_static_checks(
     if current_manifest != dict(authorization.production_component_sha256):
         raise D5StaticPreflightError("production component attestation drifted")
 
-    try:
-        version = importlib.metadata.version("openai")
-        from openai import AsyncOpenAI
-
-        retries = inspect.signature(AsyncOpenAI).parameters["max_retries"].default
-    except (ImportError, KeyError, TypeError, ValueError, importlib.metadata.PackageNotFoundError):
-        raise D5StaticPreflightError("OpenAI SDK retry contract cannot be inspected") from None
-    if version != EXPECTED_OPENAI_VERSION or retries != EXPECTED_SDK_MAX_RETRIES:
-        raise D5StaticPreflightError("OpenAI SDK version/retry contract drifted")
+    version, retries = _inspect_openai_sdk()
 
     static_attestation = _run_static_attestation(repo_root)
     return {
@@ -627,6 +633,7 @@ def _default_smoke_static_checks(
         raise D5StaticPreflightError("OpenAI package contract drifted")
     if authorization.sdk_max_retries != EXPECTED_SDK_MAX_RETRIES:
         raise D5StaticPreflightError("SDK retry contract drifted")
+    version, retries = _inspect_openai_sdk()
     if authorization.structured_output_contract != EXPECTED_STRUCTURED_OUTPUT:
         raise D5StaticPreflightError("structured-output contract drifted")
     if not authorization.thinking_off:
@@ -651,8 +658,8 @@ def _default_smoke_static_checks(
         "project_config_fingerprint_sha256": project_config.fingerprint_sha256,
         "provider": authorization.provider,
         "model": authorization.model,
-        "sdk_version": authorization.sdk_version,
-        "sdk_max_retries": authorization.sdk_max_retries,
+        "sdk_version": version,
+        "sdk_max_retries": retries,
         "structured_output_contract": authorization.structured_output_contract,
         "thinking_control_mechanism": THINKING_CONTROL_MECHANISM,
         "thinking_control_options_sha256": THINKING_CONTROL_OPTIONS_SHA256,
@@ -761,7 +768,8 @@ class D5SmokeCustody:
         *,
         authorization: D5Authorization,
         static_preflight: Mapping[str, Any],
-        readiness: D5ReadinessProjectionProtocol | None,
+        readiness: D5ReadinessProjectionProtocol,
+        endpoint_calls: int,
     ) -> D5SmokeCustody:
         """Create smoke custody only after static checks and readiness pass."""
         ensure_fresh_namespace(paths)
@@ -773,8 +781,8 @@ class D5SmokeCustody:
             "status": "SMOKE_STARTED",
             "provider": authorization.provider,
             "model": authorization.model,
-            "endpoint_calls": 2,
-            "identity_endpoint_calls": 2,
+            "endpoint_calls": endpoint_calls,
+            "identity_endpoint_calls": endpoint_calls,
             "logical_generation_calls": 0,
             "physical_generation_attempts": 0,
             "provider_calls": 0,
@@ -795,6 +803,57 @@ class D5SmokeCustody:
                 "campaign_id": paths.campaign_id,
                 "authorization_id": authorization.authorization_id,
                 "status": "SMOKE_STARTED",
+            },
+            exclusive=True,
+        )
+        paths.model_io.touch(exist_ok=False)
+        return cls(paths=paths, authorization=authorization, state=state)
+
+    @classmethod
+    def pre_smoke_failure(
+        cls,
+        paths: EvidencePaths,
+        *,
+        authorization: D5Authorization,
+        static_preflight: Mapping[str, Any],
+        endpoint_calls: int,
+        reason: str,
+    ) -> D5SmokeCustody:
+        """Create durable pre-smoke evidence without asserting smoke started."""
+        ensure_fresh_namespace(paths)
+        state = {
+            "experiment_version": D5_EXPERIMENT_VERSION,
+            "mode": "canonical_live_smoke",
+            "campaign_id": paths.campaign_id,
+            "authorization_id": authorization.authorization_id,
+            "status": "SMOKE_NOT_STARTED",
+            "provider": authorization.provider,
+            "model": authorization.model,
+            "endpoint_calls": endpoint_calls,
+            "identity_endpoint_calls": endpoint_calls,
+            "logical_generation_calls": 0,
+            "physical_generation_attempts": 0,
+            "provider_calls": 0,
+            "model_calls": 0,
+            "scientific_population_loaded": False,
+            "scientific_campaign_started": False,
+            "readiness": None,
+            "static_preflight": dict(static_preflight),
+            "reason": reason,
+        }
+        if not evidence_is_redacted(state):
+            raise D5HarnessError("smoke state redaction failure")
+        _atomic_json(paths.state, state, exclusive=True)
+        _append_jsonl(
+            paths.journal,
+            {
+                "event": "smoke_not_started",
+                "mode": "canonical_live_smoke",
+                "campaign_id": paths.campaign_id,
+                "authorization_id": authorization.authorization_id,
+                "status": "SMOKE_NOT_STARTED",
+                "endpoint_calls": endpoint_calls,
+                "reason": reason,
             },
             exclusive=True,
         )
@@ -848,6 +907,7 @@ class D5SmokeCustody:
         if outcome not in allowed or self.terminal_written or self.paths.terminal.exists():
             raise D5HarnessError("invalid or duplicate smoke terminal")
         state = json.loads(self.paths.state.read_text(encoding="utf-8"))
+        endpoint_calls = int(state.get("endpoint_calls", 0))
         state.update(
             {
                 "status": "SMOKE_TERMINAL",
@@ -881,7 +941,8 @@ class D5SmokeCustody:
             "reason": reason,
             "logical_generation_calls": self.ledger.logical_calls,
             "physical_generation_attempts": self.ledger.physical_attempts,
-            "endpoint_calls": 2,
+            "endpoint_calls": endpoint_calls,
+            "identity_endpoint_calls": endpoint_calls,
             "provider_calls": self.ledger.logical_calls,
             "model_calls": self.ledger.logical_calls,
             "scientific_population_loaded": False,
@@ -1554,7 +1615,10 @@ def prepare_readiness(
     if static_preflight.get("status") != "PASS":
         raise D5ReadinessError("static_preflight_failed", 0)
     _validate_project_config(project_config)
-    token = api_key_loader()
+    try:
+        token = api_key_loader()
+    except d4.ReadinessFailure as error:
+        raise D5ReadinessError(error.reason_code, error.identity_endpoint_calls) from None
     if not isinstance(token, str) or not token.strip():
         raise D5ReadinessError("credential_unavailable", 0)
     calls: list[str] = []
@@ -1684,6 +1748,13 @@ class _PhysicalAttemptObserver:
     def logical_call_completed(self, event: Mapping[str, Any]) -> None:
         """Persist the canonical backend parse/validation result."""
         if self.model_io_callback is not None:
+            response_reason = event.get("response_reason")
+            if hasattr(response_reason, "value"):
+                response_reason = response_reason.value
+            validation_shape = event.get("validation_shape")
+            to_json = getattr(validation_shape, "to_json", None)
+            if callable(to_json):
+                validation_shape = to_json()
             self.model_io_callback(
                 {
                     "event": "logical_call_result",
@@ -1692,8 +1763,8 @@ class _PhysicalAttemptObserver:
                     "model": event.get("model"),
                     "engine_outcome": event.get("outcome"),
                     "failure_category": event.get("failure_category"),
-                    "response_reason": event.get("response_reason"),
-                    "validation_shape": event.get("validation_shape"),
+                    "response_reason": response_reason,
+                    "validation_shape": validation_shape,
                 }
             )
 
@@ -1765,7 +1836,6 @@ class _ObservedLiveAdapter:
             raise D5HarnessError("canonical provider backend is unavailable")
         logical_index = custody.ledger.reserve()
         self.set_active_turn(SMOKE_TURN_ID)
-        self.observer.callback = custody.record_attempt
         self.observer.logical_call_started(
             {
                 "index": logical_index,
@@ -2064,12 +2134,6 @@ def execute_live_smoke(
     static = (static_checker or _default_smoke_static_checks)(repo_root, authorization, paths)
     if static.get("status") != "PASS":
         raise D5StaticPreflightError("smoke static preflight failed")
-    custody = D5SmokeCustody.start(
-        paths,
-        authorization=authorization,
-        static_preflight=static,
-        readiness=None,
-    )
     load_key = api_key_loader or (lambda: d4.load_d4_api_key(repo_root))
     build_provider = provider_factory or (
         lambda key_root, key_artifact_root, token: create_live_adapter(
@@ -2091,6 +2155,13 @@ def execute_live_smoke(
             provider_factory=lambda token: build_provider(repo_root, artifact_root, token),
         )
     except D5ReadinessError as error:
+        custody = D5SmokeCustody.pre_smoke_failure(
+            paths,
+            authorization=authorization,
+            static_preflight=static,
+            endpoint_calls=error.endpoint_calls,
+            reason=error.reason,
+        )
         terminal = custody.finish("SMOKE_NOT_READY", reason=error.reason)
         return {
             "status": "SMOKE_NOT_READY",
@@ -2100,18 +2171,30 @@ def execute_live_smoke(
             "model_calls": 0,
         }
     if not isinstance(readiness.adapter, _ObservedLiveAdapter):
+        custody = D5SmokeCustody.pre_smoke_failure(
+            paths,
+            authorization=authorization,
+            static_preflight=static,
+            endpoint_calls=len(readiness.endpoint_calls),
+            reason="canonical_adapter_unavailable",
+        )
         terminal = custody.finish("SMOKE_HARNESS_FAIL", reason="canonical adapter unavailable")
         return {"status": "SMOKE_HARNESS_FAIL", "terminal": terminal}
+    custody = D5SmokeCustody.start(
+        paths,
+        authorization=authorization,
+        static_preflight=static,
+        readiness=readiness.projection,
+        endpoint_calls=len(readiness.endpoint_calls),
+    )
     custody.record_readiness(readiness.projection)
+    readiness.adapter.bind_model_io(custody.record_model_io)
+    readiness.adapter.bind_physical_attempt(custody.record_attempt)
     try:
         asyncio.run(_run_smoke_and_close(readiness.adapter, custody))
     except ProviderRequestError as error:
         category = error.category.value
-        outcome = (
-            "SMOKE_ENVIRONMENT_BLOCKED"
-            if category in {"timeout", "transport"}
-            else "SMOKE_PROVIDER_INCONCLUSIVE"
-        )
+        outcome = "SMOKE_PROVIDER_INCONCLUSIVE"
         terminal = custody.finish(outcome, reason=category)
         return {
             "status": outcome,
