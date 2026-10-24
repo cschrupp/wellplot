@@ -41,6 +41,42 @@ non-authoritative. When a settled finding is mechanically testable, preserve
 it with a regression or invariant check; otherwise record why it cannot be
 tested mechanically.
 
+## Live Execution Safety Gate
+
+No agent may consume an irreversible live, scientific, benchmark, or one-shot
+campaign authority until all of the following have independently passed:
+
+1. static/provider-free qualification of the exact executable and frozen inputs;
+2. execution-environment qualification proving that the actual runtime is
+   explicitly permitted and able to reach every required LAN/network endpoint,
+   credential source, filesystem location, subprocess/runtime facility, and
+   other external resource;
+3. non-generative readiness/identity checks;
+4. a separate live smoke, under its own authority and fresh non-scientific
+   namespace, that exercises the real provider/harness path through the minimum
+   bounded live operation needed to establish provider construction, request
+   serialization, structured-output handling, custody, accounting, and orderly
+   termination; and
+5. independent acceptance of that smoke before scientific authority is issued.
+
+`STARTED` must never be the first point at which the project discovers whether
+the real execution environment, LAN access, provider construction,
+structured-output path, or live harness works.
+
+Project authorization to use an endpoint does not establish sandbox, LAN, DNS,
+credential, filesystem, subprocess, or runtime permission. A smoke authority
+and a scientific campaign authority are separate and non-transferable. A
+failed or inconclusive smoke does not authorize or consume a scientific
+campaign. Scientific campaigns use fresh namespaces and must not be used for
+infrastructure discovery.
+
+Sandbox denial, LAN/DNS/routing restrictions, credential isolation, filesystem
+restrictions, provider-construction failure, or harness-initialization failure
+are environment/harness evidence, not model or scientific evidence.
+
+The complete gate, authority-consumption rules, and failure classification are
+defined in `docs/project-decision-protocol.md`.
+
 ## MCP Stabilization
 
 During MCP stabilization, no runtime workaround may be added merely because a
