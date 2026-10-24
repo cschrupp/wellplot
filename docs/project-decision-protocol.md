@@ -442,3 +442,121 @@ genuinely unresolved questions, not as the normal first source of current
 project decisions. Keep active baselines concise: retain the finding, status,
 applicability boundary, provenance, implementation/regression consequence, and
 reopening condition rather than copying raw traces or chronology.
+
+## P. Live Execution Pre-START Gate
+
+This section is a standing rule for any live provider, scientific, benchmark,
+acceptance, or other one-shot execution whose authority becomes irreversible
+after a campaign enters `STARTED`.
+
+### Required gate order
+
+The mandatory order is:
+
+```text
+repository/current-baseline bootstrap
+-> provider-free/static qualification
+-> execution-environment qualification
+-> non-generative readiness
+-> separately authorized live smoke
+-> independent smoke acceptance
+-> separately authorized scientific campaign
+-> STARTED
+```
+
+The gates are distinct. Passing one does not imply the next.
+
+### Execution-environment qualification
+
+Before consuming a live smoke or scientific authority, establish that the
+**actual execution context** is permitted and able to use every external
+resource required by the run. At minimum, when applicable, this includes:
+
+- LAN/private-network access and routing to the exact authorized endpoint;
+- sandbox/network policy permission, including DNS behavior where relevant;
+- credential availability through the authorized credential path;
+- writable evidence and durable-archive destinations;
+- required subprocess/runtime capabilities; and
+- access to frozen local scientific assets.
+
+A project-level statement that an endpoint may be used is not evidence that a
+particular sandbox or agent runtime can reach it. Successful metadata GETs also
+do not prove that the generation SDK/provider path, event hooks, filesystem
+custody, or campaign initialization can execute.
+
+An environment failure must terminate as environment/harness evidence. It must
+not be attributed to the model or scientific hypothesis.
+
+### Separate live smoke
+
+Before a scientific campaign can be authorized, a live smoke must run under a
+**different authority ID and different namespace**. The smoke must be
+non-scientific and must not consume a frozen scientific turn.
+
+The smoke should exercise the minimum real production path needed to prove the
+environment and harness are operational, including as applicable:
+
+- construction of the actual provider/client;
+- one bounded live generation through the production provider boundary;
+- exact request serialization and required request controls;
+- structured-output/provider acceptance;
+- Python/schema validation;
+- logical and physical call accounting;
+- evidence/state/journal/model-I/O writes;
+- orderly terminal generation; and
+- durable archival/restoration when the scientific campaign depends on that
+  custody path.
+
+The smoke is not a semantic benchmark. It should use a fixed non-scientific
+stimulus and the smallest call budget that can demonstrate the live execution
+boundary.
+
+### Independent smoke acceptance
+
+A smoke result must be independently reviewed before a scientific authority is
+issued. The scientific authority must cite:
+
+- the accepted smoke authority and campaign ID;
+- the exact executable checkpoint exercised;
+- the exact runtime/environment identity exercised;
+- the smoke evidence/archive digest; and
+- the acceptance disposition.
+
+If no accepted smoke exists for the exact executable/runtime/execution-
+environment combination, scientific `STARTED` is forbidden.
+
+A change to the executable, provider/runtime identity, network/sandbox
+environment, credential path, or live harness invalidates smoke applicability
+unless an explicit review shows the change cannot affect the qualified live
+boundary.
+
+### Authority consumption
+
+Smoke and scientific authorities are separate and non-transferable.
+
+- A failed/inconclusive smoke does not authorize a scientific campaign.
+- A smoke namespace is never reused as a scientific namespace.
+- A scientific campaign uses a fresh authority ID and fresh namespace.
+- Once scientific custody reaches `STARTED`, campaign-specific replay,
+  selective-rerun, and replacement prohibitions apply.
+- A scientific failure or inconclusive result never automatically authorizes
+  another run.
+
+### Classification
+
+Pre-scientific failures such as sandbox denial, LAN/DNS/routing restrictions,
+credential isolation, filesystem restrictions, provider/client construction,
+event-hook initialization, custody initialization, or other harness bootstrap
+failures are classified as environment/harness outcomes.
+
+They are not model-capability evidence and are not scientific failures.
+
+### Standing invariant
+
+`STARTED` must never be the first point at which WellPlot discovers whether
+the real live execution environment works.
+
+Where practical, make this gate mechanically checkable by requiring the
+scientific authorization record to reference an accepted smoke record and
+digest.
+
