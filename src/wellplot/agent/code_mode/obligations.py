@@ -613,6 +613,7 @@ def _identity_matches(value: Mapping[str, Any], object_id: str) -> bool:
             "section_id",
             "track_id",
             "binding_id",
+            "fill_id",
             "slot_id",
             "key",
             "remark_id",
@@ -742,6 +743,7 @@ def validate_section_obligations(
     obligations: tuple[RequestObligation, ...],
     *,
     section_context: ResolvedSectionContext | None = None,
+    section_title: str | None = None,
 ) -> None:
     """Require every supported section obligation before canonical lowering."""
     if getattr(action, "action", None) == "update_curve_scale":
@@ -848,10 +850,11 @@ def validate_section_obligations(
             actual = getattr(fill, item.field, None)
             if actual != item.value:
                 raise ValueError(f"Requested fill {item.field} was not satisfied.")
+        actual_section_title = section_title if section is None else getattr(section, "title", None)
         if (
             item.owner_kind is OwnerKind.SECTION
             and item.field == "target"
-            and (section is None or getattr(section, "title", None) != item.value)
+            and actual_section_title != item.value
         ):
             raise ValueError("Requested section target was not satisfied.")
 
@@ -983,14 +986,14 @@ def verify_document_obligations(
     sections = dump.get("sections", ())
     if not isinstance(sections, list):
         raise ValueError("Candidate document has no section inventory.")
-    updated_binding_ids = set()
+    grounded_binding_ids = set()
     for operation in grounded_operations:
         object_kind = str(getattr(operation, "object_kind", "")).casefold()
         object_kind = object_kind.rsplit(".", 1)[-1]
         action = str(getattr(operation, "action", "")).casefold()
         action = action.rsplit(".", 1)[-1]
-        if object_kind == "curve_binding" and action == "update":
-            updated_binding_ids.add(str(getattr(operation, "object_id", "")))
+        if object_kind == "curve_binding" and action in {"add", "create", "update"}:
+            grounded_binding_ids.add(str(getattr(operation, "object_id", "")))
     for item in obligations:
         if item.state in {ObligationState.CONFLICTING, ObligationState.UNRESOLVED}:
             raise ValueError("Candidate contains unresolved request obligations.")
@@ -1042,7 +1045,7 @@ def verify_document_obligations(
                         if (
                             (
                                 owner == "request"
-                                and (not updated_binding_ids or binding_id in updated_binding_ids)
+                                and (not grounded_binding_ids or binding_id in grounded_binding_ids)
                                 and binding.get("channel") == item.value
                             )
                             or owner in track_identity
@@ -1075,7 +1078,7 @@ def verify_document_obligations(
                         if (
                             (
                                 owner == "request"
-                                and (not updated_binding_ids or binding_id in updated_binding_ids)
+                                and (not grounded_binding_ids or binding_id in grounded_binding_ids)
                             )
                             or owner in track_identity
                             or owner in binding_identity

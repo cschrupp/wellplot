@@ -416,6 +416,7 @@ class CanonicalSectionWorker:
                     action,
                     task.obligations,
                     section_context=section_context,
+                    section_title=task.existing_section_hint,
                 )
                 intent = lower_section_action(action, context=section_context, document=document)
                 verify_lowered_existing_curve_obligations(

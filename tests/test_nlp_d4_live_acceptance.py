@@ -1507,11 +1507,16 @@ class _D4SessionPlanner:
                 "binding.curve",
                 "fill.curve",
             )
+        task_goal = "Execute the requested LAS revision."
+        if request.startswith("Append a 30 mm normal track"):
+            task_goal = f"{request} Normalized track width: 30.0 mm; maximum scale value: 2000.0."
+        elif request.startswith("In Main Log, add a 24 mm normal track"):
+            task_goal = f"{request} Normalized track width: 24.0 mm; maximum scale value: 45.0."
         return SemanticPlan(
             summary="D4 LAS revision",
             section_tasks=(
                 SectionTask(
-                    goal="Execute the requested LAS revision.",
+                    goal=task_goal,
                     capability_ids=capability_ids,
                     existing_section_hint=section_hint,
                     source_hints=source_hints,
