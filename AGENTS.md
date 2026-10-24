@@ -70,6 +70,11 @@ failed or inconclusive smoke does not authorize or consume a scientific
 campaign. Scientific campaigns use fresh namespaces and must not be used for
 infrastructure discovery.
 
+Separate smoke authority and evidence namespace through the canonical live
+harness; do not create a separate live smoke harness or parallel execution
+path. Smoke mode must stop before the canonical scientific campaign runner
+consumes the frozen population.
+
 Sandbox denial, LAN/DNS/routing restrictions, credential isolation, filesystem
 restrictions, provider-construction failure, or harness-initialization failure
 are environment/harness evidence, not model or scientific evidence.

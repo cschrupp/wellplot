@@ -25,9 +25,12 @@ import uuid
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
+
+from pydantic import BaseModel
 
 from scripts import nlp_d4_live_acceptance as d4
+from wellplot.agent.providers.base import ProviderRequestError, StructuredGenerationRequest
 from wellplot.project_config import ProjectConfig, load_project_config
 
 D5_EXPERIMENT_VERSION = "WELLPLOT-NLP-D5-5I"
@@ -52,6 +55,12 @@ ROLE_LOGICAL_CALL_LIMITS = {
 MAX_ENDPOINT_RESPONSE_BYTES = 1_048_576
 THINKING_CONTROL_MECHANISM = "chat_template_kwargs.enable_thinking"
 THINKING_CONTROL_OPTIONS_SHA256 = "220b99e47feb82851cab428f86b8fe977ae7c605400d421a91e99d4a35ec9c26"
+SMOKE_ROLE = "smoke"
+SMOKE_TURN_ID = "D5-5J-SMOKE"
+SMOKE_SYSTEM_PROMPT = "Return the smoke readiness object using the supplied JSON Schema."
+SMOKE_USER_PROMPT = "Return exactly one JSON object with status READY and no other fields."
+SMOKE_MAX_LOGICAL_CALLS = 1
+SMOKE_MAX_PHYSICAL_ATTEMPTS = 3
 FROZEN_TURN_IDS = (
     "D4-C01:C01",
     "D4-L01:T1",
@@ -208,6 +217,20 @@ class D5ProcessInterruption(D5HarnessError):
 def _thinking_control_options() -> dict[str, object]:
     """Return the one frozen request-level thinking control."""
     return {"chat_template_kwargs": {"enable_thinking": False}}
+
+
+class SmokeReadyResponse(BaseModel):
+    """Minimal structured response used only by the canonical smoke mode."""
+
+    status: Literal["READY"]
+
+
+def _smoke_schema_sha256() -> str:
+    """Hash the exact Pydantic schema sent by the smoke request."""
+    return _sha256_json(SmokeReadyResponse.model_json_schema())
+
+
+SMOKE_SCHEMA_SHA256 = "1559e2f0e9da487297424da1fd94d65c877ce4c0a26b21658daed90c4f5680f6"
 
 
 TERMINAL_DECISIONS = frozenset({"PASS", "FAIL", "INCONCLUSIVE", "ARCHITECTURAL_ESCALATION"})
@@ -583,6 +606,67 @@ def _default_static_checks(
     }
 
 
+def _default_smoke_static_checks(
+    repo_root: Path,
+    authorization: D5Authorization,
+    artifact_paths: EvidencePaths,
+) -> dict[str, Any]:
+    """Validate smoke custody without loading scientific cases or sources."""
+    current = _git(repo_root, "rev-parse", "HEAD")
+    if current != authorization.implementation_checkpoint:
+        raise D5StaticPreflightError("implementation checkpoint mismatch")
+    if _git(repo_root, "status", "--porcelain"):
+        raise D5StaticPreflightError("working tree is not clean")
+    project_config = load_project_config(repo_root)
+    _validate_project_config(project_config)
+    if authorization.project_config_fingerprint_sha256 != project_config.fingerprint_sha256:
+        raise D5StaticPreflightError("project configuration fingerprint mismatch")
+    if authorization.provider != EXPECTED_PROVIDER or authorization.model != EXPECTED_MODEL:
+        raise D5StaticPreflightError("provider/model contract drifted")
+    if authorization.sdk_version != EXPECTED_OPENAI_VERSION:
+        raise D5StaticPreflightError("OpenAI package contract drifted")
+    if authorization.sdk_max_retries != EXPECTED_SDK_MAX_RETRIES:
+        raise D5StaticPreflightError("SDK retry contract drifted")
+    if authorization.structured_output_contract != EXPECTED_STRUCTURED_OUTPUT:
+        raise D5StaticPreflightError("structured-output contract drifted")
+    if not authorization.thinking_off:
+        raise D5StaticPreflightError("thinking-off request contract is absent")
+    if authorization.thinking_control_options_sha256 != THINKING_CONTROL_OPTIONS_SHA256:
+        raise D5StaticPreflightError("thinking-off request control digest drifted")
+    _validated_thinking_control_options(authorization.thinking_control_options)
+    if artifact_paths.campaign_id != authorization.campaign_id:
+        raise D5StaticPreflightError("smoke path is not bound to authorization")
+    if not authorization.authorization_id or not authorization.campaign_id:
+        raise D5StaticPreflightError("authorization/campaign identity is missing")
+    if _smoke_schema_sha256() != SMOKE_SCHEMA_SHA256:
+        raise D5StaticPreflightError("smoke schema fingerprint drifted")
+    for path in artifact_paths.all_paths():
+        if path.exists():
+            raise D5StaticPreflightError(f"fresh smoke artifact path already exists: {path.name}")
+    attestation = _run_static_attestation(repo_root)
+    return {
+        "status": "PASS",
+        "mode": "canonical_live_smoke",
+        "current_checkout": current,
+        "project_config_fingerprint_sha256": project_config.fingerprint_sha256,
+        "provider": authorization.provider,
+        "model": authorization.model,
+        "sdk_version": authorization.sdk_version,
+        "sdk_max_retries": authorization.sdk_max_retries,
+        "structured_output_contract": authorization.structured_output_contract,
+        "thinking_control_mechanism": THINKING_CONTROL_MECHANISM,
+        "thinking_control_options_sha256": THINKING_CONTROL_OPTIONS_SHA256,
+        "smoke_system_prompt_sha256": hashlib.sha256(
+            SMOKE_SYSTEM_PROMPT.encode("utf-8")
+        ).hexdigest(),
+        "smoke_user_prompt_sha256": hashlib.sha256(SMOKE_USER_PROMPT.encode("utf-8")).hexdigest(),
+        "smoke_schema_sha256": SMOKE_SCHEMA_SHA256,
+        "scientific_population_loaded": False,
+        "scientific_campaign_started": False,
+        "d5_attestation": attestation,
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class EvidencePaths:
     """Fresh custody namespace for one D5-4 campaign."""
@@ -630,6 +714,188 @@ class EvidencePaths:
             self.evidence,
             self.model_io,
         )
+
+
+@dataclass(slots=True)
+class D5SmokeCallLedger:
+    """Bound one smoke logical call and its SDK physical attempts."""
+
+    max_logical_calls: int = SMOKE_MAX_LOGICAL_CALLS
+    max_physical_attempts: int = SMOKE_MAX_PHYSICAL_ATTEMPTS
+    logical_calls: int = 0
+    physical_attempts: int = 0
+
+    def reserve(self) -> int:
+        """Reserve the only smoke call before provider delegation."""
+        next_index = self.logical_calls + 1
+        if next_index > self.max_logical_calls:
+            raise D5CallCapExceeded("smoke logical call 2 rejected before delegation")
+        self.logical_calls = next_index
+        return next_index
+
+    def physical_attempt(self, logical_index: int) -> int:
+        """Count one issued SDK attempt, rejecting attempt four pre-delegation."""
+        if logical_index != 1 or self.logical_calls != 1:
+            raise D5HarnessError("smoke physical attempt references unknown call")
+        next_attempt = self.physical_attempts + 1
+        if next_attempt > self.max_physical_attempts:
+            raise D5CallCapExceeded("smoke physical attempt 4 rejected before delegation")
+        self.physical_attempts = next_attempt
+        return next_attempt
+
+
+@dataclass(slots=True)
+class D5SmokeCustody:
+    """Persist one non-scientific smoke result without scientific STARTED state."""
+
+    paths: EvidencePaths
+    authorization: D5Authorization
+    state: dict[str, Any]
+    ledger: D5SmokeCallLedger = field(default_factory=D5SmokeCallLedger)
+    terminal_written: bool = False
+
+    @classmethod
+    def start(
+        cls,
+        paths: EvidencePaths,
+        *,
+        authorization: D5Authorization,
+        static_preflight: Mapping[str, Any],
+        readiness: D5ReadinessProjectionProtocol | None,
+    ) -> D5SmokeCustody:
+        """Create smoke custody only after static checks and readiness pass."""
+        ensure_fresh_namespace(paths)
+        state = {
+            "experiment_version": D5_EXPERIMENT_VERSION,
+            "mode": "canonical_live_smoke",
+            "campaign_id": paths.campaign_id,
+            "authorization_id": authorization.authorization_id,
+            "status": "SMOKE_STARTED",
+            "provider": authorization.provider,
+            "model": authorization.model,
+            "endpoint_calls": 2,
+            "identity_endpoint_calls": 2,
+            "logical_generation_calls": 0,
+            "physical_generation_attempts": 0,
+            "provider_calls": 0,
+            "model_calls": 0,
+            "scientific_population_loaded": False,
+            "scientific_campaign_started": False,
+            "readiness": readiness.as_dict() if readiness is not None else None,
+            "static_preflight": dict(static_preflight),
+        }
+        if not evidence_is_redacted(state):
+            raise D5HarnessError("smoke state redaction failure")
+        _atomic_json(paths.state, state, exclusive=True)
+        _append_jsonl(
+            paths.journal,
+            {
+                "event": "smoke_started",
+                "mode": "canonical_live_smoke",
+                "campaign_id": paths.campaign_id,
+                "authorization_id": authorization.authorization_id,
+                "status": "SMOKE_STARTED",
+            },
+            exclusive=True,
+        )
+        paths.model_io.touch(exist_ok=False)
+        return cls(paths=paths, authorization=authorization, state=state)
+
+    def record_readiness(self, readiness: D5ReadinessProjectionProtocol) -> None:
+        """Persist the bounded readiness projection before generation."""
+        self.state["readiness"] = readiness.as_dict()
+        _atomic_json(self.paths.state, self.state)
+
+    def record_model_io(self, row: Mapping[str, Any]) -> None:
+        """Persist observer output under the smoke namespace."""
+        bounded = dict(row)
+        bounded.update(
+            {
+                "campaign_id": self.paths.campaign_id,
+                "authorization_id": self.authorization.authorization_id,
+                "turn_id": SMOKE_TURN_ID,
+            }
+        )
+        if not evidence_is_redacted(bounded):
+            raise D5HarnessError("smoke model-I/O redaction failure")
+        with self.paths.model_io.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(bounded, sort_keys=True, separators=(",", ":")) + "\n")
+
+    def record_attempt(self, logical_index: int) -> None:
+        """Persist one physical attempt after the observer accepts it."""
+        attempt = self.ledger.physical_attempt(logical_index)
+        _append_jsonl(
+            self.paths.journal,
+            {
+                "event": "smoke_physical_attempt",
+                "campaign_id": self.paths.campaign_id,
+                "authorization_id": self.authorization.authorization_id,
+                "logical_call_index": logical_index,
+                "physical_attempt": attempt,
+            },
+        )
+
+    def finish(self, outcome: str, *, reason: str | None = None) -> dict[str, Any]:
+        """Seal one bounded smoke terminal and its digest summary."""
+        allowed = {
+            "SMOKE_PASS",
+            "SMOKE_ENVIRONMENT_BLOCKED",
+            "SMOKE_NOT_READY",
+            "SMOKE_PROVIDER_INCONCLUSIVE",
+            "SMOKE_HARNESS_FAIL",
+            "SMOKE_CONTRACT_FAIL",
+        }
+        if outcome not in allowed or self.terminal_written or self.paths.terminal.exists():
+            raise D5HarnessError("invalid or duplicate smoke terminal")
+        state = json.loads(self.paths.state.read_text(encoding="utf-8"))
+        state.update(
+            {
+                "status": "SMOKE_TERMINAL",
+                "outcome": outcome,
+                "reason": reason,
+                "logical_generation_calls": self.ledger.logical_calls,
+                "physical_generation_attempts": self.ledger.physical_attempts,
+                "provider_calls": self.ledger.logical_calls,
+                "model_calls": self.ledger.logical_calls,
+            }
+        )
+        _atomic_json(self.paths.state, state)
+        _append_jsonl(
+            self.paths.journal,
+            {
+                "event": "smoke_terminal",
+                "campaign_id": self.paths.campaign_id,
+                "authorization_id": self.authorization.authorization_id,
+                "outcome": outcome,
+                "reason": reason,
+                "logical_generation_calls": self.ledger.logical_calls,
+                "physical_generation_attempts": self.ledger.physical_attempts,
+            },
+        )
+        terminal = {
+            "experiment_version": D5_EXPERIMENT_VERSION,
+            "mode": "canonical_live_smoke",
+            "campaign_id": self.paths.campaign_id,
+            "authorization_id": self.authorization.authorization_id,
+            "outcome": outcome,
+            "reason": reason,
+            "logical_generation_calls": self.ledger.logical_calls,
+            "physical_generation_attempts": self.ledger.physical_attempts,
+            "endpoint_calls": 2,
+            "provider_calls": self.ledger.logical_calls,
+            "model_calls": self.ledger.logical_calls,
+            "scientific_population_loaded": False,
+            "scientific_campaign_started": False,
+            "state_sha256": _sha256_file(self.paths.state),
+            "journal_sha256": _sha256_file(self.paths.journal),
+            "model_io_sha256": _sha256_file(self.paths.model_io),
+        }
+        _atomic_json(self.paths.terminal, terminal, exclusive=True)
+        summary = dict(terminal)
+        summary["terminal_sha256"] = _sha256_file(self.paths.terminal)
+        _atomic_json(self.paths.summary, summary, exclusive=True)
+        self.terminal_written = True
+        return terminal
 
 
 def ensure_fresh_namespace(paths: EvidencePaths) -> None:
@@ -1491,6 +1757,69 @@ class _ObservedLiveAdapter:
         """Bind exact transport body capture to campaign custody."""
         self.observer.bind_model_io(callback)
 
+    async def execute_smoke(self, custody: D5SmokeCustody) -> SmokeReadyResponse:
+        """Issue one smoke call through the adapter's existing provider backend."""
+        backend = self.inner.session.session.compiler.dependencies.planner.backend
+        delegate = getattr(backend, "delegate", None)
+        if delegate is None or not callable(getattr(delegate, "generate_structured", None)):
+            raise D5HarnessError("canonical provider backend is unavailable")
+        logical_index = custody.ledger.reserve()
+        self.set_active_turn(SMOKE_TURN_ID)
+        self.observer.callback = custody.record_attempt
+        self.observer.logical_call_started(
+            {
+                "index": logical_index,
+                "generation_role": SMOKE_ROLE,
+                "model": getattr(delegate, "model", ""),
+            }
+        )
+        request = StructuredGenerationRequest(
+            system_prompt=SMOKE_SYSTEM_PROMPT,
+            user_prompt=SMOKE_USER_PROMPT,
+            timeout_seconds=900.0,
+            temperature=0.0,
+        )
+        try:
+            result = await delegate.generate_structured(
+                request,
+                response_model=SmokeReadyResponse,
+            )
+        except ProviderRequestError as error:
+            self.observer.logical_call_completed(
+                {
+                    "index": logical_index,
+                    "generation_role": SMOKE_ROLE,
+                    "model": getattr(delegate, "model", ""),
+                    "outcome": "failure",
+                    "failure_category": error.category.value,
+                    "response_reason": getattr(error, "response_reason", None),
+                    "validation_shape": getattr(error, "validation_shape", None),
+                }
+            )
+            raise
+        except Exception:
+            self.observer.logical_call_completed(
+                {
+                    "index": logical_index,
+                    "generation_role": SMOKE_ROLE,
+                    "model": getattr(delegate, "model", ""),
+                    "outcome": "failure",
+                    "failure_category": "invalid_response",
+                }
+            )
+            raise
+        self.observer.logical_call_completed(
+            {
+                "index": logical_index,
+                "generation_role": SMOKE_ROLE,
+                "model": getattr(delegate, "model", ""),
+                "outcome": "success",
+            }
+        )
+        if result.value.status != "READY":
+            raise D5HarnessError("smoke response did not establish READY")
+        return result.value
+
     @property
     def logical_call_count(self) -> int:
         """Expose the canonical adapter's logical cursor."""
@@ -1696,6 +2025,114 @@ def execute_live_campaign(
         },
     )
     return asyncio.run(runner.run(readiness.adapter))
+
+
+async def _run_smoke_and_close(
+    adapter: _ObservedLiveAdapter,
+    custody: D5SmokeCustody,
+) -> SmokeReadyResponse:
+    """Run one smoke generation and close the existing async client."""
+    try:
+        return await adapter.execute_smoke(custody)
+    finally:
+        client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
+        close = getattr(client, "close", None)
+        if callable(close):
+            result = close()
+            if inspect.isawaitable(result):
+                await result
+
+
+def execute_live_smoke(
+    *,
+    repo_root: Path,
+    authorization: D5Authorization,
+    artifact_root: Path,
+    endpoint_get: Callable[[str, str], object] = _credential_bearing_json_get,
+    api_key_loader: Callable[[], str] | None = None,
+    static_checker: Callable[[Path, D5Authorization, EvidencePaths], dict[str, Any]] | None = None,
+    provider_factory: Callable[[Path, Path, str], object] | None = None,
+) -> dict[str, Any]:
+    """Run exactly one smoke generation through the canonical live adapter."""
+    if artifact_root.resolve() != _authorized_artifact_root(repo_root, authorization):
+        raise D5StaticPreflightError("artifact root is not authorized")
+    project_config = load_project_config(repo_root)
+    _validate_project_config(project_config)
+    if authorization.project_config_fingerprint_sha256 != project_config.fingerprint_sha256:
+        raise D5StaticPreflightError("project configuration fingerprint mismatch")
+    paths = EvidencePaths(artifact_root, authorization.campaign_id)
+    static = (static_checker or _default_smoke_static_checks)(repo_root, authorization, paths)
+    if static.get("status") != "PASS":
+        raise D5StaticPreflightError("smoke static preflight failed")
+    custody = D5SmokeCustody.start(
+        paths,
+        authorization=authorization,
+        static_preflight=static,
+        readiness=None,
+    )
+    load_key = api_key_loader or (lambda: d4.load_d4_api_key(repo_root))
+    build_provider = provider_factory or (
+        lambda key_root, key_artifact_root, token: create_live_adapter(
+            repo_root=key_root,
+            artifact_root=key_artifact_root,
+            api_key=token,
+            project_config=project_config,
+            request_options=authorization.thinking_control_options,
+            require_thinking_control=True,
+        )
+    )
+    try:
+        readiness = prepare_readiness(
+            authorization=authorization,
+            project_config=project_config,
+            api_key_loader=load_key,
+            endpoint_get=endpoint_get,
+            static_preflight=static,
+            provider_factory=lambda token: build_provider(repo_root, artifact_root, token),
+        )
+    except D5ReadinessError as error:
+        terminal = custody.finish("SMOKE_NOT_READY", reason=error.reason)
+        return {
+            "status": "SMOKE_NOT_READY",
+            "terminal": terminal,
+            "readiness": _readiness_failure_result(error),
+            "provider_calls": 0,
+            "model_calls": 0,
+        }
+    if not isinstance(readiness.adapter, _ObservedLiveAdapter):
+        terminal = custody.finish("SMOKE_HARNESS_FAIL", reason="canonical adapter unavailable")
+        return {"status": "SMOKE_HARNESS_FAIL", "terminal": terminal}
+    custody.record_readiness(readiness.projection)
+    try:
+        asyncio.run(_run_smoke_and_close(readiness.adapter, custody))
+    except ProviderRequestError as error:
+        category = error.category.value
+        outcome = (
+            "SMOKE_ENVIRONMENT_BLOCKED"
+            if category in {"timeout", "transport"}
+            else "SMOKE_PROVIDER_INCONCLUSIVE"
+        )
+        terminal = custody.finish(outcome, reason=category)
+        return {
+            "status": outcome,
+            "terminal": terminal,
+            "readiness": readiness.projection.as_dict(),
+        }
+    except D5CallCapExceeded as error:
+        terminal = custody.finish("SMOKE_CONTRACT_FAIL", reason=str(error))
+        return {"status": "SMOKE_CONTRACT_FAIL", "terminal": terminal}
+    except D5HarnessError as error:
+        terminal = custody.finish("SMOKE_HARNESS_FAIL", reason=str(error))
+        return {"status": "SMOKE_HARNESS_FAIL", "terminal": terminal}
+    except Exception:
+        terminal = custody.finish("SMOKE_HARNESS_FAIL", reason="unclassified_failure")
+        return {"status": "SMOKE_HARNESS_FAIL", "terminal": terminal}
+    terminal = custody.finish("SMOKE_PASS")
+    return {
+        "status": "SMOKE_PASS",
+        "terminal": terminal,
+        "readiness": readiness.projection.as_dict(),
+    }
 
 
 def _turn_hash(value: object) -> str | None:
@@ -2334,16 +2771,16 @@ def _readiness_failure_result(error: D5ReadinessError) -> dict[str, Any]:
 
 
 def main() -> int:
-    """Run provider-free preflight or one explicit live campaign."""
+    """Run provider-free preflight, one smoke call, or one live campaign."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, default=Path.cwd())
-    parser.add_argument("--provider-free-preflight", action="store_true")
-    parser.add_argument("--execute-live", action="store_true")
+    modes = parser.add_mutually_exclusive_group(required=True)
+    modes.add_argument("--provider-free-preflight", action="store_true")
+    modes.add_argument("--execute-smoke", action="store_true")
+    modes.add_argument("--execute-live", action="store_true")
     parser.add_argument("--artifact-root", type=Path)
     parser.add_argument("--authorization-json", type=Path, required=True)
     args = parser.parse_args()
-    if args.provider_free_preflight == args.execute_live:
-        parser.error("choose exactly one of --provider-free-preflight or --execute-live")
     repo_root = args.repo_root.resolve()
     authorization = _load_authorization(args.authorization_json.resolve())
     artifact_root = (
@@ -2354,6 +2791,16 @@ def main() -> int:
     paths = EvidencePaths(artifact_root, authorization.campaign_id)
     if args.provider_free_preflight:
         result = provider_free_preflight(repo_root, authorization, paths)
+    elif args.execute_smoke:
+        try:
+            result = execute_live_smoke(
+                repo_root=repo_root,
+                authorization=authorization,
+                artifact_root=artifact_root,
+            )
+        except D5ReadinessError as error:
+            print(json.dumps(_readiness_failure_result(error), indent=2, sort_keys=True))
+            return 2
     else:
         try:
             result = execute_live_campaign(

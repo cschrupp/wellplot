@@ -1580,3 +1580,246 @@ def test_real_live_transport_exhaustion_is_not_semantic_failure(
         assert result["rows"][0]["grader_status"] == "INCONCLUSIVE"
         assert result["physical_generation_attempts"] == 3
         assert len(requests) == 3
+
+
+def _smoke_provider_factory(
+    *,
+    response_mode: str = "ready",
+    retry_count: int = 0,
+    requests: list[httpx.Request] | None = None,
+    clients: list[httpx.AsyncClient] | None = None,
+) -> Callable[[Path, Path, str], object]:
+    """Build the accepted D5 adapter with an injected, non-network transport."""
+    requests = requests if requests is not None else []
+    clients = clients if clients is not None else []
+
+    def factory(
+        observer: object,
+        *,
+        requests: list[httpx.Request] = requests,
+        clients: list[httpx.AsyncClient] = clients,
+    ) -> httpx.AsyncClient:
+        attempts = 0
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            nonlocal attempts
+            requests.append(request)
+            if request.url.path != "/v1/chat/completions":
+                return httpx.Response(404, request=request)
+            attempts += 1
+            if attempts <= retry_count:
+                return httpx.Response(500, request=request)
+            if response_mode == "invalid":
+                content = '{"status":"NOT_READY"}'
+            else:
+                content = '{"status":"READY"}'
+            return httpx.Response(
+                200,
+                request=request,
+                json={
+                    "choices": [
+                        {
+                            "message": {"role": "assistant", "content": content},
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {},
+                },
+            )
+
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            event_hooks={
+                "request": [observer.on_request],
+                "response": [observer.on_response],
+            },
+        )
+        client._platform = "Linux"
+        clients.append(client)
+        return client
+
+    def build(repo_root: Path, artifact_root: Path, token: str) -> object:
+        adapter = d5.create_live_adapter(
+            repo_root=repo_root,
+            artifact_root=artifact_root,
+            api_key=token,
+            project_config=PROJECT_CONFIG,
+            request_options=d5._thinking_control_options(),
+            require_thinking_control=True,
+            http_client_factory=factory,
+        )
+        client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
+        client._platform = "Linux"
+        return adapter
+
+    return build
+
+
+def _execute_provider_free_smoke(
+    tmp_path: Path,
+    *,
+    response_mode: str = "ready",
+    retry_count: int = 0,
+) -> tuple[dict[str, Any], list[httpx.Request], list[httpx.AsyncClient]]:
+    """Execute smoke mode with readiness and generation transports injected."""
+    artifact_root = tmp_path / "smoke"
+    requests: list[httpx.Request] = []
+    clients: list[httpx.AsyncClient] = []
+    authorization = _authorization(
+        campaign_id="d5-5j-smoke-provider-free",
+        artifact_root=str(artifact_root),
+    )
+
+    def endpoint_get(url: str, token: str) -> object:
+        assert token == "provider-free-token"
+        if url == PROJECT_CONFIG.model_catalog_url:
+            return {"data": [{"id": d5.EXPECTED_MODEL}]}
+        assert url == PROJECT_CONFIG.props_url
+        return _props()
+
+    result = d5.execute_live_smoke(
+        repo_root=REPO_ROOT,
+        authorization=authorization,
+        artifact_root=artifact_root,
+        endpoint_get=endpoint_get,
+        api_key_loader=lambda: "provider-free-token",
+        static_checker=lambda repo, checked, paths: {
+            "status": "PASS",
+            "scientific_population_loaded": False,
+            "scientific_campaign_started": False,
+        },
+        provider_factory=_smoke_provider_factory(
+            response_mode=response_mode,
+            retry_count=retry_count,
+            requests=requests,
+            clients=clients,
+        ),
+    )
+    return result, requests, clients
+
+
+def test_provider_free_smoke_uses_canonical_adapter_without_scientific_runner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One smoke call uses existing provider wiring and never starts D5 cases."""
+
+    def fail_if_started(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        raise AssertionError("scientific campaign runner must not execute in smoke mode")
+
+    monkeypatch.setattr(d5.D5CampaignRunner, "run", fail_if_started)
+    monkeypatch.setattr(d4, "load_cases", lambda *args: (_ for _ in ()).throw(AssertionError()))
+    monkeypatch.setattr(d4, "load_gold", lambda *args: (_ for _ in ()).throw(AssertionError()))
+    result, requests, clients = _execute_provider_free_smoke(tmp_path)
+    try:
+        assert result["status"] == "SMOKE_PASS"
+        assert result["terminal"]["logical_generation_calls"] == 1
+        assert result["terminal"]["physical_generation_attempts"] == 1
+        assert result["terminal"]["scientific_population_loaded"] is False
+        assert result["terminal"]["scientific_campaign_started"] is False
+        assert len(requests) == 1
+        body = json.loads(requests[0].content)
+        assert (
+            body["chat_template_kwargs"] == d5._thinking_control_options()["chat_template_kwargs"]
+        )
+        assert body["response_format"]["type"] == "json_schema"
+        assert body["messages"][0]["content"] == d5.SMOKE_SYSTEM_PROMPT
+        assert body["messages"][1]["content"] == d5.SMOKE_USER_PROMPT
+    finally:
+        assert clients
+
+
+def test_provider_free_smoke_counts_sdk_retries_as_physical_attempts(tmp_path: Path) -> None:
+    """One logical smoke call permits three physical attempts and then passes."""
+    result, requests, clients = _execute_provider_free_smoke(tmp_path, retry_count=2)
+    try:
+        assert result["status"] == "SMOKE_PASS"
+        assert result["terminal"]["logical_generation_calls"] == 1
+        assert result["terminal"]["physical_generation_attempts"] == 3
+        assert len(requests) == 3
+    finally:
+        assert clients
+
+
+def test_provider_free_smoke_invalid_structured_response_is_inconclusive(tmp_path: Path) -> None:
+    """A bounded provider response failure is not reported as harness success."""
+    result, requests, clients = _execute_provider_free_smoke(tmp_path, response_mode="invalid")
+    try:
+        assert result["status"] == "SMOKE_PROVIDER_INCONCLUSIVE"
+        assert result["terminal"]["logical_generation_calls"] == 1
+        assert result["terminal"]["physical_generation_attempts"] == 1
+        assert len(requests) == 1
+    finally:
+        assert clients
+
+
+def test_provider_free_smoke_transport_failure_is_environment_blocked(tmp_path: Path) -> None:
+    """A transport failure remains distinct from structured/provider evidence."""
+    requests: list[httpx.Request] = []
+    clients: list[httpx.AsyncClient] = []
+
+    def provider_factory(repo_root: Path, artifact_root: Path, token: str) -> object:
+        del repo_root
+
+        def factory(observer: object) -> httpx.AsyncClient:
+            async def handler(request: httpx.Request) -> httpx.Response:
+                requests.append(request)
+                raise httpx.ReadTimeout("provider-free timeout", request=request)
+
+            client = httpx.AsyncClient(
+                transport=httpx.MockTransport(handler),
+                event_hooks={"request": [observer.on_request], "response": [observer.on_response]},
+            )
+            client._platform = "Linux"
+            clients.append(client)
+            return client
+
+        adapter = d5.create_live_adapter(
+            repo_root=REPO_ROOT,
+            artifact_root=artifact_root,
+            api_key=token,
+            project_config=PROJECT_CONFIG,
+            request_options=d5._thinking_control_options(),
+            require_thinking_control=True,
+            http_client_factory=factory,
+        )
+        client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
+        client._platform = "Linux"
+        return adapter
+
+    artifact_root = tmp_path / "transport-smoke"
+    authorization = _authorization(
+        campaign_id="d5-5j-smoke-transport",
+        artifact_root=str(artifact_root),
+    )
+    result = d5.execute_live_smoke(
+        repo_root=REPO_ROOT,
+        authorization=authorization,
+        artifact_root=artifact_root,
+        endpoint_get=lambda url, token: (
+            {"data": [{"id": d5.EXPECTED_MODEL}]}
+            if url == PROJECT_CONFIG.model_catalog_url
+            else _props()
+        ),
+        api_key_loader=lambda: "provider-free-token",
+        static_checker=lambda repo, checked, paths: {"status": "PASS"},
+        provider_factory=provider_factory,
+    )
+    try:
+        assert result["status"] == "SMOKE_ENVIRONMENT_BLOCKED"
+        assert len(requests) == 3
+    finally:
+        assert clients
+
+
+def test_smoke_ledger_rejects_second_logical_and_fourth_physical_call() -> None:
+    """Smoke caps fail before a second logical or fourth physical delegation."""
+    ledger = d5.D5SmokeCallLedger()
+    assert ledger.reserve() == 1
+    with pytest.raises(d5.D5CallCapExceeded, match="logical call 2"):
+        ledger.reserve()
+    for _ in range(3):
+        ledger.physical_attempt(1)
+    with pytest.raises(d5.D5CallCapExceeded, match="physical attempt 4"):
+        ledger.physical_attempt(1)
