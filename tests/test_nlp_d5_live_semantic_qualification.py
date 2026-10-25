@@ -752,6 +752,61 @@ def test_d5i_dimension_and_correction_evidence_are_explicit() -> None:
     assert row["correction_preservation"]["final_status"] == "ACCEPTED"
 
 
+def test_d5i_positive_cbl_construction_marks_expected_mutation_as_pass() -> None:
+    """A successful construction is an appropriate mutation, not a failure."""
+    dimensions = d5._dimension_evidence(
+        case={"turn_id": "D4-C01:C01"},
+        expected={"contract": {"kind": "construction"}},
+        actual={"changed": True, "persisted": True, "rendered": True},
+        grade={"status": "PASS", "errors": []},
+        first_divergence="NONE",
+        observed_failure=None,
+    )
+    assert dimensions["mutation"] == "PASS"
+
+
+def test_d5i_positive_las_revision_marks_expected_mutation_as_pass() -> None:
+    """A successful revision is an appropriate mutation, not a failure."""
+    dimensions = d5._dimension_evidence(
+        case={"turn_id": "D4-L01:T1"},
+        expected={"contract": {"kind": "revision"}},
+        actual={"changed": True, "persisted": True, "rendered": True},
+        grade={"status": "PASS", "errors": []},
+        first_divergence="NONE",
+        observed_failure=None,
+    )
+    assert dimensions["mutation"] == "PASS"
+
+
+def test_d5i_safe_negative_without_change_marks_mutation_as_pass() -> None:
+    """A safe-negative no-op remains an appropriate mutation result."""
+    dimensions = d5._dimension_evidence(
+        case={"turn_id": "D4-L03:C01"},
+        expected={"contract": {"kind": "safety"}},
+        actual={"changed": False, "persisted": True, "rendered": True},
+        grade={"status": "PASS", "errors": []},
+        first_divergence="NONE",
+        observed_failure=None,
+    )
+    assert dimensions["mutation"] == "PASS"
+
+
+def test_d5i_unauthorized_mutation_marks_mutation_as_fail() -> None:
+    """An explicitly prohibited mutation fails even if other grading passes."""
+    dimensions = d5._dimension_evidence(
+        case={"turn_id": "D4-L01:T1"},
+        expected={"contract": {"kind": "revision"}},
+        actual={"changed": True, "persisted": True, "rendered": True},
+        grade={
+            "status": "FAIL",
+            "errors": ["canonical_change_outside_allowed_paths"],
+        },
+        first_divergence="CORRECTION_PRESERVATION",
+        observed_failure=None,
+    )
+    assert dimensions["mutation"] == "FAIL"
+
+
 def test_d5i_correction_evidence_is_derived_from_canonical_adapter_observation(
     tmp_path: Path,
 ) -> None:

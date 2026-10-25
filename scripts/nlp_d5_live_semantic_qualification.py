@@ -2235,7 +2235,21 @@ def _dimension_evidence(
         if failing_dimension is not None:
             dimensions[failing_dimension] = "FAIL"
 
-    dimensions["mutation"] = "PASS" if actual.get("changed") is not True else "FAIL"
+    mutation_errors = {
+        "canonical_change_outside_allowed_paths",
+        "failure_mutated_artifact",
+        "failure_bytes_changed",
+        "failure_canonical_state_changed",
+        "prohibited_channel_substitution",
+        "prohibited_path_mutation",
+    }
+    has_bad_mutation = any(error in mutation_errors for error in grade.get("errors", []))
+    if has_bad_mutation:
+        dimensions["mutation"] = "FAIL"
+    elif grade_status == "PASS":
+        dimensions["mutation"] = "PASS"
+    else:
+        dimensions["mutation"] = "NOT_ESTABLISHED"
     dimensions["persistence_reload_render"] = (
         "PASS"
         if actual.get("persisted") is True and actual.get("rendered") is True
