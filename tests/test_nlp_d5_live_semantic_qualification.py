@@ -921,6 +921,15 @@ def test_authorization_binds_campaign_across_runner_instances(tmp_path: Path) ->
         provenance=_provenance(),
         readiness=_ready().projection,
     )
+    custody.record_call_started(
+        {
+            "event": "logical_call_started",
+            "index": 1,
+            "generation_role": "planner",
+            "provider": d5.EXPECTED_PROVIDER,
+            "model": d5.EXPECTED_MODEL,
+        }
+    )
     custody.finish("INCONCLUSIVE", attribution="TEST", rows=[])
     second_paths = _paths(tmp_path, "different-campaign")
     with pytest.raises(d5.D5HarnessError, match="campaign path"):
