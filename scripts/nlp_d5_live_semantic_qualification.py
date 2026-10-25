@@ -848,6 +848,7 @@ class D5CampaignCustody:
         }
         if not evidence_is_redacted(state):
             raise D5HarnessError("state redaction failure")
+        paths.model_io.touch(exist_ok=False)
         return cls(
             paths=paths,
             campaign_id=paths.campaign_id,
@@ -858,6 +859,9 @@ class D5CampaignCustody:
             live=live,
             endpoint_call_count=endpoint_call_count,
         )
+
+    # Preserve the existing custody construction name while keeping activation lazy.
+    start = prepare
 
     def _activate(self) -> None:
         """Consume custody immediately before the first provider delegation."""
@@ -883,7 +887,7 @@ class D5CampaignCustody:
             },
             exclusive=True,
         )
-        self.paths.model_io.touch(exist_ok=False)
+        self.paths.model_io.touch(exist_ok=True)
         self.started = True
 
     def record_call_started(self, event: Mapping[str, Any]) -> None:
