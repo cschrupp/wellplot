@@ -476,14 +476,14 @@ class CanonicalSectionWorker:
                 return _canonical_failure(
                     "semantic_context_validation_failure",
                     "Section semantics failed canonical validation.",
-                    normalization="FAIL" if normalization_failed else "NOT_REACHED",
+                    normalization="FAIL" if normalization_failed else "PASS",
                 )
             except SemanticActionError as error:
                 if error.code != "semantic_contract_incomplete" or attempt:
                     return _canonical_failure(
                         error.code,
                         "Section semantics could not be validated safely.",
-                        normalization="FAIL" if normalization_failed else "NOT_REACHED",
+                        normalization="FAIL" if normalization_failed else "PASS",
                     )
                 correction_payload = {
                     **payload,
@@ -528,6 +528,8 @@ class CanonicalSectionWorker:
                     return _canonical_failure(
                         "worker_obligation_unsatisfied",
                         "Section semantics did not satisfy a supported request obligation.",
+                        normalization="PASS",
+                        worker_obligation="FAIL",
                     )
                 correction_payload = {
                     **payload,
@@ -567,6 +569,9 @@ class CanonicalSectionWorker:
                 return _canonical_failure(
                     "semantic_lowering_failure",
                     "Section semantics could not be lowered safely.",
+                    normalization="PASS",
+                    worker_obligation="PASS",
+                    semantic_lowering="FAIL",
                 )
         return _canonical_failure(
             "semantic_context_validation_failure",
@@ -1055,6 +1060,8 @@ def _canonical_failure(
     message: str,
     *,
     normalization: str = "NOT_REACHED",
+    worker_obligation: str = "NOT_REACHED",
+    semantic_lowering: str = "NOT_REACHED",
 ) -> CanonicalWorkerResult:
     """Create bounded canonical failure evidence without raw provider data."""
     return CanonicalWorkerResult(
@@ -1069,7 +1076,11 @@ def _canonical_failure(
             ),
         ),
         metrics=SemanticMetrics(),
-        stage_evidence=SemanticStageEvidence(normalization=normalization),
+        stage_evidence=SemanticStageEvidence(
+            normalization=normalization,
+            worker_obligation=worker_obligation,
+            semantic_lowering=semantic_lowering,
+        ),
     )
 
 

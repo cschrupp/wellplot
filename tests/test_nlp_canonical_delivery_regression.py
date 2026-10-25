@@ -11,8 +11,9 @@ import pytest
 from scripts import nlp_d4_live_acceptance as d4
 from scripts.verify_cbl_packet import _check_remarks, verify_cbl_packet
 from tests._mcp_fixtures import REPO_ROOT
-from tests.test_nlp_d4_live_acceptance import _build_rehearsal_cbl_artifact, _D4SessionPlanner
+from tests.test_nlp_d4_live_acceptance import _build_rehearsal_cbl_artifact
 
+from wellplot.agent.code_mode import typed_section_worker as section_worker
 from wellplot.agent.code_mode.canonical_workers import (
     CanonicalReportWorker,
 )
@@ -687,7 +688,7 @@ def test_section_normalization_matches_reordered_tracks_by_identity() -> None:
 
 
 def test_cbl_dimension_forms_and_task_title_are_normalized_by_host() -> None:
-    """Frozen CBL request wins over captured planner omissions for dimensions."""
+    """Frozen CBL request wins over the captured planner's anonymous dimensions."""
     cbl_request = next(
         case["request"]
         for case in d4.load_cases(REPO_ROOT)
@@ -729,18 +730,27 @@ def test_cbl_dimension_forms_and_task_title_are_normalized_by_host() -> None:
             },
         }
     )
-    planner = _D4SessionPlanner(calls=[])
-    plan = planner.plan(
-        request=cbl_request,
-        mode="revise",
-        current_document_summary={},
-        source_summary={},
-        timeout_seconds=10,
-        temperature=None,
-        max_output_tokens=None,
-    )
-    task = plan.section_tasks[0].model_copy(
-        update={"requirements": ("Normal track, width 50mm",)}
+    # This is the sanitized Main Pass task captured from the failed Qwen CBL
+    # smoke.  Keep the anonymous track wording and all captured task metadata;
+    # the authoritative frozen request remains the source of dimensions.
+    task = SectionTask.model_validate(
+        {
+            "goal": (
+                "Configure the Main Pass section with Combo, Depth, CBL, and VDL "
+                "tracks using CBL_Main.dlis data."
+            ),
+            "capability_ids": (
+                "section.log_plot",
+                "track.normal",
+                "track.reference",
+                "track.array",
+                "binding.curve",
+                "binding.raster",
+            ),
+            "existing_section_hint": "Main Pass",
+            "source_hints": ("CBL_Main.dlis",),
+            "requirements": ("Normal track, width 50mm",),
+        }
     )
 
     normalized = _normalize_reconstruct_track_dimensions(
@@ -800,6 +810,96 @@ def test_canonical_section_worker_marks_normalization_failure_separately() -> No
     assert result.success is False
     assert result.stage_evidence.normalization == "FAIL"
     assert result.stage_evidence.worker_obligation == "NOT_REACHED"
+
+
+def test_canonical_section_worker_marks_obligation_failure_separately(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An obligation failure records normalization success and obligation failure."""
+    context = _context()
+    response = {
+        "action": "reconstruct",
+        "section": {
+            "source_candidate": "source-1",
+            "title": "Main",
+            "tracks": [
+                {
+                    "semantic_id": "gr",
+                    "kind": "normal",
+                    "title": "Gamma Ray",
+                    "bindings": [{"semantic_id": "gr", "channel": "GR"}],
+                }
+            ],
+        },
+    }
+
+    def raise_obligation_failure(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        raise ValueError("obligation")
+
+    monkeypatch.setattr(
+        section_worker,
+        "validate_section_obligations",
+        raise_obligation_failure,
+    )
+    result = asyncio.run(
+        CanonicalSectionWorker(backend=_StructuredFixtureBackend([response, response])).compile(
+            task_index=0,
+            context=context,
+            document=_document(),
+            authoritative_request="Build the requested track.",
+            timeout_seconds=10,
+        )
+    )
+    assert result.success is False
+    assert result.stage_evidence.normalization == "PASS"
+    assert result.stage_evidence.worker_obligation == "FAIL"
+    assert result.stage_evidence.semantic_lowering == "NOT_REACHED"
+
+
+def test_canonical_section_worker_marks_lowering_failure_separately(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A lowering failure records both prior stages as passed."""
+    context = _context()
+    response = {
+        "action": "reconstruct",
+        "section": {
+            "source_candidate": "source-1",
+            "title": "Main",
+            "tracks": [
+                {
+                    "semantic_id": "gr",
+                    "kind": "normal",
+                    "title": "Gamma Ray",
+                    "bindings": [{"semantic_id": "gr", "channel": "GR"}],
+                }
+            ],
+        },
+    }
+
+    def raise_lowering_failure(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        raise RuntimeError("lowering")
+
+    monkeypatch.setattr(
+        section_worker,
+        "lower_section_action",
+        raise_lowering_failure,
+    )
+    result = asyncio.run(
+        CanonicalSectionWorker(backend=_StructuredFixtureBackend([response])).compile(
+            task_index=0,
+            context=context,
+            document=_document(),
+            authoritative_request="Build the requested track.",
+            timeout_seconds=10,
+        )
+    )
+    assert result.success is False
+    assert result.stage_evidence.normalization == "PASS"
+    assert result.stage_evidence.worker_obligation == "PASS"
+    assert result.stage_evidence.semantic_lowering == "FAIL"
 
 
 def test_section_normalization_rejects_requested_track_kind_mismatch() -> None:
