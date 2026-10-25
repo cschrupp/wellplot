@@ -964,7 +964,9 @@ def _normalize_track_request_semantics(track: object, body: str) -> object:
         if shared_label is not None:
             label = _match_group_value(shared_label, "label")
             if label:
-                bindings[binding_index] = binding.model_copy(update={"label": label})
+                bindings[binding_index] = bindings[binding_index].model_copy(
+                    update={"label": label}
+                )
     updates: dict[str, object] = {}
     if bindings:
         updates["bindings"] = tuple(bindings)

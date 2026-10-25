@@ -806,6 +806,15 @@ def test_shared_cbl_label_is_restored_when_generated_labels_are_missing() -> Non
         "CBL Amplitude (CBL) QSLT-B",
         "CBL Amplitude (CBL) QSLT-B",
     ]
+    first, second = normalized.bindings
+    assert (first.scale.minimum, first.scale.maximum) == (0, 100)
+    assert (second.scale.minimum, second.scale.maximum) == (0, 10)
+    assert first.style.color == "#111111"
+    assert first.style.line_style == "solid"
+    assert first.style.line_width == 0.75
+    assert second.style.color == "#2563eb"
+    assert second.style.line_style == "dashed"
+    assert second.style.line_width == 0.65
 
 
 def test_report_page_request_is_preserved_when_explicit() -> None:
