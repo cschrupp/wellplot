@@ -98,20 +98,23 @@ def test_c02_source_inventory_matches_bytes_and_required_channels() -> None:
 
 
 def test_c02_request_mentions_every_contract_identity_and_presentation_value() -> None:
-    """Ensure the structured contract is represented in the frozen request."""
-    request = _load(REQUEST_PATH)["request"]
+    """Ensure every frozen contract value is represented in the request."""
+    request = _load(REQUEST_PATH)["request"].casefold()
     contract = _load(CONTRACT_PATH)
 
-    assert request.count("CBL") >= 4
-    assert request.count("VDL") >= 2
+    assert request.count("cbl") >= 4
+    assert request.count("vdl") >= 2
+    for metadata in contract["report"]["metadata"].values():
+        fragment = f"{metadata['label']} {metadata['value']}".casefold()
+        assert fragment in request
     for title in contract["report"]["service_titles"] + contract["report"]["remarks"]:
-        assert title in request
+        assert title.casefold() in request
     for track in contract["sections"]["main_pass"]["tracks"]:
         assert f"{track['id']} = {track['kind']} {int(track['width_mm'])} mm" in request
     for binding_group in contract["bindings"].values():
         for binding in binding_group:
-            assert binding["channel"] in request
-            assert binding["label"] in request
+            assert binding["channel"].casefold() in request
+            assert binding["label"].casefold() in request
     assert "secondary vertical grid lines visible" in request
     assert "source origin 35 and step 12" in request
 

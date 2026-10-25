@@ -26,6 +26,34 @@
     }
   },
   "report": {
+    "metadata": {
+      "company": {"label": "Company", "value": "Red Mesa Completion Services"},
+      "well": {"label": "well", "value": "FORGE 16B - CBL Verification"},
+      "field": {"label": "field", "value": "Utah Research Forge"},
+      "county": {"label": "county", "value": "Beaver County"},
+      "state": {"label": "state", "value": "Utah"},
+      "section": {"label": "section", "value": "NWSE 32"},
+      "township": {"label": "township", "value": "26"},
+      "range": {"label": "range", "value": "9"},
+      "footage": {"label": "footage", "value": "1010' FSL & 485' FWL"},
+      "latitude": {"label": "latitude", "value": "38.501810"},
+      "longitude": {"label": "longitude", "value": "-112.881940"},
+      "logging_date": {"label": "logging date", "value": "14-May-2023"},
+      "kb": {"label": "KB", "value": "5447.25 ft"},
+      "gl": {"label": "GL", "value": "5416.75 ft"},
+      "df": {"label": "DF", "value": "5446.75 ft"},
+      "drilling_log_datum": {"label": "drilling and log datum", "value": "Kelly Bushing"},
+      "top_interval": {"label": "top interval", "value": "40.00 ft"},
+      "bottom_interval": {"label": "bottom interval", "value": "4760.00 ft"},
+      "fluid": {"label": "fluid", "value": "Fresh Water"},
+      "run": {"label": "run", "value": "TWO"},
+      "driller_depth": {"label": "driller depth", "value": "4895.00 ft"},
+      "logged_depth": {"label": "logged depth", "value": "TD Not Tag"},
+      "density": {"label": "density", "value": "8.6 lbm/gal"},
+      "maximum_temperature": {"label": "maximum temperature", "value": "181.0 degF"},
+      "logged_by": {"label": "logged by", "value": "M. Rivera / K. Owens"},
+      "witnessed_by": {"label": "witnessed by", "value": "A. Patel"}
+    },
     "service_titles": [
       "Gamma Ray - CCL",
       "Cement Bond Amplitude",
@@ -106,6 +134,7 @@
     "binding_identity_and_presentation": true,
     "raster_and_axes": true,
     "persistence_reload_render": true,
-    "safe_negative_grading": true
+    "construction_grading": true,
+    "mutation_validation": true
   }
 }

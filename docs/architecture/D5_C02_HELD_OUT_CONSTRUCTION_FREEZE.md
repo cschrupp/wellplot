@@ -26,7 +26,7 @@ request_fixture:
   sha256: f9e746ab41dc420f30f0f19a11859926a9b6e7276a1e56552d56e4752fe93579
 contract_fixture:
   path: tests/fixtures/d5_c02_held_out_contract.json
-  sha256: 8cf0a76101b693f0711d0681a30f9a9dce103e5677861ce582c6b64a3413ab78
+  sha256: 26e2917178a119784328ea00ff2aefd8c5317b8177232de2fa2b733ca1d3e7e3
 ```
 
 ## Source Identity
@@ -66,9 +66,11 @@ C02 preserves the C01 capability envelope while changing the request surface:
   required outcomes.
 
 The contract is independently structured rather than copied from the existing
-C01 gold. It records source selection, track identity/kind/width, binding
-identity and presentation, raster/axis settings, and the required end-to-end
-verification dimensions.
+C01 gold. It records every requested report metadata value, source selection,
+track identity/kind/width, binding identity and presentation, raster/axis
+settings, and the required end-to-end verification dimensions. The positive
+construction contract uses `construction_grading` and `mutation_validation`;
+it does not classify C02 as a safe-negative case.
 
 ## Non-Rediscovery Classification
 
