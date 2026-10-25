@@ -1298,7 +1298,8 @@ def _add_session_evidence(actual: dict[str, Any], result: object) -> None:
             return "FAIL"
         return "NOT_REACHED"
 
-    actual["normalization_status"] = aggregate_stage("worker_obligation")
+    actual["normalization_status"] = aggregate_stage("normalization")
+    actual["worker_obligation_status"] = aggregate_stage("worker_obligation")
     actual["lowering_status"] = aggregate_stage("semantic_lowering")
     actual["host_stage_evidence"] = {
         str(key): str(value)

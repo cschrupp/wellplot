@@ -115,11 +115,22 @@ _NAMED_TRACK_DIMENSION_RE = re.compile(
     r"(?:width\s*)?(?P<width>[0-9]+(?:\.[0-9]+)?)\s*mm\b",
     re.IGNORECASE | re.MULTILINE,
 )
+_INLINE_NAMED_TRACK_DIMENSION_RE = re.compile(
+    r"(?:^|[;\n])\s*(?P<semantic_id>[A-Za-z][A-Za-z0-9 _-]*?)\s*(?:=|:)\s*"
+    r"(?P<kind>normal|reference|array)(?:\s+track)?\s*,?\s*"
+    r"(?:width\s*)?(?P<width>[0-9]+(?:\.[0-9]+)?)\s*mm\b",
+    re.IGNORECASE | re.MULTILINE,
+)
 _PHRASED_TRACK_DIMENSION_RE = re.compile(
     r"^\s*(?P<semantic_id>[A-Za-z][A-Za-z0-9_-]*)\s+"
     r"(?P<kind>normal|reference|array)\s+track\s*,?\s*"
     r"(?:width\s*)?(?P<width>[0-9]+(?:\.[0-9]+)?)\s*mm\b",
     re.IGNORECASE | re.MULTILINE,
+)
+_ANONYMOUS_TRACK_DIMENSION_RE = re.compile(
+    r"(?<![A-Za-z])(?P<kind>normal|reference|array)\s+track\s*,\s*"
+    r"(?:width\s*)?(?P<width>[0-9]+(?:\.[0-9]+)?)\s*mm\b",
+    re.IGNORECASE,
 )
 _TRACK_CHANNEL_LINE_RE = re.compile(
     r"^\s*Track\s+(?P<number>\d+)(?:\s+\([^)]*\))?\s*:\s*(?P<body>.*)$",
@@ -416,14 +427,23 @@ class CanonicalSectionWorker:
             )
         action: SectionSemanticAction = generated.value.root
         for attempt in range(2):
+            normalization_failed = False
             try:
                 action = _bind_single_source_reconstruct(action, section_context)
-                action = _normalize_reconstruct_track_dimensions(action, task)
-                action = _normalize_reconstruct_request_semantics(
-                    action,
-                    task=task,
-                    authoritative_request=authoritative_request,
-                )
+                try:
+                    action = _normalize_reconstruct_track_dimensions(
+                        action,
+                        task,
+                        authoritative_request=authoritative_request,
+                    )
+                    action = _normalize_reconstruct_request_semantics(
+                        action,
+                        task=task,
+                        authoritative_request=authoritative_request,
+                    )
+                except (SemanticActionError, ValidationError):
+                    normalization_failed = True
+                    raise
                 _validate_reconstruct_completeness(action, task, section_context)
                 validate_section_obligations(
                     action,
@@ -446,6 +466,7 @@ class CanonicalSectionWorker:
                     SemanticStageEvidence(
                         provider_wire="PASS",
                         python_validation="PASS",
+                        normalization="PASS",
                         worker_obligation="PASS",
                         semantic_lowering="PASS",
                         correction="PASS" if attempt else "NOT_REACHED",
@@ -455,12 +476,14 @@ class CanonicalSectionWorker:
                 return _canonical_failure(
                     "semantic_context_validation_failure",
                     "Section semantics failed canonical validation.",
+                    normalization="FAIL" if normalization_failed else "NOT_REACHED",
                 )
             except SemanticActionError as error:
                 if error.code != "semantic_contract_incomplete" or attempt:
                     return _canonical_failure(
                         error.code,
                         "Section semantics could not be validated safely.",
+                        normalization="FAIL" if normalization_failed else "NOT_REACHED",
                     )
                 correction_payload = {
                     **payload,
@@ -606,15 +629,19 @@ def _bind_single_source_reconstruct(
 def _normalize_reconstruct_track_dimensions(
     action: SectionSemanticAction,
     task: SectionTask,
+    *,
+    authoritative_request: str = "",
 ) -> SectionSemanticAction:
     """Apply explicit track identity and width without relying on response order."""
     if action.action != "reconstruct":
         return action
-    dimensions: list[tuple[str, str, float, int | None]] = []
+    dimensions: list[tuple[str | None, str, float, int | None]] = []
     channel_signatures: dict[int, tuple[str, ...]] = {}
-    for requirement in task.requirements:
-        for match in _TRACK_DIMENSION_RE.finditer(requirement):
-            dimensions.append(
+
+    def collect(text: str) -> list[tuple[str | None, str, float, int | None]]:
+        collected: list[tuple[str | None, str, float, int | None]] = []
+        for match in _TRACK_DIMENSION_RE.finditer(text):
+            collected.append(
                 (
                     match.group("semantic_id").strip(),
                     match.group("kind").casefold(),
@@ -622,8 +649,8 @@ def _normalize_reconstruct_track_dimensions(
                     int(match.group("number")),
                 )
             )
-        for match in _NAMED_TRACK_DIMENSION_RE.finditer(requirement):
-            dimensions.append(
+        for match in _INLINE_NAMED_TRACK_DIMENSION_RE.finditer(text):
+            collected.append(
                 (
                     match.group("semantic_id").strip(),
                     match.group("kind").casefold(),
@@ -631,8 +658,8 @@ def _normalize_reconstruct_track_dimensions(
                     None,
                 )
             )
-        for match in _PHRASED_TRACK_DIMENSION_RE.finditer(requirement):
-            dimensions.append(
+        for match in _NAMED_TRACK_DIMENSION_RE.finditer(text):
+            collected.append(
                 (
                     match.group("semantic_id").strip(),
                     match.group("kind").casefold(),
@@ -640,6 +667,30 @@ def _normalize_reconstruct_track_dimensions(
                     None,
                 )
             )
+        for match in _PHRASED_TRACK_DIMENSION_RE.finditer(text):
+            collected.append(
+                (
+                    match.group("semantic_id").strip(),
+                    match.group("kind").casefold(),
+                    float(match.group("width")),
+                    None,
+                )
+            )
+        for match in _ANONYMOUS_TRACK_DIMENSION_RE.finditer(text):
+            collected.append(
+                (
+                    None,
+                    match.group("kind").casefold(),
+                    float(match.group("width")),
+                    None,
+                )
+            )
+        return collected
+
+    authoritative_dimensions = collect(authoritative_request)
+    dimensions.extend(authoritative_dimensions)
+    for requirement in task.requirements:
+        dimensions.extend(collect(requirement))
         for channel_match in _TRACK_CHANNEL_LINE_RE.finditer(requirement):
             signature = _channel_signature(channel_match.group("body"))
             if signature:
@@ -649,7 +700,16 @@ def _normalize_reconstruct_track_dimensions(
     tracks = list(action.section.tracks)
     used_indices: set[int] = set()
     seen_dimensions: set[str] = set()
+    authoritative_by_shape: dict[tuple[str, float], set[str]] = {}
+    for semantic_id, kind, width_mm, _ in authoritative_dimensions:
+        if semantic_id is not None:
+            authoritative_by_shape.setdefault((kind, width_mm), set()).add(semantic_id)
     for semantic_id, kind, width_mm, track_number in dimensions:
+        if semantic_id is None:
+            candidates = authoritative_by_shape.get((kind, width_mm), set()) - seen_dimensions
+            if len(candidates) != 1:
+                continue
+            semantic_id = next(iter(candidates))
         dimension_key = _normalize_track_identifier(semantic_id)
         if dimension_key in seen_dimensions:
             continue
@@ -990,7 +1050,12 @@ def _validate_reconstruct_completeness(
         )
 
 
-def _canonical_failure(code: str, message: str) -> CanonicalWorkerResult:
+def _canonical_failure(
+    code: str,
+    message: str,
+    *,
+    normalization: str = "NOT_REACHED",
+) -> CanonicalWorkerResult:
     """Create bounded canonical failure evidence without raw provider data."""
     return CanonicalWorkerResult(
         success=False,
@@ -1004,6 +1069,7 @@ def _canonical_failure(code: str, message: str) -> CanonicalWorkerResult:
             ),
         ),
         metrics=SemanticMetrics(),
+        stage_evidence=SemanticStageEvidence(normalization=normalization),
     )
 
 

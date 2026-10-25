@@ -1893,6 +1893,9 @@ def _bounded_turn_row(
         "worker_status": projected_actual.get("worker_status", "NOT_ESTABLISHED"),
         "worker_diagnostic_code": projected_actual.get("worker_diagnostic_code"),
         "normalization_status": projected_actual.get("normalization_status", "NOT_ESTABLISHED"),
+        "worker_obligation_status": projected_actual.get(
+            "worker_obligation_status", "NOT_ESTABLISHED"
+        ),
         "lowering_status": projected_actual.get("lowering_status", "NOT_ESTABLISHED"),
         "reconciliation_status": projected_actual.get("reconciliation_status"),
         "apply_status": projected_actual.get("apply_status"),

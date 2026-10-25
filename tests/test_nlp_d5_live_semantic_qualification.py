@@ -1109,6 +1109,7 @@ def test_session_evidence_preserves_bounded_host_application_boundary() -> None:
                         "success": False,
                         "diagnostics": [{"code": "semantic_contract_incomplete"}],
                         "stage_evidence": {
+                            "normalization": "NOT_REACHED",
                             "worker_obligation": "NOT_REACHED",
                             "semantic_lowering": "NOT_REACHED",
                         },
@@ -1124,6 +1125,8 @@ def test_session_evidence_preserves_bounded_host_application_boundary() -> None:
     assert actual["apply_status"] == "compile_failed"
     assert actual["failure_owner"] == "semantic_worker"
     assert actual["worker_diagnostic_code"] == "semantic_contract_incomplete"
+    assert actual["normalization_status"] == "NOT_REACHED"
+    assert actual["worker_obligation_status"] == "NOT_REACHED"
     assert actual["host_stage_evidence"]["persistence"] == "NOT_REACHED"
     assert d5.classify_grade_failure(actual, {"errors": ["persistence_not_proven"]}) == (
         "HOST_SEMANTIC_APPLICATION"

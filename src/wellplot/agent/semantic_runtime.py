@@ -52,6 +52,7 @@ class SemanticStageEvidence(SemanticModel):
     planner_extraction: str = "NOT_REACHED"
     planner_provenance: str = "NOT_REACHED"
     target_grounding: str = "NOT_REACHED"
+    normalization: str = "NOT_REACHED"
     worker_obligation: str = "NOT_REACHED"
     correction: str = "NOT_REACHED"
     semantic_lowering: str = "NOT_REACHED"

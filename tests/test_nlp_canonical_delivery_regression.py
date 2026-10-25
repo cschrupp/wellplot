@@ -8,9 +8,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pytest
+from scripts import nlp_d4_live_acceptance as d4
 from scripts.verify_cbl_packet import _check_remarks, verify_cbl_packet
 from tests._mcp_fixtures import REPO_ROOT
-from tests.test_nlp_d4_live_acceptance import _build_rehearsal_cbl_artifact
+from tests.test_nlp_d4_live_acceptance import _build_rehearsal_cbl_artifact, _D4SessionPlanner
 
 from wellplot.agent.code_mode.canonical_workers import (
     CanonicalReportWorker,
@@ -686,7 +687,12 @@ def test_section_normalization_matches_reordered_tracks_by_identity() -> None:
 
 
 def test_cbl_dimension_forms_and_task_title_are_normalized_by_host() -> None:
-    """Captured planner wording restores dimensions and canonical section title."""
+    """Frozen CBL request wins over captured planner omissions for dimensions."""
+    cbl_request = next(
+        case["request"]
+        for case in d4.load_cases(REPO_ROOT)
+        if case["turn_id"] == "D4-C01:C01"
+    )
     action = ReconstructSectionAction.model_validate(
         {
             "action": "reconstruct",
@@ -723,23 +729,29 @@ def test_cbl_dimension_forms_and_task_title_are_normalized_by_host() -> None:
             },
         }
     )
-    task = SectionTask(
-        goal="Reconstruct the main CBL pass.",
-        capability_ids=("section.log_plot", "track.normal", "track.reference", "track.array"),
-        existing_section_hint="Main Pass",
-        requirements=(
-            "combo = normal 50 mm\n"
-            "depth: reference, 10mm\n"
-            "cbl normal track, width 44mm\n"
-            "vdl = array 48 mm",
-        ),
+    planner = _D4SessionPlanner(calls=[])
+    plan = planner.plan(
+        request=cbl_request,
+        mode="revise",
+        current_document_summary={},
+        source_summary={},
+        timeout_seconds=10,
+        temperature=None,
+        max_output_tokens=None,
+    )
+    task = plan.section_tasks[0].model_copy(
+        update={"requirements": ("Normal track, width 50mm",)}
     )
 
-    normalized = _normalize_reconstruct_track_dimensions(action, task)
+    normalized = _normalize_reconstruct_track_dimensions(
+        action,
+        task,
+        authoritative_request=cbl_request,
+    )
     normalized = _normalize_reconstruct_request_semantics(
         normalized,
         task=task,
-        authoritative_request="Reconstruct the requested pass.",
+        authoritative_request=cbl_request,
     )
     by_id = {track.semantic_id: track for track in normalized.section.tracks}
     assert normalized.section.title == "Main Pass"
@@ -749,6 +761,45 @@ def test_cbl_dimension_forms_and_task_title_are_normalized_by_host() -> None:
         "cbl": 44,
         "vdl": 48,
     }
+
+
+def test_canonical_section_worker_marks_normalization_failure_separately() -> None:
+    """A host normalization failure is not reported as worker-obligation failure."""
+    base_context = _context()
+    task = base_context.plan.section_tasks[0].model_copy(
+        update={"requirements": ("Track 1 (gamma): reference, 42 mm",)}
+    )
+    context = base_context.model_copy(
+        update={"plan": base_context.plan.model_copy(update={"section_tasks": (task,)})}
+    )
+    response = {
+        "action": "reconstruct",
+        "section": {
+            "source_candidate": "source-1",
+            "title": "Main",
+            "tracks": [
+                {
+                    "semantic_id": "gamma",
+                    "kind": "normal",
+                    "title": "Gamma Ray",
+                    "bindings": [{"semantic_id": "gr", "channel": "GR"}],
+                }
+            ],
+        },
+    }
+    backend = _StructuredFixtureBackend([response, response])
+    result = asyncio.run(
+        CanonicalSectionWorker(backend=backend).compile(
+            task_index=0,
+            context=context,
+            document=_document(),
+            authoritative_request="Build the requested track.",
+            timeout_seconds=10,
+        )
+    )
+    assert result.success is False
+    assert result.stage_evidence.normalization == "FAIL"
+    assert result.stage_evidence.worker_obligation == "NOT_REACHED"
 
 
 def test_section_normalization_rejects_requested_track_kind_mismatch() -> None:
