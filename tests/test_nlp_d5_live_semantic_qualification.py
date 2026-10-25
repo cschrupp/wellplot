@@ -1661,14 +1661,14 @@ def test_provider_free_smoke_uses_shared_runner_and_one_frozen_turn(
     monkeypatch.setattr(d5.D5CampaignRunner, "run", capture_run)
     result, adapter = _execute_provider_free_smoke(tmp_path)
 
-    assert calls == [(("D4-L01:T1",), "smoke")]
+    assert calls == [(("D4-C01:C01",), "smoke")]
     assert not hasattr(adapter, "execute_smoke")
     assert result["status"] == "SMOKE_PASS"
     assert result["mode"] == "smoke"
     assert result["started"] is True
     assert result["campaign_consumed"] is True
     assert result["completed_turns"] == 1
-    assert result["rows"][0]["turn_id"] == "D4-L01:T1"
+    assert result["rows"][0]["turn_id"] == "D4-C01:C01"
     assert result["rows"][0]["grader_status"] == "PASS"
 
 
@@ -1697,11 +1697,23 @@ def test_provider_free_smoke_failure_before_first_call_is_not_consumed(tmp_path:
     assert result["started"] is False
     assert result["campaign_consumed"] is False
     assert result["logical_generation_calls"] == 0
-    state = json.loads(
-        (artifact_root / f"{authorization.campaign_id}.state.json").read_text(encoding="utf-8")
+    assert result["terminal"] is None
+    paths = d5.EvidencePaths(artifact_root, authorization.campaign_id)
+    assert not any(path.exists() for path in paths.all_paths())
+
+    retry = d5.execute_live_smoke(
+        repo_root=REPO_ROOT,
+        authorization=authorization,
+        artifact_root=artifact_root,
+        endpoint_get=lambda url, token: (
+            {"data": [{"id": d5.EXPECTED_MODEL}]}
+            if url == PROJECT_CONFIG.model_catalog_url
+            else _props()
+        ),
+        api_key_loader=lambda: "provider-free-token",
+        static_checker=lambda repo, checked, paths: {"status": "PASS"},
+        provider_factory=lambda repo, root, token: _WrongSemanticAdapter(),
     )
-    journal = (artifact_root / f"{authorization.campaign_id}.journal.jsonl").read_text(
-        encoding="utf-8"
-    )
-    assert state["started"] is False
-    assert "campaign_started" not in journal
+    assert retry["started"] is True
+    assert retry["campaign_consumed"] is True
+    assert paths.terminal.exists()

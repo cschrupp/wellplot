@@ -802,6 +802,7 @@ class D5CampaignCustody:
     live: bool = False
     endpoint_call_count: int = 2
     started: bool = False
+    legacy_eager: bool = False
     require_physical_observer: bool = False
     _active_logical_index: int | None = None
     _active_turn_id: str | None = None
@@ -848,7 +849,6 @@ class D5CampaignCustody:
         }
         if not evidence_is_redacted(state):
             raise D5HarnessError("state redaction failure")
-        paths.model_io.touch(exist_ok=False)
         return cls(
             paths=paths,
             campaign_id=paths.campaign_id,
@@ -861,7 +861,31 @@ class D5CampaignCustody:
         )
 
     # Preserve the existing custody construction name while keeping activation lazy.
-    start = prepare
+    @classmethod
+    def start(
+        cls,
+        paths: EvidencePaths,
+        *,
+        authorization: D5Authorization,
+        provenance: Mapping[str, Any],
+        readiness: D5ReadinessProjectionProtocol,
+        live: bool = False,
+        endpoint_call_count: int = 2,
+        mode: str = "scientific",
+    ) -> D5CampaignCustody:
+        """Retain the historical constructor for legacy custody tests only."""
+        custody = cls.prepare(
+            paths,
+            authorization=authorization,
+            provenance=provenance,
+            readiness=readiness,
+            live=live,
+            endpoint_call_count=endpoint_call_count,
+            mode=mode,
+        )
+        custody.paths.model_io.touch(exist_ok=False)
+        custody.legacy_eager = True
+        return custody
 
     def _activate(self) -> None:
         """Consume custody immediately before the first provider delegation."""
@@ -1048,6 +1072,8 @@ class D5CampaignCustody:
             raise D5HarnessError("unknown first divergence")
         if self._terminal_written or self.paths.terminal.exists():
             raise D5HarnessError("terminal artifact already written")
+        if not self.started and not self.legacy_eager:
+            raise D5HarnessError("cannot seal custody before first logical call")
         if not self.started:
             self.state.update(
                 {
@@ -1788,7 +1814,7 @@ def execute_live_smoke(
             api_key_loader=api_key_loader,
             static_checker=static_checker,
             provider_factory=provider_factory,
-            turn_ids=("D4-L01:T1",),
+            turn_ids=("D4-C01:C01",),
             mode="smoke",
         )
     except D5ReadinessError as error:
@@ -2372,6 +2398,30 @@ class D5CampaignRunner:
             if mode == "scientific"
             else None
         )
+        if not custody.started:
+            self._finished = True
+            smoke_status = None
+            if mode == "smoke":
+                smoke_status = "SMOKE_INCONCLUSIVE"
+            return {
+                "mode": mode,
+                "decision": decision,
+                "attribution": attribution,
+                "completed_turns": len(rows),
+                "rows": rows,
+                "terminal": None,
+                "logical_generation_calls": custody.ledger.logical_calls,
+                "physical_generation_attempts": custody.ledger.physical_attempts,
+                "custody_digests": {},
+                "provider_calls": 0,
+                "endpoint_calls": len(self.readiness.endpoint_calls) if self.readiness.live else 0,
+                "model_calls": 0,
+                "scientific_terminal": scientific_terminal,
+                "first_divergence": campaign_first_divergence,
+                "started": False,
+                "campaign_consumed": False,
+                "smoke_status": smoke_status,
+            }
         terminal = custody.finish(
             decision,
             attribution=attribution,
