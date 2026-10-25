@@ -685,6 +685,72 @@ def test_section_normalization_matches_reordered_tracks_by_identity() -> None:
     assert depth.bindings[0].style.color == "#abcdef"
 
 
+def test_cbl_dimension_forms_and_task_title_are_normalized_by_host() -> None:
+    """Captured planner wording restores dimensions and canonical section title."""
+    action = ReconstructSectionAction.model_validate(
+        {
+            "action": "reconstruct",
+            "section": {
+                "title": "CBL/VDL Report",
+                "source_candidate": "source-1",
+                "tracks": [
+                    {
+                        "semantic_id": "vdl_main",
+                        "kind": "array",
+                        "title": "VDL",
+                        "x_scale": {"minimum": 0, "maximum": 1},
+                        "bindings": [{"semantic_id": "vdl", "channel": "VDL"}],
+                    },
+                    {
+                        "semantic_id": "combo_main",
+                        "kind": "normal",
+                        "title": "Combo",
+                        "bindings": [{"semantic_id": "ecgr", "channel": "ECGR_STGC"}],
+                    },
+                    {
+                        "semantic_id": "cbl_main",
+                        "kind": "normal",
+                        "title": "CBL",
+                        "bindings": [{"semantic_id": "cbl", "channel": "CBL"}],
+                    },
+                    {
+                        "semantic_id": "depth_main",
+                        "kind": "reference",
+                        "title": "Depth",
+                        "bindings": [{"semantic_id": "stit", "channel": "STIT"}],
+                    },
+                ],
+            },
+        }
+    )
+    task = SectionTask(
+        goal="Reconstruct the main CBL pass.",
+        capability_ids=("section.log_plot", "track.normal", "track.reference", "track.array"),
+        existing_section_hint="Main Pass",
+        requirements=(
+            "combo = normal 50 mm\n"
+            "depth: reference, 10mm\n"
+            "cbl normal track, width 44mm\n"
+            "vdl = array 48 mm",
+        ),
+    )
+
+    normalized = _normalize_reconstruct_track_dimensions(action, task)
+    normalized = _normalize_reconstruct_request_semantics(
+        normalized,
+        task=task,
+        authoritative_request="Reconstruct the requested pass.",
+    )
+    by_id = {track.semantic_id: track for track in normalized.section.tracks}
+    assert normalized.section.title == "Main Pass"
+    assert {key: track.width_mm for key, track in by_id.items()} == {
+        "combo": 50,
+        "depth": 10,
+        "cbl": 44,
+        "vdl": 48,
+    }
+
+
 def test_section_normalization_rejects_requested_track_kind_mismatch() -> None:
     """A requested kind mismatch fails instead of being silently discarded."""
     action = ReconstructSectionAction.model_validate(

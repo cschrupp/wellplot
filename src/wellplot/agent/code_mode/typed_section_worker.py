@@ -105,12 +105,25 @@ _POSIX_PATH_RE = re.compile(r"(?<![A-Za-z0-9_])/(?:[^\s\"'<>]+/)+[^\s\"'<>]+")
 _WINDOWS_PATH_RE = re.compile(r"(?<![A-Za-z0-9_])[A-Za-z]:[\\/][^\s\"'<>]+")
 _TRACK_DIMENSION_RE = re.compile(
     r"^\s*Track\s+(?P<number>\d+)\s+\((?P<semantic_id>[^)]+)\):\s*"
-    r"(?P<kind>normal|reference|array)\s*,\s*(?P<width>[0-9]+(?:\.[0-9]+)?)\s*mm\b",
-    re.IGNORECASE,
+    r"(?P<kind>normal|reference|array)(?:\s+track)?\s*,?\s*"
+    r"(?:width\s*)?(?P<width>[0-9]+(?:\.[0-9]+)?)\s*mm\b",
+    re.IGNORECASE | re.MULTILINE,
+)
+_NAMED_TRACK_DIMENSION_RE = re.compile(
+    r"^\s*(?P<semantic_id>[A-Za-z][A-Za-z0-9 _-]*?)\s*(?:=|:)\s*"
+    r"(?P<kind>normal|reference|array)(?:\s+track)?\s*,?\s*"
+    r"(?:width\s*)?(?P<width>[0-9]+(?:\.[0-9]+)?)\s*mm\b",
+    re.IGNORECASE | re.MULTILINE,
+)
+_PHRASED_TRACK_DIMENSION_RE = re.compile(
+    r"^\s*(?P<semantic_id>[A-Za-z][A-Za-z0-9_-]*)\s+"
+    r"(?P<kind>normal|reference|array)\s+track\s*,?\s*"
+    r"(?:width\s*)?(?P<width>[0-9]+(?:\.[0-9]+)?)\s*mm\b",
+    re.IGNORECASE | re.MULTILINE,
 )
 _TRACK_CHANNEL_LINE_RE = re.compile(
     r"^\s*Track\s+(?P<number>\d+)(?:\s+\([^)]*\))?\s*:\s*(?P<body>.*)$",
-    re.IGNORECASE,
+    re.IGNORECASE | re.MULTILINE,
 )
 _TRACK_BLOCK_RE = re.compile(
     r"^\s*On\s+(?P<track>[^:\n]+):\s*\n(?P<body>.*?)(?=^\s*On\s+[^:\n]+:\s*$|"
@@ -597,30 +610,51 @@ def _normalize_reconstruct_track_dimensions(
     """Apply explicit track identity and width without relying on response order."""
     if action.action != "reconstruct":
         return action
-    dimensions: dict[int, tuple[str, str, float]] = {}
+    dimensions: list[tuple[str, str, float, int | None]] = []
     channel_signatures: dict[int, tuple[str, ...]] = {}
     for requirement in task.requirements:
-        match = _TRACK_DIMENSION_RE.match(requirement)
-        if match is not None:
-            track_number = int(match.group("number"))
-            if track_number not in dimensions:
-                dimensions[track_number] = (
+        for match in _TRACK_DIMENSION_RE.finditer(requirement):
+            dimensions.append(
+                (
                     match.group("semantic_id").strip(),
                     match.group("kind").casefold(),
                     float(match.group("width")),
+                    int(match.group("number")),
                 )
-            continue
-        channel_match = _TRACK_CHANNEL_LINE_RE.match(requirement)
-        if channel_match is not None:
-            channel_signatures[int(channel_match.group("number"))] = _channel_signature(
-                channel_match.group("body")
             )
+        for match in _NAMED_TRACK_DIMENSION_RE.finditer(requirement):
+            dimensions.append(
+                (
+                    match.group("semantic_id").strip(),
+                    match.group("kind").casefold(),
+                    float(match.group("width")),
+                    None,
+                )
+            )
+        for match in _PHRASED_TRACK_DIMENSION_RE.finditer(requirement):
+            dimensions.append(
+                (
+                    match.group("semantic_id").strip(),
+                    match.group("kind").casefold(),
+                    float(match.group("width")),
+                    None,
+                )
+            )
+        for channel_match in _TRACK_CHANNEL_LINE_RE.finditer(requirement):
+            signature = _channel_signature(channel_match.group("body"))
+            if signature:
+                channel_signatures[int(channel_match.group("number"))] = signature
     if not dimensions:
         return action
     tracks = list(action.section.tracks)
     used_indices: set[int] = set()
-    for track_number, (semantic_id, kind, width_mm) in dimensions.items():
-        signature = channel_signatures.get(track_number, ())
+    seen_dimensions: set[str] = set()
+    for semantic_id, kind, width_mm, track_number in dimensions:
+        dimension_key = _normalize_track_identifier(semantic_id)
+        if dimension_key in seen_dimensions:
+            continue
+        seen_dimensions.add(dimension_key)
+        signature = channel_signatures.get(track_number, ()) if track_number else ()
         index = _find_track_index(
             tracks,
             identifiers=(semantic_id,),
@@ -659,8 +693,11 @@ def _normalize_reconstruct_request_semantics(
         for block in task_blocks
         if block.group("track").strip().casefold() not in seen_block_names
     )
+    section = action.section
+    if task.existing_section_hint:
+        section = section.model_copy(update={"title": task.existing_section_hint})
     if not blocks:
-        return action
+        return action.model_copy(update={"section": section})
     tracks = list(action.section.tracks)
     matched_blocks: set[int] = set()
     for index, track in enumerate(tracks):
@@ -678,7 +715,7 @@ def _normalize_reconstruct_request_semantics(
             "Explicit track semantics could not be matched by identity: " + ", ".join(unmatched),
         )
     return action.model_copy(
-        update={"section": action.section.model_copy(update={"tracks": tuple(tracks)})}
+        update={"section": section.model_copy(update={"tracks": tuple(tracks)})}
     )
 
 

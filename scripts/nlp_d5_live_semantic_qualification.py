@@ -1862,11 +1862,17 @@ def _bounded_turn_row(
     status = str(grade.get("status"))
     outcome = "PASS" if status == "PASS" else "INCONCLUSIVE" if status == "INCONCLUSIVE" else "FAIL"
     first_divergence = _first_divergence(projected_actual, grade, observed_failure)
+    failure_category = (
+        observed_failure[1]
+        if observed_failure is not None
+        else classify_grade_failure(projected_actual, grade)
+    )
     scientific_terminal = _turn_scientific_terminal(
         grade=grade,
         actual=projected_actual,
         observed_failure=observed_failure,
         first_divergence=first_divergence,
+        failure_category=failure_category,
     )
     return {
         "experiment_version": D5_EXPERIMENT_VERSION,
@@ -1884,12 +1890,23 @@ def _bounded_turn_row(
         "render_sha256": _safe_hash(projected_actual.get("render_path")),
         "persisted": projected_actual.get("persisted") is True,
         "rendered": projected_actual.get("rendered") is True,
+        "worker_status": projected_actual.get("worker_status", "NOT_ESTABLISHED"),
+        "worker_diagnostic_code": projected_actual.get("worker_diagnostic_code"),
+        "normalization_status": projected_actual.get("normalization_status", "NOT_ESTABLISHED"),
+        "lowering_status": projected_actual.get("lowering_status", "NOT_ESTABLISHED"),
+        "reconciliation_status": projected_actual.get("reconciliation_status"),
+        "apply_status": projected_actual.get("apply_status"),
+        "failure_owner": projected_actual.get("failure_owner"),
+        "intent_applied": projected_actual.get("intent_applied") is True,
+        "worker_stage_evidence": projected_actual.get("worker_stage_evidence", []),
+        "host_stage_evidence": projected_actual.get("host_stage_evidence", {}),
         "logical_generation_calls": call_count,
         "physical_attempts": physical_attempt_count,
         "provider": provider,
         "model": model,
         "first_divergence": first_divergence,
         "scientific_terminal": scientific_terminal,
+        "failure_category": failure_category,
         "evidence_dimensions": _dimension_evidence(
             case=case,
             expected=expected,
@@ -1912,13 +1929,37 @@ _INFRASTRUCTURE_GRADE_ERRORS = frozenset(
         "cbl_rendered_wrong_artifact",
     }
 )
+_HOST_FAILURE_CATEGORIES = frozenset(
+    {
+        "HOST_NORMALIZATION",
+        "HOST_SEMANTIC_APPLICATION",
+        "HOST_EXECUTION",
+        "PERSISTENCE",
+        "RENDER",
+    }
+)
 
 
 def classify_grade_failure(actual: Mapping[str, Any], grade: Mapping[str, Any]) -> str | None:
-    """Classify deterministic persistence/render faults without message heuristics."""
+    """Classify the earliest observed host boundary before persistence grading."""
+    if actual.get("normalization_status") == "FAIL":
+        return "HOST_NORMALIZATION"
+    if actual.get("lowering_status") == "FAIL":
+        return "HOST_SEMANTIC_APPLICATION"
+    apply_status = str(actual.get("apply_status", ""))
+    if apply_status in {"compile_failed", "reconciliation_blocked", "validation_failed"}:
+        return "HOST_SEMANTIC_APPLICATION"
+    if apply_status in {"post_lowering_obligation_failed", "execution_failed"}:
+        return "HOST_EXECUTION"
     errors = {str(error) for error in grade.get("errors", [])}
     if not errors.intersection(_INFRASTRUCTURE_GRADE_ERRORS):
         return None
+    host_stage_evidence = actual.get("host_stage_evidence")
+    if isinstance(host_stage_evidence, Mapping) and host_stage_evidence:
+        if actual.get("persisted") is True and actual.get("rendered") is False:
+            return "RENDER"
+        if actual.get("persisted") is False:
+            return "PERSISTENCE"
     if actual.get("apply_status") in {
         "rejected",
         "compile_failed",
@@ -1995,6 +2036,16 @@ def _first_divergence(
         return declared
     if actual.get("harness_failure") is True:
         return "HARNESS"
+    if actual.get("normalization_status") == "FAIL":
+        return "HOST_EXECUTION"
+    if actual.get("lowering_status") == "FAIL" or str(actual.get("apply_status")) in {
+        "compile_failed",
+        "reconciliation_blocked",
+        "validation_failed",
+        "post_lowering_obligation_failed",
+        "execution_failed",
+    }:
+        return "HOST_EXECUTION"
     errors = {str(error) for error in grade.get("errors", [])}
     if any(
         "canonical_change_outside" in error or "failure_bytes_changed" in error for error in errors
@@ -2199,11 +2250,14 @@ def _turn_scientific_terminal(
     actual: Mapping[str, Any],
     observed_failure: tuple[str, str] | None,
     first_divergence: str,
+    failure_category: str | None = None,
 ) -> str:
     """Classify one turn using sealed evidence, not the expected gold outcome."""
     if observed_failure is not None:
         return "INCONCLUSIVE / PROVIDER"
     if actual.get("harness_failure") is True:
+        return "INCONCLUSIVE / HARNESS"
+    if failure_category in _HOST_FAILURE_CATEGORIES:
         return "INCONCLUSIVE / HARNESS"
     if grade.get("status") == "PASS":
         return "PASS"
@@ -2226,6 +2280,8 @@ def _campaign_scientific_terminal(
         return "INCONCLUSIVE / HARNESS"
     if attribution.startswith(("PROVIDER", "TRANSPORT")):
         return "INCONCLUSIVE / PROVIDER"
+    if attribution in _HOST_FAILURE_CATEGORIES:
+        return "INCONCLUSIVE / HARNESS"
     if attribution in {
         "EVIDENCE_INTEGRITY",
         "EXECUTION_INTERNAL_ERROR",
@@ -2361,6 +2417,8 @@ class D5CampaignRunner:
                 )
                 if observed_failure is not None:
                     row["attribution"] = observed_failure[0]
+                elif row["failure_category"] in _HOST_FAILURE_CATEGORIES:
+                    row["attribution"] = row["failure_category"]
                 if campaign_first_divergence == "NONE":
                     campaign_first_divergence = str(row["first_divergence"])
                 custody.append_turn(row)
@@ -2372,6 +2430,12 @@ class D5CampaignRunner:
             ]
             if provider_attributions:
                 decision, attribution = "INCONCLUSIVE", provider_attributions[0]
+            elif any(row.get("failure_category") in _HOST_FAILURE_CATEGORIES for row in rows):
+                decision, attribution = "INCONCLUSIVE", next(
+                    row["failure_category"]
+                    for row in rows
+                    if row.get("failure_category") in _HOST_FAILURE_CATEGORIES
+                )
             elif any(row["infrastructure_failure"] for row in rows):
                 decision, attribution = "INCONCLUSIVE", "PRODUCTION_OR_INFRASTRUCTURE"
             elif len(rows) != len(selected_ids):
@@ -2446,6 +2510,7 @@ class D5CampaignRunner:
                     "PRODUCTION_DEFECT",
                     "POPULATION_INCOMPLETE",
                 }
+                or attribution in _HOST_FAILURE_CATEGORIES
                 or campaign_first_divergence == "HARNESS"
             ):
                 smoke_status = "SMOKE_INCONCLUSIVE"

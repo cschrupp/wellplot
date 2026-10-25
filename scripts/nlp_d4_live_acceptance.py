@@ -1243,6 +1243,80 @@ def _add_session_evidence(actual: dict[str, Any], result: object) -> None:
     metrics = compilation.get("metrics", {})
     if not isinstance(metrics, Mapping):
         metrics = {}
+    raw_workers = compilation.get("workers", [])
+    workers = raw_workers if isinstance(raw_workers, Sequence) else ()
+    worker_stage_evidence: list[dict[str, object]] = []
+    worker_diagnostic_code: str | None = None
+    worker_statuses: list[bool] = []
+    for worker in workers:
+        if not isinstance(worker, Mapping):
+            continue
+        worker_statuses.append(worker.get("success") is True)
+        worker_diagnostics = worker.get("diagnostics", [])
+        if worker_diagnostic_code is None and isinstance(worker_diagnostics, Sequence):
+            for diagnostic in worker_diagnostics:
+                if isinstance(diagnostic, Mapping) and diagnostic.get("code") is not None:
+                    worker_diagnostic_code = str(diagnostic["code"])
+                    break
+        stage = worker.get("stage_evidence", {})
+        if isinstance(stage, Mapping):
+            worker_stage_evidence.append(
+                {
+                    "kind": worker.get("kind"),
+                    "plan_order": worker.get("plan_order"),
+                    "success": worker.get("success") is True,
+                    "stage_evidence": {
+                        str(key): str(value)
+                        for key, value in stage.items()
+                        if isinstance(value, str)
+                    },
+                }
+            )
+    host_stages = report_facts.get("host_stage_evidence", {})
+    if not isinstance(host_stages, Mapping):
+        host_stages = {}
+    actual["worker_stage_evidence"] = worker_stage_evidence
+    actual["worker_status"] = (
+        "PASS"
+        if worker_statuses and all(worker_statuses)
+        else "FAIL"
+        if worker_statuses
+        else "NOT_REACHED"
+    )
+    actual["worker_diagnostic_code"] = worker_diagnostic_code
+    stage_values = [
+        entry["stage_evidence"]
+        for entry in worker_stage_evidence
+        if isinstance(entry.get("stage_evidence"), Mapping)
+    ]
+
+    def aggregate_stage(name: str) -> str:
+        values = [str(stage[name]) for stage in stage_values if name in stage]
+        if values and all(value == "PASS" for value in values):
+            return "PASS"
+        if any(value == "FAIL" for value in values):
+            return "FAIL"
+        return "NOT_REACHED"
+
+    actual["normalization_status"] = aggregate_stage("worker_obligation")
+    actual["lowering_status"] = aggregate_stage("semantic_lowering")
+    actual["host_stage_evidence"] = {
+        str(key): str(value)
+        for key, value in host_stages.items()
+        if key
+        in {
+            "reconciliation",
+            "private_execution",
+            "canonical_validation",
+            "post_lowering_obligation",
+            "preservation",
+            "persistence",
+            "reload",
+            "render",
+        }
+        and isinstance(value, str)
+    }
+    actual["reconciliation_status"] = actual["host_stage_evidence"].get("reconciliation")
     actual["diagnostics"] = diagnostics
     actual["worker_metrics"] = _worker_metrics({"worker_metrics": metrics})
     actual["worker_repair_count"] = int(metrics.get("total_repairs", 0) or 0)

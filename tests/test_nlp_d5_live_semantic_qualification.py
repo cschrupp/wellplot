@@ -1059,6 +1059,77 @@ def test_persistence_and_render_failures_are_inconclusive_infrastructure() -> No
     )
 
 
+def test_host_application_failure_precedes_persistence_attribution() -> None:
+    """A compile/reconciliation rejection cannot be reported as model semantics."""
+    actual = {
+        "apply_status": "compile_failed",
+        "persisted": False,
+        "rendered": False,
+        "host_stage_evidence": {"persistence": "NOT_REACHED"},
+    }
+    assert (
+        d5.classify_grade_failure(actual, {"errors": ["persistence_not_proven"]})
+        == "HOST_SEMANTIC_APPLICATION"
+    )
+
+
+def test_explicit_host_evidence_distinguishes_render_failure() -> None:
+    """Persisted artifacts with a failed render retain the render boundary."""
+    actual = {
+        "apply_status": "persisted",
+        "persisted": True,
+        "rendered": False,
+        "host_stage_evidence": {"persistence": "PASS", "render": "FAIL"},
+    }
+    assert d5.classify_grade_failure(actual, {"errors": ["render_not_proven"]}) == "RENDER"
+
+
+def test_session_evidence_preserves_bounded_host_application_boundary() -> None:
+    """D5 evidence retains application state without raw provider material."""
+    actual: dict[str, object] = {}
+    result = SimpleNamespace(
+        submitted_intent=None,
+        report_facts={
+            "success": False,
+            "changed": False,
+            "apply_status": "compile_failed",
+            "host_stage_evidence": {
+                "reconciliation": "NOT_REACHED",
+                "persistence": "NOT_REACHED",
+                "render": "NOT_REACHED",
+            },
+            "compilation": {
+                "diagnostics": [
+                    {"stage": "semantic_worker", "code": "semantic_contract_incomplete"}
+                ],
+                "workers": [
+                    {
+                        "kind": "section",
+                        "plan_order": 1,
+                        "success": False,
+                        "diagnostics": [{"code": "semantic_contract_incomplete"}],
+                        "stage_evidence": {
+                            "worker_obligation": "NOT_REACHED",
+                            "semantic_lowering": "NOT_REACHED",
+                        },
+                    }
+                ],
+                "metrics": {},
+            },
+        },
+    )
+
+    d4._add_session_evidence(actual, result)
+
+    assert actual["apply_status"] == "compile_failed"
+    assert actual["failure_owner"] == "semantic_worker"
+    assert actual["worker_diagnostic_code"] == "semantic_contract_incomplete"
+    assert actual["host_stage_evidence"]["persistence"] == "NOT_REACHED"
+    assert d5.classify_grade_failure(actual, {"errors": ["persistence_not_proven"]}) == (
+        "HOST_SEMANTIC_APPLICATION"
+    )
+
+
 class _RetryingAdapter:
     """Provider-free adapter exercising integrated logical/physical custody hooks."""
 
