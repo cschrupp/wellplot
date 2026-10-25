@@ -1,0 +1,74 @@
+{
+  "report": {
+    "general_fields": [
+      {"slot_id": "general.company", "value": "University of Utah"},
+      {"slot_id": "general.well", "value": "FORGE 16B (78)-32"},
+      {"slot_id": "general.field", "value": "Utah Forge"},
+      {"slot_id": "general.county", "value": "Beaver"},
+      {"slot_id": "general.location", "value": "Utah"},
+      {"slot_id": "general.section", "value": "NWSW 32"},
+      {"slot_id": "general.township", "value": "26"},
+      {"slot_id": "general.range", "value": "9"},
+      {"slot_id": "general.footage", "value": "972' FSL & 523' FWL"},
+      {"slot_id": "general.latitude", "value": "38.501242"},
+      {"slot_id": "general.longitude", "value": "-112.882661"},
+      {"slot_id": "general.logging_date", "value": "08-May-2023"},
+      {"slot_id": "general.elevation_kb", "value": "5445.50 ft"},
+      {"slot_id": "general.elevation_gl", "value": "5415.00 ft"},
+      {"slot_id": "general.elevation_df", "value": "5445.00 ft"},
+      {"slot_id": "general.top_log_interval", "value": "25.00 ft"},
+      {"slot_id": "general.bottom_log_interval", "value": "4845.00 ft"},
+      {"slot_id": "general.fluid_type", "value": "Fresh Water"},
+      {"slot_id": "detail.row_2.column_1.cell_1", "value": "ONE"},
+      {"slot_id": "detail.row_4.column_1.cell_1", "value": "4980.00 ft"},
+      {"slot_id": "detail.row_5.column_1.cell_1", "value": "TD Not Tag"},
+      {"slot_id": "detail.row_12.value_1", "value": "8.4 lbm/gal"},
+      {"slot_id": "detail.row_19.column_1.cell_1", "value": "177.2 degF"},
+      {"slot_id": "detail.row_23.value_1", "value": "D. May / D. Jones"},
+      {"slot_id": "detail.row_24.value_1", "value": "Leroy Swearingen"}
+    ],
+    "service_titles": [
+      {"slot_id": "service_title.1", "value": "Cement Bond Log"},
+      {"slot_id": "service_title.2", "value": "Variable Density Log"},
+      {"slot_id": "service_title.3", "value": "Gamma Ray - CCL"}
+    ],
+    "remarks": [
+      {"semantic_id": "remark.reconstruction_scope", "text": "Supported Reconstruction Scope — reconstruct only the supported heading, remarks, main pass, repeat pass, and tail; do not invent unsupported well diagrams, calibration reports, or vendor parameter tables."},
+      {"semantic_id": "remark.data_sources", "text": "Data Sources — use the staged DLIS files for the main and repeat passes."},
+      {"semantic_id": "remark.public_data", "text": "Public Data and IP Notice — keep the WellPlot reproduction boundary explicit and do not recreate vendor disclaimer artwork."}
+    ],
+    "depth_unit": "ft",
+    "depth_scale": 1,
+    "tail_enabled": true
+  },
+  "sections": [
+    {
+      "action": "reconstruct",
+      "section": {
+        "title": "CBL/VDL Report",
+        "source_candidate": "source-1",
+        "tracks": [
+          {"semantic_id": "track-main-pass-combo", "kind": "normal", "title": "Combo", "bindings": [
+            {"semantic_id": "bind-combo-gamma", "channel": "ECGR_STGC", "label": "Gamma Ray (ECGR_STGC) QTGC-B", "scale": {"minimum": 0, "maximum": 150}, "style": {"color": "#16a34a", "line_width": 0.8}},
+            {"semantic_id": "bind-combo-tt", "channel": "TT", "label": "Transit Time for CBL (TT) QSLT-B", "scale": {"minimum": 400, "maximum": 200}, "style": {"color": "#2142ff", "line_width": 0.75}},
+            {"semantic_id": "bind-combo-tension", "channel": "TENS", "label": "Cable Tension (TENS)", "scale": {"minimum": 5000, "maximum": 0}, "style": {"color": "#111111", "line_width": 0.65, "fill_color": "#111111", "fill_alpha": 0.0, "colormap": "white_black"}},
+            {"semantic_id": "bind-combo-temp", "channel": "MTEM", "label": "Mud Temperature (MTEM) LEH-MT", "scale": {"minimum": 100, "maximum": 500}, "style": {"color": "#111111", "line_width": 0.9}}
+          ]},
+          {"semantic_id": "track-main-pass-depth", "kind": "reference", "title": "Depth", "bindings": [
+            {"semantic_id": "bind-depth-stit", "channel": "STIT", "label": "Stuck Tool Indicator, Total (STIT)", "scale": {"minimum": 0, "maximum": 50}, "style": {"color": "#111111", "line_width": 0.65}},
+            {"semantic_id": "bind-depth-tdsp", "channel": "TDSP", "label": "Cable Drag", "scale": {"minimum": 0, "maximum": 50}, "style": {"color": "#92400e", "line_width": 0.65, "fill_color": "#92400e", "fill_alpha": 0.0, "colormap": "white_black"}},
+            {"semantic_id": "bind-depth-vsec", "channel": "VSEC", "label": "Tool_Tot. Drag", "scale": {"minimum": 0, "maximum": 50}, "style": {"color": "#1d4ed8", "line_width": 0.65, "fill_color": "#1d4ed8", "fill_alpha": 0.0, "colormap": "white_black"}}
+          ]},
+          {"semantic_id": "track-main-pass-cbl", "kind": "normal", "title": "CBL", "bindings": [
+            {"semantic_id": "bind-cbl-full", "channel": "CBL", "label": "CBL Amplitude (CBL) QSLT-B", "scale": {"minimum": 0, "maximum": 100}, "style": {"color": "#111111", "line_width": 0.75}},
+            {"semantic_id": "bind-cbl-zoom", "channel": "CBL", "label": "CBL Amplitude (CBL) QSLT-B", "scale": {"minimum": 0, "maximum": 10}, "style": {"color": "#2563eb", "line_width": 0.65, "fill_color": "#2563eb", "fill_alpha": 0.0, "colormap": "white_black"}}
+          ]},
+          {"semantic_id": "track-main-pass-vdl", "kind": "array", "title": "VDL", "x_scale": {"minimum": 200, "maximum": 1200}, "bindings": [
+            {"semantic_id": "bind-vdl-raster", "channel": "VDL", "label": "VDL VariableDensity (VDL) QSLT-B", "profile": "vdl", "colormap": "gray_r", "colorbar_enabled": true, "colorbar_label": "Amplitude", "sample_axis": {"unit": "us", "minimum": 200, "maximum": 1200, "tick_count": 7}}
+          ]}
+        ]
+      }
+    }
+  ]
+}
+

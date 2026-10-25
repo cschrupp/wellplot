@@ -484,6 +484,7 @@ def _apply_explicit_report_request(
 ) -> ReportSemanticResponse:
     """Prefer explicit report clauses over ambiguous model slot synonyms."""
     response = _preserve_unrequested_report_depth(response, authoritative_request)
+    response = _preserve_unrequested_report_presentation(response, authoritative_request)
     metadata_parts: list[str] = []
     services: str | None = None
     remark_parts: list[str] = []
@@ -499,10 +500,12 @@ def _apply_explicit_report_request(
     metadata_parts.extend(request_metadata)
     if services is None:
         services = request_services
-    remark_parts.extend(request_remarks)
+    if request_remarks:
+        remark_parts = list(request_remarks)
     metadata = "; ".join(metadata_parts) or None
     remarks = "\n".join(f"{index}. {value}" for index, value in enumerate(remark_parts, 1)) or None
-    if metadata is None and services is None and remarks is None:
+    tail_requested = _explicit_tail_requested(authoritative_request)
+    if metadata is None and services is None and remarks is None and not tail_requested:
         return response
 
     slots = {slot.slot_id: slot for slot in context.header_slots}
@@ -529,6 +532,8 @@ def _apply_explicit_report_request(
         updates["service_titles"] = service_titles
     if parsed_remarks:
         updates["remarks"] = parsed_remarks
+    if tail_requested:
+        updates["tail_enabled"] = True
     return response.model_copy(update=updates) if updates else response
 
 
@@ -546,6 +551,22 @@ def _preserve_unrequested_report_depth(
     if response.depth_unit is None and response.depth_scale is None:
         return response
     return response.model_copy(update={"depth_unit": None, "depth_scale": None})
+
+
+def _preserve_unrequested_report_presentation(
+    response: ReportSemanticResponse,
+    authoritative_request: str,
+) -> ReportSemanticResponse:
+    """Ignore model page mutations unless page presentation is explicitly requested."""
+    if re.search(
+        r"\b(?:page|paper)\s+(?:size|orientation)\b|\b(?:a4|portrait|landscape)\b",
+        authoritative_request,
+        flags=re.IGNORECASE,
+    ):
+        return response
+    if response.page_size is None and response.page_orientation is None:
+        return response
+    return response.model_copy(update={"page_size": None, "page_orientation": None})
 
 
 def _report_requirement_fragments(
@@ -576,13 +597,47 @@ def _report_requirement_fragments(
 def _generic_report_request_fragments(
     request: str,
 ) -> tuple[tuple[str, ...], str | None, tuple[str, ...]]:
-    """Read generic labeled request fragments without depending on prose headings."""
+    """Read generic labeled fragments and bounded report prose blocks."""
     if not request:
         return (), None, ()
     metadata: list[str] = []
     services: str | None = None
     remarks: list[str] = []
-    for fragment in re.split(r"[;\n]", request):
+    structured_spans: list[tuple[int, int]] = []
+
+    def capture(pattern: str) -> list[str]:
+        matches = list(re.finditer(pattern, request, flags=re.IGNORECASE | re.DOTALL))
+        for match in matches:
+            structured_spans.append(match.span())
+        return [re.sub(r"\s+", " ", match.group("body")).strip() for match in matches]
+
+    metadata.extend(
+        capture(
+            r"\bSet\s+the\s+report\s+metadata\s+to\s*:\s*"
+            r"(?P<body>.*?)(?=\n\s*\n|\n\s*(?:Include|For each|On)\b|\Z)"
+        )
+    )
+    service_values = capture(
+        r"\bUse\s+these\s+service\s+titles\s*,?\s*in\s+order\s*:\s*"
+        r"(?P<body>.*?)(?=\n\s*\n|\n\s*(?:Set|Include|For each|On)\b|\Z)"
+    )
+    if service_values:
+        services = service_values[-1]
+    for remark_block in capture(
+        r"\bInclude\s+(?:three|the)\s+remarks?\s*:\s*"
+        r"(?P<body>.*?)(?=\n\s*\n|\n\s*(?:For each|On)\b|\Z)"
+    ):
+        numbered = re.findall(
+            r"(?:^|\s)\d+\.\s*(.*?)(?=\s+\d+\.\s|\Z)",
+            remark_block,
+            flags=re.DOTALL,
+        )
+        remarks.extend(numbered or (remark_block,))
+
+    residual = request
+    for start, end in sorted(structured_spans, reverse=True):
+        residual = residual[:start] + "\n" + residual[end:]
+    for fragment in re.split(r"[;\n]", residual):
         fragment = fragment.strip()
         if not fragment:
             continue
@@ -690,8 +745,9 @@ def _explicit_remarks(remarks: str | None) -> tuple[ReportRemark, ...]:
     if remarks is None:
         return ()
     pattern = re.compile(
-        r"^\s*\d+\.\s*(?P<title>[^—\n]+?)\s+—\s*(?P<text>.*?)(?=^\s*\d+\.\s|\Z)",
-        flags=re.IGNORECASE | re.MULTILINE | re.DOTALL,
+        r"(?:^|\s)\d+\.\s*(?P<title>[^—\n]+?)\s+—\s*"
+        r"(?P<text>.*?)(?=\s+\d+\.\s|\Z)",
+        flags=re.IGNORECASE | re.DOTALL,
     )
     matches = list(pattern.finditer(remarks))
     if not matches:
@@ -715,6 +771,21 @@ def _explicit_remarks(remarks: str | None) -> tuple[ReportRemark, ...]:
                 )
             )
     return tuple(parsed)
+
+
+def _explicit_tail_requested(request: str) -> bool:
+    """Recognize an affirmative request to preserve the existing report tail."""
+    flat = " ".join(request.split())
+    if re.search(r"\b(?:without|exclude|omit|disable)\b[^.]*\btail\b", flat, re.I):
+        return False
+    return bool(
+        re.search(
+            r"\b(?:limit\s+the\s+report\s+to|include|retain|keep|preserve)\b"
+            r"[^.]*\btail\b",
+            flat,
+            re.I,
+        )
+    )
 
 
 def _detail_slot_alias(

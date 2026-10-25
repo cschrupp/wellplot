@@ -16,6 +16,8 @@ from tests.test_nlp_d4_live_acceptance import _build_rehearsal_cbl_artifact
 from wellplot.agent.code_mode import typed_section_worker as section_worker
 from wellplot.agent.code_mode.canonical_workers import (
     CanonicalReportWorker,
+    ReportSemanticResponse,
+    _normalize_report_slot_groups,
 )
 from wellplot.agent.code_mode.enrichment import (
     ChannelContext,
@@ -632,6 +634,149 @@ def test_canonical_report_worker_uses_generic_labeled_report_requirements() -> N
     )
 
 
+def test_cbl_captured_report_prose_is_normalized_from_authoritative_request() -> None:
+    """Captured CBL report output is corrected by request-owned prose semantics."""
+    request = next(
+        case["request"] for case in d4.load_cases(REPO_ROOT) if case["turn_id"] == "D4-C01:C01"
+    )
+    captured = json.loads(
+        (REPO_ROOT / "tests/fixtures/d5_5j_qwen_smoke_003_report_sections.json").read_text()
+    )
+    response = ReportSemanticResponse.model_validate(captured["report"])
+    general = (
+        ("company", "Company"),
+        ("well", "Well"),
+        ("field", "Field"),
+        ("county", "County"),
+        ("country", "Country"),
+        ("section", "Section"),
+        ("township", "Township"),
+        ("range", "Range"),
+        ("footage", "Footage"),
+        ("latitude", "Latitude"),
+        ("longitude", "Longitude"),
+        ("logging_date", "Logging Date"),
+        ("elevation_kb", "KB"),
+        ("elevation_gl", "GL"),
+        ("elevation_df", "DF"),
+        ("measured_from", "Measured From"),
+        ("top_log_interval", "Top Log Interval"),
+        ("bottom_log_interval", "Bottom Log Interval"),
+        ("fluid_type", "Fluid Type"),
+    )
+    details = (
+        ("detail.row_2.column_1.cell_1", "run_number", "Run"),
+        ("detail.row_4.column_1.cell_1", "driller_depth", "Driller Depth"),
+        ("detail.row_5.column_1.cell_1", "logged_depth", "Logged Depth"),
+        ("detail.row_12.value_1", "fluid_density", "Fluid Density"),
+        ("detail.row_19.column_1.cell_1", "bottom_temperature", "Bottom Temperature"),
+        ("detail.row_23.value_1", "logged_by", "Logged By"),
+        ("detail.row_24.value_1", "witnessed_by", "Witnessed By"),
+    )
+    header_slots = (
+        tuple(
+            HeaderSlotInspectionSummary(slot_id=f"general.{key}", key=key, label=label)
+            for key, label in general
+        )
+        + tuple(
+            HeaderSlotInspectionSummary(slot_id=slot_id, key=key, label=label)
+            for slot_id, key, label in details
+        )
+        + tuple(
+            HeaderSlotInspectionSummary(slot_id=f"service_title.{index}") for index in (1, 2, 3)
+        )
+    )
+    context = ReportContext(
+        header_slots=header_slots,
+        general_slot_ids=tuple(f"general.{key}" for key, _ in general),
+        service_title_slot_ids=("service_title.1", "service_title.2", "service_title.3"),
+        detail_slot_ids=tuple(slot_id for slot_id, _, _ in details),
+    )
+
+    normalized = _normalize_report_slot_groups(
+        response,
+        context,
+        authoritative_request=request,
+    )
+
+    values = {field.slot_id: field.value for field in normalized.general_fields}
+    assert values["general.company"] == "University of Utah"
+    assert values["general.country"] == "Utah"
+    assert values["general.measured_from"] == "Kelly Bushing"
+    assert len(normalized.detail_fields) == 7
+    assert [item.value for item in normalized.service_titles] == [
+        "Cement Bond Log",
+        "Variable Density Log",
+        "Gamma Ray - CCL",
+    ]
+    assert [item.title for item in normalized.remarks] == [
+        "Supported Reconstruction Scope",
+        "Data Sources",
+        "Public Data and IP Notice",
+    ]
+    assert normalized.page_size is None
+    assert normalized.page_orientation is None
+    assert normalized.tail_enabled is True
+
+
+def test_cbl_captured_section_output_is_normalized_from_authoritative_request() -> None:
+    """Captured Qwen section output uses request-owned presentation semantics."""
+    request = next(
+        case["request"] for case in d4.load_cases(REPO_ROOT) if case["turn_id"] == "D4-C01:C01"
+    )
+    captured = json.loads(
+        (REPO_ROOT / "tests/fixtures/d5_5j_qwen_smoke_003_report_sections.json").read_text()
+    )
+    action = ReconstructSectionAction.model_validate(captured["sections"][0])
+    task = SectionTask(
+        goal="Configure the captured CBL main pass.",
+        capability_ids=(
+            "section.log_plot",
+            "track.normal",
+            "track.reference",
+            "track.array",
+            "binding.curve",
+            "binding.raster",
+        ),
+        existing_section_hint="Main Pass",
+        requirements=(),
+    )
+    normalized = _normalize_reconstruct_track_dimensions(
+        action,
+        task,
+        authoritative_request=request,
+    )
+    normalized = _normalize_reconstruct_request_semantics(
+        normalized,
+        task=task,
+        authoritative_request=request,
+    )
+    tracks = normalized.section.tracks
+    assert [track.width_mm for track in tracks] == [50.0, 10.0, 44.0, 48.0]
+    assert tracks[0].bindings[0].label == "Gamma Ray (ECGR_STGC) QTGC-B"
+    assert tracks[3].bindings[0].label == "VDL VariableDensity (VDL) QSLT-B"
+    assert tracks[3].bindings[0].profile == "vdl"
+    assert tracks[3].bindings[0].colorbar_position == "header"
+    assert tracks[3].bindings[0].sample_axis.source_origin == 40
+    assert tracks[3].bindings[0].sample_axis.source_step == 10
+    assert tracks[3].grid.vertical_main_visible is False
+    assert tracks[3].grid.vertical_secondary_visible is False
+
+
+def test_report_page_request_is_preserved_when_explicit() -> None:
+    """An explicit page request remains model-owned after host normalization."""
+    response = ReportSemanticResponse.model_validate(
+        {"page_size": "letter", "page_orientation": "landscape"}
+    )
+    normalized = _normalize_report_slot_groups(
+        response,
+        ReportContext(),
+        authoritative_request="Use letter page size in landscape orientation.",
+    )
+    assert normalized.page_size == "letter"
+    assert normalized.page_orientation == "landscape"
+
+
 def test_section_normalization_matches_reordered_tracks_by_identity() -> None:
     """Reordered model tracks receive dimensions and styles by identity, not position."""
     action = ReconstructSectionAction.model_validate(
@@ -690,9 +835,7 @@ def test_section_normalization_matches_reordered_tracks_by_identity() -> None:
 def test_cbl_dimension_forms_and_task_title_are_normalized_by_host() -> None:
     """Frozen CBL request wins over the captured planner's anonymous dimensions."""
     cbl_request = next(
-        case["request"]
-        for case in d4.load_cases(REPO_ROOT)
-        if case["turn_id"] == "D4-C01:C01"
+        case["request"] for case in d4.load_cases(REPO_ROOT) if case["turn_id"] == "D4-C01:C01"
     )
     action = ReconstructSectionAction.model_validate(
         {
@@ -1000,6 +1143,58 @@ def test_section_worker_normalizes_explicit_curve_presentation() -> None:
     assert binding.style.color == "#123456"
     assert binding.style.line_style == "dashed"
     assert binding.style.line_width == 0.65
+    assert binding.label == "Gamma Ray"
+
+
+def test_section_normalization_extracts_inline_raster_clause_and_label() -> None:
+    """Inline On-track prose preserves raster presentation without track-position fallback."""
+    action = ReconstructSectionAction.model_validate(
+        {
+            "action": "reconstruct",
+            "section": {
+                "title": "Main",
+                "source_candidate": "source-1",
+                "tracks": [
+                    {
+                        "semantic_id": "model-vdl",
+                        "kind": "array",
+                        "title": "VDL",
+                        "x_scale": {"minimum": 0, "maximum": 1},
+                        "bindings": [{"semantic_id": "raster", "channel": "VDL", "kind": "raster"}],
+                    }
+                ],
+            },
+        }
+    )
+    normalized = _normalize_reconstruct_request_semantics(
+        action,
+        task=SectionTask(
+            goal="Configure VDL.",
+            capability_ids=("section.log_plot", "track.array", "binding.raster"),
+            existing_section_hint="Main",
+            requirements=(),
+        ),
+        authoritative_request=(
+            'On vdl, plot VDL as a raster labelled "Synthetic VDL". '
+            "Use a linear track scale 200..1200, profile vdl, gray_r, "
+            "colorbar enabled with label Amplitude in the header, and sample axis "
+            "enabled in us from 200 to 1200 with 7 ticks, source origin 40 and step 10. "
+            "Hide both vertical main and secondary grid lines."
+        ),
+    )
+    track = normalized.section.tracks[0]
+    binding = track.bindings[0]
+    assert track.x_scale.minimum == 200
+    assert track.x_scale.maximum == 1200
+    assert track.grid.vertical_main_visible is False
+    assert track.grid.vertical_secondary_visible is False
+    assert binding.label == "Synthetic VDL"
+    assert binding.profile == "vdl"
+    assert binding.colormap == "gray_r"
+    assert binding.colorbar_label == "Amplitude"
+    assert binding.colorbar_position == "header"
+    assert binding.sample_axis.source_origin == 40
+    assert binding.sample_axis.source_step == 10
 
 
 def test_canonical_section_worker_exposes_source_labels_without_paths() -> None:

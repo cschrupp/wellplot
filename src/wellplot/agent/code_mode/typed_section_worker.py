@@ -137,9 +137,8 @@ _TRACK_CHANNEL_LINE_RE = re.compile(
     re.IGNORECASE | re.MULTILINE,
 )
 _TRACK_BLOCK_RE = re.compile(
-    r"^\s*On\s+(?P<track>[^:\n]+):\s*\n(?P<body>.*?)(?=^\s*On\s+[^:\n]+:\s*$|"
-    r"^\s*Use only channels|\Z)",
-    re.IGNORECASE | re.MULTILINE | re.DOTALL,
+    r"^\s*On\s+(?P<track>[^:,\n]+?)\s*(?P<delimiter>:|,)",
+    re.IGNORECASE | re.MULTILINE,
 )
 _TASK_TRACK_BLOCK_RE = re.compile(
     r"^\s*(?P<track>[^:\n]+?)\s+bindings?:\s*(?P<body>.*)$",
@@ -152,6 +151,16 @@ _CURVE_REQUIREMENT_RE = re.compile(
     r"(?P<maximum>-?[0-9]+(?:\.[0-9]+)?)(?P<reverse>\s+reversed)?\s*,\s*"
     r"(?P<color>#[0-9A-Fa-f]{6})(?:\s+(?P<line_style>dashed|dotted))?\s*,\s*"
     r"width\s+(?P<line_width>[0-9]+(?:\.[0-9]+)?)",
+    re.IGNORECASE,
+)
+_MULTI_BINDING_LABEL_RE = re.compile(
+    r"\b(?:both|all)\s+labels?\s+are\s+"
+    r"(?:\"(?P<label_quoted>[^\"]+)\"|'(?P<label_single>[^']+)'|(?P<label_plain>[^.,\n]+))",
+    re.IGNORECASE,
+)
+_RASTER_LABEL_RE = re.compile(
+    r"\braster\s+label(?:led|ed)\s+"
+    r"(?:\"(?P<label_quoted>[^\"]+)\"|'(?P<label_single>[^']+)'|(?P<label_plain>[^.,\n]+))",
     re.IGNORECASE,
 )
 _ORDINAL_CURVE_REQUIREMENT_RE = re.compile(
@@ -168,6 +177,14 @@ class _TypedInputModel(BaseModel):
     """Strict immutable provider-input model."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
+
+
+@dataclass(frozen=True, slots=True)
+class _RequestTrackBlock:
+    """One host-extracted request track clause."""
+
+    track: str
+    body: str
 
 
 class TypedSectionTaskInput(_TypedInputModel):
@@ -763,13 +780,17 @@ def _normalize_reconstruct_request_semantics(
     if action.action != "reconstruct":
         return action
     requirement_text = "\n".join(task.requirements)
-    request_blocks = tuple(_TRACK_BLOCK_RE.finditer(authoritative_request))
-    task_blocks = tuple(_TASK_TRACK_BLOCK_RE.finditer(requirement_text))
-    seen_block_names = {block.group("track").strip().casefold() for block in request_blocks}
+    request_blocks = _extract_request_track_blocks(authoritative_request)
+    task_blocks = tuple(
+        _RequestTrackBlock(
+            track=block.group("track").strip(),
+            body=block.group("body").strip(),
+        )
+        for block in _TASK_TRACK_BLOCK_RE.finditer(requirement_text)
+    )
+    seen_block_names = {block.track.casefold() for block in request_blocks}
     blocks = request_blocks + tuple(
-        block
-        for block in task_blocks
-        if block.group("track").strip().casefold() not in seen_block_names
+        block for block in task_blocks if block.track.strip().casefold() not in seen_block_names
     )
     section = action.section
     if task.existing_section_hint:
@@ -783,10 +804,10 @@ def _normalize_reconstruct_request_semantics(
         if block is None:
             continue
         matched_blocks.add(id(block))
-        tracks[index] = _normalize_track_request_semantics(track, block.group("body"))
+        tracks[index] = _normalize_track_request_semantics(track, block.body)
     if len(matched_blocks) != len(blocks):
         unmatched = tuple(
-            block.group("track").strip() for block in blocks if id(block) not in matched_blocks
+            block.track.strip() for block in blocks if id(block) not in matched_blocks
         )
         raise SemanticActionError(
             "semantic_contract_incomplete",
@@ -797,18 +818,33 @@ def _normalize_reconstruct_request_semantics(
     )
 
 
+def _extract_request_track_blocks(request: str) -> tuple[_RequestTrackBlock, ...]:
+    """Extract colon and inline-comma track clauses from an authoritative request."""
+    headers = tuple(_TRACK_BLOCK_RE.finditer(request))
+    blocks: list[_RequestTrackBlock] = []
+    for index, header in enumerate(headers):
+        end = headers[index + 1].start() if index + 1 < len(headers) else len(request)
+        body = request[header.end() : end]
+        body = re.split(r"^\s*Use only channels\b", body, maxsplit=1, flags=re.I | re.M)[0]
+        blocks.append(
+            _RequestTrackBlock(
+                track=header.group("track").strip(),
+                body=body.strip(),
+            )
+        )
+    return tuple(blocks)
+
+
 def _matching_track_block(
     track: object,
-    blocks: tuple[re.Match[str], ...],
-) -> re.Match[str] | None:
+    blocks: tuple[_RequestTrackBlock, ...],
+) -> _RequestTrackBlock | None:
     """Match a request block by semantic identity or channel signature only."""
     identifiers = (
         str(getattr(track, "semantic_id", "")),
         str(getattr(track, "title", "")),
     )
-    identity_matches = [
-        block for block in blocks if _identifiers_match(identifiers, block.group("track"))
-    ]
+    identity_matches = [block for block in blocks if _identifiers_match(identifiers, block.track)]
     if len(identity_matches) == 1:
         return identity_matches[0]
     if len(identity_matches) > 1:
@@ -820,7 +856,7 @@ def _matching_track_block(
     if not track_signature:
         return None
     signature_matches = [
-        block for block in blocks if _channel_signature(block.group("body")) == track_signature
+        block for block in blocks if _channel_signature(block.body) == track_signature
     ]
     if len(signature_matches) == 1:
         return signature_matches[0]
@@ -911,6 +947,7 @@ def _normalize_track_request_semantics(track: object, body: str) -> object:
     ordinal_specs = list(_ORDINAL_CURVE_REQUIREMENT_RE.finditer(body))
     bindings = list(getattr(track, "bindings", ()))
     used_specs: set[int] = set()
+    shared_label = _MULTI_BINDING_LABEL_RE.search(body)
     for binding_index, binding in enumerate(bindings):
         if getattr(binding, "kind", None) == "raster":
             bindings[binding_index] = _normalize_raster_request_semantics(binding, body)
@@ -922,7 +959,12 @@ def _normalize_track_request_semantics(track: object, body: str) -> object:
             continue
         if matching in curve_specs:
             used_specs.add(curve_specs.index(matching))
-        bindings[binding_index] = _normalize_curve_request_semantics(binding, matching)
+        if matching is not None:
+            bindings[binding_index] = _normalize_curve_request_semantics(binding, matching)
+        elif shared_label is not None:
+            label = _match_group_value(shared_label, "label")
+            if label:
+                bindings[binding_index] = binding.model_copy(update={"label": label})
     updates: dict[str, object] = {}
     if bindings:
         updates["bindings"] = tuple(bindings)
@@ -958,7 +1000,21 @@ def _normalize_curve_request_semantics(binding: object, spec: re.Match[str]) -> 
         "line_style": spec.group("line_style") or "solid",
     }
     style = AuthoringStyleIntent(**style_values)
-    return binding.model_copy(update={"scale": scale, "style": style})
+    updates: dict[str, object] = {"scale": scale, "style": style}
+    label = _match_group_value(spec, "label")
+    if label:
+        updates["label"] = label
+    return binding.model_copy(update=updates)
+
+
+def _match_group_value(match: re.Match[str], name: str) -> str | None:
+    """Return one normalized value from a quoted-or-plain regex group."""
+    value = match.groupdict().get(f"{name}_quoted")
+    if value is None:
+        value = match.groupdict().get(f"{name}_single")
+    if value is None:
+        value = match.groupdict().get(f"{name}_plain")
+    return value.strip() if value and value.strip() else None
 
 
 def _normalize_array_track_request_semantics(body: str) -> dict[str, object]:
@@ -987,6 +1043,10 @@ def _normalize_array_track_request_semantics(body: str) -> dict[str, object]:
 def _normalize_raster_request_semantics(binding: object, body: str) -> object:
     """Normalize explicit raster profile, colorbar, and sample-axis clauses."""
     updates: dict[str, object] = {}
+    label_match = _RASTER_LABEL_RE.search(body)
+    label = _match_group_value(label_match, "label") if label_match else None
+    if label:
+        updates["label"] = label
     profile_match = re.search(r"profile\s+(?P<profile>[a-z_]+)", body, re.I)
     if profile_match:
         updates["profile"] = profile_match.group("profile").casefold()
