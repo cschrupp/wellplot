@@ -857,36 +857,29 @@ def test_canonical_section_worker_marks_obligation_failure_separately(
     assert result.stage_evidence.semantic_lowering == "NOT_REACHED"
 
 
-def test_canonical_section_worker_marks_lowering_failure_separately(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A lowering failure records both prior stages as passed."""
-    context = _context()
+def test_canonical_section_worker_marks_lowering_action_error_separately() -> None:
+    """A canonical lowering error records both prior stages as passed."""
     response = {
-        "action": "reconstruct",
-        "section": {
-            "source_candidate": "source-1",
-            "title": "Main",
-            "tracks": [
+        "action": "add_track",
+        "track": {
+            "semantic_id": "quality",
+            "kind": "normal",
+            "title": "Quality",
+            "width_mm": 28,
+            "bindings": [
                 {
+                    "kind": "curve",
                     "semantic_id": "gr",
-                    "kind": "normal",
-                    "title": "Gamma Ray",
-                    "bindings": [{"semantic_id": "gr", "channel": "GR"}],
+                    "channel": "GR",
+                    "label": "Gamma Ray",
+                    "scale": {"kind": "linear", "minimum": 0, "maximum": 150},
                 }
             ],
         },
     }
-
-    def raise_lowering_failure(*args: object, **kwargs: object) -> None:
-        del args, kwargs
-        raise RuntimeError("lowering")
-
-    monkeypatch.setattr(
-        section_worker,
-        "lower_section_action",
-        raise_lowering_failure,
-    )
+    context = _context()
+    ungrounded_section = context.sections[0].model_copy(update={"section_id": None})
+    context = context.model_copy(update={"sections": (ungrounded_section,)})
     result = asyncio.run(
         CanonicalSectionWorker(backend=_StructuredFixtureBackend([response])).compile(
             task_index=0,
@@ -897,6 +890,7 @@ def test_canonical_section_worker_marks_lowering_failure_separately(
         )
     )
     assert result.success is False
+    assert result.diagnostics[0].code == "section_missing"
     assert result.stage_evidence.normalization == "PASS"
     assert result.stage_evidence.worker_obligation == "PASS"
     assert result.stage_evidence.semantic_lowering == "FAIL"

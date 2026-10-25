@@ -451,7 +451,20 @@ class CanonicalSectionWorker:
                     section_context=section_context,
                     section_title=task.existing_section_hint,
                 )
-                intent = lower_section_action(action, context=section_context, document=document)
+                try:
+                    intent = lower_section_action(
+                        action,
+                        context=section_context,
+                        document=document,
+                    )
+                except SemanticActionError as error:
+                    return _canonical_failure(
+                        error.code,
+                        "Section semantics could not be lowered safely.",
+                        normalization="PASS",
+                        worker_obligation="PASS",
+                        semantic_lowering="FAIL",
+                    )
                 verify_lowered_existing_curve_obligations(
                     action,
                     intent,
