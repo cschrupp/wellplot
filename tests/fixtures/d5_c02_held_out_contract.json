@@ -1,0 +1,111 @@
+{
+  "case_id": "D5-C02",
+  "turn_id": "D5-C02:C01",
+  "expected_outcome": "DIRECT_CORRECT",
+  "grader": "d5_c02_contract",
+  "model_unseen": true,
+  "execution_checkpoint": "abf5b5c7039fa6942cda076e6c47d780d600647b",
+  "source_inventory": {
+    "main_pass": {
+      "path": "workspace/tutorials/agent_cbl_log_example_from_prompt/CBL_Main.dlis",
+      "sha256": "3ceb9100fd654d710155672a50a9e0f24ce9705db6ef8e424140f29bd02131f7",
+      "byte_size": 111573216,
+      "channel_count": 69,
+      "channels": [
+        "AREA", "AZIM", "BFHI", "BHPR", "BHRM", "BI", "BILI", "BS", "CBL", "CBLF", "CDF", "CMCG", "CS", "CTEM", "CVEL", "DCAL", "DEPTH", "DF", "DLS", "DT", "DTCO", "DTL", "DTYP", "DT_HR", "ECGR_STGC", "ED", "EHGR_STGC", "FCD", "FF", "FTDV", "FVPU", "GHD", "GHID", "GOBO", "GR_STGC", "GTEM", "HDAR", "HGR_STGC", "HV", "ICV", "IDWD", "IHV", "INCL", "ITT", "MD", "MTEM", "MTEM_FILT", "ND", "RCBL", "ROAZ", "SOBS", "SPAA1", "SPHI", "SSLT_LQC_HW_TOOL", "STIT", "STTA1", "SVEL", "SWFA1", "SWNA1", "TDSP", "TENS", "TT", "TT1", "TVD", "TVDSS", "VDL", "VSEC", "WDE1", "WF1"
+      ]
+    },
+    "repeat_pass": {
+      "path": "workspace/tutorials/agent_cbl_log_example_from_prompt/CBL_Repeat.dlis",
+      "sha256": "a4a2e91b495172079fc47bc2e9c936f0ab60c9845bbed8e65bf56555a5e82640",
+      "byte_size": 3294924,
+      "channel_count": 72,
+      "channels": [
+        "AREA", "AZIM", "BFHI", "BHPR", "BHRM", "BI", "BILI", "BS", "CBL", "CBLF", "CDF", "CMCG", "CS", "CTEM", "CVEL", "DCAL", "DEPTH", "DF", "DLS", "DT", "DTCO", "DTL", "DTYP", "DT_HR", "ECGR_STGC", "ED", "EHGR_STGC", "FCD", "FF", "FTDV", "FVPU", "GHD", "GHID", "GOBO", "GR_STGC", "GTEM", "HDAR", "HGR_STGC", "HV", "ICV", "IDWD", "IHV", "INCL", "ITT", "MD", "MTEM", "MTEM_FILT", "ND", "RCBL", "ROAZ", "SOBS", "SPAA1", "SPHI", "SSLT_LQC_HW_TOOL", "STIT", "STTA1", "SVEL", "SWFA1", "SWFA2", "SWNA1", "SWNA2", "TDSP", "TENS", "TT", "TT1", "TVD", "TVDSS", "VDL", "VSEC", "WDE1", "WDE2", "WF1"
+      ]
+    }
+  },
+  "report": {
+    "service_titles": [
+      "Gamma Ray - CCL",
+      "Cement Bond Amplitude",
+      "Variable Density Imaging"
+    ],
+    "section_ids": ["main_pass", "repeat_pass"],
+    "remarks": [
+      "Coverage Boundary",
+      "Source Provenance",
+      "Reproduction Notice"
+    ],
+    "tail_required": true
+  },
+  "sections": {
+    "main_pass": {
+      "source": "CBL_Main.dlis",
+      "tracks": [
+        {"id": "combo", "kind": "normal", "width_mm": 42.0},
+        {"id": "depth", "kind": "reference", "width_mm": 14.0},
+        {"id": "cbl", "kind": "normal", "width_mm": 36.0},
+        {"id": "vdl", "kind": "array", "width_mm": 55.0}
+      ]
+    },
+    "repeat_pass": {
+      "source": "CBL_Repeat.dlis",
+      "tracks": [
+        {"id": "combo", "kind": "normal", "width_mm": 42.0},
+        {"id": "depth", "kind": "reference", "width_mm": 14.0},
+        {"id": "cbl", "kind": "normal", "width_mm": 36.0},
+        {"id": "vdl", "kind": "array", "width_mm": 55.0}
+      ]
+    }
+  },
+  "bindings": {
+    "combo": [
+      {"channel": "ECGR_STGC", "label": "Gamma Quality (ECGR_STGC) Field Check", "scale": {"kind": "linear", "minimum": 15.0, "maximum": 135.0, "reverse": false}, "style": {"color": "#0f766e", "line_style": "dotted", "line_width": 0.55}},
+      {"channel": "TT", "label": "CBL Transit Time (TT) Fast", "scale": {"kind": "linear", "minimum": 240.0, "maximum": 360.0, "reverse": true}, "style": {"color": "#7c3aed", "line_style": "dashed", "line_width": 0.7}},
+      {"channel": "TENS", "label": "Cable Load (TENS)", "scale": {"kind": "linear", "minimum": 0.0, "maximum": 4500.0, "reverse": false}, "style": {"color": "#b45309", "line_style": "solid", "line_width": 0.6}},
+      {"channel": "MTEM", "label": "Tool Temperature (MTEM)", "scale": {"kind": "linear", "minimum": 120.0, "maximum": 420.0, "reverse": false}, "style": {"color": "#be123c", "line_style": "dotted", "line_width": 0.8}}
+    ],
+    "depth": [
+      {"channel": "STIT", "label": "Stuck Tool (STIT) Index", "scale": {"kind": "linear", "minimum": 0.0, "maximum": 40.0, "reverse": false}, "style": {"color": "#374151", "line_style": "dashed", "line_width": 0.6}},
+      {"channel": "TDSP", "label": "Drag Indicator (TDSP)", "scale": {"kind": "linear", "minimum": 0.0, "maximum": 60.0, "reverse": false}, "style": {"color": "#0f766e", "line_style": "solid", "line_width": 0.7}},
+      {"channel": "VSEC", "label": "Vertical Section (VSEC)", "scale": {"kind": "linear", "minimum": 0.0, "maximum": 80.0, "reverse": false}, "style": {"color": "#1d4ed8", "line_style": "dotted", "line_width": 0.65}}
+    ],
+    "cbl": [
+      {"channel": "CBL", "label": "Bond Amplitude Overview (CBL) A", "scale": {"kind": "linear", "minimum": 2.0, "maximum": 90.0, "reverse": false}, "style": {"color": "#111827", "line_style": "solid", "line_width": 0.7}},
+      {"channel": "CBL", "label": "Bond Amplitude Detail (CBL) B", "scale": {"kind": "linear", "minimum": 0.0, "maximum": 12.0, "reverse": true}, "style": {"color": "#dc2626", "line_style": "dashed", "line_width": 0.6}}
+    ],
+    "vdl": [
+      {"channel": "VDL", "label": "Variable Density Image (VDL) Field Check", "kind": "raster", "profile": "vdl", "track_scale": {"kind": "linear", "minimum": 250.0, "maximum": 1050.0, "reverse": false}, "colormap": "magma", "colorbar": {"enabled": true, "label": "Bond Signal", "position": "header"}, "sample_axis": {"enabled": true, "unit": "us", "minimum": 250.0, "maximum": 1050.0, "tick_count": 9, "source_origin": 35.0, "source_step": 12.0}, "grid": {"vertical_main_visible": false, "vertical_secondary_visible": true}}
+    ]
+  },
+  "required_capabilities": [
+    "report_header_metadata",
+    "ordered_service_titles",
+    "multiple_semantic_remarks",
+    "main_and_repeat_sections",
+    "normal_reference_array_tracks",
+    "explicit_track_widths",
+    "multiple_scalar_curve_bindings",
+    "repeated_channel_binding",
+    "labels_scales_reverse_and_styles",
+    "vdl_raster_presentation",
+    "raster_profile_and_colormap",
+    "colorbar",
+    "sample_axis",
+    "grid_visibility",
+    "persistence_reload_render",
+    "deterministic_contract_verification"
+  ],
+  "verification": {
+    "report_metadata": true,
+    "service_titles_ordered": true,
+    "remarks_semantic": true,
+    "section_sources": true,
+    "track_identity_and_width": true,
+    "binding_identity_and_presentation": true,
+    "raster_and_axes": true,
+    "persistence_reload_render": true,
+    "safe_negative_grading": true
+  }
+}
