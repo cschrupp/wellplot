@@ -220,6 +220,11 @@ class _WrongSemanticAdapter:
     """Return parsed but scientifically invalid output for every turn."""
 
     logical_call_count = 0
+    _call_started: Callable[[dict[str, object]], None] | None = None
+
+    def bind_call_started(self, callback: Callable[[dict[str, object]], None]) -> None:
+        """Expose the canonical first-generation boundary to custody."""
+        self._call_started = callback
 
     async def execute_turn(
         self,
@@ -227,6 +232,17 @@ class _WrongSemanticAdapter:
         expected: dict[str, object],
     ) -> dict[str, object]:
         del case, expected
+        self.logical_call_count += 1
+        if self._call_started is not None:
+            self._call_started(
+                {
+                    "event": "logical_call_started",
+                    "index": self.logical_call_count,
+                    "generation_role": "planner",
+                    "provider": d5.EXPECTED_PROVIDER,
+                    "model": d5.EXPECTED_MODEL,
+                }
+            )
         return {
             "canonical_before": {},
             "canonical_after": {},
@@ -899,7 +915,7 @@ def test_authorization_binds_campaign_across_runner_instances(tmp_path: Path) ->
     """A second runner cannot reuse or rename the consumed authorized campaign."""
     authorization = _authorization()
     paths = _paths(tmp_path)
-    custody = d5.D5CampaignCustody.start(
+    custody = d5.D5CampaignCustody.prepare(
         paths,
         authorization=authorization,
         provenance=_provenance(),
@@ -908,14 +924,14 @@ def test_authorization_binds_campaign_across_runner_instances(tmp_path: Path) ->
     custody.finish("INCONCLUSIVE", attribution="TEST", rows=[])
     second_paths = _paths(tmp_path, "different-campaign")
     with pytest.raises(d5.D5HarnessError, match="campaign path"):
-        d5.D5CampaignCustody.start(
+        d5.D5CampaignCustody.prepare(
             second_paths,
             authorization=authorization,
             provenance=_provenance(),
             readiness=_ready().projection,
         )
     with pytest.raises(d5.D5StaticPreflightError, match="collision"):
-        d5.D5CampaignCustody.start(
+        d5.D5CampaignCustody.prepare(
             paths,
             authorization=authorization,
             provenance=_provenance(),
@@ -926,11 +942,20 @@ def test_authorization_binds_campaign_across_runner_instances(tmp_path: Path) ->
 def test_started_campaign_is_one_shot_and_terminal_is_written_once(tmp_path: Path) -> None:
     """STARTED consumes the campaign and terminal custody cannot be rewritten."""
     paths = _paths(tmp_path)
-    custody = d5.D5CampaignCustody.start(
+    custody = d5.D5CampaignCustody.prepare(
         paths,
         authorization=_authorization(),
         provenance=_provenance(),
         readiness=_ready().projection,
+    )
+    custody.record_call_started(
+        {
+            "event": "logical_call_started",
+            "index": 1,
+            "generation_role": "planner",
+            "provider": d5.EXPECTED_PROVIDER,
+            "model": d5.EXPECTED_MODEL,
+        }
     )
     terminal = custody.finish("INCONCLUSIVE", attribution="TEST", rows=[])
     assert terminal["decision"] == "INCONCLUSIVE"
@@ -1582,227 +1607,76 @@ def test_real_live_transport_exhaustion_is_not_semantic_failure(
         assert len(requests) == 3
 
 
-def _smoke_provider_factory(
-    *,
-    response_mode: str = "ready",
-    retry_count: int = 0,
-    requests: list[httpx.Request] | None = None,
-    clients: list[httpx.AsyncClient] | None = None,
-) -> Callable[[Path, Path, str], object]:
-    """Build the accepted D5 adapter with an injected, non-network transport."""
-    requests = requests if requests is not None else []
-    clients = clients if clients is not None else []
-
-    def factory(
-        observer: object,
-        *,
-        requests: list[httpx.Request] = requests,
-        clients: list[httpx.AsyncClient] = clients,
-    ) -> httpx.AsyncClient:
-        attempts = 0
-
-        async def handler(request: httpx.Request) -> httpx.Response:
-            nonlocal attempts
-            requests.append(request)
-            if request.url.path != "/v1/chat/completions":
-                return httpx.Response(404, request=request)
-            attempts += 1
-            if attempts <= retry_count:
-                return httpx.Response(500, request=request)
-            if response_mode == "invalid":
-                content = '{"status":"NOT_READY"}'
-            else:
-                content = '{"status":"READY"}'
-            return httpx.Response(
-                200,
-                request=request,
-                json={
-                    "choices": [
-                        {
-                            "message": {"role": "assistant", "content": content},
-                            "finish_reason": "stop",
-                        }
-                    ],
-                    "usage": {},
-                },
-            )
-
-        client = httpx.AsyncClient(
-            transport=httpx.MockTransport(handler),
-            event_hooks={
-                "request": [observer.on_request],
-                "response": [observer.on_response],
-            },
-        )
-        client._platform = "Linux"
-        clients.append(client)
-        return client
-
-    def build(repo_root: Path, artifact_root: Path, token: str) -> object:
-        adapter = d5.create_live_adapter(
-            repo_root=repo_root,
-            artifact_root=artifact_root,
-            api_key=token,
-            project_config=PROJECT_CONFIG,
-            request_options=d5._thinking_control_options(),
-            require_thinking_control=True,
-            http_client_factory=factory,
-        )
-        client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
-        client._platform = "Linux"
-        return adapter
-
-    return build
-
-
 def _execute_provider_free_smoke(
     tmp_path: Path,
-    *,
-    response_mode: str = "ready",
-    retry_count: int = 0,
-) -> tuple[dict[str, Any], list[httpx.Request], list[httpx.AsyncClient]]:
-    """Execute smoke mode with readiness and generation transports injected."""
-    artifact_root = tmp_path / "smoke"
-    requests: list[httpx.Request] = []
-    clients: list[httpx.AsyncClient] = []
-    authorization = _authorization(
-        campaign_id="d5-5j-smoke-provider-free",
-        artifact_root=str(artifact_root),
-    )
+) -> tuple[dict[str, Any], d4.D4CampaignAdapter]:
+    """Execute one frozen turn through the canonical campaign adapter."""
+    del tmp_path
+    with TemporaryDirectory(dir=REPO_ROOT) as temporary:
+        root = Path(temporary)
+        artifact_root = root / "smoke"
+        harness = _D4SessionHarness.create(root)
+        authorization = _authorization(
+            campaign_id="d5-5j-smoke-provider-free",
+            artifact_root=str(artifact_root),
+        )
 
-    def endpoint_get(url: str, token: str) -> object:
-        assert token == "provider-free-token"
-        if url == PROJECT_CONFIG.model_catalog_url:
-            return {"data": [{"id": d5.EXPECTED_MODEL}]}
-        assert url == PROJECT_CONFIG.props_url
-        return _props()
+        def endpoint_get(url: str, token: str) -> object:
+            assert token == "provider-free-token"
+            if url == PROJECT_CONFIG.model_catalog_url:
+                return {"data": [{"id": d5.EXPECTED_MODEL}]}
+            assert url == PROJECT_CONFIG.props_url
+            return _props()
 
-    result = d5.execute_live_smoke(
-        repo_root=REPO_ROOT,
-        authorization=authorization,
-        artifact_root=artifact_root,
-        endpoint_get=endpoint_get,
-        api_key_loader=lambda: "provider-free-token",
-        static_checker=lambda repo, checked, paths: {
-            "status": "PASS",
-            "scientific_population_loaded": False,
-            "scientific_campaign_started": False,
-        },
-        provider_factory=_smoke_provider_factory(
-            response_mode=response_mode,
-            retry_count=retry_count,
-            requests=requests,
-            clients=clients,
-        ),
-    )
-    return result, requests, clients
+        result = d5.execute_live_smoke(
+            repo_root=REPO_ROOT,
+            authorization=authorization,
+            artifact_root=artifact_root,
+            endpoint_get=endpoint_get,
+            api_key_loader=lambda: "provider-free-token",
+            static_checker=lambda repo, checked, paths: {"status": "PASS"},
+            provider_factory=lambda repo, root, token: harness.adapter,
+        )
+        return result, harness.adapter
 
 
-def test_provider_free_smoke_uses_canonical_adapter_without_scientific_runner(
+def test_provider_free_smoke_uses_shared_runner_and_one_frozen_turn(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """One smoke call uses existing provider wiring and never starts D5 cases."""
+    """Smoke selects one frozen turn through the scientific runner and grader."""
+    calls: list[tuple[tuple[str, ...], str]] = []
+    original_run = d5.D5CampaignRunner.run
 
-    def fail_if_started(*args: object, **kwargs: object) -> None:
-        del args, kwargs
-        raise AssertionError("scientific campaign runner must not execute in smoke mode")
+    async def capture_run(
+        runner: d5.D5CampaignRunner,
+        adapter: object,
+        *,
+        turn_ids: tuple[str, ...],
+        mode: str,
+    ) -> dict[str, Any]:
+        calls.append((turn_ids, mode))
+        return await original_run(runner, adapter, turn_ids=turn_ids, mode=mode)
 
-    monkeypatch.setattr(d5.D5CampaignRunner, "run", fail_if_started)
-    monkeypatch.setattr(d4, "load_cases", lambda *args: (_ for _ in ()).throw(AssertionError()))
-    monkeypatch.setattr(d4, "load_gold", lambda *args: (_ for _ in ()).throw(AssertionError()))
-    result, requests, clients = _execute_provider_free_smoke(tmp_path)
-    try:
-        assert result["status"] == "SMOKE_PASS"
-        assert result["terminal"]["logical_generation_calls"] == 1
-        assert result["terminal"]["physical_generation_attempts"] == 1
-        assert result["terminal"]["scientific_population_loaded"] is False
-        assert result["terminal"]["scientific_campaign_started"] is False
-        assert len(requests) == 1
-        body = json.loads(requests[0].content)
-        assert (
-            body["chat_template_kwargs"] == d5._thinking_control_options()["chat_template_kwargs"]
-        )
-        assert body["response_format"]["type"] == "json_schema"
-        assert body["messages"][0]["content"] == d5.SMOKE_SYSTEM_PROMPT
-        assert body["messages"][1]["content"] == d5.SMOKE_USER_PROMPT
-        model_io_path = tmp_path / "smoke" / "d5-5j-smoke-provider-free.model-io.jsonl"
-        model_io_rows = [
-            json.loads(line) for line in model_io_path.read_text(encoding="utf-8").splitlines()
-        ]
-        request_rows = [row for row in model_io_rows if row["event"] == "physical_request"]
-        response_rows = [row for row in model_io_rows if row["event"] == "physical_response"]
-        logical_rows = [row for row in model_io_rows if row["event"] == "logical_call_result"]
-        assert len(request_rows) == len(response_rows) == len(logical_rows) == 1
-        assert request_rows[0]["request_json"]["chat_template_kwargs"] == {"enable_thinking": False}
-        assert request_rows[0]["request_sha256"]
-        assert response_rows[0]["response_sha256"]
-        assert logical_rows[0]["logical_call_index"] == 1
-    finally:
-        assert clients
+    monkeypatch.setattr(d5.D5CampaignRunner, "run", capture_run)
+    result, adapter = _execute_provider_free_smoke(tmp_path)
+
+    assert calls == [(("D4-L01:T1",), "smoke")]
+    assert not hasattr(adapter, "execute_smoke")
+    assert result["status"] == "SMOKE_PASS"
+    assert result["mode"] == "smoke"
+    assert result["started"] is True
+    assert result["campaign_consumed"] is True
+    assert result["completed_turns"] == 1
+    assert result["rows"][0]["turn_id"] == "D4-L01:T1"
+    assert result["rows"][0]["grader_status"] == "PASS"
 
 
-def test_provider_free_smoke_counts_sdk_retries_as_physical_attempts(tmp_path: Path) -> None:
-    """One logical smoke call permits three physical attempts and then passes."""
-    result, requests, clients = _execute_provider_free_smoke(tmp_path, retry_count=2)
-    try:
-        assert result["status"] == "SMOKE_PASS"
-        assert result["terminal"]["logical_generation_calls"] == 1
-        assert result["terminal"]["physical_generation_attempts"] == 3
-        assert len(requests) == 3
-    finally:
-        assert clients
-
-
-def test_provider_free_smoke_invalid_structured_response_is_inconclusive(tmp_path: Path) -> None:
-    """A bounded provider response failure is not reported as harness success."""
-    result, requests, clients = _execute_provider_free_smoke(tmp_path, response_mode="invalid")
-    try:
-        assert result["status"] == "SMOKE_PROVIDER_INCONCLUSIVE"
-        assert result["terminal"]["logical_generation_calls"] == 1
-        assert result["terminal"]["physical_generation_attempts"] == 1
-        assert len(requests) == 1
-    finally:
-        assert clients
-
-
-def test_provider_free_smoke_transport_failure_is_provider_inconclusive(tmp_path: Path) -> None:
-    """A generic transport failure is not asserted to be sandbox denial."""
-    requests: list[httpx.Request] = []
-    clients: list[httpx.AsyncClient] = []
-
-    def provider_factory(repo_root: Path, artifact_root: Path, token: str) -> object:
-        del repo_root
-
-        def factory(observer: object) -> httpx.AsyncClient:
-            async def handler(request: httpx.Request) -> httpx.Response:
-                requests.append(request)
-                raise httpx.ReadTimeout("provider-free timeout", request=request)
-
-            client = httpx.AsyncClient(
-                transport=httpx.MockTransport(handler),
-                event_hooks={"request": [observer.on_request], "response": [observer.on_response]},
-            )
-            client._platform = "Linux"
-            clients.append(client)
-            return client
-
-        adapter = d5.create_live_adapter(
-            repo_root=REPO_ROOT,
-            artifact_root=artifact_root,
-            api_key=token,
-            project_config=PROJECT_CONFIG,
-            request_options=d5._thinking_control_options(),
-            require_thinking_control=True,
-            http_client_factory=factory,
-        )
-        client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
-        client._platform = "Linux"
-        return adapter
-
-    artifact_root = tmp_path / "transport-smoke"
+def test_provider_free_smoke_failure_before_first_call_is_not_consumed(tmp_path: Path) -> None:
+    """Local/bootstrap failure before logical call one remains repairable."""
+    artifact_root = tmp_path / "smoke-failure"
     authorization = _authorization(
-        campaign_id="d5-5j-smoke-transport",
+        campaign_id="d5-5j-smoke-pre-start",
         artifact_root=str(artifact_root),
     )
     result = d5.execute_live_smoke(
@@ -1816,123 +1690,18 @@ def test_provider_free_smoke_transport_failure_is_provider_inconclusive(tmp_path
         ),
         api_key_loader=lambda: "provider-free-token",
         static_checker=lambda repo, checked, paths: {"status": "PASS"},
-        provider_factory=provider_factory,
-    )
-    try:
-        assert result["status"] == "SMOKE_PROVIDER_INCONCLUSIVE"
-        assert len(requests) == 3
-    finally:
-        assert clients
-
-
-@pytest.mark.parametrize(
-    ("endpoint_failure", "expected_calls"),
-    [
-        ("credential", 0),
-        ("first_get", 1),
-        ("second_get", 2),
-    ],
-)
-def test_smoke_readiness_failure_is_pre_start_and_truthful(
-    tmp_path: Path,
-    endpoint_failure: str,
-    expected_calls: int,
-) -> None:
-    """Readiness failures seal without creating SMOKE_STARTED state."""
-    artifact_root = tmp_path / f"pre-smoke-{endpoint_failure}"
-    authorization = _authorization(
-        campaign_id=f"d5-5j-smoke-{endpoint_failure}",
-        artifact_root=str(artifact_root),
-    )
-    provider_calls: list[str] = []
-
-    def endpoint_get(url: str, token: str) -> object:
-        del token
-        if endpoint_failure == "first_get":
-            raise d5.D5ReadinessError("endpoint_authentication_failed", 1)
-        if endpoint_failure == "second_get" and url == PROJECT_CONFIG.props_url:
-            raise d5.D5ReadinessError("endpoint_server_error", 2)
-        if url == PROJECT_CONFIG.model_catalog_url:
-            return {"data": [{"id": d5.EXPECTED_MODEL}]}
-        return _props()
-
-    result = d5.execute_live_smoke(
-        repo_root=REPO_ROOT,
-        authorization=authorization,
-        artifact_root=artifact_root,
-        endpoint_get=endpoint_get,
-        api_key_loader=(
-            (lambda: "") if endpoint_failure == "credential" else (lambda: "provider-free-token")
-        ),
-        static_checker=lambda repo, checked, paths: {"status": "PASS"},
-        provider_factory=lambda repo, root, token: (
-            provider_calls.append(token) or _WrongSemanticAdapter()
-        ),
+        provider_factory=lambda repo, root, token: _MissingAssetAdapter(),
     )
 
-    assert result["status"] == "SMOKE_NOT_READY"
-    assert result["terminal"]["endpoint_calls"] == expected_calls
-    assert result["readiness"]["endpoint_calls"] == expected_calls
-    assert provider_calls == []
+    assert result["status"] == "SMOKE_INCONCLUSIVE"
+    assert result["started"] is False
+    assert result["campaign_consumed"] is False
+    assert result["logical_generation_calls"] == 0
     state = json.loads(
         (artifact_root / f"{authorization.campaign_id}.state.json").read_text(encoding="utf-8")
     )
     journal = (artifact_root / f"{authorization.campaign_id}.journal.jsonl").read_text(
         encoding="utf-8"
     )
-    assert state["status"] == "SMOKE_TERMINAL"
-    assert "SMOKE_STARTED" not in journal
-    assert "smoke_not_started" in journal
-
-
-def test_smoke_provider_construction_failure_is_pre_start(tmp_path: Path) -> None:
-    """Provider construction failure cannot create SMOKE_STARTED custody."""
-    artifact_root = tmp_path / "provider-construction"
-    authorization = _authorization(
-        campaign_id="d5-5j-smoke-provider-construction",
-        artifact_root=str(artifact_root),
-    )
-
-    def fail_provider(repo: Path, root: Path, token: str) -> object:
-        del repo, root, token
-        raise RuntimeError("provider unavailable")
-
-    result = d5.execute_live_smoke(
-        repo_root=REPO_ROOT,
-        authorization=authorization,
-        artifact_root=artifact_root,
-        endpoint_get=lambda url, token: (
-            {"data": [{"id": d5.EXPECTED_MODEL}]}
-            if url == PROJECT_CONFIG.model_catalog_url
-            else _props()
-        ),
-        api_key_loader=lambda: "provider-free-token",
-        static_checker=lambda repo, checked, paths: {"status": "PASS"},
-        provider_factory=fail_provider,
-    )
-
-    assert result["status"] == "SMOKE_NOT_READY"
-    assert result["terminal"]["endpoint_calls"] == 2
-    journal = (artifact_root / f"{authorization.campaign_id}.journal.jsonl").read_text(
-        encoding="utf-8"
-    )
-    assert "SMOKE_STARTED" not in journal
-
-
-def test_smoke_static_contract_inspects_installed_sdk() -> None:
-    """The shared SDK inspection enforces the installed smoke contract."""
-    version, retries = d5._inspect_openai_sdk()
-    assert version == d5.EXPECTED_OPENAI_VERSION
-    assert retries == d5.EXPECTED_SDK_MAX_RETRIES
-
-
-def test_smoke_ledger_rejects_second_logical_and_fourth_physical_call() -> None:
-    """Smoke caps fail before a second logical or fourth physical delegation."""
-    ledger = d5.D5SmokeCallLedger()
-    assert ledger.reserve() == 1
-    with pytest.raises(d5.D5CallCapExceeded, match="logical call 2"):
-        ledger.reserve()
-    for _ in range(3):
-        ledger.physical_attempt(1)
-    with pytest.raises(d5.D5CallCapExceeded, match="physical attempt 4"):
-        ledger.physical_attempt(1)
+    assert state["started"] is False
+    assert "campaign_started" not in journal
