@@ -68,7 +68,33 @@
           ]}
         ]
       }
+    },
+    {
+      "action": "reconstruct",
+      "section": {
+        "title": "CBL/VDL Report",
+        "source_candidate": "source-2",
+        "tracks": [
+          {"semantic_id": "track_combo", "kind": "normal", "title": "Combo", "bindings": [
+            {"semantic_id": "bind_ecgr", "channel": "ECGR_STGC", "label": "Gamma Ray (ECGR_STGC) QTGC-B", "scale": {"minimum": 0, "maximum": 150, "reverse": false}, "style": {"color": "#16a34a", "line_width": 0.8}},
+            {"semantic_id": "bind_tt", "channel": "TT", "label": "Transit Time for CBL (TT) QSLT-B", "scale": {"minimum": 200, "maximum": 400, "reverse": true}, "style": {"color": "#2142ff", "line_width": 0.75}},
+            {"semantic_id": "bind_tens", "channel": "TENS", "label": "Cable Tension (TENS)", "scale": {"minimum": 5000, "maximum": 0, "reverse": true}, "style": {"color": "#111111", "line_width": 0.65, "fill_alpha": 0, "colormap": "categorical"}},
+            {"semantic_id": "bind_mtem", "channel": "MTEM", "label": "Mud Temperature (MTEM) LEH-MT", "scale": {"minimum": 100, "maximum": 500, "reverse": false}, "style": {"color": "#111111", "line_width": 0.9}}
+          ]},
+          {"semantic_id": "track_depth", "kind": "reference", "title": "Depth", "bindings": [
+            {"semantic_id": "bind_stit", "channel": "STIT", "label": "Stuck Tool Indicator, Total (STIT)", "scale": {"minimum": 0, "maximum": 50, "reverse": false}, "style": {"color": "#111111", "line_width": 0.65}},
+            {"semantic_id": "bind_tdsp", "channel": "TDSP", "label": "Cable Drag", "scale": {"minimum": 0, "maximum": 50, "reverse": false}, "style": {"color": "#92400e", "line_width": 0.65, "fill_alpha": 0, "colormap": "categorical"}},
+            {"semantic_id": "bind_vsec", "channel": "VSEC", "label": "Tool_Tot. Drag", "scale": {"minimum": 0, "maximum": 50, "reverse": false}, "style": {"color": "#1d4ed8", "line_width": 0.65, "fill_alpha": 0, "colormap": "categorical"}}
+          ]},
+          {"semantic_id": "track_cbl", "kind": "normal", "title": "CBL", "bindings": [
+            {"semantic_id": "bind_cbl_1", "channel": "CBL", "label": "CBL Amplitude (CBL) QSLT-B", "scale": {"minimum": 0, "maximum": 100, "reverse": false}, "style": {"color": "#111111", "line_width": 0.75}},
+            {"semantic_id": "bind_cbl_2", "channel": "CBL", "label": "CBL Amplitude (CBL) QSLT-B", "scale": {"minimum": 0, "maximum": 10, "reverse": false}, "style": {"color": "#2563eb", "line_width": 0.65, "fill_alpha": 0, "colormap": "categorical"}}
+          ]},
+          {"semantic_id": "track_vdl", "kind": "array", "title": "VDL", "x_scale": {"minimum": 200, "maximum": 1200, "reverse": false, "unit": "us"}, "bindings": [
+            {"semantic_id": "bind_vdl", "channel": "VDL", "label": "VDL VariableDensity (VDL) QSLT-B", "profile": "vdl", "colormap": "gray_r", "colorbar_label": "Amplitude", "sample_axis": {"unit": "us", "minimum": 200, "maximum": 1200, "tick_count": 7}}
+          ], "grid": {"vertical_main_visible": false, "vertical_secondary_visible": false}}
+        ]
+      }
     }
   ]
 }
-

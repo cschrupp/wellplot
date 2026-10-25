@@ -727,40 +727,85 @@ def test_cbl_captured_section_output_is_normalized_from_authoritative_request() 
     captured = json.loads(
         (REPO_ROOT / "tests/fixtures/d5_5j_qwen_smoke_003_report_sections.json").read_text()
     )
-    action = ReconstructSectionAction.model_validate(captured["sections"][0])
-    task = SectionTask(
-        goal="Configure the captured CBL main pass.",
-        capability_ids=(
-            "section.log_plot",
-            "track.normal",
-            "track.reference",
-            "track.array",
-            "binding.curve",
-            "binding.raster",
-        ),
-        existing_section_hint="Main Pass",
-        requirements=(),
+    for section_payload, section_hint in zip(
+        captured["sections"], ("Main Pass", "Repeat Pass"), strict=True
+    ):
+        action = ReconstructSectionAction.model_validate(section_payload)
+        task = SectionTask(
+            goal=f"Configure the captured CBL {section_hint.lower()}.",
+            capability_ids=(
+                "section.log_plot",
+                "track.normal",
+                "track.reference",
+                "track.array",
+                "binding.curve",
+                "binding.raster",
+            ),
+            existing_section_hint=section_hint,
+            requirements=(),
+        )
+        normalized = _normalize_reconstruct_track_dimensions(
+            action,
+            task,
+            authoritative_request=request,
+        )
+        normalized = _normalize_reconstruct_request_semantics(
+            normalized,
+            task=task,
+            authoritative_request=request,
+        )
+        tracks = normalized.section.tracks
+        assert [track.width_mm for track in tracks] == [50.0, 10.0, 44.0, 48.0]
+        assert tracks[0].bindings[0].label == "Gamma Ray (ECGR_STGC) QTGC-B"
+        assert tracks[3].bindings[0].label == "VDL VariableDensity (VDL) QSLT-B"
+        assert tracks[3].bindings[0].profile == "vdl"
+        assert tracks[3].bindings[0].colorbar_position == "header"
+        assert tracks[3].bindings[0].sample_axis.source_origin == 40
+        assert tracks[3].bindings[0].sample_axis.source_step == 10
+        assert tracks[3].grid.vertical_main_visible is False
+        assert tracks[3].grid.vertical_secondary_visible is False
+
+
+def test_shared_cbl_label_is_restored_when_generated_labels_are_missing() -> None:
+    """Shared request labels apply independently of ordinal scale matching."""
+    action = ReconstructSectionAction.model_validate(
+        {
+            "action": "reconstruct",
+            "section": {
+                "title": "Main Pass",
+                "source_candidate": "source-1",
+                "tracks": [
+                    {
+                        "semantic_id": "cbl",
+                        "kind": "normal",
+                        "title": "CBL",
+                        "bindings": [
+                            {
+                                "semantic_id": "cbl-full",
+                                "channel": "CBL",
+                                "scale": {"minimum": 0, "maximum": 100},
+                            },
+                            {
+                                "semantic_id": "cbl-zoom",
+                                "channel": "CBL",
+                                "scale": {"minimum": 0, "maximum": 10},
+                            },
+                        ],
+                    }
+                ],
+            },
+        }
     )
-    normalized = _normalize_reconstruct_track_dimensions(
-        action,
-        task,
-        authoritative_request=request,
+    normalized = section_worker._normalize_track_request_semantics(
+        action.section.tracks[0],
+        'Both labels are "CBL Amplitude (CBL) QSLT-B". '
+        "The first is linear 0..100, #111111, width 0.75. "
+        "The second is linear 0..10, #2563eb dashed, width 0.65.",
     )
-    normalized = _normalize_reconstruct_request_semantics(
-        normalized,
-        task=task,
-        authoritative_request=request,
-    )
-    tracks = normalized.section.tracks
-    assert [track.width_mm for track in tracks] == [50.0, 10.0, 44.0, 48.0]
-    assert tracks[0].bindings[0].label == "Gamma Ray (ECGR_STGC) QTGC-B"
-    assert tracks[3].bindings[0].label == "VDL VariableDensity (VDL) QSLT-B"
-    assert tracks[3].bindings[0].profile == "vdl"
-    assert tracks[3].bindings[0].colorbar_position == "header"
-    assert tracks[3].bindings[0].sample_axis.source_origin == 40
-    assert tracks[3].bindings[0].sample_axis.source_step == 10
-    assert tracks[3].grid.vertical_main_visible is False
-    assert tracks[3].grid.vertical_secondary_visible is False
+    assert [binding.label for binding in normalized.bindings] == [
+        "CBL Amplitude (CBL) QSLT-B",
+        "CBL Amplitude (CBL) QSLT-B",
+    ]
 
 
 def test_report_page_request_is_preserved_when_explicit() -> None:

@@ -961,7 +961,7 @@ def _normalize_track_request_semantics(track: object, body: str) -> object:
             used_specs.add(curve_specs.index(matching))
         if matching is not None:
             bindings[binding_index] = _normalize_curve_request_semantics(binding, matching)
-        elif shared_label is not None:
+        if shared_label is not None:
             label = _match_group_value(shared_label, "label")
             if label:
                 bindings[binding_index] = binding.model_copy(update={"label": label})
