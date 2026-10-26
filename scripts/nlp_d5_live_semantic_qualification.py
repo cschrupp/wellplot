@@ -2464,23 +2464,14 @@ _PROVIDER_RUNTIME_FAILURE_CATEGORIES = frozenset(
 def _classify_logical_call_failure(
     calls: Sequence[Mapping[str, Any]],
 ) -> tuple[str, str] | None:
-    """Classify stable provider custody categories before semantic grading."""
-    if calls and calls[-1].get("outcome") in {"completed", "success"}:
+    """Classify the latest unrecovered logical-call failure."""
+    if not calls or calls[-1].get("outcome") in {"completed", "success"}:
         return None
-    terminal_calls = [call for call in calls if call.get("outcome") not in {"completed", "success"}]
-    categories = [
-        str(call.get("failure_category"))
-        for call in terminal_calls
-        if call.get("failure_category") is not None
-    ]
-    if any(category in _STRUCTURED_OUTPUT_FAILURE_CATEGORIES for category in categories):
-        return "PROVIDER_BOUNDARY / STRUCTURED_OUTPUT", next(
-            category for category in categories if category in _STRUCTURED_OUTPUT_FAILURE_CATEGORIES
-        )
-    if any(category in _PROVIDER_RUNTIME_FAILURE_CATEGORIES for category in categories):
-        return "PROVIDER_OR_TRANSPORT_RUNTIME", next(
-            category for category in categories if category in _PROVIDER_RUNTIME_FAILURE_CATEGORIES
-        )
+    category = calls[-1].get("failure_category")
+    if category in _STRUCTURED_OUTPUT_FAILURE_CATEGORIES:
+        return "PROVIDER_BOUNDARY / STRUCTURED_OUTPUT", str(category)
+    if category in _PROVIDER_RUNTIME_FAILURE_CATEGORIES:
+        return "PROVIDER_OR_TRANSPORT_RUNTIME", str(category)
     return None
 
 

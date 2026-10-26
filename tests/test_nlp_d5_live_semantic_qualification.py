@@ -1114,6 +1114,73 @@ def test_recovered_schema_validation_is_not_terminal_failure() -> None:
     assert d5._classify_logical_call_failure(calls) is None
 
 
+@pytest.mark.parametrize(
+    ("calls", "expected"),
+    [
+        (
+            [
+                {
+                    "outcome": "failed",
+                    "failure_category": "invalid_response",
+                    "response_reason": "schema_validation",
+                },
+                {"outcome": "failed", "failure_category": "invalid_response"},
+            ],
+            ("PROVIDER_BOUNDARY / STRUCTURED_OUTPUT", "invalid_response"),
+        ),
+        (
+            [
+                {
+                    "outcome": "failed",
+                    "failure_category": "invalid_response",
+                },
+                {"outcome": "completed", "failure_category": None},
+                {"outcome": "failed", "failure_category": "timeout"},
+            ],
+            ("PROVIDER_OR_TRANSPORT_RUNTIME", "timeout"),
+        ),
+        (
+            [
+                {
+                    "outcome": "failed",
+                    "failure_category": "invalid_response",
+                },
+                {"outcome": "completed", "failure_category": None},
+                {"outcome": "completed", "failure_category": None},
+            ],
+            None,
+        ),
+    ],
+)
+def test_recovered_structured_failures_do_not_poison_later_terminal_state(
+    calls: list[dict[str, object]],
+    expected: tuple[str, str] | None,
+) -> None:
+    """Only the latest unrecovered logical call owns terminal attribution."""
+    assert d5._classify_logical_call_failure(calls) == expected
+
+
+def test_recovered_structured_failure_does_not_override_host_failure() -> None:
+    """A later host failure retains host ownership after recovered output errors."""
+    calls = [
+        {"outcome": "failed", "failure_category": "invalid_response"},
+        {"outcome": "completed", "failure_category": None},
+        {"outcome": "completed", "failure_category": None},
+    ]
+    actual = {
+        "apply_status": "compile_failed",
+        "persisted": False,
+        "rendered": False,
+        "host_stage_evidence": {"persistence": "NOT_REACHED"},
+    }
+    grade = {"errors": ["persistence_not_proven"]}
+    observed_failure = d5._classify_logical_call_failure(calls)
+
+    assert observed_failure is None
+    assert d5.classify_grade_failure(actual, grade) == "HOST_SEMANTIC_APPLICATION"
+    assert d5._first_divergence(actual, grade, observed_failure) == "HOST_EXECUTION"
+
+
 def test_scientifically_wrong_structured_result_is_fail(tmp_path: Path) -> None:
     """Validly returned but wrong canonical semantics classify as FAIL."""
     runner = d5.D5CampaignRunner(

@@ -205,25 +205,83 @@ def test_provider_schema_requires_work_unit_and_revision_hint_key() -> None:
         )
 
 
-@pytest.mark.parametrize(
-    "captured_response",
-    [
-        {
-            "summary": "Revise Gamma Ray to a linear 5-125 scale.",
-            "unresolved_requirements": [],
-            "obligations": [{"field": "label"}],
-        },
-        {
-            "summary": "Revise Gamma Ray to a linear 5-125 scale.",
-            "unresolved_requirements": [],
-            "obligations": [{"field": "title"}],
-        },
-    ],
+_CAPTURED_D4_L01_T2_RESPONSES = (
+    json.loads(
+        r"""{
+          "summary": "Revise the 'Main Log' section to update the Gamma Ray curve """
+        r"""binding scale from 0–100 to 5–125.",
+          "unresolved_requirements": [],
+          "obligations": [
+            {
+              "kind": "preservation",
+              "owner_kind": "binding",
+              "owner_ref": "Gamma Ray curve in Main Log",
+              "field": "label",
+              "request_sha256": "7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b",
+              "start_byte": 0,
+              "end_byte": 10,
+              "span_sha256": "1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b"
+            },
+            {
+              "kind": "preservation",
+              "owner_kind": "binding",
+              "owner_ref": "Gamma Ray curve in Main Log",
+              "field": "color",
+              "request_sha256": "2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c",
+              "start_byte": 0,
+              "end_byte": 10,
+              "span_sha256": "2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c"
+            },
+            {
+              "kind": "preservation",
+              "owner_kind": "binding",
+              "owner_ref": "Gamma Ray curve in Main Log",
+              "field": "width_mm",
+              "request_sha256": "3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d",
+              "start_byte": 0,
+              "end_byte": 10,
+              "span_sha256": "3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d"
+            }
+          ]
+        }"""
+    ),
+    json.loads(
+        r"""{
+          "summary": "Revise the 'Main Log' section to update the Gamma Ray curve """
+        r"""scale to a linear 5–125 range.",
+          "unresolved_requirements": [],
+          "obligations": [
+            {
+              "kind": "preservation",
+              "owner_kind": "section",
+              "owner_ref": "existing_section_hint",
+              "field": "title",
+              "request_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+              "start_byte": 0,
+              "end_byte": 100,
+              "span_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+            },
+            {
+              "kind": "preservation",
+              "owner_kind": "section",
+              "owner_ref": "existing_section_hint",
+              "field": "subtitle",
+              "request_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+              "start_byte": 0,
+              "end_byte": 100,
+              "span_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+            }
+          ]
+        }"""
+    ),
 )
+
+
+@pytest.mark.parametrize("captured_response", _CAPTURED_D4_L01_T2_RESPONSES)
 def test_captured_planner_responses_are_rejected_at_wire_boundary(
     captured_response: dict[str, object],
 ) -> None:
-    """Captured responses cannot bypass the executable-work or wire contract."""
+    """The exact captured responses remain rejected at the wire boundary."""
     with pytest.raises(ValidationError):
         _PlannerWirePlan.model_validate(captured_response)
 
