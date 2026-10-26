@@ -11,6 +11,8 @@ from scripts import d5_5_c02_contract_grader as c02_grader
 from scripts import d5_5_final_population as final_population
 from scripts import nlp_d5_live_semantic_qualification as d5
 
+from wellplot.model.authoring import AuthoringDocumentSpec
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -127,6 +129,38 @@ def _valid_payload(contract: dict[str, object]) -> dict[str, object]:
     }
 
 
+def _canonical_payload(contract: dict[str, object]) -> dict[str, object]:
+    """Round-trip the positive fixture through the canonical authoring model."""
+    payload = _valid_payload(contract)
+    payload["name"] = "d5-c02-test"
+    header = payload["header"]
+    for index, field in enumerate(header["general_fields"]):
+        field["slot_id"] = f"general.{index}"
+    for index, title in enumerate(header["service_titles"]):
+        title["slot_id"] = f"service_title.{index}"
+    detail = header["detail"]
+    detail["kind"] = "cased_hole"
+    for index, row in enumerate(detail["rows"]):
+        row["row_id"] = f"detail.{index}"
+        row["values"] = [
+            {
+                "slot_id": f"{row['key']}.{index}",
+                "value": {"value": cell["value"]},
+            }
+            for cell in row["values"]
+        ]
+    for section in payload["sections"]:
+        section["title"] = section["id"]
+        for track in section["tracks"]:
+            track["title"] = track["id"]
+            for index, binding in enumerate(track["bindings"]):
+                binding["binding_id"] = f"{section['id']}.{track['id']}.{index}"
+    for index, remark in enumerate(payload["remarks"]):
+        remark["remark_id"] = f"remark-{index + 1}"
+        remark["text"] = remark["title"]
+    return AuthoringDocumentSpec.model_validate(payload).model_dump(mode="json")
+
+
 def test_final_population_has_nine_d4_turns_then_c02() -> None:
     """Assemble the final ten-turn population without changing D4 fixtures."""
     cases, gold = final_population.load_final_population(ROOT)
@@ -140,7 +174,10 @@ def test_final_population_has_nine_d4_turns_then_c02() -> None:
 def test_c02_grader_passes_the_frozen_contract_shape() -> None:
     """Grade a provider-free canonical payload against the frozen C02 contract."""
     contract = _contract()
-    result = c02_grader.grade_c02_payload(_valid_payload(contract), contract)
+    payload = _canonical_payload(contract)
+    sample_axis = payload["sections"][0]["tracks"][-1]["bindings"][0]["sample_axis"]
+    assert sample_axis["label"] is None
+    result = c02_grader.grade_c02_payload(payload, contract)
     assert result["status"] == "PASS", result["errors"]
     assert all(item["status"] == "PASS" for item in result["verifier_requirements"])
 
@@ -148,13 +185,50 @@ def test_c02_grader_passes_the_frozen_contract_shape() -> None:
 def test_c02_grader_rejects_metadata_and_presentation_drift() -> None:
     """Reject wrong frozen metadata and a wrong C02 presentation scale."""
     contract = _contract()
-    payload = _valid_payload(contract)
+    payload = _canonical_payload(contract)
     payload["header"]["general_fields"][0]["value"]["value"] = "Wrong Company"
     payload["sections"][0]["tracks"][0]["bindings"][0]["scale"]["maximum"] = 136.0
     result = c02_grader.grade_c02_payload(payload, contract)
     assert result["status"] == "FAIL"
     assert any("metadata value missing" in error for error in result["errors"])
     assert any("scale mismatch" in error for error in result["errors"])
+
+
+def test_c02_requirement_failures_are_isolated() -> None:
+    """Report scalar and raster defects only in their respective requirements."""
+    contract = _contract()
+    scalar_payload = _canonical_payload(contract)
+    scalar_payload["sections"][0]["tracks"][0]["bindings"][0]["label"] = "Wrong"
+    scalar_result = c02_grader.grade_c02_payload(scalar_payload, contract)
+    scalar_statuses = {
+        item["id"]: item["status"] for item in scalar_result["verifier_requirements"]
+    }
+    assert scalar_statuses["C02-04"] == "FAIL"
+    assert scalar_statuses["C02-05"] == "PASS"
+
+    raster_payload = _canonical_payload(contract)
+    raster_payload["sections"][0]["tracks"][-1]["bindings"][0]["label"] = "Wrong"
+    raster_result = c02_grader.grade_c02_payload(raster_payload, contract)
+    raster_statuses = {
+        item["id"]: item["status"] for item in raster_result["verifier_requirements"]
+    }
+    assert raster_statuses["C02-04"] == "PASS"
+    assert raster_statuses["C02-05"] == "FAIL"
+
+
+def test_c02_grader_requires_exact_ordered_report_shape() -> None:
+    """Reject extra or reordered frozen report slots and tracks."""
+    contract = _contract()
+    payload = _canonical_payload(contract)
+    payload["header"]["service_titles"].append(
+        {"slot_id": "service_title.extra", "value": {"value": "Unexpected"}}
+    )
+    payload["remarks"].append({"remark_id": "remark-extra", "title": "Unexpected", "text": "x"})
+    payload["sections"][0]["tracks"].reverse()
+    result = c02_grader.grade_c02_payload(payload, contract)
+    assert "service title order or values mismatch" in result["errors"]
+    assert "remark order or values mismatch" in result["errors"]
+    assert "track identity or order mismatch: main_pass" in result["errors"]
 
 
 def test_d5_grading_dispatches_c02_without_changing_d4_grading(

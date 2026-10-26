@@ -54,6 +54,26 @@ def _close(actual: object, expected: object) -> bool:
         return actual == expected
 
 
+def _matches_expected_fields(actual: object, expected: object) -> bool:
+    """Match frozen fields while allowing canonical model default fields."""
+    if isinstance(expected, Mapping):
+        return isinstance(actual, Mapping) and all(
+            key in actual and _matches_expected_fields(actual[key], value)
+            for key, value in expected.items()
+        )
+    if isinstance(expected, Sequence) and not isinstance(expected, (str, bytes, bytearray)):
+        return (
+            isinstance(actual, Sequence)
+            and not isinstance(actual, (str, bytes, bytearray))
+            and len(actual) == len(expected)
+            and all(
+                _matches_expected_fields(left, right)
+                for left, right in zip(actual, expected, strict=True)
+            )
+        )
+    return _close(actual, expected)
+
+
 def _slot_values(value: object) -> list[str]:
     values: list[str] = []
     if isinstance(value, Mapping):
@@ -120,13 +140,17 @@ def _check_report(payload: Mapping[str, Any], contract: Mapping[str, Any]) -> li
             if isinstance(item, Mapping) and isinstance(item.get("value"), Mapping)
         ]
     expected_titles = contract.get("report", {}).get("service_titles", [])
-    if titles[: len(expected_titles)] != expected_titles:
+    if titles != expected_titles:
         errors.append("service title order or values mismatch")
     remarks = payload.get("remarks")
-    actual_remarks = [item.get("title") for item in remarks if isinstance(item, Mapping)]
-    for title in contract.get("report", {}).get("remarks", []):
-        if title not in actual_remarks:
-            errors.append(f"remark title missing: {title}")
+    actual_remarks = (
+        [item.get("title") for item in remarks if isinstance(item, Mapping)]
+        if isinstance(remarks, list)
+        else []
+    )
+    expected_remarks = contract.get("report", {}).get("remarks", [])
+    if actual_remarks != expected_remarks:
+        errors.append("remark order or values mismatch")
     return errors
 
 
@@ -151,12 +175,17 @@ def _check_sections(payload: Mapping[str, Any], contract: Mapping[str, Any]) -> 
             or Path(str(source.get("source_path", ""))).name != expected_source
         ):
             errors.append(f"section source mismatch: {section_id}")
-        tracks = {
-            item.get("id"): item
-            for item in actual_section.get("tracks", [])
-            if isinstance(item, Mapping)
-        }
-        for expected_track in expected_section.get("tracks", []):
+        actual_tracks = actual_section.get("tracks", [])
+        if not isinstance(actual_tracks, list):
+            errors.append(f"tracks missing: {section_id}")
+            continue
+        expected_tracks = expected_section.get("tracks", [])
+        expected_track_ids = [item["id"] for item in expected_tracks]
+        actual_track_ids = [item.get("id") for item in actual_tracks if isinstance(item, Mapping)]
+        if actual_track_ids != expected_track_ids:
+            errors.append(f"track identity or order mismatch: {section_id}")
+        tracks = {item.get("id"): item for item in actual_tracks if isinstance(item, Mapping)}
+        for expected_track in expected_tracks:
             track_id = expected_track["id"]
             actual_track = tracks.get(track_id)
             if not isinstance(actual_track, Mapping):
@@ -169,7 +198,7 @@ def _check_sections(payload: Mapping[str, Any], contract: Mapping[str, Any]) -> 
     return errors
 
 
-def _check_bindings(payload: Mapping[str, Any], contract: Mapping[str, Any]) -> list[str]:
+def _check_scalar_bindings(payload: Mapping[str, Any], contract: Mapping[str, Any]) -> list[str]:
     errors: list[str] = []
     expected_bindings = contract.get("bindings", {})
     for section in payload.get("sections", []):
@@ -180,38 +209,12 @@ def _check_bindings(payload: Mapping[str, Any], contract: Mapping[str, Any]) -> 
             if not isinstance(track, Mapping):
                 continue
             track_id = str(track.get("id"))
+            if track_id == "vdl":
+                continue
             expected = expected_bindings.get(track_id, [])
             actual = [item for item in track.get("bindings", []) if isinstance(item, Mapping)]
             if len(actual) != len(expected):
                 errors.append(f"binding count mismatch: {section_id}/{track_id}")
-                continue
-            if track_id == "vdl":
-                item = actual[0]
-                target = expected[0]
-                if item.get("kind") != target["kind"] or item.get("channel") != target["channel"]:
-                    errors.append(f"raster identity mismatch: {section_id}/{track_id}")
-                if item.get("label") != target["label"] or item.get("profile") != target["profile"]:
-                    errors.append(f"raster label or profile mismatch: {section_id}/{track_id}")
-                x_scale = track.get("x_scale", {})
-                expected_scale = target["track_scale"]
-                for key in ("kind", "minimum", "maximum", "reverse"):
-                    if not _close(x_scale.get(key), expected_scale.get(key)):
-                        errors.append(f"raster scale mismatch: {section_id}/{track_id}")
-                style = item.get("style", {})
-                if style.get("colormap") != target["colormap"]:
-                    errors.append(f"raster colormap mismatch: {section_id}/{track_id}")
-                if item.get("colorbar") != target["colorbar"]:
-                    errors.append(f"raster colorbar mismatch: {section_id}/{track_id}")
-                if item.get("sample_axis") != target["sample_axis"]:
-                    errors.append(f"raster sample axis mismatch: {section_id}/{track_id}")
-                grid = track.get("grid", {})
-                if grid.get("vertical_main_visible") != target["grid"]["vertical_main_visible"]:
-                    errors.append(f"main grid mismatch: {section_id}/{track_id}")
-                if (
-                    grid.get("vertical_secondary_visible")
-                    != target["grid"]["vertical_secondary_visible"]
-                ):
-                    errors.append(f"secondary grid mismatch: {section_id}/{track_id}")
                 continue
             for index, (actual_binding, expected_binding) in enumerate(
                 zip(actual, expected, strict=True)
@@ -237,6 +240,49 @@ def _check_bindings(payload: Mapping[str, Any], contract: Mapping[str, Any]) -> 
     return errors
 
 
+def _check_raster_binding(payload: Mapping[str, Any], contract: Mapping[str, Any]) -> list[str]:
+    errors: list[str] = []
+    expected = contract.get("bindings", {}).get("vdl", [])
+    for section in payload.get("sections", []):
+        if not isinstance(section, Mapping):
+            continue
+        section_id = str(section.get("id"))
+        for track in section.get("tracks", []):
+            if not isinstance(track, Mapping) or track.get("id") != "vdl":
+                continue
+            actual = [item for item in track.get("bindings", []) if isinstance(item, Mapping)]
+            if len(actual) != len(expected):
+                errors.append(f"binding count mismatch: {section_id}/vdl")
+                continue
+            item = actual[0]
+            target = expected[0]
+            if item.get("kind") != target["kind"] or item.get("channel") != target["channel"]:
+                errors.append(f"raster identity mismatch: {section_id}/vdl")
+            if item.get("label") != target["label"] or item.get("profile") != target["profile"]:
+                errors.append(f"raster label or profile mismatch: {section_id}/vdl")
+            x_scale = track.get("x_scale", {})
+            expected_scale = target["track_scale"]
+            for key in ("kind", "minimum", "maximum", "reverse"):
+                if not _close(x_scale.get(key), expected_scale.get(key)):
+                    errors.append(f"raster scale mismatch: {section_id}/vdl")
+            style = item.get("style", {})
+            if style.get("colormap") != target["colormap"]:
+                errors.append(f"raster colormap mismatch: {section_id}/vdl")
+            if item.get("colorbar") != target["colorbar"]:
+                errors.append(f"raster colorbar mismatch: {section_id}/vdl")
+            if not _matches_expected_fields(item.get("sample_axis"), target["sample_axis"]):
+                errors.append(f"raster sample axis mismatch: {section_id}/vdl")
+            grid = track.get("grid", {})
+            if grid.get("vertical_main_visible") != target["grid"]["vertical_main_visible"]:
+                errors.append(f"main grid mismatch: {section_id}/vdl")
+            if (
+                grid.get("vertical_secondary_visible")
+                != target["grid"]["vertical_secondary_visible"]
+            ):
+                errors.append(f"secondary grid mismatch: {section_id}/vdl")
+    return errors
+
+
 def grade_c02_payload(payload: Mapping[str, Any], contract: Mapping[str, Any]) -> dict[str, Any]:
     """Grade one canonical C02 document against the frozen contract."""
     tail = payload.get("tail")
@@ -244,8 +290,8 @@ def grade_c02_payload(payload: Mapping[str, Any], contract: Mapping[str, Any]) -
         ("C02-01", _check_metadata(payload, contract)),
         ("C02-02", _check_report(payload, contract)),
         ("C02-03", _check_sections(payload, contract)),
-        ("C02-04", _check_bindings(payload, contract)),
-        ("C02-05", _check_bindings(payload, contract)),
+        ("C02-04", _check_scalar_bindings(payload, contract)),
+        ("C02-05", _check_raster_binding(payload, contract)),
         (
             "C02-06",
             [] if isinstance(tail, Mapping) and tail.get("enabled") is True else ["tail missing"],
