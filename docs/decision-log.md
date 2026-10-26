@@ -1,6 +1,6 @@
 # wellplot Decision Log
 
-Last updated: 2026-10-21
+Last updated: 2026-10-26
 
 ## Purpose
 
@@ -66,6 +66,30 @@ The first active baseline is now
 [docs/agent-code-mode-current-baseline.md](agent-code-mode-current-baseline.md).
 Dependent agent/Code-Mode work must cite it and complete the protocol's
 non-rediscovery preflight before proceeding.
+
+### Canonical Live Runtime Adherence Acceptance (2026-10-26)
+
+The independently reviewed
+`WELLPLOT-D5-CANONICAL-LIVE-RUNTIME-ADHERENCE-DESIGN-001` candidate
+`abb1d3ce76498d262f8020d54c218ed9efbb56e0` is accepted and closed.
+
+For the current WellPlot host, all credential-bearing readiness, provider-backed
+smoke/scientific/benchmark execution, local scientific assets used by those
+runs, and durable campaign custody are bound to the persistent canonical
+checkout at `/home/user/projects/well_log_os`. Disposable clones/worktrees,
+including `/tmp/...`, remain implementation/review-only and must not receive
+copied or symlinked live credentials or become durable evidence roots.
+
+The decision preserves `config/wellplot.yaml` as the sole canonical non-secret
+runtime configuration, preserves the existing credential loader/provider
+boundary/canonical semantic engine/D5 population and checkpoints, and adds no
+production or harness path. Independent review found no concrete enforcement
+gap requiring a mechanical guard.
+
+Before another live authority is consumed, the exact executing shell must pass
+the non-generative canonical-runtime environment check with zero model calls
+and no secret disclosure. A failure remains operational evidence and does not
+consume C02 or create a scientific observation.
 
 ## Product and Scope Decisions
 
