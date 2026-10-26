@@ -330,7 +330,7 @@ def test_provider_free_preflight_exposes_d5i_contract_without_calls(tmp_path: Pa
     assert result["role_logical_call_limits"] == {
         "planner": 2,
         "report_worker": 2,
-        "section_worker": 2,
+        "section_worker": 4,
     }
     assert result["accepted_h_implementation_checkpoint"] == (
         d5.D5I_ACCEPTED_H_IMPLEMENTATION_CHECKPOINT
@@ -673,17 +673,45 @@ def test_call_ledger_rejects_call_46_and_keeps_retries_physical() -> None:
     assert retry_ledger.calls[0]["physical_attempt_count"] == 2
 
 
-def test_d5i_role_limits_reset_per_turn_and_physical_136_fails_closed() -> None:
-    """Per-turn role caps and the global physical ceiling fail before delegation."""
+@pytest.mark.parametrize(
+    ("role", "limit"),
+    [
+        ("planner", 2),
+        ("report_worker", 2),
+        ("section_worker", 4),
+    ],
+)
+def test_d5i_role_limits_fail_closed_at_role_specific_boundary(role: str, limit: int) -> None:
+    """Each role admits its canonical per-turn envelope and rejects the next call."""
     ledger = d5.D5LogicalCallLedger()
     ledger.begin_turn("turn-1")
-    ledger.reserve("report_worker")
-    ledger.reserve("report_worker")
-    with pytest.raises(d5.D5CallCapExceeded, match="report_worker logical call limit 2"):
-        ledger.reserve("report_worker")
+    for _ in range(limit):
+        ledger.reserve(role)
+    with pytest.raises(
+        d5.D5CallCapExceeded,
+        match=rf"{role} logical call limit {limit}",
+    ):
+        ledger.reserve(role)
 
-    ledger.begin_turn("turn-2")
-    ledger.reserve("report_worker")
+
+def test_d5i_cbl_role_shape_and_per_turn_reset_are_provider_free() -> None:
+    """A two-section CBL turn admits one initial/correction pair per section."""
+    ledger = d5.D5LogicalCallLedger()
+    for turn_id in ("turn-1", "turn-2"):
+        ledger.begin_turn(turn_id)
+        ledger.reserve("planner")
+        ledger.reserve("report_worker")
+        for _ in range(4):
+            ledger.reserve("section_worker")
+        assert ledger.turn_role_counts == {
+            "planner": 1,
+            "report_worker": 1,
+            "section_worker": 4,
+        }
+
+
+def test_d5i_global_physical_136_fails_closed() -> None:
+    """The physical-attempt ceiling remains independent of role-local limits."""
     physical_ledger = d5.D5LogicalCallLedger()
     index = physical_ledger.reserve("planner")
     for _ in range(d5.MAX_PHYSICAL_ATTEMPTS):
