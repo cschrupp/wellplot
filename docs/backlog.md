@@ -48,17 +48,25 @@ relative paths, sizes, and SHA-256 values. Distinguish `NOT_TRACKED`,
 `LOCAL_UNVERIFIED`, `MISSING`, and `VERIFIED`. Consider an optional
 `scripts/check_local_assets.py` helper.
 
-## Local Checkout / Worktree Simplification
+## Local Checkout / Worktree Cleanup
 
-Default to one canonical checkout. A new branch does not imply a new worktree,
-and independent SHA review does not imply a second checkout. Use additional
-worktrees only for genuinely simultaneous checkout needs and prune obsolete
-folders after branch/SHA reachability is proven.
+The live-runtime decision is no longer deferred: credential-bearing readiness,
+provider-backed smoke/scientific execution, local scientific assets used by
+those runs, and durable campaign custody use the canonical persistent checkout
+at `/home/user/projects/well_log_os`.
+
+The remaining deferred work is housekeeping only: inventory and prune obsolete
+clones/worktrees after branch/SHA reachability is proven. Additional worktrees
+are implementation/review-only and require a genuine simultaneous-checkout
+need.
 
 ## Shared Local-Asset Provisioning
 
-Consider one permanent local asset root with links into exceptional worktrees;
-never commit the scientific asset bytes.
+Do not build a second live asset root or provision live scientific assets into
+temporary worktrees. The canonical persistent checkout remains the live asset
+authority. If a non-live implementation/review worktree needs synthetic or
+read-only development fixtures, provision them without turning that worktree
+into a live runtime and never commit the scientific asset bytes.
 
 ## Mainline Integration / Promotion
 
