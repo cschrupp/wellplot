@@ -1,0 +1,20 @@
+{
+  "population_id": "D5-FINAL-10",
+  "execution_checkpoint": "abf5b5c7039fa6942cda076e6c47d780d600647b",
+  "turn_ids": [
+    "D4-C01:C01",
+    "D4-L01:T1",
+    "D4-L01:T2",
+    "D4-L01:T3",
+    "D4-L01:T4",
+    "D4-L02:T1",
+    "D4-L02:T2",
+    "D4-L03:C01",
+    "D4-L04:C01",
+    "D5-C02:C01"
+  ],
+  "d4_cases_fixture_sha256": "f710581831b29dcd7ab321dd91afc5dd2b4e40b729161f969f8802f3f7a84298",
+  "d4_gold_fixture_sha256": "99ba5fc73dfd95d67c8a909cb75325a84ff1bbccc724fa524d7850f306d02968",
+  "c02_request_fixture_sha256": "f9e746ab41dc420f30f0f19a11859926a9b6e7276a1e56552d56e4752fe93579",
+  "c02_contract_fixture_sha256": "26e2917178a119784328ea00ff2aefd8c5317b8177232de2fa2b733ca1d3e7e3"
+}

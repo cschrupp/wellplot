@@ -27,7 +27,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
+from scripts import d5_5_final_population as final_population
 from scripts import nlp_d4_live_acceptance as d4
+from scripts.d5_5_c02_contract_grader import grade_c02_artifact
 from wellplot.project_config import ProjectConfig, load_project_config
 
 D5_EXPERIMENT_VERSION = "WELLPLOT-NLP-D5-5I"
@@ -1738,8 +1740,9 @@ def execute_live_campaign(
     api_key_loader: Callable[[], str] | None = None,
     static_checker: Callable[[Path, D5Authorization, EvidencePaths], dict[str, Any]] | None = None,
     provider_factory: Callable[[Path, Path, str], object] | None = None,
-    turn_ids: Sequence[str] = FROZEN_TURN_IDS,
+    turn_ids: Sequence[str] | None = None,
     mode: str = "scientific",
+    population: str = "d4",
 ) -> dict[str, Any]:
     """Run selected frozen turns after static/readiness interlocks."""
     if artifact_root.resolve() != _authorized_artifact_root(repo_root, authorization):
@@ -1754,6 +1757,7 @@ def execute_live_campaign(
         authorization,
         paths,
         static_checker=static_checker,
+        population=population,
     )
     load_key = api_key_loader or (lambda: d4.load_d4_api_key(repo_root))
     build_provider = provider_factory or (
@@ -1791,7 +1795,10 @@ def execute_live_campaign(
             ),
         },
     )
-    return asyncio.run(runner.run(readiness.adapter, turn_ids=turn_ids, mode=mode))
+    runner_kwargs: dict[str, Any] = {"turn_ids": turn_ids, "mode": mode}
+    if population != "d4":
+        runner_kwargs["population"] = population
+    return asyncio.run(runner.run(readiness.adapter, **runner_kwargs))
 
 
 def execute_live_smoke(
@@ -1816,6 +1823,7 @@ def execute_live_smoke(
             provider_factory=provider_factory,
             turn_ids=("D4-C01:C01",),
             mode="smoke",
+            population="d4",
         )
     except D5ReadinessError as error:
         return {
@@ -2291,6 +2299,7 @@ def _campaign_scientific_terminal(
     attribution: str,
     rows: Sequence[Mapping[str, Any]],
     first_divergence: str,
+    population_size: int,
 ) -> str:
     """Project legacy campaign outcomes into the D5-5I terminal taxonomy."""
     if first_divergence == "HARNESS":
@@ -2308,11 +2317,18 @@ def _campaign_scientific_terminal(
         "POPULATION_INCOMPLETE",
     }:
         return "INCONCLUSIVE / HARNESS"
-    if decision == "PASS" and len(rows) == len(FROZEN_TURN_IDS):
+    if decision == "PASS" and len(rows) == population_size:
         return "PASS"
     if any(row.get("scientific_terminal") == "FAIL / CONTRACT_OR_INPUT" for row in rows):
         return "FAIL / CONTRACT_OR_INPUT"
     return "FAIL / RESIDUAL_SEMANTIC"
+
+
+def _grade_turn(actual: dict[str, Any], expected: dict[str, Any]) -> dict[str, Any]:
+    """Dispatch the final held-out contract without changing D4 grading."""
+    if expected.get("grader") == "d5_c02_contract":
+        return grade_c02_artifact(actual, expected["contract"])
+    return d4.grade_turn(actual, expected)
 
 
 class D5CampaignRunner:
@@ -2340,20 +2356,31 @@ class D5CampaignRunner:
         self,
         adapter: object,
         *,
-        turn_ids: Sequence[str] = FROZEN_TURN_IDS,
+        turn_ids: Sequence[str] | None = None,
         mode: str = "scientific",
+        population: str = "d4",
     ) -> dict[str, Any]:
         """Run selected frozen turns through the shared canonical adapter."""
         if self._started or self._finished:
             raise D5HarnessError("campaign cannot be resumed or invoked twice")
         if mode not in {"smoke", "scientific"}:
             raise D5HarnessError("unknown campaign mode")
-        selected_ids = tuple(str(turn_id) for turn_id in turn_ids)
+        if population == "d4":
+            cases = d4.load_cases(self.repo_root)
+            gold_cases = {item["turn_id"]: item for item in d4.load_gold(self.repo_root)["cases"]}
+            population_ids = FROZEN_TURN_IDS
+        elif population == "final":
+            cases, gold_payload = final_population.load_final_population(self.repo_root)
+            gold_cases = {item["turn_id"]: item for item in gold_payload["cases"]}
+            population_ids = final_population.FINAL_TURN_IDS
+        else:
+            raise D5StaticPreflightError("unknown population")
+        selected_ids = tuple(str(turn_id) for turn_id in (turn_ids or population_ids))
         if not selected_ids or len(set(selected_ids)) != len(selected_ids):
             raise D5StaticPreflightError("selected turn population is invalid")
-        if any(turn_id not in FROZEN_TURN_IDS for turn_id in selected_ids):
+        if any(turn_id not in population_ids for turn_id in selected_ids):
             raise D5StaticPreflightError("selected turn is outside the frozen population")
-        if selected_ids != tuple(turn_id for turn_id in FROZEN_TURN_IDS if turn_id in selected_ids):
+        if selected_ids != tuple(turn_id for turn_id in population_ids if turn_id in selected_ids):
             raise D5StaticPreflightError("selected turn order drifted")
         if self.readiness.live and (
             self.paths.root.resolve()
@@ -2384,10 +2411,6 @@ class D5CampaignRunner:
                 adapter.bind_physical_attempt(custody.record_physical_attempt)
             if callable(getattr(adapter, "bind_model_io", None)):
                 adapter.bind_model_io(custody.record_model_io)
-            cases = d4.load_cases(self.repo_root)
-            gold = {item["turn_id"]: item for item in d4.load_gold(self.repo_root)["cases"]}
-            if tuple(item["turn_id"] for item in cases) != FROZEN_TURN_IDS:
-                raise D5StaticPreflightError("D5 population order drifted")
             selected_cases = [case for case in cases if case["turn_id"] in selected_ids]
             if tuple(case["turn_id"] for case in selected_cases) != selected_ids:
                 raise D5StaticPreflightError("selected turn population drifted")
@@ -2398,7 +2421,7 @@ class D5CampaignRunner:
                 custody.begin_turn(str(case["turn_id"]))
                 if callable(getattr(adapter, "set_active_turn", None)):
                     adapter.set_active_turn(str(case["turn_id"]))
-                expected = gold[case["turn_id"]]
+                expected = gold_cases[case["turn_id"]]
                 cursor = int(getattr(adapter, "logical_call_count", 0))
                 physical_cursor = custody.ledger.physical_attempts
                 started = time.perf_counter()
@@ -2407,7 +2430,7 @@ class D5CampaignRunner:
                 grade = (
                     {"status": "INCONCLUSIVE", "errors": [], "verifier_requirements": []}
                     if observed_failure is not None
-                    else d4.grade_turn(dict(actual), expected)
+                    else _grade_turn(dict(actual), expected)
                 )
                 calls = int(getattr(adapter, "logical_call_count", 0)) - cursor
                 row = _bounded_turn_row(
@@ -2448,10 +2471,13 @@ class D5CampaignRunner:
             if provider_attributions:
                 decision, attribution = "INCONCLUSIVE", provider_attributions[0]
             elif any(row.get("failure_category") in _HOST_FAILURE_CATEGORIES for row in rows):
-                decision, attribution = "INCONCLUSIVE", next(
-                    row["failure_category"]
-                    for row in rows
-                    if row.get("failure_category") in _HOST_FAILURE_CATEGORIES
+                decision, attribution = (
+                    "INCONCLUSIVE",
+                    next(
+                        row["failure_category"]
+                        for row in rows
+                        if row.get("failure_category") in _HOST_FAILURE_CATEGORIES
+                    ),
                 )
             elif any(row["infrastructure_failure"] for row in rows):
                 decision, attribution = "INCONCLUSIVE", "PRODUCTION_OR_INFRASTRUCTURE"
@@ -2475,6 +2501,7 @@ class D5CampaignRunner:
                 attribution=attribution,
                 rows=rows,
                 first_divergence=campaign_first_divergence,
+                population_size=len(selected_ids),
             )
             if mode == "scientific"
             else None
@@ -2560,12 +2587,17 @@ def provider_free_preflight(
     paths: EvidencePaths,
     *,
     static_checker: Callable[[Path, D5Authorization, EvidencePaths], dict[str, Any]] | None = None,
+    population: str = "d4",
 ) -> dict[str, Any]:
     """Run static D5-4 checks without credentials, endpoints, or providers."""
     project_config = load_project_config(repo_root)
     _validate_project_config(project_config)
     if authorization.project_config_fingerprint_sha256 != project_config.fingerprint_sha256:
         raise D5StaticPreflightError("project configuration fingerprint mismatch")
+    if population == "final":
+        final_population.load_final_population(repo_root)
+    elif population != "d4":
+        raise D5StaticPreflightError("unknown population")
     checker = static_checker or _default_static_checks
     facts = checker(repo_root, authorization, paths)
     if facts.get("status") != "PASS":
@@ -2578,7 +2610,14 @@ def provider_free_preflight(
         "accepted_d5_engine_checkpoint": D5_ENGINE_CHECKPOINT,
         "accepted_d5_design_checkpoint": D5_DESIGN_CHECKPOINT,
         "accepted_h_implementation_checkpoint": D5I_ACCEPTED_H_IMPLEMENTATION_CHECKPOINT,
-        "population": {"turns": 9, "turn_ids": list(FROZEN_TURN_IDS)},
+        "population": {
+            "turns": len(FROZEN_TURN_IDS)
+            if population == "d4"
+            else len(final_population.FINAL_TURN_IDS),
+            "turn_ids": list(
+                FROZEN_TURN_IDS if population == "d4" else final_population.FINAL_TURN_IDS
+            ),
+        },
         "logical_call_ceiling": MAX_LOGICAL_CALLS,
         "physical_attempt_upper_bound": MAX_PHYSICAL_ATTEMPTS,
         "role_logical_call_limits": dict(ROLE_LOGICAL_CALL_LIMITS),
@@ -2624,6 +2663,7 @@ def main() -> int:
     modes.add_argument("--provider-free-preflight", action="store_true")
     modes.add_argument("--execute-smoke", action="store_true")
     modes.add_argument("--execute-live", action="store_true")
+    parser.add_argument("--population", choices=("d4", "final"), default="d4")
     parser.add_argument("--artifact-root", type=Path)
     parser.add_argument("--authorization-json", type=Path, required=True)
     args = parser.parse_args()
@@ -2636,7 +2676,12 @@ def main() -> int:
     )
     paths = EvidencePaths(artifact_root, authorization.campaign_id)
     if args.provider_free_preflight:
-        result = provider_free_preflight(repo_root, authorization, paths)
+        result = provider_free_preflight(
+            repo_root,
+            authorization,
+            paths,
+            population=args.population,
+        )
     elif args.execute_smoke:
         try:
             result = execute_live_smoke(
@@ -2653,6 +2698,7 @@ def main() -> int:
                 repo_root=repo_root,
                 authorization=authorization,
                 artifact_root=artifact_root,
+                population=args.population,
             )
         except D5ReadinessError as error:
             print(json.dumps(_readiness_failure_result(error), indent=2, sort_keys=True))
