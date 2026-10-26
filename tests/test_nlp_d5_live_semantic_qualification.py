@@ -1084,6 +1084,36 @@ def test_first_generation_structured_output_rejection_is_inconclusive(tmp_path: 
     assert "replay" not in journal.read_text(encoding="utf-8").casefold()
 
 
+def test_exhausted_schema_validation_is_provider_structured_failure() -> None:
+    """An unrecovered invalid response cannot fall through to host execution."""
+    calls = [
+        {
+            "outcome": "failed",
+            "failure_category": "invalid_response",
+            "response_reason": "schema_validation",
+        }
+    ]
+
+    assert d5._classify_logical_call_failure(calls) == (
+        "PROVIDER_BOUNDARY / STRUCTURED_OUTPUT",
+        "invalid_response",
+    )
+
+
+def test_recovered_schema_validation_is_not_terminal_failure() -> None:
+    """A failed attempt followed by success remains a recovered call."""
+    calls = [
+        {
+            "outcome": "failed",
+            "failure_category": "invalid_response",
+            "response_reason": "schema_validation",
+        },
+        {"outcome": "completed", "failure_category": None},
+    ]
+
+    assert d5._classify_logical_call_failure(calls) is None
+
+
 def test_scientifically_wrong_structured_result_is_fail(tmp_path: Path) -> None:
     """Validly returned but wrong canonical semantics classify as FAIL."""
     runner = d5.D5CampaignRunner(

@@ -108,6 +108,95 @@ class SectionTask(_SemanticModel):
         return values
 
 
+class _PlannerWireReportTask(_SemanticModel):
+    """Provider-facing report task without host-owned provenance."""
+
+    goal: str = Field(min_length=1)
+    capability_ids: tuple[str, ...] = ()
+    requirements: tuple[str, ...] = ()
+    constraints: tuple[str, ...] = ()
+
+    @field_validator("capability_ids", "requirements", "constraints")
+    @classmethod
+    def validate_text_items(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        """Keep wire text collections aligned with canonical validation."""
+        _require_nonempty_items(values)
+        return values
+
+
+class _PlannerWireSectionTask(_SemanticModel):
+    """Provider-facing section task without host-owned provenance."""
+
+    goal: str = Field(min_length=1)
+    capability_ids: tuple[str, ...] = Field(min_length=1)
+    existing_section_hint: str | None = Field(default=None, min_length=1)
+    source_hints: tuple[str, ...] = ()
+    requirements: tuple[str, ...] = ()
+    constraints: tuple[str, ...] = ()
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        str_strip_whitespace=True,
+        json_schema_extra=_require_section_hint_in_schema,
+    )
+
+    @classmethod
+    def model_validate(cls, obj: object, **kwargs: object) -> _PlannerWireSectionTask:
+        """Require the explicit section-target key at the wire boundary."""
+        if isinstance(obj, Mapping) and "existing_section_hint" not in obj:
+            raise _missing_section_hint_error(obj)
+        return super().model_validate(obj, **kwargs)
+
+    @field_validator("capability_ids", "source_hints", "requirements", "constraints")
+    @classmethod
+    def validate_text_items(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        """Keep wire text collections aligned with canonical validation."""
+        _require_nonempty_items(values)
+        return values
+
+
+class _PlannerWirePlan(_SemanticModel):
+    """Provider-facing semantic plan containing no deterministic provenance."""
+
+    summary: str = Field(min_length=1)
+    report_task: _PlannerWireReportTask | None = None
+    section_tasks: tuple[_PlannerWireSectionTask, ...] = ()
+    unresolved_requirements: tuple[str, ...] = ()
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        str_strip_whitespace=True,
+        json_schema_extra=lambda schema: _add_work_unit_schema_constraint(schema),
+    )
+
+    @classmethod
+    def model_validate(cls, obj: object, **kwargs: object) -> _PlannerWirePlan:
+        """Apply the required section-target key check to wire mappings."""
+        if isinstance(obj, Mapping):
+            section_tasks = obj.get("section_tasks", ())
+            if isinstance(section_tasks, (list, tuple)):
+                for task in section_tasks:
+                    if isinstance(task, Mapping) and "existing_section_hint" not in task:
+                        raise _missing_section_hint_error(task)
+        return super().model_validate(obj, **kwargs)
+
+    @model_validator(mode="after")
+    def validate_work_units(self) -> _PlannerWirePlan:
+        """Keep the canonical executable-work invariant at the wire boundary."""
+        if self.report_task is None and not self.section_tasks:
+            raise ValueError("SemanticPlan must contain a report task or section tasks.")
+        return self
+
+    @field_validator("unresolved_requirements")
+    @classmethod
+    def validate_text_items(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        """Keep unresolved requirement validation aligned with the canonical model."""
+        _require_nonempty_items(values)
+        return values
+
+
 class PlannerSemanticError(ValueError):
     """One expected semantic error in provider-produced planner output."""
 
@@ -200,6 +289,11 @@ def _add_work_unit_schema_constraint(schema: dict[str, object]) -> None:
             ]
         }
     )
+
+
+def _canonical_plan_from_wire(wire_plan: _PlannerWirePlan) -> SemanticPlan:
+    """Convert one provider DTO into the canonical validated plan exactly once."""
+    return SemanticPlan.model_validate(wire_plan.model_dump(mode="python"))
 
 
 def _missing_section_hint_error(input_value: object) -> ValidationError:
@@ -340,7 +434,7 @@ class SemanticPlanner:
                     temperature=temperature,
                     max_output_tokens=max_output_tokens,
                 ),
-                response_model=SemanticPlan,
+                response_model=_PlannerWirePlan,
             )
         except ProviderRequestError as error:
             if error.category is not ProviderFailureCategory.INVALID_RESPONSE:
@@ -352,6 +446,7 @@ class SemanticPlanner:
             ):
                 retry_request = _schema_correction_request(
                     context=context,
+                    diagnostic=_schema_failure_diagnostic(error),
                     timeout_seconds=timeout_seconds,
                     temperature=temperature,
                     max_output_tokens=max_output_tokens,
@@ -365,9 +460,9 @@ class SemanticPlanner:
                 )
             generated = await self.backend.generate_structured(
                 retry_request,
-                response_model=SemanticPlan,
+                response_model=_PlannerWirePlan,
             )
-        plan = SemanticPlan.model_validate(generated.value)
+        plan = _canonical_plan_from_wire(generated.value)
         plan = _attach_request_obligations(plan, request)
         try:
             _validate_extraction_coverage(plan)
@@ -391,9 +486,9 @@ class SemanticPlanner:
                     temperature=temperature,
                     max_output_tokens=max_output_tokens,
                 ),
-                response_model=SemanticPlan,
+                response_model=_PlannerWirePlan,
             )
-            corrected_plan = SemanticPlan.model_validate(corrected.value)
+            corrected_plan = _canonical_plan_from_wire(corrected.value)
             corrected_plan = _attach_request_obligations(corrected_plan, request)
             try:
                 _assert_correction_scope(plan, corrected_plan, first_error)
@@ -752,6 +847,7 @@ def _planning_request(
 def _schema_correction_request(
     *,
     context: Mapping[str, object],
+    diagnostic: Mapping[str, str] | None = None,
     timeout_seconds: float,
     temperature: float | None,
     max_output_tokens: int | None,
@@ -762,12 +858,40 @@ def _schema_correction_request(
         user_prompt=(
             _SCHEMA_CORRECTION_INSTRUCTION
             + "\n\nSchema correction context:\n"
-            + json.dumps(context, sort_keys=True, separators=(",", ":"))
+            + json.dumps(
+                {
+                    "context": context,
+                    "diagnostic": dict(diagnostic or {}),
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            )
         ),
         timeout_seconds=timeout_seconds,
         temperature=temperature,
         max_output_tokens=max_output_tokens,
     )
+
+
+def _schema_failure_diagnostic(error: Exception) -> dict[str, str]:
+    """Return bounded structural feedback without exposing provider payloads."""
+    if isinstance(error, StructuredResponseProviderError):
+        shape = error.validation_shape
+        if shape is not None and any(
+            issue.error_type == "value_error" and issue.location == ("$root",)
+            for issue in shape.issues
+        ):
+            return {
+                "code": "missing_executable_work_unit",
+                "message": (
+                    "SemanticPlan requires a non-null report_task or at least one "
+                    "section_tasks item."
+                ),
+            }
+    return {
+        "code": "schema_validation",
+        "message": "Return one object that satisfies the structured response model.",
+    }
 
 
 def _correction_request(
@@ -999,7 +1123,15 @@ _PLANNER_SYSTEM_PROMPT = """You are the semantic planning stage of Wellplot Code
 Describe semantic work units only. Do not emit document object IDs, section IDs,
 track IDs, binding IDs, component trees, parent relationships, operation order,
 insert positions, source paths, source formats, header slot IDs, or data-source
-objects. Do not describe SDK calls or mutation steps.
+objects. Do not describe SDK calls or mutation steps. Do not emit request hashes,
+span hashes, byte offsets, or other provenance; the host derives those facts from
+the authoritative request.
+
+The response must contain at least one executable work unit: a non-null
+report_task or a non-empty section_tasks array. A summary alone is never an
+executable plan. For a section edit, include one SectionTask with the required
+existing_section_hint key, including an explicit null only when reconstruction
+has no existing target.
 
 Select capability IDs exactly as listed in the static capability catalogue. A
 SectionTask describes what one logical section should accomplish; its list order

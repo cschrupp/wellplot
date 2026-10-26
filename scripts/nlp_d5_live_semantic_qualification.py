@@ -2453,7 +2453,9 @@ def classify_grade_failure(actual: Mapping[str, Any], grade: Mapping[str, Any]) 
     return None
 
 
-_STRUCTURED_OUTPUT_FAILURE_CATEGORIES = frozenset({"configuration", "provider_rejected"})
+_STRUCTURED_OUTPUT_FAILURE_CATEGORIES = frozenset(
+    {"configuration", "provider_rejected", "invalid_response"}
+)
 _PROVIDER_RUNTIME_FAILURE_CATEGORIES = frozenset(
     {"transport", "timeout", "rate_limit", "authentication"}
 )
@@ -2463,9 +2465,12 @@ def _classify_logical_call_failure(
     calls: Sequence[Mapping[str, Any]],
 ) -> tuple[str, str] | None:
     """Classify stable provider custody categories before semantic grading."""
+    if calls and calls[-1].get("outcome") in {"completed", "success"}:
+        return None
+    terminal_calls = [call for call in calls if call.get("outcome") not in {"completed", "success"}]
     categories = [
         str(call.get("failure_category"))
-        for call in calls
+        for call in terminal_calls
         if call.get("failure_category") is not None
     ]
     if any(category in _STRUCTURED_OUTPUT_FAILURE_CATEGORIES for category in categories):

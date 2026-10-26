@@ -27,7 +27,12 @@ from wellplot.agent.code_mode.canonical_workers import (
     ReportSemanticResponse,
     SectionSemanticActionResponse,
 )
-from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan
+from wellplot.agent.code_mode.planner import (
+    ReportTask,
+    SectionTask,
+    SemanticPlan,
+    _PlannerWirePlan,
+)
 from wellplot.agent.providers.base import (
     ProviderMetrics,
     StructuredGenerationRequest,
@@ -1536,9 +1541,8 @@ class _D4PlannerBackend:
         self,
         request: StructuredGenerationRequest,
         *,
-        response_model: type[SemanticPlan],
+        response_model: type[object],
     ) -> StructuredGenerationResult[SemanticPlan]:
-        del response_model
         context = json.loads(request.user_prompt.split("Context:\n", 1)[1])
         value = self.planner.plan(
             request=context["request"],
@@ -1549,8 +1553,15 @@ class _D4PlannerBackend:
             temperature=request.temperature,
             max_output_tokens=request.max_output_tokens,
         )
+        payload = value.model_dump(mode="python")
+        payload.pop("obligations", None)
+        if isinstance(payload.get("report_task"), dict):
+            payload["report_task"].pop("obligations", None)
+        for task in payload.get("section_tasks", ()):
+            if isinstance(task, dict):
+                task.pop("obligations", None)
         return StructuredGenerationResult(
-            value=value,
+            value=response_model.model_validate(payload),
             metrics=ProviderMetrics(input_tokens=1, output_tokens=1, total_tokens=2),
         )
 
@@ -1614,8 +1625,8 @@ class _D4SessionBackend:
         response_model: type[object],
     ) -> StructuredGenerationResult[object]:
         """Select the typed fixture response by the production response model."""
-        if response_model is SemanticPlan:
-            return await self.planner.generate_structured(request, response_model=SemanticPlan)
+        if response_model in {SemanticPlan, _PlannerWirePlan}:
+            return await self.planner.generate_structured(request, response_model=response_model)
         if response_model is ReportSemanticResponse:
             return await self.report.generate_structured(
                 request, response_model=ReportSemanticResponse

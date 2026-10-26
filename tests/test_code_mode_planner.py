@@ -18,7 +18,10 @@ from wellplot.agent.code_mode.planner import (
     SectionTask,
     SemanticPlan,
     SemanticPlanner,
+    _attach_request_obligations,
+    _canonical_plan_from_wire,
     _correction_request,
+    _PlannerWirePlan,
     _safe_source_summary,
     _safe_task_for_correction,
     _schema_correction_request,
@@ -33,6 +36,8 @@ from wellplot.agent.providers.base import (
 )
 from wellplot.agent.providers.response_diagnostics import (
     ProviderResponseFailureReason,
+    ProviderSchemaValidationIssue,
+    ProviderSchemaValidationShape,
     StructuredResponseProviderError,
 )
 from wellplot.capabilities import CapabilityRegistry, CapabilitySpec, create_builtin_registry
@@ -120,7 +125,7 @@ def _plan_payload() -> dict[str, object]:
 
 def test_semantic_schema_contains_no_document_identity_fields() -> None:
     """The static v2 schema cannot ask the provider for canonical object IDs."""
-    schema_text = json.dumps(SemanticPlan.model_json_schema(), sort_keys=True)
+    schema_text = json.dumps(_PlannerWirePlan.model_json_schema(), sort_keys=True)
     forbidden = {
         "component_id",
         "target_id",
@@ -137,12 +142,17 @@ def test_semantic_schema_contains_no_document_identity_fields() -> None:
     assert not forbidden.intersection(schema_text)
     assert "existing_section_hint" in schema_text
     assert "capability_ids" in schema_text
+    assert "RequestObligation" not in schema_text
+    assert "request_sha256" not in schema_text
+    assert "span_sha256" not in schema_text
+    assert "start_byte" not in schema_text
+    assert "end_byte" not in schema_text
 
 
 def test_provider_schema_requires_work_unit_and_revision_hint_key() -> None:
     """The emitted schema carries settled structural requirements."""
-    schema = SemanticPlan.model_json_schema()
-    section_schema = schema["$defs"]["SectionTask"]
+    schema = _PlannerWirePlan.model_json_schema()
+    section_schema = schema["$defs"]["_PlannerWireSectionTask"]
     assert "existing_section_hint" in section_schema["required"]
     assert list(Draft202012Validator(schema).iter_errors({"summary": "No work"}))
     assert list(
@@ -172,7 +182,7 @@ def test_provider_schema_requires_work_unit_and_revision_hint_key() -> None:
         ],
     }
     assert not list(Draft202012Validator(schema).iter_errors(section_only))
-    assert SemanticPlan.model_validate(
+    assert _PlannerWirePlan.model_validate(
         {
             "summary": "Reconstruct a section.",
             "section_tasks": [
@@ -185,7 +195,7 @@ def test_provider_schema_requires_work_unit_and_revision_hint_key() -> None:
         }
     )
     with pytest.raises(ValidationError):
-        SemanticPlan.model_validate(
+        _PlannerWirePlan.model_validate(
             {
                 "summary": "Reconstruct a section.",
                 "section_tasks": [
@@ -193,6 +203,61 @@ def test_provider_schema_requires_work_unit_and_revision_hint_key() -> None:
                 ],
             }
         )
+
+
+@pytest.mark.parametrize(
+    "captured_response",
+    [
+        {
+            "summary": "Revise Gamma Ray to a linear 5-125 scale.",
+            "unresolved_requirements": [],
+            "obligations": [{"field": "label"}],
+        },
+        {
+            "summary": "Revise Gamma Ray to a linear 5-125 scale.",
+            "unresolved_requirements": [],
+            "obligations": [{"field": "title"}],
+        },
+    ],
+)
+def test_captured_planner_responses_are_rejected_at_wire_boundary(
+    captured_response: dict[str, object],
+) -> None:
+    """Captured responses cannot bypass the executable-work or wire contract."""
+    with pytest.raises(ValidationError):
+        _PlannerWirePlan.model_validate(captured_response)
+
+
+def test_wire_plan_converts_once_then_receives_host_provenance() -> None:
+    """Semantic DTO conversion precedes the existing deterministic attachment."""
+    request = (
+        'Append a 30 mm normal track named "Resistivity QC" to Main Log. '
+        'Plot ILD on it as "Resistivity QC" with a logarithmic 0.2-2000 scale.'
+    )
+    wire = _PlannerWirePlan.model_validate(
+        {
+            "summary": "Add the requested resistivity track.",
+            "section_tasks": [
+                {
+                    "goal": "Add the resistivity quality-control track.",
+                    "capability_ids": [
+                        "section.log_plot",
+                        "track.normal",
+                        "binding.curve",
+                    ],
+                    "existing_section_hint": "Main Log",
+                    "requirements": [request],
+                }
+            ],
+        }
+    )
+    canonical = _canonical_plan_from_wire(wire)
+    attached = _attach_request_obligations(canonical, request)
+
+    assert isinstance(canonical, SemanticPlan)
+    assert attached.obligations
+    assert all(task.obligations for task in attached.section_tasks)
+    assert {item.field for item in attached.obligations} >= {"title", "kind", "width_mm"}
 
 
 def test_source_inventory_distinguishes_inspection_states() -> None:
@@ -264,7 +329,7 @@ def test_planner_makes_one_static_structured_call() -> None:
         "the existing main CBL presentation section"
     )
     assert len(backend.requests) == 1
-    assert backend.response_models == [SemanticPlan]
+    assert backend.response_models == [_PlannerWirePlan]
     prompt = backend.requests[0].user_prompt
     assert "source_manifest" not in prompt
     assert "source_path" not in prompt
@@ -836,8 +901,41 @@ def test_schema_validation_uses_a_bounded_schema_correction_request() -> None:
     assert initial.max_output_tokens == retry.max_output_tokens == 2048
     initial_context = json.loads(initial.user_prompt.split("Context:\n", 1)[1])
     retry_context = json.loads(retry.user_prompt.split("Schema correction context:\n", 1)[1])
-    assert retry_context == initial_context
-    assert backend.response_models == [SemanticPlan, SemanticPlan]
+    assert retry_context["context"] == initial_context
+    assert retry_context["diagnostic"] == {
+        "code": "schema_validation",
+        "message": "Return one object that satisfies the structured response model.",
+    }
+    assert backend.response_models == [_PlannerWirePlan, _PlannerWirePlan]
+
+
+def test_schema_correction_reports_missing_work_unit_without_answer_injection() -> None:
+    """Known root work-unit failures get structural, bounded retry feedback."""
+    failure = StructuredResponseProviderError(
+        "Planner returned invalid structured output.",
+        response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
+        validation_shape=ProviderSchemaValidationShape(
+            issue_count=1,
+            issues=(ProviderSchemaValidationIssue("value_error", ("$root",)),),
+            truncated=False,
+        ),
+    )
+    backend = _SequenceBackend(responses=[failure, _plan_payload()])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    asyncio.run(
+        planner.plan(
+            request="Set Gamma Ray to linear 5-125.",
+            mode="revise",
+            timeout_seconds=5.0,
+        )
+    )
+
+    retry_prompt = backend.requests[1].user_prompt
+    assert "missing_executable_work_unit" in retry_prompt
+    assert "report_task" in retry_prompt
+    assert "section_tasks" in retry_prompt
+    assert '"scale_minimum"' not in retry_prompt
 
 
 def test_schema_correction_helper_has_no_previous_response_arguments() -> None:
@@ -846,6 +944,7 @@ def test_schema_correction_helper_has_no_previous_response_arguments() -> None:
 
     assert parameters == {
         "context",
+        "diagnostic",
         "timeout_seconds",
         "temperature",
         "max_output_tokens",

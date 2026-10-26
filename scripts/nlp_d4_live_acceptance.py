@@ -35,7 +35,7 @@ from wellplot.agent.code_mode.canonical_workers import (
 from wellplot.agent.code_mode.canonical_workers import (
     SectionSemanticActionResponse as DeliverySectionResponse,
 )
-from wellplot.agent.code_mode.planner import SemanticPlan
+from wellplot.agent.code_mode.planner import SemanticPlan, _PlannerWirePlan
 from wellplot.agent.direct_notebook import DirectNotebookSession
 from wellplot.agent.providers.base import (
     ModelBackendProtocol,
@@ -322,6 +322,7 @@ class CountingBackend:
             raise PreflightError("program generation is forbidden for the typed D4 harness")
         roles = {
             SemanticPlan: "planner",
+            _PlannerWirePlan: "planner",
             DeliveryReportResponse: "report_worker",
             DeliverySectionResponse: "section_worker",
         }
