@@ -34,13 +34,22 @@ response.
 | 8 | planner | `3e0c7545652ae004ace55e2c36a0fcfe3987e4785299e35eaf05b9230363868b` | `a6da2edc36a2cc62478b0af45b8621c314112d4f8d9a2cf7ebb0376bd1fc2525` | HTTP 200, structured validation rejected |
 | 9 | planner | `d1f489e498ab597a0a2566d0648e247f4afd646a100ec694d0330ba0fec47924` | `a62c9c72312b79a81559dfd33658a3610693daf3064742212c2423366d3b50d2` | HTTP 200, structured validation rejected |
 
-Both logical-call results record `response_reason=schema_validation` with one
-bounded root validation issue. The first response contains a natural-language
-summary mentioning a linear `5–125` range, but its structured obligations use
+Both logical-call results record `failure_category=invalid_response`,
+`response_reason=schema_validation`, and one bounded root validation issue.
+The canonical backend path is: HTTP completion, JSON decoding, response-model
+validation, then `StructuredResponseProviderError` with
+`SCHEMA_VALIDATION`. The first response contains a natural-language summary
+mentioning a linear `5–125` range, but its structured obligations use
 placeholder spans/hashes and it does not provide an accepted semantic plan.
 The second response contains only section-preservation obligations and also
 does not provide a valid section task. Neither response is admissible as a
 validated model semantic output.
+
+This establishes the earliest observed divergence as
+`PROVIDER_OR_STRUCTURED`, specifically
+`PLANNER_RESPONSE_SCHEMA_VALIDATION_FAILURE`. It occurs before any semantic
+worker, lowering, reconciliation, private application, obligation
+verification, persistence, or rendering.
 
 Therefore the following model-side facts are **not established** by custody:
 
@@ -119,33 +128,47 @@ cannot be performed without inventing unrecorded state.
   it is not an independent persistence defect.
 
 The existing campaign attribution
-`HOST_SEMANTIC_APPLICATION / HOST_EXECUTION` is **NOT_RESOLVABLE** from the
-sealed evidence. The evidence does not establish whether a valid model
-semantic action was ever produced, so it cannot distinguish a model semantic
-mistake from a host application or obligation-verifier defect.
+`HOST_SEMANTIC_APPLICATION / HOST_EXECUTION` is **MISATTRIBUTED**. The
+sealed evidence establishes a structured-response failure before host
+semantic application. It does not establish whether the underlying cause of
+the invalid structured response was Qwen's conformance or a planner
+schema/contract defect; that narrower ownership question remains open.
+
+The current D5 classifier explains the misattribution. Its
+`_classify_logical_call_failure()` recognizes structured failures with
+categories `configuration` and `provider_rejected`, but not the actual
+`invalid_response` category recorded here. The failure therefore falls
+through to later `compile_failed` attribution as
+`HOST_SEMANTIC_APPLICATION`, even though the provider/backend custody has
+already recorded `response_reason=schema_validation`.
 
 ## Terminal
 
 ```yaml
-forensic_terminal: EVIDENCE_INSUFFICIENT
-existing_campaign_attribution: NOT_RESOLVABLE
+forensic_terminal: PROVIDER_OR_STRUCTURED_RESPONSE_FAILURE
+observed_failure: PLANNER_RESPONSE_SCHEMA_VALIDATION_FAILURE
+existing_campaign_attribution: MISATTRIBUTED
 model_semantic_failure: NOT_ESTABLISHED
-production_or_harness_failure: NOT_ESTABLISHED
+host_semantic_application_reached: false
+host_execution_reached: false
 ```
 
-This result is deliberately narrower than the campaign's operational
-`INCONCLUSIVE / HARNESS` terminal. It does not relabel that sealed result; it
-records that the available evidence cannot causally adjudicate its owner.
+This result corrects the causal interpretation of the campaign's operational
+`INCONCLUSIVE / HARNESS` terminal. It does not claim a model semantic failure:
+the model-side semantic result remains unestablished. The bounded terminal is
+known to be a provider/structured-response boundary failure, while ownership
+between model structured conformance and a planner schema/contract defect
+remains unresolved.
 
 ## Scientific Consequence
 
 - `D4-L01:T2` does not constitute usable model semantic evidence for the
   requested scale transition.
-- It does constitute evidence that the canonical run terminated before a
-  valid accepted semantic chain was available, but not evidence of a specific
-  production defect.
-- No further causal adjudication is possible without new evidence; no model
-  call is required for this conclusion.
+- It does constitute evidence of a planner structured-response failure before
+  host semantic application; the prior host attribution was incorrect.
+- The remaining model-conformance versus planner-schema question can be
+  investigated provider-free from the recorded request schema and response.
+- No model call is required for this conclusion.
 - `C02` remains model-unseen.
 - The consumed campaign and namespace remain closed. No new campaign is
   authorized by this adjudication.
@@ -161,3 +184,9 @@ model calls:          0
 endpoint calls:       0
 C02 exposure:         0
 ```
+
+The next engineering step, if separately authorized, is provider-free
+diagnosis of the exact planner schema mismatch and a bounded correction to
+the D5 attribution classifier so `invalid_response` plus
+`schema_validation` cannot fall through to `HOST_EXECUTION`. No new Qwen run
+is justified by this record.
