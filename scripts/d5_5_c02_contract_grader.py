@@ -130,7 +130,7 @@ def _check_metadata(payload: Mapping[str, Any], contract: Mapping[str, Any]) -> 
 
 
 def _check_report(payload: Mapping[str, Any], contract: Mapping[str, Any]) -> list[str]:
-    errors = _check_metadata(payload, contract)
+    errors: list[str] = []
     header = payload.get("header")
     titles = []
     if isinstance(header, Mapping):
@@ -160,9 +160,11 @@ def _check_sections(payload: Mapping[str, Any], contract: Mapping[str, Any]) -> 
     if not isinstance(sections, list):
         return ["sections missing"]
     expected_sections = contract.get("sections", {})
+    actual_section_ids = [item.get("id") for item in sections if isinstance(item, Mapping)]
+    expected_section_ids = list(expected_sections)
+    if actual_section_ids != expected_section_ids:
+        errors.append("section identity, order, or cardinality mismatch")
     actual_by_id = {item.get("id"): item for item in sections if isinstance(item, Mapping)}
-    if list(actual_by_id) != list(expected_sections):
-        errors.append("section identity or order mismatch")
     for section_id, expected_section in expected_sections.items():
         actual_section = actual_by_id.get(section_id)
         if not isinstance(actual_section, Mapping):
@@ -314,6 +316,12 @@ def grade_c02_artifact(actual: Mapping[str, Any], contract: Mapping[str, Any]) -
     errors: list[str] = []
     requirements: list[dict[str, str]] = []
     artifact_path = actual.get("artifact_path")
+    artifact_state_ok = (
+        actual.get("persisted") is True
+        and actual.get("rendered") is True
+        and actual.get("rendered_artifact_path") == artifact_path
+        and bool(artifact_path)
+    )
     if actual.get("persisted") is not True:
         errors.append("persistence_not_proven")
     if actual.get("rendered") is not True:
@@ -331,6 +339,10 @@ def grade_c02_artifact(actual: Mapping[str, Any], contract: Mapping[str, Any]) -
             result = grade_c02_payload(payload, contract)
             errors.extend(result["errors"])
             requirements = result["verifier_requirements"]
+    if requirements and not artifact_state_ok:
+        for requirement in requirements:
+            if requirement["id"] == "C02-06":
+                requirement["status"] = "FAIL"
     if not requirements:
         requirements = [
             {"id": requirement_id, "status": "FAIL"} for requirement_id, _name in _REQUIREMENT_NAMES

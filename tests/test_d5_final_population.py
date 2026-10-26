@@ -194,6 +194,54 @@ def test_c02_grader_rejects_metadata_and_presentation_drift() -> None:
     assert any("scale mismatch" in error for error in result["errors"])
 
 
+def test_c02_metadata_failure_does_not_fail_report_requirement() -> None:
+    """Keep metadata evidence separate from service titles and remarks."""
+    contract = _contract()
+    payload = _canonical_payload(contract)
+    payload["header"]["general_fields"][0]["value"]["value"] = "Wrong Company"
+    result = c02_grader.grade_c02_payload(payload, contract)
+    statuses = {item["id"]: item["status"] for item in result["verifier_requirements"]}
+    assert statuses["C02-01"] == "FAIL"
+    assert statuses["C02-02"] == "PASS"
+
+
+def test_c02_artifact_state_is_part_of_end_to_end_requirement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Persistence/render failures must fail C02-06 even with a valid document."""
+    contract = _contract()
+    payload = _canonical_payload(contract)
+
+    class _Document:
+        def model_dump(self, *, mode: str) -> dict[str, object]:
+            assert mode == "json"
+            return payload
+
+    monkeypatch.setattr(c02_grader, "load_authoring_document", lambda _: _Document())
+    result = c02_grader.grade_c02_artifact(
+        {
+            "artifact_path": "c02.yaml",
+            "persisted": False,
+            "rendered": True,
+            "rendered_artifact_path": "c02.yaml",
+        },
+        contract,
+    )
+    statuses = {item["id"]: item["status"] for item in result["verifier_requirements"]}
+    assert result["status"] == "FAIL"
+    assert statuses["C02-06"] == "FAIL"
+
+
+def test_c02_grader_rejects_duplicate_sections() -> None:
+    """Reject duplicate section IDs instead of collapsing them in a mapping."""
+    contract = _contract()
+    payload = _canonical_payload(contract)
+    payload["sections"].append(copy.deepcopy(payload["sections"][1]))
+    result = c02_grader.grade_c02_payload(payload, contract)
+    statuses = {item["id"]: item["status"] for item in result["verifier_requirements"]}
+    assert statuses["C02-03"] == "FAIL"
+
+
 def test_c02_requirement_failures_are_isolated() -> None:
     """Report scalar and raster defects only in their respective requirements."""
     contract = _contract()
