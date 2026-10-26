@@ -5,7 +5,7 @@
 ```yaml
 population: D5-FINAL-10
 status: FROZEN / PROVIDER-FREE
-execution_checkpoint: 5529f501e5f53fa045fa6c8a0e63e4847be7e1e8
+execution_checkpoint: d610bcc098ebae5e55a7c8e4e1677b2423c039f4
 provider_calls: 0
 model_calls: 0
 endpoint_calls: 0
@@ -35,7 +35,7 @@ The exact population binding is committed in
 `tests/fixtures/d5_final_10_turn_population.json`.
 
 ```yaml
-population_fixture_sha256: 931f030d1a5dcb6877045752b0b48813b321c185570108c50f4b601a779a5c3d
+population_fixture_sha256: 7481ad88b489f676426002f0b68abc4927cef5ed15376dd9279fbb0853aa5d54
 d4_cases_fixture_sha256: f710581831b29dcd7ab321dd91afc5dd2b4e40b729161f969f8802f3f7a84298
 d4_gold_fixture_sha256: 99ba5fc73dfd95d67c8a909cb75325a84ff1bbccc724fa524d7850f306d02968
 c02_request_fixture_sha256: f9e746ab41dc420f30f0f19a11859926a9b6e7276a1e56552d56e4752fe93579
