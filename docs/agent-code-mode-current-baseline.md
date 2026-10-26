@@ -157,6 +157,42 @@ execution path is outside the active architecture.
   mechanically equivalent pre-START qualification that preserves the same
   separation of environment, smoke, and science.
 
+### K-07 - Live execution is bound to the canonical persistent WellPlot checkout
+
+- **Status:** `SETTLED_ARCHITECTURAL_INVARIANT`
+- **Evidence:** `ADAPTED`
+- **Provenance:** independently accepted
+  `WELLPLOT-D5-CANONICAL-LIVE-RUNTIME-ADHERENCE-DESIGN-001` at exact reviewed
+  candidate `abb1d3ce76498d262f8020d54c218ed9efbb56e0`.
+- **Boundary:** credential-bearing endpoint checks, provider-backed smoke,
+  scientific/benchmark execution, local scientific assets used by those runs,
+  and durable campaign custody on the current WellPlot host.
+- **Finding:** the canonical live/evidence runtime root is
+  `/home/user/projects/well_log_os`. Disposable clones/worktrees, including
+  `/tmp/...`, are implementation/review-only and may not become a live
+  runtime, credential location, local scientific-asset authority, or durable
+  evidence root.
+- **Configuration consequence:** `config/wellplot.yaml` remains the sole
+  canonical non-secret runtime configuration; the machine-local credential
+  remains `/home/user/projects/well_log_os/LLAMA_CPP_API_KEY.txt`. Do not add
+  a second runtime-root/config/provider/engine abstraction to solve checkout
+  misuse.
+- **Pre-authority consequence:** before any new live smoke or scientific
+  authority is consumed, the exact executing shell must prove the resolved
+  working directory and Git top-level are the canonical checkout, the canonical
+  config loads, the credential exists/is readable and loads without disclosure,
+  required local assets are available/hash-qualified, the authorized artifact
+  root is durable under `workspace/evaluations`, and the non-generative
+  `/v1/models` and `/props` readiness checks succeed.
+- **Scientific consequence:** failure of this environment check is operational
+  evidence only; it does not consume C02 or create a model/scientific
+  observation.
+- **Enforcement:** governance-only enforcement is currently sufficient; no
+  product/harness guard is required absent a demonstrated enforcement gap.
+- **Reopen:** only for a genuine multi-host/runtime packaging requirement or a
+  demonstrated governance-enforcement failure, through explicit architecture
+  review.
+
 ## 4. Implementation Requirements
 
 ### R-01 - Provider-visible input sufficiency
@@ -471,6 +507,7 @@ settled architecture or authorize model comparison.
 - Current D5 causal evidence and custody:
   `docs/architecture/D5_5G_QWEN_LIVE_001_FORENSIC_ANALYSIS.md` and its JSON
   companion, plus the sealed campaign artifacts they digest.
+- Canonical live-runtime adherence authority: `docs/architecture/D5_CANONICAL_LIVE_RUNTIME_ADHERENCE_DESIGN.md` and `AGENTS.md`.
 - Current architecture and implementation contracts: `src/wellplot/agent`,
   `src/wellplot/agent/code_mode`, relevant tests, and the accepted D5 design
   records.
@@ -498,6 +535,7 @@ of current authority.
 ### Promoted
 
 - Live scientific campaigns now require an execution-environment gate and a separately authorized, independently accepted live smoke before scientific `STARTED`.
+- Live/evidence-bearing execution on the current host is bound to `/home/user/projects/well_log_os`; disposable worktrees are implementation/review-only.
 - The CM/TW/D5 findings listed in sections 3-5 are now active project
   constraints rather than archive-only observations.
 - Schema/input/grading defects must be repaired or bounded before model
@@ -515,6 +553,7 @@ of current authority.
 ### Changed
 
 - The closed `d5-5j-qwen-live-001` result is classified as `INCONCLUSIVE / HARNESS`: readiness passed, but the campaign failed before turn 1 with zero generation calls. It does not weaken D5-5J semantic acceptance and does not provide Qwen scientific evidence.
+- Canonical-checkout discipline is now an active invariant rather than deferred operational guidance; the accepted design found no current need for a mechanical harness guard.
 - Evidence strength is now explicitly separate from project knowledge status.
 - Accepted results require a Knowledge Delta and active-baseline update before
   dependent slices proceed.
@@ -524,6 +563,7 @@ of current authority.
 ### Superseded
 
 - Direct progression from readiness into an irreversible scientific `STARTED` without a separately accepted live smoke.
+- Using `/tmp`, an ephemeral clone, or another disposable worktree as the live/evidence runtime, or copying/symlinking the canonical credential there to make live execution work.
 - Treating project-level endpoint authorization as proof that the actual sandbox/LAN execution context has the required network, credential, filesystem, and runtime permissions.
 - Archive-first progression from accepted result directly to another dependent
   experiment.
@@ -539,6 +579,7 @@ of current authority.
 ### No-change findings
 
 - The single canonical engine remains authoritative.
+- `config/wellplot.yaml` remains the sole canonical non-secret runtime configuration; no second runtime-root/configuration layer is introduced.
 - Historical artifacts remain immutable.
 - No provider/model calls or source changes are part of this baseline. D5-5H
   implementation changes are accepted, while live/end-to-end qualification
@@ -547,6 +588,7 @@ of current authority.
 ### Required baseline/regression updates
 
 - Every future scientific live authority must reference an accepted smoke campaign/evidence digest for the exact executable/runtime/execution environment; otherwise `STARTED` is forbidden.
+- Before any fresh smoke/scientific authority, the executing shell must pass the canonical-runtime environment check from `/home/user/projects/well_log_os`, with zero model calls and no secret disclosure.
 - Future contract work must preserve and exercise the accepted H schema parity,
   inventory, preservation, causal-negative, and request/verifier consistency
   regressions before qualification.
