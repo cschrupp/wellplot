@@ -82,6 +82,37 @@ are environment/harness evidence, not model or scientific evidence.
 The complete gate, authority-consumption rules, and failure classification are
 defined in `docs/project-decision-protocol.md`.
 
+## Canonical Live Runtime
+
+For the current WellPlot host, live and evidence-bearing execution has one
+persistent canonical repository/runtime root:
+
+```text
+/home/user/projects/well_log_os
+```
+
+Any credential-bearing endpoint check, provider-backed smoke, scientific or
+benchmark campaign, or durable campaign-custody operation must run from that
+canonical checkout. Before consuming live authority, both the resolved working
+directory and Git top-level must identify that path.
+
+Disposable clones and worktrees, including `/tmp/...`, are implementation-
+and review-only. They must not be used for live qualification, credentials,
+local scientific assets, or durable evidence. Do not copy or symlink
+`LLAMA_CPP_API_KEY.txt` into a temporary worktree to make live execution
+work.
+
+The machine-local credential source for the current host remains
+`/home/user/projects/well_log_os/LLAMA_CPP_API_KEY.txt`; never print or commit
+its contents. Canonical non-secret provider/runtime settings remain exclusively
+in `config/wellplot.yaml`. Do not create another config layer, provider path,
+semantic engine, live-smoke harness, or evaluation-only authoring engine to
+work around execution-root problems.
+
+A temporary/secondary worktree is permitted only for a real simultaneous-
+checkout implementation or review need, and must hand off any later live work
+back to the canonical persistent checkout.
+
 ## MCP Stabilization
 
 During MCP stabilization, no runtime workaround may be added merely because a
