@@ -2,7 +2,7 @@
 
 ```yaml
 authority: WELLPLOT-D5-CANONICAL-LIVE-RUNTIME-ADHERENCE-DESIGN-001
-status: DESIGN_CANDIDATE
+status: ACCEPTED / CLOSED
 base_checkpoint: f752db35a75f8015c13ff99dc5b8d63c1deaa6f7
 provider_calls: 0
 model_calls: 0
@@ -266,18 +266,31 @@ Independent review must verify all of the following:
 - canonical live evidence remains durable below the persistent checkout;
 - the design does not authorize a new harness or scientific campaign.
 
-## 10. Next step
+## 10. Independent review and closure
 
-Run an independent review of this exact design candidate and the associated
-`AGENTS.md` change.
+Independent review of exact candidate
+`abb1d3ce76498d262f8020d54c218ed9efbb56e0` returned:
 
-If accepted:
+```text
+ACCEPTED / CLOSED
+```
 
-1. promote the invariant into the Current Active Baseline;
-2. reconcile the related backlog wording;
-3. perform the non-generative canonical-runtime environment check from
-   `/home/user/projects/well_log_os`;
-4. only after that check succeeds, decide whether a fresh smoke authority is
-   appropriate.
+The reviewer verified that the candidate was exactly two commits above
+`f752db35a75f8015c13ff99dc5b8d63c1deaa6f7`, changed only this design record
+and `AGENTS.md`, preserved the existing config/credential/provider/engine/
+population/checkpoint authorities, preserved C02 as model-unseen, and required
+the pre-authority root/credential/assets/artifact/readiness checks.
+
+The review found no concrete enforcement gap requiring a mechanical guard.
+The governance-only correction is sufficient for this slice.
+
+## 11. Post-acceptance authority
+
+The accepted finding is promoted into the Current Active Baseline as a settled
+architectural/operational invariant.
+
+The next live step is the non-generative canonical-runtime environment check
+from `/home/user/projects/well_log_os`. Only after that succeeds may a fresh
+smoke authority be considered.
 
 No scientific campaign is authorized by this document.
