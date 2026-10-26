@@ -171,6 +171,23 @@ def test_final_population_has_nine_d4_turns_then_c02() -> None:
     assert gold["cases"][-1]["grader"] == "d5_c02_contract"
 
 
+def test_final_population_rejects_execution_checkpoint_drift(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reject a population record that names a different evaluator checkpoint."""
+    original_load = final_population._load
+
+    def load_with_wrong_checkpoint(path: Path) -> dict[str, object]:
+        value = original_load(path)
+        if path == ROOT / final_population.POPULATION_PATH:
+            value["execution_checkpoint"] = "wrong-checkpoint"
+        return value
+
+    monkeypatch.setattr(final_population, "_load", load_with_wrong_checkpoint)
+    with pytest.raises(ValueError, match="execution checkpoint drifted"):
+        final_population.load_final_population(ROOT)
+
+
 def test_c02_grader_passes_the_frozen_contract_shape() -> None:
     """Grade a provider-free canonical payload against the frozen C02 contract."""
     contract = _contract()

@@ -26,7 +26,8 @@ FINAL_TURN_IDS = (
 )
 EXPECTED_C02_REQUEST_SHA256 = "f9e746ab41dc420f30f0f19a11859926a9b6e7276a1e56552d56e4752fe93579"
 EXPECTED_C02_CONTRACT_SHA256 = "26e2917178a119784328ea00ff2aefd8c5317b8177232de2fa2b733ca1d3e7e3"
-EXPECTED_POPULATION_SHA256 = "fd86d1ac20726f7277f78ff99cb284d80985e46e306e57942d9a4a5bcad0529b"
+EXPECTED_POPULATION_SHA256 = "931f030d1a5dcb6877045752b0b48813b321c185570108c50f4b601a779a5c3d"
+EXPECTED_FINAL_EXECUTION_CHECKPOINT = "5529f501e5f53fa045fa6c8a0e63e4847be7e1e8"
 
 
 def _sha256(path: Path) -> str:
@@ -45,6 +46,8 @@ def load_final_population(repo_root: Path) -> tuple[list[dict[str, Any]], dict[s
     if _sha256(repo_root / POPULATION_PATH) != EXPECTED_POPULATION_SHA256:
         raise ValueError("final population fixture identity drifted")
     population = _load(repo_root / POPULATION_PATH)
+    if population.get("execution_checkpoint") != EXPECTED_FINAL_EXECUTION_CHECKPOINT:
+        raise ValueError("final population execution checkpoint drifted")
     if tuple(population.get("turn_ids", ())) != FINAL_TURN_IDS:
         raise ValueError("D5 final population order drifted")
     if population.get("d4_cases_fixture_sha256") != d4.FROZEN_CASES_SHA256:
