@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import suppress
@@ -230,6 +231,8 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
                 metrics=SemanticMetrics(),
             )
             return _outcome_state(outcome)
+        except asyncio.CancelledError:
+            raise
         except BaseException as error:
             callback = dependencies.diagnostic_callback
             if callback is not None:

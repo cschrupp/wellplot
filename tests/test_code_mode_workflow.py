@@ -8,6 +8,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
 import pytest
+from langgraph.errors import NodeCancelledError
 
 from wellplot.agent.code_mode.enrichment import (
     EnrichedSemanticContext,
@@ -192,6 +193,14 @@ class _ExplodingSectionAdapter:
         raise RuntimeError("provider response detail must not be persisted")
 
 
+class _CancellingSectionAdapter:
+    """Propagate sibling cancellation without emitting worker failure evidence."""
+
+    async def compile(self, **_kwargs: object) -> ProgramExecutionResult:
+        """Raise the cancellation unchanged at the worker boundary."""
+        raise asyncio.CancelledError
+
+
 def _graph(
     plan: SemanticPlan,
     workers: _Workers,
@@ -316,6 +325,32 @@ def test_graph_reports_unexpected_worker_exception_before_reraising() -> None:
             "provider_call_state": "UNKNOWN",
         }
     ]
+
+
+def test_graph_propagates_cancellation_without_worker_exception_diagnostic() -> None:
+    """Sibling cancellation remains transport-level termination evidence."""
+    plan = SemanticPlan(
+        summary="section only",
+        section_tasks=(
+            SectionTask(
+                goal="first section",
+                capability_ids=("section.log_plot",),
+                existing_section_hint=None,
+            ),
+        ),
+    )
+    events: list[Mapping[str, object]] = []
+    with pytest.raises(NodeCancelledError) as error:
+        asyncio.run(
+            _graph(
+                plan,
+                _Workers(),
+                diagnostic_callback=events.append,
+                section_compiler=_CancellingSectionAdapter(),
+            ).ainvoke(_state(plan))
+        )
+    assert isinstance(error.value.__cause__, asyncio.CancelledError)
+    assert events == []
 
 
 def test_graph_plans_at_zero_and_keeps_source_summary_path_free() -> None:
