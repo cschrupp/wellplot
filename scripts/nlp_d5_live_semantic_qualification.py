@@ -1129,7 +1129,7 @@ class D5CampaignCustody:
     started: bool = False
     legacy_eager: bool = False
     require_physical_observer: bool = False
-    _primary_failure_recorded: bool = False
+    _failure_candidates: list[dict[str, Any]] = field(default_factory=list)
     _active_logical_index: int | None = None
     _active_turn_id: str | None = None
     _terminal_written: bool = False
@@ -1298,9 +1298,20 @@ class D5CampaignCustody:
 
     def record_call_aborted(self, event: Mapping[str, Any]) -> None:
         """Persist bounded termination evidence without inventing completion."""
-        secondary = self._primary_failure_recorded and event.get("termination_kind") == "cancelled"
-        if not secondary:
-            self._primary_failure_recorded = True
+        self._failure_candidates.append(
+            {
+                "failure_kind": (
+                    "cancellation"
+                    if event.get("termination_kind") == "cancelled"
+                    else "logical_abort"
+                ),
+                "index": event.get("index"),
+                "role": event.get("generation_role"),
+                "exception_type": event.get("exception_type"),
+                "exception_module": event.get("exception_module"),
+                "termination_kind": event.get("termination_kind"),
+            }
+        )
         _append_jsonl(
             self.paths.journal,
             {
@@ -1317,15 +1328,22 @@ class D5CampaignCustody:
                 "exception_module": event.get("exception_module"),
                 "status_code": event.get("status_code"),
                 "timeout": event.get("timeout"),
-                "primary_or_secondary": "secondary" if secondary else "primary",
+                "primary_or_secondary": "PROVISIONAL",
             },
         )
 
     def record_worker_diagnostic(self, event: Mapping[str, Any]) -> None:
         """Persist bounded canonical worker exception evidence."""
-        secondary = self._primary_failure_recorded
-        if not secondary:
-            self._primary_failure_recorded = True
+        self._failure_candidates.append(
+            {
+                "failure_kind": "worker_exception",
+                "index": None,
+                "role": event.get("worker_kind"),
+                "plan_order": event.get("plan_order"),
+                "exception_type": event.get("exception_type"),
+                "exception_module": event.get("exception_module"),
+            }
+        )
         _append_jsonl(
             self.paths.journal,
             {
@@ -1340,7 +1358,7 @@ class D5CampaignCustody:
                 "exception_module": event.get("exception_module"),
                 "provider_call_in_flight": event.get("provider_call_in_flight"),
                 "provider_call_state": event.get("provider_call_state"),
-                "primary_or_secondary": "secondary" if secondary else "primary",
+                "primary_or_secondary": "PROVISIONAL",
             },
         )
 
@@ -1352,9 +1370,15 @@ class D5CampaignCustody:
         completed_worker_outcomes: Sequence[Mapping[str, Any]],
     ) -> None:
         """Persist top-level exception context before terminal classification."""
-        secondary = self._primary_failure_recorded
-        if not secondary:
-            self._primary_failure_recorded = True
+        self._failure_candidates.append(
+            {
+                "failure_kind": "campaign_exception",
+                "index": self._active_logical_index,
+                "role": None,
+                "exception_type": type(error).__name__,
+                "exception_module": type(error).__module__,
+            }
+        )
         started = [call for call in self.ledger.calls if call.get("outcome") != "reserved"]
         completed = [call for call in started if call.get("outcome") in {"completed", "failed"}]
         outstanding = [
@@ -1393,7 +1417,33 @@ class D5CampaignCustody:
                 ),
                 "outstanding_logical_calls": outstanding,
                 "completed_worker_outcomes": outcomes,
-                "primary_or_secondary": "secondary" if secondary else "primary",
+                "primary_or_secondary": "PROVISIONAL",
+            },
+        )
+
+    def _record_failure_adjudication(self) -> None:
+        """Seal order-independent primary/secondary ownership for candidates."""
+        if not self._failure_candidates:
+            return
+        candidates = list(enumerate(self._failure_candidates))
+        primary_index, primary = min(
+            candidates,
+            key=lambda item: (
+                item[1].get("failure_kind") == "cancellation",
+                item[0],
+            ),
+        )
+        secondary = [candidate for index, candidate in candidates if index != primary_index]
+        _append_jsonl(
+            self.paths.journal,
+            {
+                "event": "failure_adjudication",
+                "experiment_version": D5_EXPERIMENT_VERSION,
+                "campaign_id": self.campaign_id,
+                "authorization_id": self.authorization_id,
+                "primary": primary,
+                "secondary": secondary,
+                "rule": "non_cancellation_precedes_cancellation",
             },
         )
 
@@ -1517,6 +1567,7 @@ class D5CampaignCustody:
             _atomic_json(self.paths.state, self.state, exclusive=True)
             self.paths.evidence.touch()
             self.paths.model_io.touch()
+        self._record_failure_adjudication()
         _append_jsonl(
             self.paths.journal,
             {
@@ -1869,9 +1920,20 @@ class _PhysicalAttemptObserver:
         path = str(getattr(url, "path", ""))
         if not path.endswith("/chat/completions"):
             return
-        if self.active_logical_index is None or self.callback is None:
+        logical_context = d4.current_logical_call_context()
+        if logical_context is None:
+            if self.active_logical_index is None:
+                raise D5HarnessError("generation attempt has no active logical call")
+            logical_context = {
+                "index": self.active_logical_index,
+                "generation_role": self.active_role,
+                "model": self.active_model,
+            }
+        if self.callback is None:
             raise D5HarnessError("generation attempt has no active logical call")
-        logical_index = self.active_logical_index
+        logical_index = int(logical_context["index"])
+        role = logical_context.get("generation_role")
+        model = logical_context.get("model")
         attempt = self._attempts.get(logical_index, 0) + 1
         self.callback(logical_index)
         self._attempts[logical_index] = attempt
@@ -1880,8 +1942,8 @@ class _PhysicalAttemptObserver:
             "event": "physical_request",
             "turn_id": self.active_turn_id,
             "logical_call_index": logical_index,
-            "role": self.active_role,
-            "model": self.active_model,
+            "role": role,
+            "model": model,
             "physical_attempt": attempt,
             "request_sha256": hashlib.sha256(body).hexdigest(),
             "request_body": body.decode("utf-8", errors="replace"),

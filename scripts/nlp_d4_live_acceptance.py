@@ -22,6 +22,7 @@ import urllib.error
 import urllib.request
 import uuid
 from collections.abc import Callable, Mapping, Sequence
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -79,6 +80,18 @@ FROZEN_CASES_SHA256 = "f710581831b29dcd7ab321dd91afc5dd2b4e40b729161f969f8802f3f
 FROZEN_GOLD_SHA256 = "99ba5fc73dfd95d67c8a909cb75325a84ff1bbccc724fa524d7850f306d02968"
 FROZEN_UV_LOCK_SHA256 = "0076359f8f68da82efa5e800d61ef38032fad72742340f51b78b6d8e969ff1b6"
 D5_PRODUCTION_MANIFEST_PATH = Path("docs/architecture/D5_SINGLE_ENGINE_PRODUCTION_MANIFEST.json")
+
+_ACTIVE_LOGICAL_CALL: ContextVar[dict[str, Any] | None] = ContextVar(
+    "wellplot_active_logical_call",
+    default=None,
+)
+
+
+def current_logical_call_context() -> Mapping[str, Any] | None:
+    """Return the logical generation identity for the current async task."""
+    return _ACTIVE_LOGICAL_CALL.get()
+
+
 FROZEN_PRODUCTION_COMPONENT_SHA256 = {
     str(path): digest
     for path, digest in json.loads(
@@ -478,12 +491,21 @@ class CountingBackend:
             request,
             generation_role=generation_role,
         )
+        context_token = _ACTIVE_LOGICAL_CALL.set(
+            {
+                "index": index,
+                "generation_role": generation_role,
+                "provider": self.provider,
+                "model": self.model,
+            }
+        )
         try:
             result = await self.delegate.generate_structured(
                 request,
                 response_model=response_model,
             )
         except asyncio.CancelledError as error:
+            _ACTIVE_LOGICAL_CALL.reset(context_token)
             self._record_abort(
                 index=index,
                 generation_role=generation_role,
@@ -492,6 +514,7 @@ class CountingBackend:
             )
             raise
         except ProviderRequestError as error:
+            _ACTIVE_LOGICAL_CALL.reset(context_token)
             self._record_abort(
                 index=index,
                 generation_role=generation_role,
@@ -514,6 +537,7 @@ class CountingBackend:
             )
             raise
         except Exception as error:
+            _ACTIVE_LOGICAL_CALL.reset(context_token)
             self._record_abort(
                 index=index,
                 generation_role=generation_role,
@@ -531,6 +555,7 @@ class CountingBackend:
                 diagnostic=None,
             )
             raise
+        _ACTIVE_LOGICAL_CALL.reset(context_token)
         self._record(
             index=index,
             operation="structured",

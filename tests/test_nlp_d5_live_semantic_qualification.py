@@ -1084,26 +1084,110 @@ def test_campaign_exception_custody_records_primary_context_without_message(tmp_
     assert '"outstanding_logical_calls":[{"index":1,"role":"section_worker"}]' in journal
 
 
+def test_physical_observer_correlates_interleaved_logical_calls_by_context() -> None:
+    """Overlapping backend tasks retain their own logical request identities."""
+    observer = d5._PhysicalAttemptObserver()
+    rows: list[dict[str, object]] = []
+    observer.bind_model_io(rows.append)
+    observer.callback = lambda _index: None
+    observer.set_active_turn("D4-C01:C01")
+    first_started = asyncio.Event()
+    release_first = asyncio.Event()
+
+    class _InterleavedDelegate:
+        async def generate_structured(
+            self,
+            request: d4.StructuredGenerationRequest,
+            *,
+            response_model: type[object],
+        ) -> d4.StructuredGenerationResult[object]:
+            del response_model
+            if request.user_prompt == "first":
+                first_started.set()
+                await release_first.wait()
+            else:
+                await first_started.wait()
+            request_object = SimpleNamespace(
+                url=SimpleNamespace(path="/v1/chat/completions"),
+                content=request.user_prompt.encode(),
+            )
+            await observer.on_request(request_object)
+
+            async def aread(body: bytes = b'{"ok":true}') -> bytes:
+                return body
+
+            await observer.on_response(
+                SimpleNamespace(request=request_object, status_code=200, aread=aread)
+            )
+            return d4.StructuredGenerationResult(
+                value=d4.SemanticPlan(
+                    summary=request.user_prompt,
+                    report_task={"goal": "diagnostic report"},
+                ),
+                metrics=d4.ProviderMetrics(),
+            )
+
+    backend = d4.CountingBackend(delegate=_InterleavedDelegate())
+    backend.call_started = observer.logical_call_started
+    backend.call_completed = observer.logical_call_completed
+
+    async def run() -> None:
+        first = asyncio.create_task(
+            backend.generate_structured(
+                d4.StructuredGenerationRequest(
+                    system_prompt="system",
+                    user_prompt="first",
+                    timeout_seconds=10.0,
+                    temperature=0.0,
+                ),
+                response_model=d4.SemanticPlan,
+            )
+        )
+        await first_started.wait()
+        second = asyncio.create_task(
+            backend.generate_structured(
+                d4.StructuredGenerationRequest(
+                    system_prompt="system",
+                    user_prompt="second",
+                    timeout_seconds=10.0,
+                    temperature=0.0,
+                ),
+                response_model=d4.SemanticPlan,
+            )
+        )
+        await second
+        release_first.set()
+        await first
+
+    asyncio.run(run())
+    requests = [row for row in rows if row["event"] == "physical_request"]
+    assert [(row["logical_call_index"], row["request_body"]) for row in requests] == [
+        (2, "second"),
+        (1, "first"),
+    ]
+
+
 def test_secondary_cancellation_cannot_replace_primary_worker_failure(tmp_path: Path) -> None:
-    """Sibling cancellation is explicitly secondary after a worker failure."""
-    paths = _paths(tmp_path, "secondary-cancellation")
-    custody = d5.D5CampaignCustody.prepare(
-        paths,
-        authorization=_authorization(campaign_id="secondary-cancellation"),
-        provenance=_provenance(),
-        readiness=_ready().projection,
-    )
-    custody.record_call_started(
-        {
-            "event": "logical_call_started",
-            "index": 1,
-            "generation_role": "section_worker",
-            "provider": d5.EXPECTED_PROVIDER,
-            "model": d5.EXPECTED_MODEL,
-        }
-    )
-    custody.record_worker_diagnostic(
-        {
+    """Both callback orders adjudicate worker failure over sibling cancellation."""
+    for order in ("worker-first", "cancel-first"):
+        campaign_id = f"secondary-cancellation-{order}"
+        paths = _paths(tmp_path, campaign_id)
+        custody = d5.D5CampaignCustody.prepare(
+            paths,
+            authorization=_authorization(campaign_id=campaign_id),
+            provenance=_provenance(),
+            readiness=_ready().projection,
+        )
+        custody.record_call_started(
+            {
+                "event": "logical_call_started",
+                "index": 1,
+                "generation_role": "section_worker",
+                "provider": d5.EXPECTED_PROVIDER,
+                "model": d5.EXPECTED_MODEL,
+            }
+        )
+        worker_event = {
             "worker_kind": "section",
             "plan_order": 1,
             "stage": "compile_worker",
@@ -1112,9 +1196,7 @@ def test_secondary_cancellation_cannot_replace_primary_worker_failure(tmp_path: 
             "provider_call_in_flight": None,
             "provider_call_state": "UNKNOWN",
         }
-    )
-    custody.record_call_aborted(
-        {
+        cancellation_event = {
             "index": 1,
             "generation_role": "section_worker",
             "provider": d5.EXPECTED_PROVIDER,
@@ -1125,12 +1207,40 @@ def test_secondary_cancellation_cannot_replace_primary_worker_failure(tmp_path: 
             "status_code": None,
             "timeout": False,
         }
-    )
-    events = [json.loads(line) for line in paths.journal.read_text().splitlines()]
-    diagnostics = [
-        event for event in events if event["event"] in {"worker_exception", "logical_call_aborted"}
-    ]
-    assert [event["primary_or_secondary"] for event in diagnostics] == ["primary", "secondary"]
+
+        async def emit_concurrently(
+            *,
+            current_order: str = order,
+            current_custody: d5.D5CampaignCustody = custody,
+            current_worker_event: dict[str, object] = worker_event,
+            current_cancellation_event: dict[str, object] = cancellation_event,
+        ) -> None:
+            ready = asyncio.Barrier(2)
+            worker_done = asyncio.Event()
+            cancellation_done = asyncio.Event()
+
+            async def emit_worker() -> None:
+                await ready.wait()
+                if current_order == "cancel-first":
+                    await cancellation_done.wait()
+                current_custody.record_worker_diagnostic(current_worker_event)
+                worker_done.set()
+
+            async def emit_cancellation() -> None:
+                await ready.wait()
+                if current_order == "worker-first":
+                    await worker_done.wait()
+                current_custody.record_call_aborted(current_cancellation_event)
+                cancellation_done.set()
+
+            await asyncio.gather(emit_worker(), emit_cancellation())
+
+        asyncio.run(emit_concurrently())
+        custody.finish("INCONCLUSIVE", attribution="TEST", rows=[])
+        events = [json.loads(line) for line in paths.journal.read_text().splitlines()]
+        adjudication = next(event for event in events if event["event"] == "failure_adjudication")
+        assert adjudication["primary"]["failure_kind"] == "worker_exception"
+        assert adjudication["secondary"][0]["failure_kind"] == "cancellation"
 
 
 def test_authorization_binds_campaign_across_runner_instances(tmp_path: Path) -> None:
