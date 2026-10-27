@@ -551,7 +551,16 @@ class CanonicalSectionWorker:
                     item.field for item in task.obligations if item.state.value == "SET"
                 )
                 if allowed_fields:
-                    verify_worker_correction_scope(action, corrected_action, allowed_fields)
+                    try:
+                        verify_worker_correction_scope(action, corrected_action, allowed_fields)
+                    except ValueError:
+                        return _canonical_failure(
+                            "worker_correction_scope_violation",
+                            "Section correction changed fields outside the supported "
+                            "obligation scope.",
+                            normalization="PASS",
+                            worker_obligation="FAIL",
+                        )
                 action = corrected_action
             except ValueError:
                 if attempt:
@@ -592,7 +601,16 @@ class CanonicalSectionWorker:
                     item.field for item in task.obligations if item.state.value == "SET"
                 )
                 if allowed_fields:
-                    verify_worker_correction_scope(action, corrected_action, allowed_fields)
+                    try:
+                        verify_worker_correction_scope(action, corrected_action, allowed_fields)
+                    except ValueError:
+                        return _canonical_failure(
+                            "worker_correction_scope_violation",
+                            "Section correction changed fields outside the supported "
+                            "obligation scope.",
+                            normalization="PASS",
+                            worker_obligation="FAIL",
+                        )
                 action = corrected_action
                 continue
             except Exception:

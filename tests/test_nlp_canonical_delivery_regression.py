@@ -28,6 +28,7 @@ from wellplot.agent.code_mode.enrichment import (
     ResolvedSectionContext,
     SourceContext,
 )
+from wellplot.agent.code_mode.obligations import extract_supported_obligations
 from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan
 from wellplot.agent.code_mode.semantic_actions import (
     ReconstructSectionAction,
@@ -1364,6 +1365,76 @@ def test_canonical_section_worker_updates_existing_scale() -> None:
     binding = result.intent_fragment.curve_bindings[0]
     assert binding.binding_id == "main.gr.GR"
     assert binding.scale.minimum == 10
+
+
+def test_canonical_section_worker_bounds_unauthorized_correction_scope() -> None:
+    """An invalid correction is reported without escaping as a harness exception."""
+    request = 'Add a 42 mm normal track titled "Gamma". Add a 18 mm normal track titled "Caliper".'
+    base_context = _context()
+    task = base_context.plan.section_tasks[0].model_copy(
+        update={
+            "requirements": (
+                "Track 1 (gamma): normal, 42 mm",
+                "Track 2 (cali): normal, 18 mm",
+            ),
+            "obligations": extract_supported_obligations(request),
+        }
+    )
+    context = base_context.model_copy(
+        update={"plan": base_context.plan.model_copy(update={"section_tasks": (task,)})}
+    )
+    incomplete = {
+        "action": "reconstruct",
+        "section": {
+            "source_candidate": "source-1",
+            "title": "Main",
+            "tracks": [
+                {
+                    "semantic_id": "gr",
+                    "kind": "normal",
+                    "title": "Gamma Ray",
+                    "bindings": [{"semantic_id": "gr", "channel": "GR"}],
+                }
+            ],
+        },
+    }
+    unauthorized_correction = {
+        "action": "reconstruct",
+        "section": {
+            "source_candidate": "source-1",
+            "title": "Main",
+            "tracks": [
+                {
+                    "semantic_id": "gr",
+                    "kind": "normal",
+                    "title": "Gamma Ray",
+                    "bindings": [{"semantic_id": "gr", "channel": "GR"}],
+                },
+                {
+                    "semantic_id": "cali",
+                    "kind": "normal",
+                    "title": "Caliper",
+                    "bindings": [{"semantic_id": "cali", "channel": "CALI"}],
+                },
+            ],
+        },
+    }
+    result = asyncio.run(
+        CanonicalSectionWorker(
+            backend=_StructuredFixtureBackend([incomplete, unauthorized_correction])
+        ).compile(
+            task_index=0,
+            context=context,
+            document=_document(),
+            authoritative_request=request,
+            timeout_seconds=10,
+        )
+    )
+    assert result.success is False
+    assert result.diagnostics[0].code == "worker_correction_scope_violation"
+    assert result.stage_evidence.normalization == "PASS"
+    assert result.stage_evidence.worker_obligation == "FAIL"
+    assert result.stage_evidence.semantic_lowering == "NOT_REACHED"
 
 
 def test_canonical_section_worker_creates_grounded_track_and_curve() -> None:
