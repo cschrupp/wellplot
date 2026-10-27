@@ -113,7 +113,7 @@ def _plan_payload() -> dict[str, object]:
             {
                 "goal": "Show the main CBL and VDL interpretation.",
                 "capability_ids": ("section.log_plot", "track.normal", "binding.curve"),
-                "existing_section_hint": "the existing main CBL presentation section",
+                "existing_section_hint": "Main Pass",
                 "source_hints": ("use the staged CBL DLIS",),
                 "requirements": ("Include depth and cement-bond measurements.",),
                 "constraints": ("Keep the section readable.",),
@@ -383,9 +383,7 @@ def test_planner_makes_one_static_structured_call() -> None:
         )
     )
 
-    assert result.section_tasks[0].existing_section_hint == (
-        "the existing main CBL presentation section"
-    )
+    assert result.section_tasks[0].existing_section_hint is None
     assert len(backend.requests) == 1
     assert backend.response_models == [_PlannerWirePlan]
     prompt = backend.requests[0].user_prompt
@@ -541,7 +539,7 @@ def test_planner_preserves_revise_mode_as_semantic_context() -> None:
 
     asyncio.run(
         planner.plan(
-            request="Change the CBL display.",
+            request="In the Main Pass section, change the CBL display.",
             mode="revise",
             timeout_seconds=5.0,
         )
@@ -564,7 +562,7 @@ def test_revise_plan_correction_receives_existing_section_hints() -> None:
 
     result = asyncio.run(
         planner.plan(
-            request="Change the CBL display.",
+            request="In the Main Pass section, change the CBL display.",
             mode="revise",
             current_document_summary={
                 "existing_section_hints": [{"title": "Main Pass", "subtitle": "CBL presentation"}]
@@ -573,9 +571,7 @@ def test_revise_plan_correction_receives_existing_section_hints() -> None:
         )
     )
 
-    assert result.section_tasks[0].existing_section_hint == (
-        "the existing main CBL presentation section"
-    )
+    assert result.section_tasks[0].existing_section_hint == "Main Pass"
     correction = json.loads(backend.requests[1].user_prompt.split("Correction context:\n", 1)[1])
     assert correction["diagnostic"]["code"] == "missing_existing_section_hint"
     assert correction["current_document_summary"] == {
@@ -597,7 +593,7 @@ def test_correction_rejects_out_of_scope_plan_mutation() -> None:
     with pytest.raises(PlannerSemanticFailure) as caught:
         asyncio.run(
             planner.plan(
-                request="Revise the section.",
+                request="In the Main Pass section, revise the section.",
                 mode="revise",
                 timeout_seconds=5.0,
             )
@@ -662,7 +658,9 @@ def test_planner_corrects_each_typed_semantic_error_once(kind: str) -> None:
         )
     )
 
-    assert result == SemanticPlan.model_validate(_plan_payload())
+    assert result == _attach_request_obligations(
+        SemanticPlan.model_validate(_plan_payload()), "Build the CBL quicklook."
+    )
     assert len(backend.requests) == 2
     correction_prompt = backend.requests[1].user_prompt
     assert "capabilities" in correction_prompt
@@ -847,7 +845,9 @@ def test_planner_retries_one_invalid_structured_response() -> None:
         planner.plan(request="Build the CBL quicklook.", mode="reconstruct", timeout_seconds=5.0)
     )
 
-    assert result == SemanticPlan.model_validate(_plan_payload())
+    assert result == _attach_request_obligations(
+        SemanticPlan.model_validate(_plan_payload()), "Build the CBL quicklook."
+    )
     assert len(backend.requests) == 2
     assert backend.requests[0].user_prompt == backend.requests[1].user_prompt
 
@@ -916,7 +916,9 @@ def test_planner_recovers_after_invalid_json_reason() -> None:
         planner.plan(request="Build the CBL quicklook.", mode="reconstruct", timeout_seconds=5.0)
     )
 
-    assert result == SemanticPlan.model_validate(_plan_payload())
+    assert result == _attach_request_obligations(
+        SemanticPlan.model_validate(_plan_payload()), "Build the CBL quicklook."
+    )
     assert len(backend.requests) == 2
     assert backend.requests[0].user_prompt == backend.requests[1].user_prompt
 
@@ -936,7 +938,7 @@ def test_schema_validation_uses_a_bounded_schema_correction_request() -> None:
 
     result = asyncio.run(
         planner.plan(
-            request="Build the CBL quicklook.",
+            request="In the Main Pass section, build the CBL quicklook.",
             mode="revise",
             current_document_summary={"sections": ["existing"]},
             source_summary={"sources": [{"labels": ["main pass"], "channels": []}]},
@@ -946,7 +948,10 @@ def test_schema_validation_uses_a_bounded_schema_correction_request() -> None:
         )
     )
 
-    assert result == SemanticPlan.model_validate(_plan_payload())
+    assert result == _attach_request_obligations(
+        SemanticPlan.model_validate(_plan_payload()),
+        "In the Main Pass section, build the CBL quicklook.",
+    )
     assert len(backend.requests) == 2
     initial, retry = backend.requests
     assert initial.user_prompt != retry.user_prompt
@@ -983,7 +988,7 @@ def test_schema_correction_reports_missing_work_unit_without_answer_injection() 
 
     asyncio.run(
         planner.plan(
-            request="Set Gamma Ray to linear 5-125.",
+            request="In the Main Pass section, set Gamma Ray to linear 5-125.",
             mode="revise",
             timeout_seconds=5.0,
         )
@@ -1381,7 +1386,9 @@ def test_duplicate_plan_enters_correction_without_host_normalization() -> None:
         planner.plan(request="Build a section.", mode="reconstruct", timeout_seconds=5.0)
     )
 
-    assert result == SemanticPlan.model_validate(_plan_payload())
+    assert result == _attach_request_obligations(
+        SemanticPlan.model_validate(_plan_payload()), "Build a section."
+    )
     assert len(backend.requests) == 2
     correction = json.loads(backend.requests[1].user_prompt.split("Correction context:\n", 1)[1])
     assert correction["diagnostic"]["code"] == "duplicate_capability"

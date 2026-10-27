@@ -18,7 +18,7 @@ from ..inspection import (
     ChannelInspectionSummary,
     HeaderSlotInspectionSummary,
 )
-from .obligations import ObligationKind, extract_supported_obligations
+from .obligations import ObligationKind
 from .planner import CompilationMode, SectionTask, SemanticPlan
 
 SourceFormat = Literal["las", "dlis"]
@@ -156,6 +156,7 @@ class EnrichmentErrorCode(StrEnum):
     SECTION_HINT_AMBIGUOUS = "section_hint_ambiguous"
     SECTION_TARGET_DUPLICATE = "section_target_duplicate"
     SECTION_TARGET_CARDINALITY_AMBIGUOUS = "section_target_cardinality_ambiguous"
+    SCOPE_BINDING_MISMATCH = "scope_binding_mismatch"
 
 
 class SemanticEnrichmentError(ValueError):
@@ -202,17 +203,14 @@ class SemanticEnricher:
         mode: CompilationMode = "reconstruct",
     ) -> EnrichedSemanticContext:
         """Enrich one plan without changing it or mutating the document."""
-        if request is not None:
-            target_obligations = tuple(
-                item
-                for item in extract_supported_obligations(request)
-                if item.kind is ObligationKind.TARGET_REFERENCE
+        target_obligations = tuple(
+            item for item in plan.obligations if item.kind is ObligationKind.TARGET_REFERENCE
+        )
+        if len(target_obligations) == 1 and len(plan.section_tasks) > 1:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SECTION_TARGET_CARDINALITY_AMBIGUOUS,
+                "One request target cannot authorize multiple section tasks.",
             )
-            if len(target_obligations) == 1 and len(plan.section_tasks) > 1:
-                raise SemanticEnrichmentError(
-                    EnrichmentErrorCode.SECTION_TARGET_CARDINALITY_AMBIGUOUS,
-                    "One request target cannot authorize multiple section tasks.",
-                )
         resolved_section_ids: list[str | None] = []
         warnings: list[EnrichmentWarning] = []
         for task_index, task in enumerate(plan.section_tasks):
@@ -238,6 +236,23 @@ class SemanticEnricher:
                     continue
                 raise
         _validate_unique_section_targets(resolved_section_ids)
+        for task, section_id in zip(plan.section_tasks, resolved_section_ids, strict=True):
+            scope_id = task.scope_id
+            if scope_id is None:
+                raise SemanticEnrichmentError(
+                    EnrichmentErrorCode.SCOPE_BINDING_MISMATCH,
+                    "Section task has no host-bound request scope.",
+                )
+            if scope_id.startswith("existing:") and section_id is None:
+                raise SemanticEnrichmentError(
+                    EnrichmentErrorCode.SCOPE_BINDING_MISMATCH,
+                    "Request-declared existing section did not resolve in host context.",
+                )
+            if scope_id.startswith("new:") and section_id is not None:
+                raise SemanticEnrichmentError(
+                    EnrichmentErrorCode.SCOPE_BINDING_MISMATCH,
+                    "New-section task unexpectedly resolved to an existing section.",
+                )
         roots = _normalize_roots(self.allowed_roots)
         candidates = _normalize_candidates(source_candidates, roots)
         loaded_cache: dict[tuple[Path, SourceFormat], LoadedSource] = {}

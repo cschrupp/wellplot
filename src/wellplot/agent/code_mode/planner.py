@@ -22,10 +22,13 @@ from ..providers.response_diagnostics import (
     StructuredResponseProviderError,
 )
 from .obligations import (
+    RequestCompilationResult,
+    RequestCompilationStatus,
     RequestObligation,
-    extract_supported_obligations,
-    verify_anchor_coverage,
-    verify_obligation_spans,
+    ScopeBindingResult,
+    ScopeBindingStatus,
+    ScopeDeclaration,
+    compile_request_contract,
 )
 
 CompilationMode = Literal["reconstruct", "revise"]
@@ -85,6 +88,8 @@ class SectionTask(_SemanticModel):
     requirements: tuple[str, ...] = ()
     constraints: tuple[str, ...] = ()
     obligations: tuple[RequestObligation, ...] = ()
+    requirement_refs: tuple[str, ...] = ()
+    scope_id: str | None = None
 
     model_config = ConfigDict(
         extra="forbid",
@@ -232,6 +237,8 @@ class SemanticPlan(_SemanticModel):
     section_tasks: tuple[SectionTask, ...] = ()
     unresolved_requirements: tuple[str, ...] = ()
     obligations: tuple[RequestObligation, ...] = ()
+    requirement_compilation: RequestCompilationResult | None = None
+    scope_binding: ScopeBindingResult | None = None
 
     model_config = ConfigDict(
         extra="forbid",
@@ -418,6 +425,17 @@ class SemanticPlanner:
         if not isinstance(request, str) or not request.strip():
             raise ValueError("Planning request must be a non-empty string.")
 
+        compilation = compile_request_contract(request)
+        if compilation.status in {
+            RequestCompilationStatus.CONFLICTING,
+            RequestCompilationStatus.UNRESOLVED_SUPPORTED,
+            RequestCompilationStatus.COVERAGE_FAILURE,
+        }:
+            raise PlannerSemanticFailure(
+                f"request_compilation_{compilation.status.value.casefold()}",
+                "The authoritative request could not be compiled consistently.",
+            )
+
         context = {
             "request": request,
             "mode": mode,
@@ -463,7 +481,7 @@ class SemanticPlanner:
                 response_model=_PlannerWirePlan,
             )
         plan = _canonical_plan_from_wire(generated.value)
-        plan = _attach_request_obligations(plan, request)
+        plan = _attach_compiled_requirements(plan, compilation)
         try:
             _validate_extraction_coverage(plan)
             return validate_semantic_plan(plan, self.registry, mode=mode)
@@ -489,7 +507,7 @@ class SemanticPlanner:
                 response_model=_PlannerWirePlan,
             )
             corrected_plan = _canonical_plan_from_wire(corrected.value)
-            corrected_plan = _attach_request_obligations(corrected_plan, request)
+            corrected_plan = _attach_compiled_requirements(corrected_plan, compilation)
             try:
                 _assert_correction_scope(plan, corrected_plan, first_error)
             except PlannerSemanticFailure:
@@ -504,92 +522,222 @@ class SemanticPlanner:
                 ) from second_error
 
 
-def _attach_request_obligations(plan: SemanticPlan, request: str) -> SemanticPlan:
-    """Attach host-extracted obligations without trusting provider restatement."""
-    obligations = extract_supported_obligations(request)
-    verify_obligation_spans(request, obligations)
-    verify_anchor_coverage(request, obligations)
+def _attach_compiled_requirements(
+    plan: SemanticPlan,
+    compilation: RequestCompilationResult,
+) -> SemanticPlan:
+    """Bind already compiled request facts to plan tasks without reparsing text."""
+    requirements = compilation.requirements.requirements
     report = plan.report_task
     if report is not None:
         report = report.model_copy(
             update={
                 "obligations": tuple(
-                    item for item in obligations if item.owner_kind.value == "report"
+                    item for item in requirements if item.owner_kind.value == "report"
                 )
             }
         )
-    non_report = tuple(item for item in obligations if item.owner_kind.value != "report")
-    section_count = len(plan.section_tasks)
-    sections = tuple(
-        task.model_copy(
-            update={
-                "obligations": _partition_task_obligations(
-                    task,
-                    non_report,
-                    section_count=section_count,
-                    authoritative_request=request,
-                )
-            }
+    non_report = tuple(item for item in requirements if item.owner_kind.value != "report")
+    scopes = compilation.requirements.scopes.scopes
+    if (
+        not scopes
+        and plan.section_tasks
+        and compilation.status is RequestCompilationStatus.NO_SUPPORTED_SEMANTICS
+    ):
+        raise PlannerSemanticError(
+            "unresolved_supported_scope",
+            "Section planner output has no independently declared request scope.",
         )
-        for task in plan.section_tasks
-    )
-    return plan.model_copy(
-        update={"report_task": report, "section_tasks": sections, "obligations": obligations}
-    )
+    expected_by_selector: dict[str, str] = {}
+    for declaration in scopes:
+        if declaration.selector_text is None:
+            continue
+        key = _scope_key(declaration.selector_text)
+        if key in expected_by_selector:
+            raise PlannerSemanticError(
+                "ambiguous_scope_resolution",
+                "Two request scope declarations resolve to the same section selector.",
+            )
+        expected_by_selector[key] = (
+            f"existing:{key}" if declaration.kind == "EXISTING_SECTION" else f"new:{key}"
+        )
 
+    assigned_scope_ids: list[str] = []
+    task_scope_ids: list[str] = []
+    new_scopes = [scope for scope in scopes if scope.kind == "NEW_SECTION"]
+    anonymous_new_scopes = [scope for scope in new_scopes if scope.selector_text is None]
+    for _task_index, task in enumerate(plan.section_tasks):
+        if len(scopes) == 1 and len(anonymous_new_scopes) == 1:
+            assigned = f"new:{_scope_key(anonymous_new_scopes[0].declaration_id)}"
+        elif task.existing_section_hint:
+            key = _scope_key(task.existing_section_hint)
+            assigned = expected_by_selector.get(key)
+            if assigned is None:
+                raise PlannerSemanticError(
+                    "unexpected_scope_assignment",
+                    "Planner assigned a section that was not declared by the request.",
+                )
+        else:
+            if len(scopes) == 1 and len(plan.section_tasks) == 1:
+                declaration = scopes[0]
+                assigned = (
+                    expected_by_selector.get(_scope_key(declaration.selector_text or ""))
+                    or f"new:{_scope_key(declaration.declaration_id)}"
+                )
+            elif len(anonymous_new_scopes) == 1:
+                declaration = anonymous_new_scopes[0]
+                assigned = f"new:{_scope_key(declaration.declaration_id)}"
+            else:
+                raise PlannerSemanticError(
+                    "unresolved_existing_object",
+                    "Planner section task could not be bound to one requested scope.",
+                )
+        assigned_scope_ids.append(assigned)
+        task_scope_ids.append(assigned)
 
-def _partition_task_obligations(
-    task: SectionTask,
-    obligations: tuple[RequestObligation, ...],
-    *,
-    section_count: int,
-    authoritative_request: str,
-) -> tuple[RequestObligation, ...]:
-    """Bind facts to one task without broadcasting request-wide assertions."""
-    repeated_pass_request = bool(
-        re.search(r"\bfor\s+each\s+(?:pass|section)\b", authoritative_request, re.IGNORECASE)
+    if len(set(assigned_scope_ids)) != len(assigned_scope_ids):
+        raise PlannerSemanticError(
+            "duplicate_scope_assignment",
+            "Multiple planner tasks resolve to the same requested section scope.",
+        )
+    expected_scope_ids = tuple(expected_by_selector.values()) + tuple(
+        f"new:{_scope_key(scope.declaration_id)}"
+        for scope in new_scopes
+        if scope.selector_text is None
     )
-    task_text = " ".join(
-        (
-            task.goal,
-            task.existing_section_hint or "",
-            *task.source_hints,
-            *(
-                requirement
-                for requirement in task.requirements
-                if requirement.strip().casefold() != authoritative_request.strip().casefold()
+    if set(assigned_scope_ids) != set(expected_scope_ids):
+        missing = set(expected_scope_ids) - set(assigned_scope_ids)
+        if missing:
+            raise PlannerSemanticError(
+                "missing_requested_scope",
+                "A request-declared section scope has no planner task.",
+            )
+        raise PlannerSemanticError(
+            "unexpected_scope_assignment",
+            "A planner task has no corresponding request-declared section scope.",
+        )
+
+    sections: list[SectionTask] = []
+    is_shared = bool(compilation.requirements.shared_scope_rules)
+    for task, assigned in zip(plan.section_tasks, assigned_scope_ids, strict=True):
+        selector = None if assigned.startswith("new:") else task.existing_section_hint
+        declaration_id = next(
+            (
+                scope.declaration_id
+                for scope in scopes
+                if (
+                    assigned
+                    == (
+                        f"existing:{_scope_key(scope.selector_text)}"
+                        if scope.kind == "EXISTING_SECTION" and scope.selector_text is not None
+                        else f"new:{_scope_key(scope.selector_text)}"
+                        if scope.selector_text is not None
+                        else f"new:{_scope_key(scope.declaration_id)}"
+                    )
+                )
             ),
-            *task.constraints,
+            None,
         )
-    ).casefold()
-    selected: list[RequestObligation] = []
-    for item in obligations:
-        owner = item.owner_ref.casefold()
-        value = "" if item.value is None else str(item.value).casefold()
-        if item.scope == "global" or (
-            repeated_pass_request
-            and "pass" in task_text
-            and item.owner_kind.value in {"track", "binding"}
-        ):
-            selected.append(item)
-        elif owner == "request":
-            if section_count == 1 or value in task_text:
-                selected.append(item)
-        elif owner in task_text or value in task_text:
-            selected.append(item)
-    return tuple(selected)
+        requirement_scope = {
+            _scope_key(scope.selector_text or ""): scope.declaration_id
+            for scope in scopes
+            if scope.selector_text is not None
+        }
+
+        def belongs_to_task(
+            item: RequestObligation,
+            *,
+            scope_id: str | None = declaration_id,
+            shared: bool = is_shared,
+            task_count: int = len(plan.section_tasks),
+            scope_by_requirement: Mapping[str, str] = requirement_scope,
+            declared_scopes: tuple[ScopeDeclaration, ...] = scopes,
+        ) -> bool:
+            if item.scope_key == scope_id or item.scope == "global":
+                return True
+            if shared and item.owner_kind.value in {"track", "binding", "array_track"}:
+                return item.field not in {"target", "source"}
+            if task_count == 1:
+                return True
+            if item.owner_ref != "request":
+                owner_scope = scope_by_requirement.get(_scope_key(item.owner_ref))
+                if owner_scope is not None:
+                    return owner_scope == scope_id
+            starts = [
+                (scope.provenance[0].start_byte, scope.declaration_id)
+                for scope in declared_scopes
+                if scope.provenance and scope.provenance[0].start_byte <= item.start_byte
+            ]
+            if starts:
+                return max(starts)[1] == scope_id
+            return False
+
+        relevant = tuple(item for item in non_report if belongs_to_task(item))
+        scoped = tuple(
+            item.model_copy(
+                update={
+                    "scope_key": assigned,
+                    "requirement_id": f"{item.requirement_id}.{_scope_key(assigned)}",
+                }
+            )
+            for item in relevant
+        )
+        sections.append(
+            task.model_copy(
+                update={
+                    "obligations": scoped,
+                    "requirement_refs": tuple(item.requirement_id for item in scoped),
+                    "scope_id": assigned,
+                    "existing_section_hint": selector,
+                }
+            )
+        )
+    binding = ScopeBindingResult(
+        status=ScopeBindingStatus.BINDING_COMPLETE,
+        expected_scope_ids=expected_scope_ids,
+        assigned_scope_ids=tuple(assigned_scope_ids),
+        task_scope_ids=tuple(task_scope_ids),
+    )
+    bound_requirements = tuple(
+        item for item in requirements if item.owner_kind.value == "report"
+    ) + tuple(item for task in sections for item in task.obligations)
+    return plan.model_copy(
+        update={
+            "report_task": report,
+            "section_tasks": tuple(sections),
+            "obligations": bound_requirements,
+            "requirement_compilation": compilation,
+            "scope_binding": binding,
+        }
+    )
+
+
+def _attach_request_obligations(plan: SemanticPlan, request: str) -> SemanticPlan:
+    """Compatibility helper for provider-free historical tests."""
+    return _attach_compiled_requirements(plan, compile_request_contract(request))
+
+
+def _scope_key(value: str) -> str:
+    """Normalize symbolic scope labels for exact request/task reconciliation."""
+    return "_".join(re.findall(r"[a-z0-9]+", value.casefold()))
 
 
 def _validate_extraction_coverage(plan: SemanticPlan) -> None:
-    """Reject plans that drop a supported value or its request-local owner."""
-    report_text = " ".join(
-        (
-            plan.report_task.goal if plan.report_task else "",
-            *(plan.report_task.requirements if plan.report_task else ()),
-            *(plan.report_task.constraints if plan.report_task else ()),
+    """Require exact host assignment without using planner prose as a parser."""
+    if plan.requirement_compilation is None:
+        raise PlannerSemanticError(
+            "request_compilation_missing",
+            "Canonical request requirements were not attached to the plan.",
         )
-    ).casefold()
-    for obligation in plan.obligations:
+    if plan.section_tasks and (
+        plan.scope_binding is None
+        or plan.scope_binding.status is not ScopeBindingStatus.BINDING_COMPLETE
+    ):
+        raise PlannerSemanticError(
+            "scope_binding_incomplete",
+            "Requested section scopes were not completely bound to planner tasks.",
+        )
+    for obligation in plan.requirement_compilation.requirements.requirements:
         if obligation.owner_kind.value == "report":
             if obligation not in (plan.report_task.obligations if plan.report_task else ()):
                 raise PlannerSemanticError(
@@ -597,47 +745,32 @@ def _validate_extraction_coverage(plan: SemanticPlan) -> None:
                     "Planner report ownership was missing or ambiguous.",
                     affected_paths=("/report_task/requirements",),
                 )
-            searchable = report_text
         else:
-            assigned = [task for task in plan.section_tasks if obligation in task.obligations]
-            expected_assignments = len(plan.section_tasks) if obligation.scope == "global" else 1
-            repeated_task_assignment = (
-                obligation.scope == "task"
-                and obligation.owner_kind.value in {"track", "binding"}
-                and len(assigned) > 1
-                and all(
-                    "pass"
-                    in f"{task.goal} {task.existing_section_hint or ''}".casefold()
-                    for task in assigned
+            assigned = [
+                task
+                for task in plan.section_tasks
+                if any(
+                    reference == obligation.requirement_id
+                    or reference.startswith(f"{obligation.requirement_id}.")
+                    for reference in task.requirement_refs
                 )
+            ]
+            shared_scoped_requirement = (
+                bool(plan.requirement_compilation.requirements.shared_scope_rules)
+                and obligation.owner_kind.value in {"track", "binding", "array_track"}
+                and obligation.field not in {"target", "source"}
             )
-            if len(assigned) != expected_assignments and not repeated_task_assignment:
+            expected_count = (
+                len(plan.section_tasks)
+                if obligation.scope == "global" or shared_scoped_requirement
+                else 1
+            )
+            if len(assigned) != expected_count:
                 raise PlannerSemanticError(
                     "planner_extraction_coverage",
-                    "Planner obligation ownership was missing or ambiguous.",
+                    "A compiled requirement was not assigned to its exact request scopes.",
                     affected_paths=("/section_tasks/*/requirements",),
                 )
-            task = assigned[0]
-            searchable = " ".join(
-                (
-                    task.goal,
-                    task.existing_section_hint or "",
-                    *task.source_hints,
-                    *task.requirements,
-                    *task.constraints,
-                )
-            ).casefold()
-        value = "" if obligation.value is None else str(obligation.value).casefold()
-        owner = obligation.owner_ref.casefold()
-        if owner == "request" or obligation.scope == "global":
-            continue
-        if owner in searchable and (not value or value in searchable):
-            continue
-        raise PlannerSemanticError(
-            "planner_extraction_coverage",
-            "Planner output did not retain a supported request obligation.",
-            affected_paths=("/report_task/requirements", "/section_tasks/*/requirements"),
-        )
 
 
 def validate_semantic_plan(

@@ -17,7 +17,12 @@ from wellplot.agent.code_mode.enrichment import (
     SourceCandidate,
     SourceMetadata,
 )
-from wellplot.agent.code_mode.planner import SectionTask, SemanticPlan
+from wellplot.agent.code_mode.obligations import compile_request_contract
+from wellplot.agent.code_mode.planner import (
+    SectionTask,
+    SemanticPlan,
+    _attach_compiled_requirements,
+)
 from wellplot.model.authoring import AuthoringDocumentSpec
 
 
@@ -119,7 +124,7 @@ def _plan(
     duplicate_titles: bool = False,
 ) -> SemanticPlan:
     """Build one semantic plan for enrichment tests."""
-    return SemanticPlan(
+    plan = SemanticPlan(
         summary="Prepare a section context.",
         section_tasks=(
             SectionTask(
@@ -130,6 +135,13 @@ def _plan(
             ),
         ),
     )
+    selector = " ".join(hint.split()) if hint else None
+    request = (
+        f"In {selector} section, prepare the requested source."
+        if selector
+        else "Create a section for the requested source."
+    )
+    return _attach_compiled_requirements(plan, compile_request_contract(request))
 
 
 def _candidate(
@@ -389,17 +401,7 @@ def test_equivalent_paths_are_loaded_once_and_channels_are_semantic_only(tmp_pat
     source = data / "same.dlis"
     source.write_text("source", encoding="utf-8")
     enricher, loader = _enricher(tmp_path)
-    plan = SemanticPlan(
-        summary="Prepare two source views.",
-        section_tasks=(
-            SectionTask(
-                goal="Use both explicit source labels.",
-                capability_ids=("section.log_plot",),
-                existing_section_hint=None,
-                source_hints=("first", "second"),
-            ),
-        ),
-    )
+    plan = _plan(source_hints=("first", "second"))
     candidates = (
         SourceCandidate(
             candidate_id="first",
@@ -514,8 +516,17 @@ def test_section_hint_containment_requires_one_match(tmp_path: Path) -> None:
     )
     assert contained.sections[0].section_id == "main"
 
+    advisory_plan = _plan().model_copy(
+        update={
+            "section_tasks": (
+                _plan()
+                .section_tasks[0]
+                .model_copy(update={"existing_section_hint": "Gamma ray only"}),
+            )
+        }
+    )
     unresolved = enricher.enrich(
-        plan=_plan(hint="Gamma ray only"),
+        plan=advisory_plan,
         document=_document(),
         source_candidates=(),
         mode="reconstruct",
@@ -526,7 +537,7 @@ def test_section_hint_containment_requires_one_match(tmp_path: Path) -> None:
 
     with pytest.raises(SemanticEnrichmentError) as revise_unresolved:
         enricher.enrich(
-            plan=_plan(hint="Gamma ray only"),
+            plan=advisory_plan,
             document=_document(),
             source_candidates=(),
             mode="revise",
@@ -566,12 +577,14 @@ def test_new_section_has_no_allocated_id_and_existing_channels_use_facade(tmp_pa
                 capability_ids=("section.log_plot",),
                 existing_section_hint="Main Pass",
                 source_hints=("main",),
+                scope_id="existing:main_pass",
             ),
             SectionTask(
                 goal="Prepare a new pass.",
                 capability_ids=("section.log_plot",),
                 existing_section_hint=None,
                 source_hints=("main",),
+                scope_id="new:repeat_pass",
             ),
         ),
     )

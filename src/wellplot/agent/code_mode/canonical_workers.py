@@ -27,7 +27,13 @@ from ..providers.base import (
 )
 from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
 from .enrichment import ReportContext, ResolvedSectionContext
-from .obligations import validate_report_obligations, verify_worker_correction_scope
+from .obligations import (
+    ObligationState,
+    OwnerKind,
+    RequestObligation,
+    validate_report_obligations,
+    verify_worker_correction_scope,
+)
 from .planner import ReportTask
 from .semantic_actions import SectionSemanticAction
 from .worker_contracts import CanonicalWorkerResult
@@ -233,12 +239,12 @@ class CanonicalReportWorker:
                     "Report output did not match the canonical semantic schema.",
                 )
             try:
-                response = _normalize_report_slot_groups(
+                response = _apply_compiled_report_requirements(
                     generated.value,
                     report_context,
-                    authoritative_request=authoritative_request,
-                    task_requirements=task.requirements,
+                    task.obligations,
                 )
+                response = _normalize_report_slot_groups(response, report_context)
                 if previous_response is not None and allowed_fields:
                     verify_worker_correction_scope(
                         previous_response,
@@ -473,6 +479,141 @@ def _normalize_report_slot_groups(
             "detail_fields": tuple(detail_fields),
         }
     )
+
+
+def _apply_compiled_report_requirements(
+    response: ReportSemanticResponse,
+    context: ReportContext,
+    obligations: tuple[RequestObligation, ...],
+) -> ReportSemanticResponse:
+    """Apply host-compiled report values without reparsing request or planner prose."""
+    metadata_items = [
+        item
+        for item in obligations
+        if item.owner_kind is OwnerKind.REPORT
+        and item.field == "metadata"
+        and item.state is ObligationState.SET
+    ]
+    slots = {slot.slot_id: slot for slot in context.header_slots}
+    aliases_by_slot: dict[str, set[str]] = {}
+    for slot_id, slot in slots.items():
+        aliases = {
+            _slot_alias(str(value))
+            for value in (getattr(slot, "key", None), getattr(slot, "label", None))
+            if value
+        }
+        key = getattr(slot, "key", None)
+        if key:
+            aliases.add(_slot_alias(str(key).replace("_", " ")))
+        aliases.update(
+            {
+                "country": {"state"},
+                "measured_from": {"drillingandlogdatum"},
+                "log_measured_from": {"drillingandlogdatum"},
+                "elevation_kb": {"kb"},
+                "elevation_gl": {"gl"},
+                "elevation_df": {"df"},
+                "bottom_temperature": {"maximumtemperature"},
+                "fluid_density": {"density"},
+                "top_log_interval": {"topinterval"},
+                "bottom_log_interval": {"bottominterval"},
+                "fluid_type": {"fluid"},
+                "run_number": {"run"},
+            }.get(str(key), set())
+        )
+        aliases_by_slot[slot_id] = aliases
+
+    metadata_values: dict[str, str] = {}
+    for item in metadata_items:
+        matching_slots = [
+            slot_id
+            for slot_id, aliases in aliases_by_slot.items()
+            if _slot_alias(item.owner_ref) in aliases
+        ]
+        if not matching_slots:
+            raise ValueError("Compiled report metadata does not resolve to an inspected slot.")
+        for slot_id in matching_slots:
+            metadata_values[slot_id] = str(item.value)
+
+    updates: dict[str, object] = {}
+    if metadata_values:
+        general_ids = set(context.general_slot_ids)
+        detail_ids = set(context.detail_slot_ids)
+        current_general = {item.slot_id: item for item in response.general_fields}
+        current_detail = {item.slot_id: item for item in response.detail_fields}
+        for slot_id, value in metadata_values.items():
+            target = current_general if slot_id in general_ids else current_detail
+            if slot_id in general_ids or slot_id in detail_ids:
+                target[slot_id] = ReportSlotValue(slot_id=slot_id, value=value)
+            else:
+                raise ValueError(
+                    "Compiled report metadata resolved outside an authorized slot group."
+                )
+        updates["general_fields"] = tuple(current_general.values())
+        updates["detail_fields"] = tuple(current_detail.values())
+
+    service_items = sorted(
+        (
+            item
+            for item in obligations
+            if item.owner_kind is OwnerKind.REPORT
+            and item.field == "service_title"
+            and item.state is ObligationState.SET
+        ),
+        key=lambda item: int((item.slot_key or "").rsplit(".", maxsplit=1)[-1]),
+    )
+    if service_items:
+        if len(service_items) != len(context.service_title_slot_ids):
+            raise ValueError("Compiled service-title count does not match inspected slots.")
+        updates["service_titles"] = tuple(
+            ReportSlotValue(slot_id=slot_id, value=str(item.value))
+            for slot_id, item in zip(context.service_title_slot_ids, service_items, strict=True)
+        )
+
+    remark_items = sorted(
+        (
+            item
+            for item in obligations
+            if item.owner_kind is OwnerKind.REPORT
+            and item.field == "remark"
+            and item.state is ObligationState.SET
+        ),
+        key=lambda item: item.slot_key or "",
+    )
+    if remark_items:
+        remarks: list[ReportRemark] = []
+        for index, item in enumerate(remark_items, start=1):
+            value = json.loads(str(item.value))
+            remarks.append(
+                ReportRemark(
+                    semantic_id=f"request-remark-{index}",
+                    title=value["title"],
+                    text=value["text"],
+                )
+            )
+        updates["remarks"] = tuple(remarks)
+
+    tail_items = [
+        item
+        for item in obligations
+        if item.owner_kind is OwnerKind.REPORT and item.field == "tail_enabled"
+    ]
+    if tail_items:
+        updates["tail_enabled"] = tail_items[-1].value is True
+
+    page_allowed = any(
+        item.field == "page_presentation_allowed" and item.value is True for item in obligations
+    )
+    depth_allowed = any(
+        item.field == "depth_presentation_allowed" and item.value is True for item in obligations
+    )
+    if not page_allowed:
+        updates["page_size"] = None
+        updates["page_orientation"] = None
+    if not depth_allowed:
+        updates["depth_unit"] = None
+        updates["depth_scale"] = None
+    return response.model_copy(update=updates) if updates else response
 
 
 def _apply_explicit_report_request(

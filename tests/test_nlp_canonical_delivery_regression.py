@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import inspect
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from scripts import nlp_d4_live_acceptance as d4
@@ -17,6 +20,7 @@ from wellplot.agent.code_mode import typed_section_worker as section_worker
 from wellplot.agent.code_mode.canonical_workers import (
     CanonicalReportWorker,
     ReportSemanticResponse,
+    _apply_compiled_report_requirements,
     _normalize_report_slot_groups,
 )
 from wellplot.agent.code_mode.enrichment import (
@@ -28,8 +32,22 @@ from wellplot.agent.code_mode.enrichment import (
     ResolvedSectionContext,
     SourceContext,
 )
-from wellplot.agent.code_mode.obligations import extract_supported_obligations
-from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan
+from wellplot.agent.code_mode.obligations import (
+    compile_request_contract,
+    extract_supported_obligations,
+    validate_section_obligations,
+    verify_document_obligations,
+)
+from wellplot.agent.code_mode.planner import (
+    ReportTask,
+    SectionTask,
+    SemanticPlan,
+    _attach_compiled_requirements,
+    _canonical_plan_from_wire,
+    _PlannerWirePlan,
+    _PlannerWireSectionTask,
+    _validate_extraction_coverage,
+)
 from wellplot.agent.code_mode.semantic_actions import (
     ReconstructSectionAction,
     SemanticActionError,
@@ -38,6 +56,7 @@ from wellplot.agent.code_mode.typed_section_worker import (
     CanonicalSectionWorker,
     _normalize_reconstruct_request_semantics,
     _normalize_reconstruct_track_dimensions,
+    apply_compiled_requirements,
 )
 from wellplot.agent.providers.base import (
     ProviderMetrics,
@@ -114,6 +133,7 @@ def _context() -> EnrichedSemanticContext:
             ChannelContext(mnemonic="CALI", kind="scalar", unit="in"),
         ),
     )
+
     resolved = ResolvedSectionContext(
         task_index=0,
         section_id="main",
@@ -146,6 +166,16 @@ def _context() -> EnrichedSemanticContext:
     )
 
 
+def _context_for_request(request: str) -> EnrichedSemanticContext:
+    """Attach one compiled request contract to the canonical worker fixture."""
+    base = _context()
+    plan = _attach_compiled_requirements(
+        base.plan.model_copy(update={"section_tasks": (base.plan.section_tasks[0],)}),
+        compile_request_contract(request),
+    )
+    return base.model_copy(update={"plan": plan})
+
+
 def _run_section(response: dict[str, object]) -> object:
     """Compile one response through the canonical section worker."""
     backend = _StructuredFixtureBackend([response])
@@ -176,7 +206,7 @@ def test_canonical_report_worker_owns_report_title_only() -> None:
             timeout_seconds=10,
         )
     )
-    assert result.success is True
+    assert result.success is True, result.diagnostics
     assert result.intent_fragment is not None
     assert result.intent_fragment.title == "Gamma Ray Quality Control Review"
     assert "empty header-slot inventory does not prevent" in backend.requests[0].user_prompt
@@ -432,12 +462,23 @@ def test_canonical_report_worker_retries_unknown_slot_response() -> None:
             timeout_seconds=10,
         )
     )
-    assert result.success is True
+    assert result.success is True, result.diagnostics
     assert len(backend.requests) == 2
 
 
 def test_canonical_report_worker_prefers_explicit_planner_slot_values() -> None:
-    """Use planner-owned report clauses instead of ambiguous model synonyms."""
+    """Compiled report facts replace conflicting values in valid inspected slots."""
+    authoritative_request = (
+        "Set the report metadata to:\n"
+        "Company: University of Utah; State: Utah; Logged Depth: TD Not Tag\n\n"
+        "Use these service titles, in order:\n"
+        '"Cement Bond Log"'
+    )
+    compilation = compile_request_contract(authoritative_request)
+    assert compilation.status.value == "EXTRACTION_COMPLETE"
+    report_obligations = tuple(
+        item for item in compilation.requirements.requirements if item.owner_kind.value == "report"
+    )
     report_context = ReportContext(
         header_slots=(
             HeaderSlotInspectionSummary(slot_id="general.company", key="company", label="Company"),
@@ -457,7 +498,7 @@ def test_canonical_report_worker_prefers_explicit_planner_slot_values() -> None:
         [
             {
                 "general_fields": [
-                    {"slot_id": "general.location", "value": "wrong slot"},
+                    {"slot_id": "general.company", "value": "wrong value"},
                 ],
                 "detail_fields": [
                     {"slot_id": "detail.logged_depth", "value": "wrong value"},
@@ -476,10 +517,11 @@ def test_canonical_report_worker_prefers_explicit_planner_slot_values() -> None:
                     "Logged depth: TD Not Tag",
                     "Service titles: Cement Bond Log",
                 ),
+                obligations=report_obligations,
             ),
             report_context=report_context,
             document=_document(),
-            authoritative_request="Set report metadata.",
+            authoritative_request=authoritative_request,
             timeout_seconds=10,
         )
     )
@@ -508,6 +550,14 @@ def test_canonical_report_worker_preserves_depth_for_section_track_requests() ->
         ),
         general_slot_ids=("general.company",),
     )
+    authoritative_request = (
+        "Set the report metadata to:\nCompany: FORGE\n\n"
+        "For each pass, use a depth = reference track."
+    )
+    compilation = compile_request_contract(authoritative_request)
+    report_obligations = tuple(
+        item for item in compilation.requirements.requirements if item.owner_kind.value == "report"
+    )
     backend = _StructuredFixtureBackend(
         [
             {
@@ -522,13 +572,11 @@ def test_canonical_report_worker_preserves_depth_for_section_track_requests() ->
                 goal="Reconstruct a section with a depth reference track.",
                 capability_ids=("report.standard",),
                 requirements=("Set the report metadata to: Company: FORGE; On depth: reference.",),
+                obligations=report_obligations,
             ),
             report_context=report_context,
             document=_document(),
-            authoritative_request=(
-                "Set the report metadata to: Company: FORGE;\n"
-                "For each pass, use a depth = reference track."
-            ),
+            authoritative_request=authoritative_request,
             timeout_seconds=10,
         )
     )
@@ -538,7 +586,17 @@ def test_canonical_report_worker_preserves_depth_for_section_track_requests() ->
 
 
 def test_canonical_report_worker_merges_planner_metadata_with_raw_request() -> None:
-    """Use normalized planner clauses when the scientist request omits colons."""
+    """Compiled metadata is applied without downstream prose parsing."""
+    authoritative_request = (
+        "Set the report metadata to:\n"
+        "Company: University of Utah; State: Utah\n\n"
+        "For each pass, use the requested tracks."
+    )
+    compilation = compile_request_contract(authoritative_request)
+    assert compilation.status.value == "EXTRACTION_COMPLETE"
+    report_obligations = tuple(
+        item for item in compilation.requirements.requirements if item.owner_kind.value == "report"
+    )
     report_context = ReportContext(
         header_slots=(
             HeaderSlotInspectionSummary(
@@ -564,14 +622,11 @@ def test_canonical_report_worker_merges_planner_metadata_with_raw_request() -> N
                     "Company: University of Utah",
                     "State: Utah",
                 ),
+                obligations=report_obligations,
             ),
             report_context=report_context,
             document=_document(),
-            authoritative_request=(
-                "Set the report metadata to:\n"
-                "Company University of Utah; state Utah.\n"
-                "For each pass, use the requested tracks."
-            ),
+            authoritative_request=authoritative_request,
             timeout_seconds=10,
         )
     )
@@ -589,6 +644,19 @@ def test_canonical_report_worker_merges_planner_metadata_with_raw_request() -> N
 
 def test_canonical_report_worker_uses_generic_labeled_report_requirements() -> None:
     """Paraphrased report instructions preserve a renamed remark verbatim."""
+    authoritative_request = (
+        "Set the report metadata to:\n"
+        "Company: North Star Labs\n\n"
+        "Use these service titles, in order:\n"
+        '"Cement Review"\n\n'
+        "Include the remarks:\n"
+        "1. Scope Boundary — Preserve this exact sentence, including punctuation."
+    )
+    compilation = compile_request_contract(authoritative_request)
+    assert compilation.status.value == "EXTRACTION_COMPLETE"
+    report_obligations = tuple(
+        item for item in compilation.requirements.requirements if item.owner_kind.value == "report"
+    )
     report_context = ReportContext(
         header_slots=(
             HeaderSlotInspectionSummary(
@@ -613,15 +681,11 @@ def test_canonical_report_worker_uses_generic_labeled_report_requirements() -> N
                     "Remark 1: Scope Boundary — Preserve this exact sentence, "
                     "including punctuation.",
                 ),
+                obligations=report_obligations,
             ),
             report_context=report_context,
             document=_document(),
-            authoritative_request=(
-                "Please record the labeled details below.\n"
-                "Company: North Star Labs\n"
-                "Service titles: Cement Review\n"
-                "Remark 1: Scope Boundary — Preserve this exact sentence, including punctuation."
-            ),
+            authoritative_request=authoritative_request,
             timeout_seconds=10,
         )
     )
@@ -635,8 +699,8 @@ def test_canonical_report_worker_uses_generic_labeled_report_requirements() -> N
     )
 
 
-def test_cbl_captured_report_prose_is_normalized_from_authoritative_request() -> None:
-    """Captured CBL report output is corrected by request-owned prose semantics."""
+def test_cbl_captured_report_uses_compiled_request_requirements() -> None:
+    """Captured CBL report semantics are applied from the compiled contract."""
     request = next(
         case["request"] for case in d4.load_cases(REPO_ROOT) if case["turn_id"] == "D4-C01:C01"
     )
@@ -649,6 +713,7 @@ def test_cbl_captured_report_prose_is_normalized_from_authoritative_request() ->
         ("well", "Well"),
         ("field", "Field"),
         ("county", "County"),
+        ("location", "Location"),
         ("country", "Country"),
         ("section", "Section"),
         ("township", "Township"),
@@ -694,11 +759,17 @@ def test_cbl_captured_report_prose_is_normalized_from_authoritative_request() ->
         detail_slot_ids=tuple(slot_id for slot_id, _, _ in details),
     )
 
-    normalized = _normalize_report_slot_groups(
+    compilation = compile_request_contract(request)
+    assert compilation.status.value == "EXTRACTION_COMPLETE"
+    report_obligations = tuple(
+        item for item in compilation.requirements.requirements if item.owner_kind.value == "report"
+    )
+    normalized = _apply_compiled_report_requirements(
         response,
         context,
-        authoritative_request=request,
+        report_obligations,
     )
+    normalized = _normalize_report_slot_groups(normalized, context)
 
     values = {field.slot_id: field.value for field in normalized.general_fields}
     assert values["general.company"] == "University of Utah"
@@ -720,51 +791,281 @@ def test_cbl_captured_report_prose_is_normalized_from_authoritative_request() ->
     assert normalized.tail_enabled is True
 
 
-def test_cbl_captured_section_output_is_normalized_from_authoritative_request() -> None:
-    """Captured Qwen section output uses request-owned presentation semantics."""
+def _compiled_cbl_capture() -> tuple[object, ...]:
+    """Compile D4-C01 and apply its host-owned requirements to captured sections."""
     request = next(
         case["request"] for case in d4.load_cases(REPO_ROOT) if case["turn_id"] == "D4-C01:C01"
     )
     captured = json.loads(
         (REPO_ROOT / "tests/fixtures/d5_5j_qwen_smoke_003_report_sections.json").read_text()
     )
-    for section_payload, section_hint in zip(
-        captured["sections"], ("Main Pass", "Repeat Pass"), strict=True
-    ):
-        action = ReconstructSectionAction.model_validate(section_payload)
-        task = SectionTask(
-            goal=f"Configure the captured CBL {section_hint.lower()}.",
-            capability_ids=(
-                "section.log_plot",
-                "track.normal",
-                "track.reference",
-                "track.array",
-                "binding.curve",
-                "binding.raster",
+    section_hints = ("Main Pass", "Repeat Pass")
+    plan = _attach_compiled_requirements(
+        SemanticPlan(
+            summary="Configure both CBL passes.",
+            report_task=ReportTask(
+                goal="Populate report metadata and remarks.",
+                capability_ids=("report.standard",),
             ),
-            existing_section_hint=section_hint,
-            requirements=(),
+            section_tasks=tuple(
+                SectionTask(
+                    goal=f"Configure the CBL {section_hint.lower()}.",
+                    capability_ids=(
+                        "section.log_plot",
+                        "track.normal",
+                        "track.reference",
+                        "track.array",
+                        "binding.curve",
+                        "binding.raster",
+                    ),
+                    existing_section_hint=section_hint,
+                    requirements=(),
+                )
+                for section_hint in section_hints
+            ),
+        ),
+        compile_request_contract(request),
+    )
+    actions = []
+    for section_payload, section_hint in zip(captured["sections"], section_hints, strict=True):
+        action = ReconstructSectionAction.model_validate(section_payload)
+        section_task = next(
+            bound_task
+            for bound_task in plan.section_tasks
+            if bound_task.existing_section_hint == section_hint
         )
-        normalized = _normalize_reconstruct_track_dimensions(
-            action,
-            task,
-            authoritative_request=request,
-        )
-        normalized = _normalize_reconstruct_request_semantics(
+        normalized = apply_compiled_requirements(action, section_task.obligations)
+        validate_section_obligations(
             normalized,
-            task=task,
-            authoritative_request=request,
+            section_task.obligations,
+            section_title=section_task.existing_section_hint,
         )
-        tracks = normalized.section.tracks
+        actions.append(normalized)
+    return plan.requirement_compilation, plan, tuple(actions)
+
+
+_CBL_MIGRATION_CASES = (
+    ("C01", "combo", "kind", "normal", None),
+    ("C02", "combo", "width_mm", 50.0, None),
+    ("C03", "combo", "channel", "ECGR_STGC", "combo.binding.1"),
+    ("C04", "combo", "label", "Gamma Ray (ECGR_STGC) QTGC-B", "combo.binding.1"),
+    ("C05", "combo", "scale_kind", "linear", "combo.binding.1"),
+    ("C06", "combo", "scale_minimum", 0.0, "combo.binding.1"),
+    ("C07", "combo", "scale_maximum", 150.0, "combo.binding.1"),
+    ("C08", "combo", "scale_reverse", True, "combo.binding.2"),
+    ("C09", "combo", "color", "#16a34a", "combo.binding.1"),
+    ("C10", "combo", "line_width", 0.8, "combo.binding.1"),
+    ("C11", "combo", "line_style", "dashed", "combo.binding.3"),
+    ("C12", "cbl", "label", "CBL Amplitude (CBL) QSLT-B", "cbl.binding.2"),
+    ("C13", "vdl", "track_scale_kind", "linear", None),
+    ("C14", "vdl", "track_scale_minimum", 200.0, None),
+    ("C15", "vdl", "track_scale_maximum", 1200.0, None),
+    ("C16", "vdl", "vertical_main_visible", False, None),
+    ("C17", "vdl", "vertical_secondary_visible", False, None),
+    ("C18", "vdl", "label", "VDL VariableDensity (VDL) QSLT-B", "vdl.binding.raster"),
+    ("C19", "vdl", "raster_profile", "vdl", "vdl.binding.raster"),
+    ("C20", "vdl", "raster_colormap", "gray_r", "vdl.binding.raster"),
+    ("C21", "vdl", "colorbar_enabled", True, "vdl.binding.raster"),
+    ("C22", "vdl", "sample_axis_source_step", 10.0, "vdl.binding.raster"),
+)
+
+
+def _compiled_value(action: ReconstructSectionAction, case: tuple[object, ...]) -> object:
+    """Read one migration-matrix value from its identity-bound canonical owner."""
+    _case_id, owner, field, _expected, slot_key = case
+    track = next(
+        item
+        for item in action.section.tracks
+        if str(owner).casefold() in item.semantic_id.casefold()
+    )
+    if field == "kind":
+        return track.kind
+    if field == "width_mm":
+        return track.width_mm
+    if field.startswith("track_scale_"):
+        name = field.removeprefix("track_scale_")
+        return getattr(track.x_scale, name)
+    if field in {"vertical_main_visible", "vertical_secondary_visible"}:
+        return getattr(track.grid, field)
+
+    if slot_key.endswith(".binding.raster"):
+        binding = next(item for item in track.bindings if item.profile is not None)
+    else:
+        index = int(slot_key.rsplit(".", maxsplit=1)[1]) - 1
+        binding = track.bindings[index]
+    if field == "channel" or field == "label":
+        return getattr(binding, field)
+    if field.startswith("scale_"):
+        return getattr(binding.scale, field.removeprefix("scale_"))
+    if field in {"color", "line_width", "line_style"}:
+        return getattr(binding.style, field)
+    if field == "raster_profile":
+        return binding.profile
+    if field == "raster_colormap":
+        return binding.colormap
+    if field.startswith("colorbar_"):
+        return getattr(binding, field)
+    if field.startswith("sample_axis_"):
+        return getattr(binding.sample_axis, field.removeprefix("sample_axis_"))
+    raise AssertionError(f"Unsupported matrix field: {field}")
+
+
+@pytest.mark.parametrize("case", _CBL_MIGRATION_CASES, ids=lambda case: case[0])
+def test_compilation_matrix_c01_c22_has_independent_provenance(case: tuple[object, ...]) -> None:
+    """Every Rev 2 compilation row is value-bearing and independently anchored."""
+    compilation, plan, _actions = _compiled_cbl_capture()
+    assert compilation.status.value == "EXTRACTION_COMPLETE"
+    _validate_extraction_coverage(plan)
+    _owner, owner, field, expected, slot_key = case
+    assert any(
+        item.owner_ref == owner
+        and item.field == field
+        and item.value == expected
+        and item.slot_key == slot_key
+        and item.provenance
+        for item in compilation.requirements.requirements
+    )
+
+
+@pytest.mark.parametrize("case", _CBL_MIGRATION_CASES, ids=lambda case: f"M{case[0][1:]}")
+def test_migration_matrix_m01_m22_applies_to_identity_bound_capture(
+    case: tuple[object, ...],
+) -> None:
+    """Every Rev 3 migration row is applied to its canonical captured owner."""
+    _compilation, _plan, actions = _compiled_cbl_capture()
+    for action in actions:
+        assert _compiled_value(action, case) == case[3]
+
+
+def test_cbl_captured_section_output_uses_compiled_request_semantics() -> None:
+    """Captured Main and Repeat sections pass the compiled requirement contract."""
+    compilation, plan, actions = _compiled_cbl_capture()
+    assert compilation.status.value == "EXTRACTION_COMPLETE"
+    assert len(plan.scope_binding.expected_scope_ids) == 2
+    assert len(actions) == 2
+    for action in actions:
+        tracks = action.section.tracks
         assert [track.width_mm for track in tracks] == [50.0, 10.0, 44.0, 48.0]
         assert tracks[0].bindings[0].label == "Gamma Ray (ECGR_STGC) QTGC-B"
+        assert tracks[0].bindings[1].scale.reverse is True
+        assert tracks[0].bindings[2].style.line_style == "dashed"
+        assert tracks[2].bindings[0].style.color == "#111111"
+        assert tracks[2].bindings[1].style.line_style == "dashed"
         assert tracks[3].bindings[0].label == "VDL VariableDensity (VDL) QSLT-B"
         assert tracks[3].bindings[0].profile == "vdl"
         assert tracks[3].bindings[0].colorbar_position == "header"
+        assert tracks[3].bindings[0].sample_axis.unit == "us"
+        assert tracks[3].bindings[0].sample_axis.minimum == 200
+        assert tracks[3].bindings[0].sample_axis.maximum == 1200
+        assert tracks[3].bindings[0].sample_axis.tick_count == 7
         assert tracks[3].bindings[0].sample_axis.source_origin == 40
         assert tracks[3].bindings[0].sample_axis.source_step == 10
         assert tracks[3].grid.vertical_main_visible is False
         assert tracks[3].grid.vertical_secondary_visible is False
+
+
+def test_post_lowering_verification_uses_repeated_binding_slot_identity() -> None:
+    """Two same-channel CBL curves are checked against their ordered request slots."""
+    _compilation, plan, _actions = _compiled_cbl_capture()
+    main_task = next(
+        task for task in plan.section_tasks if task.existing_section_hint == "Main Pass"
+    )
+    obligations = tuple(
+        item
+        for item in main_task.obligations
+        if item.slot_key in {"cbl.binding.1", "cbl.binding.2"}
+        and item.field in {"scale_kind", "scale_minimum", "scale_maximum"}
+    )
+
+    def document(first_maximum: float, second_maximum: float) -> SimpleNamespace:
+        return SimpleNamespace(
+            model_dump=lambda mode: {
+                "sections": [
+                    {
+                        "id": "main_pass",
+                        "tracks": [
+                            {
+                                "id": "cbl",
+                                "bindings": [
+                                    {
+                                        "binding_id": "cbl-one",
+                                        "channel": "CBL",
+                                        "scale": {
+                                            "kind": "linear",
+                                            "minimum": 0.0,
+                                            "maximum": first_maximum,
+                                        },
+                                    },
+                                    {
+                                        "binding_id": "cbl-two",
+                                        "channel": "CBL",
+                                        "scale": {
+                                            "kind": "linear",
+                                            "minimum": 0.0,
+                                            "maximum": second_maximum,
+                                        },
+                                    },
+                                ],
+                            }
+                        ],
+                    }
+                ]
+            }
+        )
+
+    verify_document_obligations(document(100.0, 10.0), obligations)
+    with pytest.raises(ValueError, match="scale_maximum"):
+        verify_document_obligations(document(10.0, 100.0), obligations)
+
+
+def test_authority_f_planner_phrase_is_not_a_compiled_track_identity() -> None:
+    """Captured planner prose cannot become authoritative semantic identity."""
+    request = next(
+        case["request"] for case in d4.load_cases(REPO_ROOT) if case["turn_id"] == "D4-C01:C01"
+    )
+    captured_plan = json.loads(
+        (REPO_ROOT / "tests/fixtures/authority_f_captured_planner_task.json").read_text()
+    )
+    phrase = "Create track 'combo' (normal, 50 mm) with"
+    assert phrase in captured_plan["section_tasks"][0]["requirements"][0]
+
+    plan = _attach_compiled_requirements(
+        _canonical_plan_from_wire(_PlannerWirePlan.model_validate(captured_plan)),
+        compile_request_contract(request),
+    )
+    assert plan.requirement_compilation is not None
+    assert plan.requirement_compilation.status.value == "EXTRACTION_COMPLETE"
+
+    for task in plan.section_tasks:
+        assert phrase not in {item.owner_ref for item in task.obligations}
+        assert any(item.owner_ref == "combo" for item in task.obligations)
+
+    captured_sections = json.loads(
+        (REPO_ROOT / "tests/fixtures/d5_5j_qwen_smoke_003_report_sections.json").read_text()
+    )["sections"]
+    for section_payload, task in zip(captured_sections, plan.section_tasks, strict=True):
+        action = ReconstructSectionAction.model_validate(section_payload)
+        compiled = apply_compiled_requirements(action, task.obligations)
+        validate_section_obligations(
+            compiled,
+            task.obligations,
+            section_title=task.existing_section_hint,
+        )
+
+
+def test_compiled_worker_path_cannot_reenter_legacy_request_parsers() -> None:
+    """Static boundary check keeps authoritative parsing before worker execution."""
+    worker_body = inspect.getsource(CanonicalSectionWorker.compile)
+    assert "apply_compiled_requirements" in worker_body
+    assert "_normalize_reconstruct_track_dimensions" not in worker_body
+    assert "_normalize_reconstruct_request_semantics" not in worker_body
+    assert "_normalize_track_request_semantics" not in worker_body
+    assert "_normalize_curve_request_semantics" not in worker_body
+    assert "extract_supported_obligations" not in worker_body
+    assert "compile_request_contract" not in worker_body
+
+    wire_fields = set(_PlannerWireSectionTask.model_fields)
+    assert not {"obligations", "requirement_refs", "scope_id"} & wire_fields
 
 
 def test_shared_cbl_label_is_restored_when_generated_labels_are_missing() -> None:
@@ -971,8 +1272,8 @@ def test_cbl_dimension_forms_and_task_title_are_normalized_by_host() -> None:
     }
 
 
-def test_canonical_section_worker_marks_normalization_failure_separately() -> None:
-    """A host normalization failure is not reported as worker-obligation failure."""
+def test_canonical_section_worker_ignores_uncompiled_planner_dimension_prose() -> None:
+    """Planner task prose does not become downstream semantic authority."""
     base_context = _context()
     task = base_context.plan.section_tasks[0].model_copy(
         update={"requirements": ("Track 1 (gamma): reference, 42 mm",)}
@@ -984,13 +1285,31 @@ def test_canonical_section_worker_marks_normalization_failure_separately() -> No
         "action": "reconstruct",
         "section": {
             "source_candidate": "source-1",
-            "title": "Main",
+            "title": "Main Log",
             "tracks": [
                 {
                     "semantic_id": "gamma",
                     "kind": "normal",
                     "title": "Gamma Ray",
-                    "bindings": [{"semantic_id": "gr", "channel": "GR"}],
+                    "width_mm": 30,
+                    "bindings": [
+                        {
+                            "semantic_id": "gr",
+                            "channel": "GR",
+                            "label": "Gamma Ray",
+                            "scale": {
+                                "kind": "linear",
+                                "minimum": 0,
+                                "maximum": 150,
+                                "reverse": False,
+                            },
+                            "style": {
+                                "color": "#111111",
+                                "line_width": 1,
+                                "line_style": "solid",
+                            },
+                        }
+                    ],
                 }
             ],
         },
@@ -1005,27 +1324,44 @@ def test_canonical_section_worker_marks_normalization_failure_separately() -> No
             timeout_seconds=10,
         )
     )
-    assert result.success is False
-    assert result.stage_evidence.normalization == "FAIL"
-    assert result.stage_evidence.worker_obligation == "NOT_REACHED"
+    assert result.success is True
+    assert result.stage_evidence.normalization == "PASS"
 
 
 def test_canonical_section_worker_marks_obligation_failure_separately(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An obligation failure records normalization success and obligation failure."""
-    context = _context()
+    request = "Track gamma: normal, width 30 mm."
     response = {
         "action": "reconstruct",
         "section": {
             "source_candidate": "source-1",
-            "title": "Main",
+            "title": "Main Log",
             "tracks": [
                 {
-                    "semantic_id": "gr",
+                    "semantic_id": "gamma",
                     "kind": "normal",
                     "title": "Gamma Ray",
-                    "bindings": [{"semantic_id": "gr", "channel": "GR"}],
+                    "width_mm": 30,
+                    "bindings": [
+                        {
+                            "semantic_id": "gr",
+                            "channel": "GR",
+                            "label": "Gamma Ray",
+                            "scale": {
+                                "kind": "linear",
+                                "minimum": 0,
+                                "maximum": 150,
+                                "reverse": False,
+                            },
+                            "style": {
+                                "color": "#111111",
+                                "line_width": 1,
+                                "line_style": "solid",
+                            },
+                        }
+                    ],
                 }
             ],
         },
@@ -1040,12 +1376,13 @@ def test_canonical_section_worker_marks_obligation_failure_separately(
         "validate_section_obligations",
         raise_obligation_failure,
     )
+    context = _context_for_request(request)
     result = asyncio.run(
         CanonicalSectionWorker(backend=_StructuredFixtureBackend([response, response])).compile(
             task_index=0,
             context=context,
             document=_document(),
-            authoritative_request="Build the requested track.",
+            authoritative_request=request,
             timeout_seconds=10,
         )
     )
@@ -1284,17 +1621,15 @@ def test_canonical_section_worker_exposes_source_labels_without_paths() -> None:
 
 
 def test_canonical_section_worker_retries_incomplete_reconstruction() -> None:
-    """Request one bounded correction when explicit reconstruction content is omitted."""
+    """One missing ordered binding is repaired under its exact compiled slot."""
     base_context = _context()
+    request = (
+        "In the Main Log section.\nOn gamma: "
+        "GR -> Gamma Ray, linear 0..150, #111111, width 1; "
+        "CALI -> Caliper, linear 0..20, #111111, width 1."
+    )
     task = base_context.plan.section_tasks[0].model_copy(
-        update={
-            "requirements": (
-                "Track 1: GR -> Gamma Ray.",
-                "Track 2: CALI -> Caliper.",
-                "Track 1 (gamma): normal, 42 mm",
-                "Track 2 (cali): normal, 18 mm",
-            )
-        }
+        update={"obligations": extract_supported_obligations(request)}
     )
     context = base_context.model_copy(
         update={"plan": base_context.plan.model_copy(update={"section_tasks": (task,)})}
@@ -1318,37 +1653,72 @@ def test_canonical_section_worker_retries_incomplete_reconstruction() -> None:
         "action": "reconstruct",
         "section": {
             "source_candidate": "source-1",
-            "title": "Main",
+            "title": "Main Log",
             "tracks": [
                 {
                     "semantic_id": "gr",
                     "kind": "normal",
                     "title": "Gamma Ray",
-                    "bindings": [{"semantic_id": "gr", "channel": "GR"}],
-                },
-                {
-                    "semantic_id": "cali",
-                    "kind": "normal",
-                    "title": "Caliper",
-                    "bindings": [{"semantic_id": "cali", "channel": "CALI"}],
+                    "bindings": [
+                        {
+                            "semantic_id": "gr",
+                            "channel": "GR",
+                            "label": "Gamma Ray",
+                            "scale": {
+                                "kind": "linear",
+                                "minimum": 0,
+                                "maximum": 150,
+                                "reverse": False,
+                            },
+                            "style": {
+                                "color": "#111111",
+                                "line_width": 1,
+                                "line_style": "solid",
+                            },
+                        }
+                    ],
                 },
             ],
         },
     }
+    complete["section"]["tracks"][0]["bindings"].append(
+        {
+            "semantic_id": "cali",
+            "channel": "CALI",
+            "label": "Caliper",
+            "scale": {"kind": "linear", "minimum": 0, "maximum": 20, "reverse": False},
+            "style": {"color": "#111111", "line_width": 1, "line_style": "solid"},
+        }
+    )
     backend = _StructuredFixtureBackend([incomplete, complete])
     result = asyncio.run(
         CanonicalSectionWorker(backend=backend).compile(
             task_index=0,
             context=context,
             document=_document(),
-            authoritative_request="Build both requested tracks.",
+            authoritative_request=request,
             timeout_seconds=10,
         )
     )
-    assert result.success is True
+    assert result.success is True, result.diagnostics
     assert len(backend.requests) == 2
+    correction = json.loads(backend.requests[1].user_prompt)["correction"]
+    host_baseline = correction["host_applied_candidate"]
+    canonical_baseline = json.dumps(
+        host_baseline, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    assert (
+        correction["repair_contract"]["baseline_sha256"]
+        == hashlib.sha256(canonical_baseline.encode()).hexdigest()
+    )
+    assert len(correction["repair_contract"]["operations"]) == 1
+    assert correction["repair_contract"]["operations"][0]["operation"] == "ADD"
     assert result.intent_fragment is not None
-    assert [track.width_mm for track in result.intent_fragment.sections[0].tracks] == [42, 18]
+    assert [
+        binding.channel
+        for track in result.intent_fragment.sections[0].tracks
+        for binding in track.bindings
+    ] == ["GR", "CALI"]
 
 
 def test_canonical_section_worker_updates_existing_scale() -> None:
@@ -1369,20 +1739,12 @@ def test_canonical_section_worker_updates_existing_scale() -> None:
 
 def test_canonical_section_worker_bounds_unauthorized_correction_scope() -> None:
     """An invalid correction is reported without escaping as a harness exception."""
-    request = 'Add a 42 mm normal track titled "Gamma". Add a 18 mm normal track titled "Caliper".'
-    base_context = _context()
-    task = base_context.plan.section_tasks[0].model_copy(
-        update={
-            "requirements": (
-                "Track 1 (gamma): normal, 42 mm",
-                "Track 2 (cali): normal, 18 mm",
-            ),
-            "obligations": extract_supported_obligations(request),
-        }
+    request = (
+        "In the Main Log section.\nOn gamma: "
+        "GR -> Gamma Ray, linear 0..150, #111111, width 1; "
+        "CALI -> Caliper, linear 0..20, #111111, width 1."
     )
-    context = base_context.model_copy(
-        update={"plan": base_context.plan.model_copy(update={"section_tasks": (task,)})}
-    )
+    context = _context_for_request(request)
     incomplete = {
         "action": "reconstruct",
         "section": {
@@ -1402,13 +1764,30 @@ def test_canonical_section_worker_bounds_unauthorized_correction_scope() -> None
         "action": "reconstruct",
         "section": {
             "source_candidate": "source-1",
-            "title": "Main",
+            "title": "Main Log",
             "tracks": [
                 {
                     "semantic_id": "gr",
                     "kind": "normal",
                     "title": "Gamma Ray",
-                    "bindings": [{"semantic_id": "gr", "channel": "GR"}],
+                    "bindings": [
+                        {
+                            "semantic_id": "gr",
+                            "channel": "GR",
+                            "label": "Gamma Ray",
+                            "scale": {
+                                "kind": "linear",
+                                "minimum": 0,
+                                "maximum": 150,
+                                "reverse": False,
+                            },
+                            "style": {
+                                "color": "#111111",
+                                "line_width": 1,
+                                "line_style": "solid",
+                            },
+                        }
+                    ],
                 },
                 {
                     "semantic_id": "cali",
@@ -1435,6 +1814,81 @@ def test_canonical_section_worker_bounds_unauthorized_correction_scope() -> None
     assert result.stage_evidence.normalization == "PASS"
     assert result.stage_evidence.worker_obligation == "FAIL"
     assert result.stage_evidence.semantic_lowering == "NOT_REACHED"
+
+
+def test_repair_matrix_r23_r28_rejects_raw_sibling_change_before_overlay() -> None:
+    """Adding a missing binding cannot authorize a sibling width replacement."""
+    request = (
+        "In the Main Log section.\nTrack combo: normal, width 50 mm.\n\n"
+        "On gamma:\n"
+        'GR -> "Gamma Ray", linear 0..100, #111111, width 0.75.\n'
+        'GR -> "Gamma Ray", linear 0..10, #2563eb dashed, width 0.65.'
+    )
+    initial = {
+        "action": "reconstruct",
+        "section": {
+            "title": "Main Log",
+            "source_candidate": "source-1",
+            "tracks": [
+                {
+                    "semantic_id": "combo",
+                    "kind": "normal",
+                    "title": "Combo",
+                    "width_mm": 50,
+                    "bindings": [
+                        {
+                            "semantic_id": "combo-cali",
+                            "channel": "CALI",
+                            "label": "Caliper",
+                            "scale": {"minimum": 0, "maximum": 20},
+                        }
+                    ],
+                },
+                {
+                    "semantic_id": "gamma",
+                    "kind": "normal",
+                    "title": "Gamma Ray",
+                    "bindings": [
+                        {
+                            "semantic_id": "gamma-main",
+                            "channel": "GR",
+                            "label": "Gamma Ray",
+                            "scale": {"minimum": 0, "maximum": 100},
+                        }
+                    ],
+                },
+            ],
+        },
+    }
+    unauthorized_correction = json.loads(json.dumps(initial))
+    unauthorized_correction["section"]["tracks"][0]["width_mm"] = 60
+    unauthorized_correction["section"]["tracks"][1]["bindings"].append(
+        {
+            "semantic_id": "gamma-zoom",
+            "channel": "GR",
+            "label": "Gamma Ray",
+            "scale": {"kind": "linear", "minimum": 0, "maximum": 10, "reverse": False},
+            "style": {"color": "#2563eb", "line_width": 0.65, "line_style": "dashed"},
+        }
+    )
+    backend = _StructuredFixtureBackend([initial, unauthorized_correction])
+    result = asyncio.run(
+        CanonicalSectionWorker(backend=backend).compile(
+            task_index=0,
+            context=_context_for_request(request),
+            document=_document(),
+            authoritative_request=request,
+            timeout_seconds=10,
+        )
+    )
+    assert result.success is False
+    assert result.diagnostics[0].code == "worker_correction_scope_violation"
+    assert len(backend.requests) == 2
+    correction = json.loads(backend.requests[1].user_prompt)["correction"]
+    assert correction["host_applied_candidate"]["section"]["tracks"][0]["width_mm"] == 50
+    assert any(
+        operation["operation"] == "ADD" for operation in correction["repair_contract"]["operations"]
+    )
 
 
 def test_canonical_section_worker_creates_grounded_track_and_curve() -> None:

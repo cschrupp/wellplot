@@ -7,11 +7,16 @@ from types import SimpleNamespace
 import pytest
 
 from wellplot.agent.code_mode.canonical_workers import ReportSemanticResponse
-from wellplot.agent.code_mode.enrichment import ExistingCurveContext, ResolvedSectionContext
+from wellplot.agent.code_mode.enrichment import (
+    ExistingCurveContext,
+    ResolvedSectionContext,
+    SourceContext,
+)
 from wellplot.agent.code_mode.obligations import (
     ObligationKind,
     ObligationState,
     OwnerKind,
+    compile_request_contract,
     extract_supported_anchors,
     extract_supported_obligations,
     validate_report_obligations,
@@ -27,6 +32,7 @@ from wellplot.agent.code_mode.planner import (
     PlannerSemanticError,
     SectionTask,
     SemanticPlan,
+    _attach_compiled_requirements,
     _attach_request_obligations,
     _validate_extraction_coverage,
 )
@@ -50,6 +56,74 @@ def test_obligations_use_exact_request_and_utf8_spans() -> None:
     assert {item.field for item in obligations} == {"title", "kind", "width_mm"}
     verify_obligation_spans(request, obligations)
     verify_anchor_coverage(request, obligations)
+
+
+def test_sparse_add_track_source_obligation_uses_unique_inspected_context() -> None:
+    """An add-track action binds its source through the resolved existing section."""
+    request = 'Add a track from "well-a.las".'
+    source_obligation = next(
+        item
+        for item in extract_supported_obligations(request)
+        if item.owner_kind is OwnerKind.SOURCE
+    )
+    context = ResolvedSectionContext(
+        task_index=0,
+        section_id="main",
+        sources=(
+            SourceContext(
+                candidate_id="source-1",
+                labels=("well-a.las",),
+                canonical_path="/host/data/well-a.las",
+                source_format="las",
+            ),
+        ),
+    )
+
+    validate_section_obligations(
+        SimpleNamespace(action="add_track"),
+        (source_obligation,),
+        section_context=context,
+    )
+
+
+@pytest.mark.parametrize(
+    "sources",
+    [
+        (),
+        (
+            SourceContext(
+                candidate_id="source-1",
+                labels=("well-a.las",),
+                canonical_path="/host/data/well-a.las",
+                source_format="las",
+            ),
+            SourceContext(
+                candidate_id="source-2",
+                labels=("well-a.las",),
+                canonical_path="/other/data/well-a.las",
+                source_format="las",
+            ),
+        ),
+    ],
+)
+def test_sparse_add_track_source_obligation_fails_closed_without_unique_match(
+    sources: tuple[SourceContext, ...],
+) -> None:
+    """Missing or ambiguous context sources cannot satisfy an explicit source fact."""
+    request = 'Add a track from "well-a.las".'
+    source_obligation = next(
+        item
+        for item in extract_supported_obligations(request)
+        if item.owner_kind is OwnerKind.SOURCE
+    )
+    context = ResolvedSectionContext(task_index=0, section_id="main", sources=sources)
+
+    with pytest.raises(ValueError, match="source was not resolved"):
+        validate_section_obligations(
+            SimpleNamespace(action="add_track"),
+            (source_obligation,),
+            section_context=context,
+        )
 
 
 def test_obligation_span_tampering_fails_closed() -> None:
@@ -157,6 +231,40 @@ def test_negation_and_conflict_states_are_explicit() -> None:
     }
 
 
+def test_request_compilation_reports_conflict_and_empty_semantics() -> None:
+    """Compilation state distinguishes contradictory and unsupported requests."""
+    conflicting = compile_request_contract(
+        "Track gamma: normal, width 30 mm. Track gamma: normal, width 32 mm."
+    )
+    assert conflicting.status.value == "CONFLICTING"
+    unsupported = compile_request_contract("Please make the layout attractive.")
+    assert unsupported.status.value == "NO_SUPPORTED_SEMANTICS"
+
+
+def test_compiled_provenance_spans_validate_independently() -> None:
+    """Compiled provenance remains byte-accurate for multi-span value sources."""
+    request = (
+        'On cbl: Use channel CBL. Both labels are "CBL Amplitude". '
+        "The first is linear 0..100, #111111, width 0.75. "
+        "The second is linear 0..10, #2563eb dashed, width 0.65."
+    )
+    compilation = compile_request_contract(request)
+    verify_obligation_spans(request, compilation.requirements.requirements)
+    verify_anchor_coverage(
+        request,
+        compilation.requirements.requirements,
+        anchors=compilation.anchors,
+    )
+    labels = [
+        item
+        for item in compilation.requirements.requirements
+        if item.field == "label" and item.value == "CBL Amplitude"
+    ]
+    assert len(labels) == 2
+    assert {item.slot_key for item in labels} == {"cbl.binding.1", "cbl.binding.2"}
+    assert all(item.provenance for item in labels)
+
+
 def test_percentage_alpha_span_accepts_normalized_fraction() -> None:
     """Percentage request syntax remains valid after alpha normalization."""
     request = "Fill the track using #f2e8a0 at 20% opacity."
@@ -190,8 +298,8 @@ def test_supported_obligation_vocabulary_is_closed() -> None:
     assert not any(item.field == "arbitrary_json" for item in obligations)
 
 
-def test_planner_coverage_rejects_dropped_explicit_width() -> None:
-    """A typed obligation cannot certify a plan that dropped its width."""
+def test_planner_binds_explicit_width_independently_of_planner_prose() -> None:
+    """Compiled width is attached even when the planner omits it from prose."""
     plan = SemanticPlan(
         summary="Add a track.",
         section_tasks=(
@@ -207,8 +315,11 @@ def test_planner_coverage_rejects_dropped_explicit_width() -> None:
         "Add Track gamma: normal, width 30 mm.",
     )
 
-    with pytest.raises(PlannerSemanticError, match="did not retain"):
-        _validate_extraction_coverage(attached)
+    _validate_extraction_coverage(attached)
+    width = [item for item in attached.section_tasks[0].obligations if item.field == "width_mm"]
+    assert len(width) == 1
+    assert width[0].value == 30.0
+    assert width[0].requirement_id in attached.section_tasks[0].requirement_refs
 
 
 def test_section_obligations_are_partitioned_by_target() -> None:
@@ -219,11 +330,13 @@ def test_section_obligations_are_partitioned_by_target() -> None:
             SectionTask(
                 goal="Main Log GR",
                 capability_ids=("section.log_plot",),
+                existing_section_hint="Main Log",
                 requirements=("Main Log", "GR"),
             ),
             SectionTask(
                 goal="Repeat Log CBL",
                 capability_ids=("section.log_plot",),
+                existing_section_hint="Repeat Log",
                 requirements=("Repeat Log", "CBL"),
             ),
         ),
@@ -248,18 +361,20 @@ def test_targeted_channels_remain_bound_to_their_grounded_task() -> None:
             SectionTask(
                 goal="Main pass",
                 capability_ids=("section.log_plot",),
+                existing_section_hint="Main Pass",
                 requirements=("cbl", "CBL"),
             ),
             SectionTask(
                 goal="Repeat pass",
                 capability_ids=("section.log_plot",),
+                existing_section_hint="Repeat Pass",
                 requirements=("vdl", "VDL"),
             ),
         ),
     )
     attached = _attach_request_obligations(
         plan,
-        "On cbl, plot CBL. On vdl, plot VDL.",
+        "In the Main Pass section, plot CBL on cbl. In the Repeat Pass section, plot VDL on vdl.",
     )
 
     assert [
@@ -314,6 +429,153 @@ def test_final_document_preservation_rejects_unrelated_binding_mutation() -> Non
         ]
     }
     verify_document_preservation(before, valid, (operation,))
+
+
+def test_scope_matrix_s01_independently_declares_ordered_passes() -> None:
+    """Expected scopes originate in request compilation before task binding."""
+    request = (
+        "In the Main Pass section, use GR. In the Repeat Pass section, use GR. "
+        "For each pass, keep the main curve."
+    )
+    compilation = compile_request_contract(request)
+    assert [scope.selector_text for scope in compilation.requirements.scopes.scopes] == [
+        "Main Pass",
+        "Repeat Pass",
+    ]
+    assert compilation.requirements.shared_scope_rules
+
+
+def test_scope_matrix_recognizes_comma_form_section_target() -> None:
+    """The established 'In Main Log, ...' request form owns its target scope."""
+    compilation = compile_request_contract(
+        "In Main Log, set the Gamma Ray curve to a linear 5-125 scale."
+    )
+
+    assert [scope.selector_text for scope in compilation.requirements.scopes.scopes] == ["Main Log"]
+    target_values = [
+        item.value for item in compilation.requirements.requirements if item.field == "target"
+    ]
+    assert target_values == ["Main Log"]
+
+
+def test_scope_matrix_recognizes_possessive_section_track_target() -> None:
+    """A request targeting a section's track declares that existing section."""
+    compilation = compile_request_contract(
+        "On Main Log's GR track, fill from Gamma Ray to its lower scale boundary."
+    )
+
+    assert [scope.selector_text for scope in compilation.requirements.scopes.scopes] == ["Main Log"]
+    assert any(
+        item.owner_kind is OwnerKind.SECTION and item.field == "target" and item.value == "Main Log"
+        for item in compilation.requirements.requirements
+    )
+
+
+def test_scope_matrix_recognizes_unicode_dash_to_target() -> None:
+    """Section selectors preserve an en dash in the request's target name."""
+    compilation = compile_request_contract(
+        "Apply that 20–110 linear Gamma Ray scale change only to Main Log – Upper."
+    )
+
+    assert [scope.selector_text for scope in compilation.requirements.scopes.scopes] == [
+        "Main Log – Upper"
+    ]
+
+
+def test_scope_matrix_s02_rejects_missing_requested_scope() -> None:
+    """A missing planner task cannot shrink the request-owned scope set."""
+    plan = SemanticPlan(
+        summary="Configure passes.",
+        section_tasks=(
+            SectionTask(
+                goal="Configure Main Pass.",
+                capability_ids=("section.log_plot",),
+                existing_section_hint="Main Pass",
+                requirements=(),
+            ),
+        ),
+    )
+    with pytest.raises(PlannerSemanticError) as error:
+        _attach_compiled_requirements(
+            plan,
+            compile_request_contract(
+                "In the Main Pass section, use GR. In the Repeat Pass section, use GR."
+            ),
+        )
+    assert error.value.code == "missing_requested_scope"
+
+
+def test_scope_matrix_s03_rejects_duplicate_assignment() -> None:
+    """Two tasks cannot consume one expected scope declaration."""
+    plan = SemanticPlan(
+        summary="Configure passes.",
+        section_tasks=tuple(
+            SectionTask(
+                goal="Configure Main Pass.",
+                capability_ids=("section.log_plot",),
+                existing_section_hint="Main Pass",
+                requirements=(),
+            )
+            for _ in range(2)
+        ),
+    )
+    with pytest.raises(PlannerSemanticError) as error:
+        _attach_compiled_requirements(
+            plan,
+            compile_request_contract("In the Main Pass section, use GR."),
+        )
+    assert error.value.code == "duplicate_scope_assignment"
+
+
+def test_scope_matrix_s04_rejects_unexpected_assignment() -> None:
+    """Planner scope hints cannot introduce an undeclared section."""
+    plan = SemanticPlan(
+        summary="Configure passes.",
+        section_tasks=(
+            SectionTask(
+                goal="Configure Side Pass.",
+                capability_ids=("section.log_plot",),
+                existing_section_hint="Side Pass",
+                requirements=(),
+            ),
+        ),
+    )
+    with pytest.raises(PlannerSemanticError) as error:
+        _attach_compiled_requirements(
+            plan,
+            compile_request_contract("In the Main Pass section, use GR."),
+        )
+    assert error.value.code == "unexpected_scope_assignment"
+
+
+def test_scope_matrix_s05_shared_rules_bind_to_each_declared_pass() -> None:
+    """Shared requirements instantiate against expected passes, not task count."""
+    request = (
+        "In the Main Pass section, use GR. In the Repeat Pass section, use GR. "
+        "For each pass, set the GR scale to linear 0..100."
+    )
+    plan = SemanticPlan(
+        summary="Configure both passes.",
+        section_tasks=tuple(
+            SectionTask(
+                goal=f"Configure {name}.",
+                capability_ids=("section.log_plot",),
+                existing_section_hint=name,
+                requirements=(),
+            )
+            for name in ("Main Pass", "Repeat Pass")
+        ),
+    )
+    attached = _attach_compiled_requirements(plan, compile_request_contract(request))
+    assert attached.scope_binding.expected_scope_ids == (
+        "existing:main_pass",
+        "existing:repeat_pass",
+    )
+    scales = [
+        [item.value for item in task.obligations if item.field == "scale_maximum"]
+        for task in attached.section_tasks
+    ]
+    assert scales == [[100.0], [100.0]]
 
 
 def test_document_preservation_allows_authorized_collection_create() -> None:
@@ -424,7 +686,12 @@ def test_existing_curve_scale_obligation_uses_host_grounded_selector() -> None:
     context = _existing_gr_context()
     action = _existing_gr_scale_action()
 
-    validate_section_obligations(action, obligations, section_context=context)
+    validate_section_obligations(
+        action,
+        obligations,
+        section_context=context,
+        section_title="Main Log",
+    )
     intent = AuthoringDocumentIntent(
         curve_bindings=[
             AuthoringCurveBindingIntent(
@@ -456,6 +723,7 @@ def test_existing_curve_scale_obligation_rejects_wrong_scale(kind: str, maximum:
             _existing_gr_scale_action(kind=kind, maximum=maximum),
             extract_supported_obligations(request),
             section_context=_existing_gr_context(),
+            section_title="Main Log",
         )
 
 
@@ -567,6 +835,45 @@ def test_post_lowering_scale_uses_reconciliation_binding_identity() -> None:
             document,
             obligations,
             grounded_operations=(wrong_operation,),
+        )
+
+
+def test_post_lowering_array_track_scale_reads_canonical_x_scale() -> None:
+    """Array track requirements are verified against the persisted x_scale shape."""
+    request = "On vdl: linear track scale 200..1200."
+    obligations = tuple(
+        item
+        for item in extract_supported_obligations(request)
+        if item.owner_ref.casefold() == "vdl" and item.field.startswith("track_scale_")
+    )
+    assert {item.field for item in obligations} == {
+        "track_scale_kind",
+        "track_scale_minimum",
+        "track_scale_maximum",
+    }
+
+    def document(scale: dict[str, object]) -> SimpleNamespace:
+        return SimpleNamespace(
+            model_dump=lambda mode: {
+                "sections": [
+                    {
+                        "id": "main_pass",
+                        "tracks": [
+                            {"id": "vdl", "x_scale": scale, "grid": {}},
+                        ],
+                    }
+                ]
+            }
+        )
+
+    verify_document_obligations(
+        document({"kind": "linear", "minimum": 200.0, "maximum": 1200.0}),
+        obligations,
+    )
+    with pytest.raises(ValueError, match="track_scale_minimum"):
+        verify_document_obligations(
+            document({"kind": "linear", "minimum": 100.0, "maximum": 1200.0}),
+            obligations,
         )
 
 

@@ -2654,6 +2654,8 @@ def classify_grade_failure(actual: Mapping[str, Any], grade: Mapping[str, Any]) 
     """Classify the earliest observed host boundary before persistence grading."""
     if _is_correction_scope_violation(actual):
         return None
+    if actual.get("observed_safe_rejection") is True and grade.get("status") == "PASS":
+        return None
     if actual.get("normalization_status") == "FAIL":
         return "HOST_NORMALIZATION"
     if actual.get("lowering_status") == "FAIL":
@@ -2741,6 +2743,8 @@ def _first_divergence(
         return "PROVIDER_OR_STRUCTURED"
     if _is_correction_scope_violation(actual):
         return "CORRECTION_PRESERVATION"
+    if actual.get("observed_safe_rejection") is True and grade.get("status") == "PASS":
+        return "NONE"
     declared = actual.get("first_divergence")
     if isinstance(declared, str) and declared in D5I_FIRST_DIVERGENCES:
         return declared
@@ -2748,7 +2752,9 @@ def _first_divergence(
         return "HARNESS"
     if actual.get("normalization_status") == "FAIL":
         return "HOST_EXECUTION"
-    if actual.get("lowering_status") == "FAIL" or str(actual.get("apply_status")) in {
+    if actual.get("lowering_status") == "FAIL":
+        return "HOST_EXECUTION"
+    if str(actual.get("apply_status")) in {
         "compile_failed",
         "reconciliation_blocked",
         "validation_failed",

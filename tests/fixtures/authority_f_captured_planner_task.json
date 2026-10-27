@@ -1,0 +1,37 @@
+{
+  "summary": "Reconstruct the D4 CBL report scaffold by populating the existing 'Main Pass' and 'Repeat Pass' sections with specified tracks, curve/raster bindings, and fills, while setting the report metadata and remarks. The plan preserves existing section identities and limits scope to the requested heading, remarks, two strip sections, and tail.",
+  "section_tasks": [
+    {
+      "goal": "Configure the Main Pass section with four tracks (combo, depth, cbl, vdl) and their respective bindings.",
+      "capability_ids": [
+        "section.log_plot",
+        "track.normal",
+        "track.reference",
+        "track.array",
+        "binding.curve",
+        "binding.raster"
+      ],
+      "existing_section_hint": "Main Pass",
+      "source_hints": ["CBL_Main.dlis"],
+      "requirements": [
+        "Create track 'combo' (normal, 50 mm) with bindings: ECGR_STGC (Gamma Ray (ECGR_STGC) QTGC-B, linear 0..150, #16a34a, width 0.8), TT (Transit Time for CBL (TT) QSLT-B, linear 200..400 reversed, #2142ff, width 0.75), TENS (Cable Tension (TENS), linear 5000..0, #111111 dashed, width 0.65), MTEM (Mud Temperature (MTEM) LEH-MT, linear 100..500, #111111, width 0.9)."
+      ]
+    },
+    {
+      "goal": "Configure the Repeat Pass section with four tracks (combo, depth, cbl, vdl) and their respective bindings.",
+      "capability_ids": [
+        "section.log_plot",
+        "track.normal",
+        "track.reference",
+        "track.array",
+        "binding.curve",
+        "binding.raster"
+      ],
+      "existing_section_hint": "Repeat Pass",
+      "source_hints": ["CBL_Repeat.dlis"],
+      "requirements": [
+        "Create track 'combo' (normal, 50 mm) with bindings: ECGR_STGC, TT, TENS, MTEM."
+      ]
+    }
+  ]
+}

@@ -1471,6 +1471,36 @@ def test_genuine_compile_failure_remains_host_inconclusive() -> None:
     assert d5._first_divergence(actual, {"errors": []}, None) == "HOST_EXECUTION"
 
 
+def test_graded_safe_rejection_is_not_host_infrastructure() -> None:
+    """A byte-preserving expected rejection does not stop the remaining population."""
+    actual = {
+        "observed_safe_rejection": True,
+        "apply_status": "compile_failed",
+        "lowering_status": "FAIL",
+        "persisted": False,
+        "rendered": False,
+        "intent_applied": False,
+        "pre_bytes_sha256": "same",
+        "post_bytes_sha256": "same",
+        "worker_diagnostic_code": "enrichment.section_hint_ambiguous",
+    }
+    grade = {"status": "PASS", "errors": []}
+
+    assert d5.classify_grade_failure(actual, grade) is None
+    assert d5._first_divergence(actual, grade, None) == "NONE"
+    row = d5._bounded_turn_row(
+        {"case_id": "D4-L02", "turn_id": "D4-L02:T1"},
+        {"expected_outcome": "SAFE_ACTIONABLE_FAILURE"},
+        actual,
+        grade,
+        execution_index=6,
+        call_count=2,
+        physical_attempt_count=2,
+    )
+    assert row["failure_category"] is None
+    assert row["scientific_terminal"] == "PASS"
+
+
 def test_scientifically_wrong_structured_result_is_fail(tmp_path: Path) -> None:
     """Validly returned but wrong canonical semantics classify as FAIL."""
     runner = d5.D5CampaignRunner(

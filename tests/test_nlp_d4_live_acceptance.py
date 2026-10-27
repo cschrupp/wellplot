@@ -1596,11 +1596,15 @@ class _D4PlannerBackend:
         )
         payload = value.model_dump(mode="python")
         payload.pop("obligations", None)
+        payload.pop("requirement_compilation", None)
+        payload.pop("scope_binding", None)
         if isinstance(payload.get("report_task"), dict):
             payload["report_task"].pop("obligations", None)
         for task in payload.get("section_tasks", ()):
             if isinstance(task, dict):
                 task.pop("obligations", None)
+                task.pop("requirement_refs", None)
+                task.pop("scope_id", None)
         return StructuredGenerationResult(
             value=response_model.model_validate(payload),
             metrics=ProviderMetrics(input_tokens=1, output_tokens=1, total_tokens=2),
@@ -1831,6 +1835,32 @@ def test_observed_negative_outcomes_distinguish_safe_rejection_from_bad_output()
     case = {"workflow": "LAS-REVISE", "request": "missing channel"}
     assert d4._observed_outcome(safe, case, {"sections": []}) == "SAFE_ACTIONABLE_FAILURE"
     assert d4._observed_outcome(bad, case, {"sections": []}) == "DETECTED_INCORRECT_OUTPUT"
+
+
+def test_d4_l04_unavailable_requested_channel_is_a_safe_rejection() -> None:
+    """A sparse add-track source fact resolves before lowering rejects unavailable RT."""
+    with TemporaryDirectory(dir=REPO_ROOT) as temporary:
+        root = Path(temporary)
+        harness = _D4SessionHarness.create(root)
+        case = next(item for item in d4.load_cases(REPO_ROOT) if item["turn_id"] == "D4-L04:C01")
+        expected = next(
+            item for item in d4.load_gold(REPO_ROOT)["cases"] if item["turn_id"] == case["turn_id"]
+        )
+
+        actual = asyncio.run(harness.adapter.execute_turn(case, expected))
+
+        assert actual["worker_diagnostic_code"] == "channel_missing"
+        assert actual["persisted"] is False
+        assert actual["rendered"] is False
+        assert actual["intent_applied"] is False
+        assert actual["pre_bytes_sha256"] == actual["post_bytes_sha256"]
+        assert actual["canonical_before"] == actual["canonical_after"]
+        assert actual["observed_safe_rejection"] is True
+        assert (
+            d4._observed_outcome(actual, case, actual["canonical_before"])
+            == "SAFE_ACTIONABLE_FAILURE"
+        )
+        assert d4.grade_turn(actual, expected)["status"] == "PASS"
 
 
 def test_safe_actionable_failure_uses_observed_diagnostics_not_request_text() -> None:
