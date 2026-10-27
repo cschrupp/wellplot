@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from .code_mode.canonical_workers import CanonicalReportWorker
 from .code_mode.enrichment import SemanticEnricher
@@ -92,6 +92,7 @@ def create_canonical_dependencies(
     *,
     backend: object,
     server_root: Path,
+    diagnostic_callback: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> CodeModeGraphDependencies:
     """Build one worker composition shared by notebook, MCP, and experiments."""
     from ..capabilities import create_builtin_registry
@@ -105,13 +106,23 @@ def create_canonical_dependencies(
         ),
         report_compiler=CanonicalReportWorker(backend=backend),
         section_compiler=CanonicalSectionWorker(backend=backend),
+        diagnostic_callback=diagnostic_callback,
     )
 
 
-def create_canonical_compile_facade(*, backend: object, server_root: Path) -> CodeModeCompileFacade:
+def create_canonical_compile_facade(
+    *,
+    backend: object,
+    server_root: Path,
+    diagnostic_callback: Callable[[Mapping[str, Any]], None] | None = None,
+) -> CodeModeCompileFacade:
     """Construct the shared planner, workers, workflow, and facade."""
     return CodeModeCompileFacade(
-        create_canonical_dependencies(backend=backend, server_root=server_root)
+        create_canonical_dependencies(
+            backend=backend,
+            server_root=server_root,
+            diagnostic_callback=diagnostic_callback,
+        )
     )
 
 

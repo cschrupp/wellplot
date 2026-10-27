@@ -1095,6 +1095,47 @@ def test_counting_backend_preserves_controls_and_records_bounded_metadata() -> N
     assert not hasattr(backend.calls[1], "raw_structured_payload")
 
 
+def test_counting_backend_reports_abort_without_changing_failure_semantics() -> None:
+    """Observe ordinary, provider, and cancellation termination separately."""
+
+    class _FailingDelegate:
+        def __init__(self, error: BaseException) -> None:
+            self.error = error
+
+        async def generate_structured(
+            self, request: object, *, response_model: type[object]
+        ) -> object:
+            del request, response_model
+            raise self.error
+
+    provider_error = d4.ProviderRequestError(
+        d4.ProviderFailureCategory.TRANSPORT,
+        "bounded transport failure",
+        status_code=503,
+    )
+    cases = [
+        (_FailingDelegate(RuntimeError("secret provider detail")), "ordinary_exception"),
+        (_FailingDelegate(provider_error), "provider_request_error"),
+        (_FailingDelegate(asyncio.CancelledError()), "cancelled"),
+    ]
+    for delegate, termination_kind in cases:
+        aborted: list[dict[str, object]] = []
+        backend = d4.CountingBackend(delegate=delegate, call_aborted=aborted.append)
+        with pytest.raises((RuntimeError, asyncio.CancelledError)):
+            asyncio.run(
+                backend.generate_structured(_structured_request(), response_model=SemanticPlan)
+            )
+        assert len(aborted) == 1
+        event = aborted[0]
+        assert event["termination_kind"] == termination_kind
+        assert event["exception_type"] in {"RuntimeError", "ProviderRequestError", "CancelledError"}
+        assert "secret provider detail" not in str(event)
+        assert "message" not in event
+        assert event["status_code"] == (
+            503 if termination_kind == "provider_request_error" else None
+        )
+
+
 def test_counting_backend_rejects_role_control_drift_before_delegation() -> None:
     """Planner and typed-worker controls are attested independently."""
     planner_delegate = _Backend()

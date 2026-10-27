@@ -304,6 +304,7 @@ class CountingBackend:
     max_calls: int = MAX_LOGICAL_CALLS
     call_started: Callable[[dict[str, Any]], None] | None = None
     call_completed: Callable[[dict[str, Any]], None] | None = None
+    call_aborted: Callable[[dict[str, Any]], None] | None = None
     prompt_guard: Callable[[str], None] | None = None
     calls: list[LogicalCall] = field(default_factory=list)
     ledger: LogicalCallLedger | None = None
@@ -426,6 +427,44 @@ class CountingBackend:
                 }
             )
 
+    def _record_abort(
+        self,
+        *,
+        index: int,
+        generation_role: str,
+        error: BaseException,
+        termination_kind: str,
+    ) -> None:
+        """Emit bounded termination evidence before preserving the exception."""
+        if self.call_aborted is None:
+            return
+        status_code = getattr(error, "status_code", None)
+        if not isinstance(status_code, int) or isinstance(status_code, bool):
+            status_code = None
+        timeout = isinstance(error, TimeoutError) or (
+            isinstance(error, ProviderRequestError)
+            and error.category is ProviderFailureCategory.TIMEOUT
+        )
+        try:
+            self.call_aborted(
+                {
+                    "event": "logical_call_aborted",
+                    "index": index,
+                    "operation": "structured",
+                    "generation_role": generation_role,
+                    "provider": self.provider,
+                    "model": self.model,
+                    "termination_kind": termination_kind,
+                    "exception_type": type(error).__name__,
+                    "exception_module": type(error).__module__,
+                    "status_code": status_code,
+                    "timeout": timeout,
+                }
+            )
+        except Exception:
+            # Diagnostics must not replace the primary provider/runtime failure.
+            return
+
     async def generate_structured(
         self,
         request: StructuredGenerationRequest,
@@ -444,7 +483,21 @@ class CountingBackend:
                 request,
                 response_model=response_model,
             )
+        except asyncio.CancelledError as error:
+            self._record_abort(
+                index=index,
+                generation_role=generation_role,
+                error=error,
+                termination_kind="cancelled",
+            )
+            raise
         except ProviderRequestError as error:
+            self._record_abort(
+                index=index,
+                generation_role=generation_role,
+                error=error,
+                termination_kind="provider_request_error",
+            )
             diagnostic = {
                 "response_reason": getattr(error, "response_reason", None),
                 "validation_shape": getattr(error, "validation_shape", None),
@@ -460,7 +513,13 @@ class CountingBackend:
                 diagnostic=diagnostic,
             )
             raise
-        except Exception:
+        except Exception as error:
+            self._record_abort(
+                index=index,
+                generation_role=generation_role,
+                error=error,
+                termination_kind="ordinary_exception",
+            )
             self._record(
                 index=index,
                 operation="structured",
@@ -515,6 +574,11 @@ class CampaignCallSource:
         """Bind durable completion evidence to every backend boundary."""
         for backend in self.backends:
             backend.call_completed = callback
+
+    def bind_call_aborted(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Bind bounded evidence for calls that never reach completion."""
+        for backend in self.backends:
+            backend.call_aborted = callback
 
     @property
     def logical_call_count(self) -> int:
@@ -1541,6 +1605,7 @@ def build_notebook_session(
     server_root: Path,
     credential_source: str | None,
     timeout: float,
+    diagnostic_callback: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> DirectNotebookSession:
     """Compose the unchanged production notebook graph around one backend."""
     from wellplot.agent.composition import create_canonical_compile_facade
@@ -1551,6 +1616,7 @@ def build_notebook_session(
             compiler=create_canonical_compile_facade(
                 backend=backend,
                 server_root=server_root,
+                diagnostic_callback=diagnostic_callback,
             ),
             config=AgentSessionConfig(timeout_seconds=timeout),
         ),
@@ -1582,6 +1648,10 @@ class D4CampaignAdapter:
     def bind_call_completed(self, callback: Callable[[dict[str, Any]], None]) -> None:
         """Bind durable completion evidence to all backend calls."""
         self.call_source.bind_call_completed(callback)
+
+    def bind_call_aborted(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Bind durable evidence for calls that terminate without completion."""
+        self.call_source.bind_call_aborted(callback)
 
     @property
     def logical_call_count(self) -> int:

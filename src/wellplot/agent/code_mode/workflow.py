@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable, Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any, cast
 
@@ -51,6 +52,7 @@ class CodeModeGraphDependencies:
     # tests and research fixtures.
     report_compiler: object
     section_compiler: object
+    diagnostic_callback: Callable[[Mapping[str, Any]], None] | None = None
 
 
 def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStateGraph:
@@ -228,6 +230,23 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
                 metrics=SemanticMetrics(),
             )
             return _outcome_state(outcome)
+        except BaseException as error:
+            callback = dependencies.diagnostic_callback
+            if callback is not None:
+                with suppress(Exception):
+                    callback(
+                        {
+                            "event": "worker_exception",
+                            "worker_kind": kind,
+                            "plan_order": plan_order,
+                            "stage": "compile_worker",
+                            "exception_type": type(error).__name__,
+                            "exception_module": type(error).__module__,
+                            "provider_call_in_flight": None,
+                            "provider_call_state": "UNKNOWN",
+                        }
+                    )
+            raise
 
         intent_fragment = getattr(result, "intent_fragment", None)
         if intent_fragment is None and result.success:

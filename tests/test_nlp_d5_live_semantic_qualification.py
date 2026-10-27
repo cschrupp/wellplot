@@ -994,6 +994,145 @@ def test_redaction_rejects_secrets_raw_payloads_and_absolute_paths() -> None:
     assert d5.evidence_is_redacted({"model": d5.EXPECTED_MODEL, "sha256": "a" * 64})
 
 
+def test_physical_observer_seals_no_response_termination_without_raw_exception() -> None:
+    """Five completed calls followed by no response preserve the forensic boundary."""
+    observer = d5._PhysicalAttemptObserver()
+    rows: list[dict[str, object]] = []
+    observer.bind_model_io(rows.append)
+    observer.callback = lambda _index: None
+    observer.set_active_turn("D4-C01:C01")
+    for index in range(1, 6):
+        observer.logical_call_started(
+            {
+                "index": index,
+                "generation_role": "section_worker",
+                "model": d5.EXPECTED_MODEL,
+            }
+        )
+        request = SimpleNamespace(
+            url=SimpleNamespace(path="/v1/chat/completions"),
+            content=f'{{"call":{index}}}'.encode(),
+        )
+        asyncio.run(observer.on_request(request))
+
+        async def aread(body: bytes = b'{"ok":true}') -> bytes:
+            return body
+
+        response = SimpleNamespace(request=request, status_code=200, aread=aread)
+        asyncio.run(observer.on_response(response))
+
+    observer.logical_call_started(
+        {
+            "index": 6,
+            "generation_role": "section_worker",
+            "model": d5.EXPECTED_MODEL,
+        }
+    )
+    request = SimpleNamespace(
+        url=SimpleNamespace(path="/v1/chat/completions"),
+        content=b'{"bounded":"request"}',
+    )
+    asyncio.run(observer.on_request(request))
+    observer.logical_call_aborted(
+        {
+            "index": 6,
+            "generation_role": "section_worker",
+            "model": d5.EXPECTED_MODEL,
+            "termination_kind": "provider_request_error",
+            "exception_type": "ReadTimeout",
+            "exception_module": "httpx",
+            "status_code": None,
+            "timeout": True,
+        }
+    )
+    assert len([row for row in rows if row["event"] == "physical_response"]) == 5
+    termination = next(row for row in rows if row["event"] == "physical_termination")
+    assert termination["physical_attempt"] == 1
+    assert termination["request_sha256"] == hashlib.sha256(request.content).hexdigest()
+    assert termination["timeout"] is True
+    assert "bounded" not in str(termination)
+    assert all("headers" not in row for row in rows)
+
+
+def test_campaign_exception_custody_records_primary_context_without_message(tmp_path: Path) -> None:
+    """Top-level failure custody identifies outstanding calls without raw text."""
+    paths = _paths(tmp_path, "campaign-exception")
+    custody = d5.D5CampaignCustody.prepare(
+        paths,
+        authorization=_authorization(campaign_id="campaign-exception"),
+        provenance=_provenance(),
+        readiness=_ready().projection,
+    )
+    custody.record_call_started(
+        {
+            "event": "logical_call_started",
+            "index": 1,
+            "generation_role": "section_worker",
+            "provider": d5.EXPECTED_PROVIDER,
+            "model": d5.EXPECTED_MODEL,
+        }
+    )
+    custody.record_campaign_exception(
+        RuntimeError("do not persist this detail"),
+        active_turn="D4-C01:C01",
+        completed_worker_outcomes=[],
+    )
+    journal = paths.journal.read_text(encoding="utf-8")
+    assert "campaign_exception" in journal
+    assert "do not persist this detail" not in journal
+    assert '"active_turn":"D4-C01:C01"' in journal
+    assert '"outstanding_logical_calls":[{"index":1,"role":"section_worker"}]' in journal
+
+
+def test_secondary_cancellation_cannot_replace_primary_worker_failure(tmp_path: Path) -> None:
+    """Sibling cancellation is explicitly secondary after a worker failure."""
+    paths = _paths(tmp_path, "secondary-cancellation")
+    custody = d5.D5CampaignCustody.prepare(
+        paths,
+        authorization=_authorization(campaign_id="secondary-cancellation"),
+        provenance=_provenance(),
+        readiness=_ready().projection,
+    )
+    custody.record_call_started(
+        {
+            "event": "logical_call_started",
+            "index": 1,
+            "generation_role": "section_worker",
+            "provider": d5.EXPECTED_PROVIDER,
+            "model": d5.EXPECTED_MODEL,
+        }
+    )
+    custody.record_worker_diagnostic(
+        {
+            "worker_kind": "section",
+            "plan_order": 1,
+            "stage": "compile_worker",
+            "exception_type": "RuntimeError",
+            "exception_module": "builtins",
+            "provider_call_in_flight": None,
+            "provider_call_state": "UNKNOWN",
+        }
+    )
+    custody.record_call_aborted(
+        {
+            "index": 1,
+            "generation_role": "section_worker",
+            "provider": d5.EXPECTED_PROVIDER,
+            "model": d5.EXPECTED_MODEL,
+            "termination_kind": "cancelled",
+            "exception_type": "CancelledError",
+            "exception_module": "asyncio.exceptions",
+            "status_code": None,
+            "timeout": False,
+        }
+    )
+    events = [json.loads(line) for line in paths.journal.read_text().splitlines()]
+    diagnostics = [
+        event for event in events if event["event"] in {"worker_exception", "logical_call_aborted"}
+    ]
+    assert [event["primary_or_secondary"] for event in diagnostics] == ["primary", "secondary"]
+
+
 def test_authorization_binds_campaign_across_runner_instances(tmp_path: Path) -> None:
     """A second runner cannot reuse or rename the consumed authorized campaign."""
     authorization = _authorization()

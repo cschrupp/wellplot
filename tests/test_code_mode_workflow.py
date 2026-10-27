@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 
 import pytest
@@ -183,13 +184,28 @@ class _SectionAdapter:
         return await self.workers.compile_section(**kwargs)
 
 
-def _graph(plan: SemanticPlan, workers: _Workers, planner: _Planner | None = None) -> object:
+class _ExplodingSectionAdapter:
+    """Raise an unexpected worker exception for diagnostic-boundary tests."""
+
+    async def compile(self, **_kwargs: object) -> ProgramExecutionResult:
+        """Raise without changing the canonical worker result contract."""
+        raise RuntimeError("provider response detail must not be persisted")
+
+
+def _graph(
+    plan: SemanticPlan,
+    workers: _Workers,
+    planner: _Planner | None = None,
+    diagnostic_callback: Callable[[Mapping[str, object]], None] | None = None,
+    section_compiler: object | None = None,
+) -> object:
     """Build a graph with host fakes at every v2 boundary."""
     dependencies = CodeModeGraphDependencies(
         planner=planner or _Planner(plan),  # type: ignore[arg-type]
         enricher=_Enricher(),  # type: ignore[arg-type]
         report_compiler=_ReportAdapter(workers),  # type: ignore[arg-type]
-        section_compiler=_SectionAdapter(workers),  # type: ignore[arg-type]
+        section_compiler=section_compiler or _SectionAdapter(workers),  # type: ignore[arg-type]
+        diagnostic_callback=diagnostic_callback,
     )
     return build_compile_graph(dependencies)
 
@@ -264,6 +280,42 @@ def test_graph_supports_report_only_and_section_only_plans() -> None:
     )
     section_result = _invoke(section_plan, _Workers())
     assert section_result["merged_intent"]["sections"][0]["section_id"] == "section-0"
+
+
+def test_graph_reports_unexpected_worker_exception_before_reraising() -> None:
+    """Unexpected compile exceptions are observable without changing propagation."""
+    plan = SemanticPlan(
+        summary="section only",
+        section_tasks=(
+            SectionTask(
+                goal="first section",
+                capability_ids=("section.log_plot",),
+                existing_section_hint=None,
+            ),
+        ),
+    )
+    events: list[Mapping[str, object]] = []
+    with pytest.raises(RuntimeError, match="provider response detail"):
+        asyncio.run(
+            _graph(
+                plan,
+                _Workers(),
+                diagnostic_callback=events.append,
+                section_compiler=_ExplodingSectionAdapter(),
+            ).ainvoke(_state(plan))
+        )
+    assert events == [
+        {
+            "event": "worker_exception",
+            "worker_kind": "section",
+            "plan_order": 1,
+            "stage": "compile_worker",
+            "exception_type": "RuntimeError",
+            "exception_module": "builtins",
+            "provider_call_in_flight": None,
+            "provider_call_state": "UNKNOWN",
+        }
+    ]
 
 
 def test_graph_plans_at_zero_and_keeps_source_summary_path_free() -> None:

@@ -1129,6 +1129,7 @@ class D5CampaignCustody:
     started: bool = False
     legacy_eager: bool = False
     require_physical_observer: bool = False
+    _primary_failure_recorded: bool = False
     _active_logical_index: int | None = None
     _active_turn_id: str | None = None
     _terminal_written: bool = False
@@ -1294,6 +1295,107 @@ class D5CampaignCustody:
             "total_tokens": event.get("total_tokens"),
         }
         _append_jsonl(self.paths.journal, bounded)
+
+    def record_call_aborted(self, event: Mapping[str, Any]) -> None:
+        """Persist bounded termination evidence without inventing completion."""
+        secondary = self._primary_failure_recorded and event.get("termination_kind") == "cancelled"
+        if not secondary:
+            self._primary_failure_recorded = True
+        _append_jsonl(
+            self.paths.journal,
+            {
+                "event": "logical_call_aborted",
+                "experiment_version": D5_EXPERIMENT_VERSION,
+                "campaign_id": self.campaign_id,
+                "authorization_id": self.authorization_id,
+                "index": event.get("index"),
+                "generation_role": event.get("generation_role"),
+                "provider": event.get("provider"),
+                "model": event.get("model"),
+                "termination_kind": event.get("termination_kind"),
+                "exception_type": event.get("exception_type"),
+                "exception_module": event.get("exception_module"),
+                "status_code": event.get("status_code"),
+                "timeout": event.get("timeout"),
+                "primary_or_secondary": "secondary" if secondary else "primary",
+            },
+        )
+
+    def record_worker_diagnostic(self, event: Mapping[str, Any]) -> None:
+        """Persist bounded canonical worker exception evidence."""
+        secondary = self._primary_failure_recorded
+        if not secondary:
+            self._primary_failure_recorded = True
+        _append_jsonl(
+            self.paths.journal,
+            {
+                "event": "worker_exception",
+                "experiment_version": D5_EXPERIMENT_VERSION,
+                "campaign_id": self.campaign_id,
+                "authorization_id": self.authorization_id,
+                "worker_kind": event.get("worker_kind"),
+                "plan_order": event.get("plan_order"),
+                "stage": event.get("stage"),
+                "exception_type": event.get("exception_type"),
+                "exception_module": event.get("exception_module"),
+                "provider_call_in_flight": event.get("provider_call_in_flight"),
+                "provider_call_state": event.get("provider_call_state"),
+                "primary_or_secondary": "secondary" if secondary else "primary",
+            },
+        )
+
+    def record_campaign_exception(
+        self,
+        error: BaseException,
+        *,
+        active_turn: str | None,
+        completed_worker_outcomes: Sequence[Mapping[str, Any]],
+    ) -> None:
+        """Persist top-level exception context before terminal classification."""
+        secondary = self._primary_failure_recorded
+        if not secondary:
+            self._primary_failure_recorded = True
+        started = [call for call in self.ledger.calls if call.get("outcome") != "reserved"]
+        completed = [call for call in started if call.get("outcome") in {"completed", "failed"}]
+        outstanding = [
+            {
+                "index": call.get("logical_call_index"),
+                "role": call.get("role"),
+            }
+            for call in self.ledger.calls
+            if call.get("outcome") == "reserved"
+        ]
+        outcomes = []
+        for outcome in completed_worker_outcomes:
+            outcomes.append(
+                {
+                    "turn_id": outcome.get("turn_id"),
+                    "grader_status": outcome.get("grader_status"),
+                    "attribution": outcome.get("attribution"),
+                    "first_divergence": outcome.get("first_divergence"),
+                }
+            )
+        _append_jsonl(
+            self.paths.journal,
+            {
+                "event": "campaign_exception",
+                "experiment_version": D5_EXPERIMENT_VERSION,
+                "campaign_id": self.campaign_id,
+                "authorization_id": self.authorization_id,
+                "exception_type": type(error).__name__,
+                "exception_module": type(error).__module__,
+                "active_turn": active_turn,
+                "last_started_logical_call": (
+                    self.ledger.calls[-1].get("logical_call_index") if self.ledger.calls else None
+                ),
+                "last_completed_logical_call": (
+                    completed[-1].get("logical_call_index") if completed else None
+                ),
+                "outstanding_logical_calls": outstanding,
+                "completed_worker_outcomes": outcomes,
+                "primary_or_secondary": "secondary" if secondary else "primary",
+            },
+        )
 
     def record_physical_attempt(self, index: int | None = None) -> None:
         """Record one observed SDK/HTTP attempt for the active logical call."""
@@ -1750,6 +1852,7 @@ class _PhysicalAttemptObserver:
         self.active_logical_index: int | None = None
         self.callback: Callable[[int], None] | None = None
         self.model_io_callback: Callable[[dict[str, Any]], None] | None = None
+        self.worker_diagnostic_callback: Callable[[dict[str, Any]], None] | None = None
         self.active_turn_id: str | None = None
         self.active_role: str | None = None
         self.active_model: str | None = None
@@ -1812,6 +1915,48 @@ class _PhysicalAttemptObserver:
         if self.model_io_callback is not None:
             self.model_io_callback(response_row)
 
+    def logical_call_aborted(self, event: Mapping[str, Any]) -> None:
+        """Close unresolved physical requests without fabricating responses."""
+        logical_index = int(event["index"])
+        pending_keys = [
+            request_id
+            for request_id, row in self._pending_responses.items()
+            if row.get("logical_call_index") == logical_index
+        ]
+        for request_id in pending_keys:
+            pending = self._pending_responses.pop(request_id)
+            if self.model_io_callback is not None:
+                self.model_io_callback(
+                    {
+                        "event": "physical_termination",
+                        "turn_id": self.active_turn_id,
+                        "logical_call_index": logical_index,
+                        "role": pending.get("role"),
+                        "model": pending.get("model"),
+                        "physical_attempt": pending.get("physical_attempt"),
+                        "request_sha256": pending.get("request_sha256"),
+                        "termination_kind": event.get("termination_kind"),
+                        "exception_type": event.get("exception_type"),
+                        "exception_module": event.get("exception_module"),
+                        "status_code": event.get("status_code"),
+                        "timeout": event.get("timeout"),
+                    }
+                )
+        if self.model_io_callback is not None:
+            self.model_io_callback(
+                {
+                    "event": "logical_call_aborted",
+                    "logical_call_index": logical_index,
+                    "role": event.get("generation_role"),
+                    "model": event.get("model"),
+                    "termination_kind": event.get("termination_kind"),
+                    "exception_type": event.get("exception_type"),
+                    "exception_module": event.get("exception_module"),
+                    "status_code": event.get("status_code"),
+                    "timeout": event.get("timeout"),
+                }
+            )
+
     def set_active_turn(self, turn_id: str) -> None:
         """Set the current frozen turn without entering the provider body."""
         self.active_turn_id = str(turn_id)
@@ -1819,6 +1964,15 @@ class _PhysicalAttemptObserver:
     def bind_model_io(self, callback: Callable[[dict[str, Any]], None]) -> None:
         """Bind append-only model-I/O custody."""
         self.model_io_callback = callback
+
+    def bind_worker_diagnostic(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Bind canonical graph exception diagnostics to campaign custody."""
+        self.worker_diagnostic_callback = callback
+
+    def capture_worker_diagnostic(self, event: Mapping[str, Any]) -> None:
+        """Forward bounded worker diagnostics without changing graph behavior."""
+        if self.worker_diagnostic_callback is not None:
+            self.worker_diagnostic_callback(dict(event))
 
     def logical_call_started(self, event: Mapping[str, Any]) -> None:
         """Track role and model alongside the existing logical identity."""
@@ -1897,6 +2051,19 @@ class _ObservedLiveAdapter:
             callback(event)
 
         self.inner.bind_call_completed(wrapped)
+
+    def bind_call_aborted(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Forward logical aborts while closing unresolved transport observations."""
+
+        def wrapped(event: dict[str, Any]) -> None:
+            self.observer.logical_call_aborted(event)
+            callback(event)
+
+        self.inner.bind_call_aborted(wrapped)
+
+    def bind_worker_diagnostic(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Bind canonical compile-worker exception evidence."""
+        self.observer.bind_worker_diagnostic(callback)
 
     def bind_physical_attempt(self, callback: Callable[[int], None]) -> None:
         """Bind the D5 ledger to each observed SDK transport attempt."""
@@ -2048,6 +2215,7 @@ def create_live_adapter(
         server_root=repo_root,
         credential_source="configured",
         timeout=project_config.provider.timeout_seconds,
+        diagnostic_callback=observer.capture_worker_diagnostic,
     )
     inner = d4.D4CampaignAdapter(
         repo_root=repo_root,
@@ -2872,10 +3040,14 @@ class D5CampaignRunner:
                 adapter.bind_call_started(custody.record_call_started)
             if callable(getattr(adapter, "bind_call_completed", None)):
                 adapter.bind_call_completed(custody.record_call_completed)
+            if callable(getattr(adapter, "bind_call_aborted", None)):
+                adapter.bind_call_aborted(custody.record_call_aborted)
             if callable(getattr(adapter, "bind_physical_attempt", None)):
                 adapter.bind_physical_attempt(custody.record_physical_attempt)
             if callable(getattr(adapter, "bind_model_io", None)):
                 adapter.bind_model_io(custody.record_model_io)
+            if callable(getattr(adapter, "bind_worker_diagnostic", None)):
+                adapter.bind_worker_diagnostic(custody.record_worker_diagnostic)
             selected_cases = [case for case in cases if case["turn_id"] in selected_ids]
             if tuple(case["turn_id"] for case in selected_cases) != selected_ids:
                 raise D5StaticPreflightError("selected turn population drifted")
@@ -2953,6 +3125,11 @@ class D5CampaignRunner:
             else:
                 decision, attribution = "FAIL", "SEMANTIC_CONTRACT"
         except Exception as error:
+            custody.record_campaign_exception(
+                error,
+                active_turn=custody._active_turn_id,
+                completed_worker_outcomes=rows,
+            )
             observed_failure = _classify_logical_call_failure(custody.ledger.calls)
             if observed_failure is not None:
                 decision, attribution = "INCONCLUSIVE", observed_failure[0]
