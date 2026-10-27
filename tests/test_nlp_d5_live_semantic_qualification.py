@@ -1430,6 +1430,47 @@ def test_recovered_structured_failure_does_not_override_host_failure() -> None:
     assert d5._first_divergence(actual, grade, observed_failure) == "HOST_EXECUTION"
 
 
+def test_correction_scope_violation_is_semantic_not_host_infrastructure() -> None:
+    """A correctly rejected correction remains a residual semantic failure."""
+    actual = {
+        "worker_diagnostic_code": "worker_correction_scope_violation",
+        "normalization_status": "PASS",
+        "worker_obligation_status": "FAIL",
+        "lowering_status": "NOT_REACHED",
+        "apply_status": "compile_failed",
+        "persisted": False,
+        "rendered": False,
+    }
+    grade = {"status": "FAIL", "errors": ["persistence_not_proven"]}
+
+    assert d5.classify_grade_failure(actual, grade) is None
+    assert d5._first_divergence(actual, grade, None) == "CORRECTION_PRESERVATION"
+    row = d5._bounded_turn_row(
+        {"case_id": "D4-C01", "turn_id": "D4-C01:C01"},
+        {},
+        actual,
+        grade,
+        execution_index=1,
+        call_count=6,
+        physical_attempt_count=6,
+    )
+    assert row["failure_category"] is None
+    assert row["first_divergence"] == "CORRECTION_PRESERVATION"
+    assert row["scientific_terminal"] == "FAIL / RESIDUAL_SEMANTIC"
+    assert row["worker_diagnostic_code"] == "worker_correction_scope_violation"
+
+
+def test_genuine_compile_failure_remains_host_inconclusive() -> None:
+    """Unrelated compile failures retain the host/infrastructure boundary."""
+    actual = {
+        "apply_status": "compile_failed",
+        "persisted": False,
+        "rendered": False,
+    }
+    assert d5.classify_grade_failure(actual, {"errors": []}) == ("HOST_SEMANTIC_APPLICATION")
+    assert d5._first_divergence(actual, {"errors": []}, None) == "HOST_EXECUTION"
+
+
 def test_scientifically_wrong_structured_result_is_fail(tmp_path: Path) -> None:
     """Validly returned but wrong canonical semantics classify as FAIL."""
     runner = d5.D5CampaignRunner(
@@ -1443,6 +1484,7 @@ def test_scientifically_wrong_structured_result_is_fail(tmp_path: Path) -> None:
     assert result["decision"] == "FAIL"
     assert result["attribution"] == "SEMANTIC_CONTRACT"
     assert result["completed_turns"] == 9
+    assert all(row["infrastructure_failure"] is False for row in result["rows"])
 
 
 def test_exception_classification_is_fail_closed() -> None:

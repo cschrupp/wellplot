@@ -2652,6 +2652,8 @@ _HOST_FAILURE_CATEGORIES = frozenset(
 
 def classify_grade_failure(actual: Mapping[str, Any], grade: Mapping[str, Any]) -> str | None:
     """Classify the earliest observed host boundary before persistence grading."""
+    if _is_correction_scope_violation(actual):
+        return None
     if actual.get("normalization_status") == "FAIL":
         return "HOST_NORMALIZATION"
     if actual.get("lowering_status") == "FAIL":
@@ -2737,6 +2739,8 @@ def _first_divergence(
     """Select the earliest evidence-supported turn divergence."""
     if observed_failure is not None:
         return "PROVIDER_OR_STRUCTURED"
+    if _is_correction_scope_violation(actual):
+        return "CORRECTION_PRESERVATION"
     declared = actual.get("first_divergence")
     if isinstance(declared, str) and declared in D5I_FIRST_DIVERGENCES:
         return declared
@@ -2772,6 +2776,17 @@ def _first_divergence(
     if errors:
         return "SEMANTIC"
     return "NONE"
+
+
+def _is_correction_scope_violation(actual: Mapping[str, Any]) -> bool:
+    """Recognize a bounded rejected correction without calling it host failure."""
+    return (
+        actual.get("worker_diagnostic_code") == "worker_correction_scope_violation"
+        and actual.get("normalization_status") == "PASS"
+        and actual.get("worker_obligation_status") == "FAIL"
+        and actual.get("lowering_status") == "NOT_REACHED"
+        and actual.get("apply_status") == "compile_failed"
+    )
 
 
 def _correction_preservation_evidence(actual: Mapping[str, Any]) -> dict[str, Any]:
