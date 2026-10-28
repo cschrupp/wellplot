@@ -32,8 +32,10 @@ from wellplot.agent.code_mode.facade import (
     CodeModeCompileResult,
     CompileDiagnostic,
     CompileMetrics,
+    CompileWorkerEvidence,
 )
 from wellplot.agent.providers.base import ProviderRequestError, StructuredGenerationRequest
+from wellplot.model.intent import AuthoringDocumentIntent
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PROJECT_CONFIG = d5.load_project_config(REPO_ROOT)
@@ -2559,6 +2561,7 @@ def test_smoke_custody_captures_planner_replay_and_zero_worker_diagnostics(
     assert compile_result["diagnostics"][0]["code"] == "planner_semantic_failure"
     assert compile_result["workers"] == []
     assert compile_result["metrics"]["worker_count"] == 0
+    assert compile_result["merged_intent_present"] is False
     model_io = paths.model_io.read_text(encoding="utf-8")
     assert "request_sha256" in model_io
     assert "raw request body" not in model_io
@@ -2571,6 +2574,211 @@ def test_smoke_custody_captures_planner_replay_and_zero_worker_diagnostics(
     assert terminal["observability_artifacts"][paths.planner_wire.name] == d5._sha256_file(
         paths.planner_wire
     )
+
+
+def test_smoke_compile_result_records_successful_merged_intent_presence(tmp_path: Path) -> None:
+    """Compile custody reports the public merged-intent field without storing it."""
+    authorization = _authorization(
+        campaign_id="compile-success-observability",
+        artifact_root=str(tmp_path / "compile-success"),
+    )
+    paths = d5.EvidencePaths(tmp_path / "compile-success", authorization.campaign_id)
+    custody = d5.D5SmokeCustody.start(
+        paths,
+        authorization=authorization,
+        static_preflight={"status": "PASS"},
+        readiness=_ready().projection,
+        endpoint_calls=2,
+        smoke_kind="planner_observability",
+    )
+    result = CodeModeCompileResult(
+        success=True,
+        merged_intent=AuthoringDocumentIntent(),
+        workers=(CompileWorkerEvidence(kind="section", plan_order=0, success=True),),
+        metrics=CompileMetrics(
+            worker_count=1,
+            successful_workers=1,
+            failed_workers=0,
+            total_program_chars=0,
+            total_ast_nodes=0,
+            total_statements=0,
+            total_calls=0,
+            total_repairs=0,
+            total_loop_iterations=0,
+            total_created_objects=0,
+            max_nesting_depth=0,
+        ),
+    )
+
+    custody.record_compile_result(result)
+
+    payload = json.loads(paths.compile_result.read_text(encoding="utf-8"))
+    assert payload["merged_intent_present"] is True
+    assert "merged_intent" not in payload
+    assert "intent" not in payload
+    custody.finish("SMOKE_HARNESS_FAIL", reason="provider-free-custody-test")
+
+
+def test_binding_smoke_wires_canonical_calls_and_bounded_model_io(tmp_path: Path) -> None:
+    """Binding custody records canonical roles and cannot retain raw model I/O."""
+    authorization = _authorization(
+        campaign_id="binding-smoke-observability",
+        artifact_root=str(tmp_path / "binding-smoke"),
+    )
+    paths = d5.EvidencePaths(tmp_path / "binding-smoke", authorization.campaign_id)
+    custody = d5.D5SmokeCustody.start(
+        paths,
+        authorization=authorization,
+        static_preflight={"status": "PASS"},
+        readiness=_ready().projection,
+        endpoint_calls=2,
+        smoke_kind=d5.SMOKE_BINDING_KIND,
+    )
+
+    class CallbackAdapter:
+        def bind_call_started(self, callback: Callable[[dict[str, Any]], None]) -> None:
+            self.started = callback
+
+        def bind_call_completed(self, callback: Callable[[dict[str, Any]], None]) -> None:
+            self.completed = callback
+
+        def bind_call_aborted(self, callback: Callable[[dict[str, Any]], None]) -> None:
+            self.aborted = callback
+
+        def bind_physical_attempt(self, callback: Callable[[int], None]) -> None:
+            self.physical_attempt = callback
+
+        def bind_model_io(self, callback: Callable[[dict[str, Any]], None]) -> None:
+            self.model_io = callback
+
+        def set_active_turn(self, turn_id: str) -> None:
+            self.turn_id = turn_id
+
+    inner = CallbackAdapter()
+    observer = d5._PhysicalAttemptObserver()
+    adapter = d5._ObservedLiveAdapter(inner, observer)
+    custody.bind_binding_smoke_observability(adapter)
+
+    for index, role in ((1, "planner"), (2, "section_worker")):
+        inner.started(
+            {
+                "event": "logical_call_started",
+                "index": index,
+                "generation_role": role,
+                "provider": d5.EXPECTED_PROVIDER,
+                "model": d5.EXPECTED_MODEL,
+            }
+        )
+        observer.callback(index)
+        inner.completed(
+            {
+                "event": "logical_call_completed",
+                "index": index,
+                "generation_role": role,
+                "outcome": "success",
+                "provider": d5.EXPECTED_PROVIDER,
+                "model": d5.EXPECTED_MODEL,
+            }
+        )
+
+    observer.model_io_callback(
+        {
+            "event": "physical_request",
+            "turn_id": observer.active_turn_id,
+            "logical_call_index": 1,
+            "role": "planner",
+            "physical_attempt": 1,
+            "request_sha256": "a" * 64,
+            "request_body": "private request body",
+            "request_json": {"prompt": "private request"},
+            "response_body": "private response body",
+            "response_json": {"token": "private response"},
+            "headers": {"Authorization": "Bearer private-secret"},
+            "authorization": "Bearer private-secret",
+            "api_key": "private-secret",
+        }
+    )
+    terminal = custody.finish("SMOKE_PASS")
+
+    journal = [json.loads(line) for line in paths.journal.read_text(encoding="utf-8").splitlines()]
+    calls = [row for row in journal if row["event"] == "logical_call_started"]
+    assert [(row["logical_call_index"], row["generation_role"]) for row in calls] == [
+        (1, "planner"),
+        (2, "section_worker"),
+    ]
+    assert observer.active_turn_id == d5.SMOKE_BINDING_TURN_ID
+    assert terminal["logical_generation_calls"] == 2
+    assert terminal["provider_calls"] == terminal["model_calls"] == 2
+    assert terminal["physical_generation_attempts"] == 2
+    assert terminal["logical_calls_by_role"] == {"planner": 1, "section_worker": 1}
+
+    model_io = paths.model_io.read_text(encoding="utf-8")
+    assert '"request_sha256"' in model_io
+    for forbidden in (
+        "request_body",
+        "request_json",
+        "response_body",
+        "response_json",
+        "Authorization",
+        '"authorization"',
+        '"api_key"',
+        "private-secret",
+        "private request",
+        "private response",
+    ):
+        assert forbidden not in model_io
+    serialized = "".join(
+        path.read_text(encoding="utf-8") for path in paths.all_paths() if path.is_file()
+    )
+    for forbidden in (
+        '"request_body"',
+        '"request_json"',
+        '"response_body"',
+        '"response_json"',
+        '"Authorization"',
+        '"authorization"',
+        '"api_key"',
+        "private-secret",
+    ):
+        assert forbidden not in serialized
+
+
+def test_binding_smoke_ledger_enforces_role_and_per_call_attempt_caps() -> None:
+    """Binding mode permits planner/section calls but rejects other roles/caps."""
+    ledger = d5.D5SmokeCallLedger(mode="binding_compile")
+    calls = (
+        (1, "planner"),
+        (2, "planner"),
+        (3, "section_worker"),
+        (4, "section_worker"),
+    )
+    for index, role in calls:
+        ledger.record_canonical_call_started(index, role)
+    with pytest.raises(d5.D5CallCapExceeded):
+        ledger.record_canonical_call_started(5, "section_worker")
+
+    report_ledger = d5.D5SmokeCallLedger(mode="binding_compile")
+    with pytest.raises(d5.D5CallCapExceeded):
+        report_ledger.record_canonical_call_started(1, "report_worker")
+
+    planner_ledger = d5.D5SmokeCallLedger(mode="binding_compile")
+    planner_ledger.record_canonical_call_started(1, "planner")
+    planner_ledger.record_canonical_call_started(2, "planner")
+    with pytest.raises(d5.D5CallCapExceeded):
+        planner_ledger.record_canonical_call_started(3, "planner")
+
+    section_ledger = d5.D5SmokeCallLedger(mode="binding_compile")
+    section_ledger.record_canonical_call_started(1, "section_worker")
+    section_ledger.record_canonical_call_started(2, "section_worker")
+    with pytest.raises(d5.D5CallCapExceeded):
+        section_ledger.record_canonical_call_started(3, "section_worker")
+
+    for index in range(1, 5):
+        for _ in range(3):
+            ledger.physical_attempt(index)
+    assert ledger.physical_attempts == 12
+    with pytest.raises(d5.D5CallCapExceeded, match="attempt 4"):
+        ledger.physical_attempt(1)
 
 
 def test_smoke_ledger_rejects_second_logical_and_fourth_physical_call() -> None:

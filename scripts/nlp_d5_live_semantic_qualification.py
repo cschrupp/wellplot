@@ -58,10 +58,15 @@ ROLE_LOGICAL_CALL_LIMITS = {
 }
 SMOKE_ROLE = "smoke"
 SMOKE_TURN_ID = "D5-5J-SMOKE"
+SMOKE_BINDING_KIND = "binding_compile"
+SMOKE_BINDING_TURN_ID = "D5-5J-BINDING-SMOKE"
 SMOKE_SYSTEM_PROMPT = "Return the smoke readiness object using the supplied JSON Schema."
 SMOKE_USER_PROMPT = "Return exactly one JSON object with status READY and no other fields."
 SMOKE_MAX_LOGICAL_CALLS = 1
 SMOKE_MAX_PHYSICAL_ATTEMPTS = 3
+SMOKE_BINDING_ROLE_LIMITS = {"planner": 2, "section_worker": 2, "report_worker": 0}
+SMOKE_BINDING_MAX_LOGICAL_CALLS = 4
+SMOKE_BINDING_MAX_PHYSICAL_ATTEMPTS_PER_CALL = 3
 MAX_ENDPOINT_RESPONSE_BYTES = 1_048_576
 THINKING_CONTROL_MECHANISM = "chat_template_kwargs.enable_thinking"
 THINKING_CONTROL_OPTIONS_SHA256 = "220b99e47feb82851cab428f86b8fe977ae7c605400d421a91e99d4a35ec9c26"
@@ -759,29 +764,77 @@ class EvidencePaths:
 
 @dataclass(slots=True)
 class D5SmokeCallLedger:
-    """Bound one smoke logical call and its SDK physical attempts."""
+    """Bound READY or canonical binding-smoke calls and physical attempts."""
 
+    mode: Literal["structured_ready", "binding_compile"] = "structured_ready"
     max_logical_calls: int = SMOKE_MAX_LOGICAL_CALLS
     max_physical_attempts: int = SMOKE_MAX_PHYSICAL_ATTEMPTS
     logical_calls: int = 0
     physical_attempts: int = 0
+    calls_by_role: dict[str, int] = field(default_factory=dict)
+    roles_by_index: dict[int, str] = field(default_factory=dict)
+    attempts_by_index: dict[int, int] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Set the logical-call ceiling for the selected smoke mode."""
+        if self.mode == "binding_compile":
+            self.max_logical_calls = SMOKE_BINDING_MAX_LOGICAL_CALLS
+        elif self.mode != "structured_ready":
+            raise D5HarnessError("unknown smoke accounting mode")
 
     def reserve(self) -> int:
-        """Reserve the only smoke call before provider delegation."""
+        """Reserve the READY smoke call before provider delegation."""
+        if self.mode != "structured_ready":
+            raise D5HarnessError("binding smoke calls require canonical role events")
         next_index = self.logical_calls + 1
         if next_index > self.max_logical_calls:
             raise D5CallCapExceeded("smoke logical call 2 rejected before delegation")
         self.logical_calls = next_index
+        self.roles_by_index[next_index] = SMOKE_ROLE
+        self.calls_by_role[SMOKE_ROLE] = 1
+        self.attempts_by_index[next_index] = 0
         return next_index
 
+    def record_canonical_call_started(self, index: int, role: str) -> None:
+        """Admit a canonical planner/worker call before provider delegation."""
+        if self.mode != "binding_compile":
+            raise D5HarnessError("canonical role events require binding-smoke mode")
+        if index != self.logical_calls + 1:
+            raise D5HarnessError("binding smoke logical identity is not sequential")
+        if role not in SMOKE_BINDING_ROLE_LIMITS:
+            raise D5CallCapExceeded("binding smoke generation role is not authorized")
+        if self.logical_calls >= self.max_logical_calls:
+            raise D5CallCapExceeded("binding smoke logical call 5 rejected before delegation")
+        role_count = self.calls_by_role.get(role, 0)
+        if role_count >= SMOKE_BINDING_ROLE_LIMITS[role]:
+            raise D5CallCapExceeded(f"binding smoke {role} call limit rejected before delegation")
+        self.logical_calls = index
+        self.roles_by_index[index] = role
+        self.calls_by_role[role] = role_count + 1
+        self.attempts_by_index[index] = 0
+
+    def validate_call_event(self, index: int, role: str | None) -> None:
+        """Reject lifecycle events that do not match an admitted call identity."""
+        if self.roles_by_index.get(index) != role:
+            raise D5HarnessError("binding smoke lifecycle event identity mismatch")
+
     def physical_attempt(self, logical_index: int) -> int:
-        """Count one issued SDK attempt, rejecting attempt four pre-delegation."""
-        if logical_index != 1 or self.logical_calls != 1:
+        """Count an SDK attempt under the mode-specific per-call ceiling."""
+        role = self.roles_by_index.get(logical_index)
+        if role is None:
             raise D5HarnessError("smoke physical attempt references unknown call")
-        next_attempt = self.physical_attempts + 1
-        if next_attempt > self.max_physical_attempts:
+        next_attempt = self.attempts_by_index[logical_index] + 1
+        limit = (
+            self.max_physical_attempts
+            if self.mode == "structured_ready"
+            else SMOKE_BINDING_MAX_PHYSICAL_ATTEMPTS_PER_CALL
+        )
+        if next_attempt > limit:
             raise D5CallCapExceeded("smoke physical attempt 4 rejected before delegation")
+        self.attempts_by_index[logical_index] = next_attempt
         self.physical_attempts = next_attempt
+        if self.mode == "binding_compile":
+            self.physical_attempts = sum(self.attempts_by_index.values())
         return next_attempt
 
 
@@ -810,6 +863,9 @@ class D5SmokeCustody:
         """Create smoke custody only after static checks and readiness pass."""
         ensure_fresh_namespace(paths)
         safe_asset_identities = _sanitize_source_asset_identities(source_asset_identities)
+        ledger = D5SmokeCallLedger(
+            mode="binding_compile" if smoke_kind == SMOKE_BINDING_KIND else "structured_ready"
+        )
         state = {
             "experiment_version": D5_EXPERIMENT_VERSION,
             "mode": "canonical_live_smoke",
@@ -831,6 +887,8 @@ class D5SmokeCustody:
             "static_preflight": dict(static_preflight),
             "source_asset_identities": safe_asset_identities,
         }
+        if ledger.mode == "binding_compile":
+            state["logical_calls_by_role"] = {}
         if not evidence_is_redacted(state):
             raise D5HarnessError("smoke state redaction failure")
         _atomic_json(paths.state, state, exclusive=True)
@@ -850,6 +908,7 @@ class D5SmokeCustody:
             paths=paths,
             authorization=authorization,
             state=state,
+            ledger=ledger,
         )
 
     @classmethod
@@ -1001,7 +1060,7 @@ class D5SmokeCustody:
             "obligations": [
                 item.model_dump(mode="json") for item in getattr(result, "obligations", ())
             ],
-            "merged_intent_present": getattr(result, "intent", None) is not None,
+            "merged_intent_present": getattr(result, "merged_intent", None) is not None,
         }
         if not evidence_is_redacted(payload):
             raise D5HarnessError("compile result redaction failure")
@@ -1010,16 +1069,106 @@ class D5SmokeCustody:
     def record_attempt(self, logical_index: int) -> None:
         """Persist one physical attempt after the observer accepts it."""
         attempt = self.ledger.physical_attempt(logical_index)
+        binding_event = self.ledger.mode == "binding_compile"
+        row = {
+            "event": "smoke_physical_attempt",
+            "campaign_id": self.paths.campaign_id,
+            "authorization_id": self.authorization.authorization_id,
+            "logical_call_index": logical_index,
+            "physical_attempt": attempt,
+        }
+        if binding_event:
+            row["generation_role"] = self.ledger.roles_by_index[logical_index]
+            self.state["physical_generation_attempts"] = self.ledger.physical_attempts
+            _atomic_json(self.paths.state, self.state)
+        _append_jsonl(
+            self.paths.journal,
+            row,
+        )
+
+    def record_binding_call_started(self, event: Mapping[str, Any]) -> None:
+        """Record the canonical logical index and role before provider delegation."""
+        if self.state.get("smoke_kind") != SMOKE_BINDING_KIND:
+            raise D5HarnessError("binding-smoke callback used outside binding-smoke mode")
+        index = int(event["index"])
+        role = str(event.get("generation_role", ""))
+        self.ledger.record_canonical_call_started(index, role)
+        self.state["logical_generation_calls"] = self.ledger.logical_calls
+        self.state["logical_calls_by_role"] = dict(self.ledger.calls_by_role)
+        _atomic_json(self.paths.state, self.state)
         _append_jsonl(
             self.paths.journal,
             {
-                "event": "smoke_physical_attempt",
+                "event": "logical_call_started",
+                "mode": SMOKE_BINDING_KIND,
                 "campaign_id": self.paths.campaign_id,
                 "authorization_id": self.authorization.authorization_id,
-                "logical_call_index": logical_index,
-                "physical_attempt": attempt,
+                "logical_call_index": index,
+                "generation_role": role,
+                "provider": event.get("provider"),
+                "model": event.get("model"),
             },
         )
+
+    def record_binding_call_completed(self, event: Mapping[str, Any]) -> None:
+        """Record bounded completion metadata for one admitted canonical call."""
+        index = int(event.get("index", 0))
+        role = str(event.get("generation_role", ""))
+        self.ledger.validate_call_event(index, role)
+        _append_jsonl(
+            self.paths.journal,
+            {
+                "event": "logical_call_completed",
+                "mode": SMOKE_BINDING_KIND,
+                "campaign_id": self.paths.campaign_id,
+                "authorization_id": self.authorization.authorization_id,
+                "logical_call_index": index,
+                "generation_role": role,
+                "outcome": event.get("outcome"),
+                "failure_category": event.get("failure_category"),
+            },
+        )
+
+    def record_binding_call_aborted(self, event: Mapping[str, Any]) -> None:
+        """Record bounded termination metadata for one admitted canonical call."""
+        index = int(event.get("index", 0))
+        role = str(event.get("generation_role", ""))
+        self.ledger.validate_call_event(index, role)
+        _append_jsonl(
+            self.paths.journal,
+            {
+                "event": "logical_call_aborted",
+                "mode": SMOKE_BINDING_KIND,
+                "campaign_id": self.paths.campaign_id,
+                "authorization_id": self.authorization.authorization_id,
+                "logical_call_index": index,
+                "generation_role": role,
+                "termination_kind": event.get("termination_kind"),
+                "exception_type": event.get("exception_type"),
+                "exception_module": event.get("exception_module"),
+            },
+        )
+
+    def bind_binding_smoke_observability(self, adapter: object) -> None:
+        """Bind canonical lifecycle callbacks to bounded binding-smoke custody."""
+        if self.state.get("smoke_kind") != SMOKE_BINDING_KIND:
+            raise D5HarnessError("binding-smoke wiring requires binding-smoke custody")
+        binders = {
+            "bind_call_started": self.record_binding_call_started,
+            "bind_call_completed": self.record_binding_call_completed,
+            "bind_call_aborted": self.record_binding_call_aborted,
+            "bind_physical_attempt": self.record_attempt,
+            "bind_model_io": self.record_bounded_model_io,
+        }
+        for name, callback in binders.items():
+            binder = getattr(adapter, name, None)
+            if not callable(binder):
+                raise D5HarnessError("canonical binding-smoke observer is unavailable")
+            binder(callback)
+        set_active_turn = getattr(adapter, "set_active_turn", None)
+        if not callable(set_active_turn):
+            raise D5HarnessError("canonical binding-smoke observer is unavailable")
+        set_active_turn(SMOKE_BINDING_TURN_ID)
 
     def finish(self, outcome: str, *, reason: str | None = None) -> dict[str, Any]:
         """Seal one bounded smoke terminal and its digest summary."""
@@ -1046,19 +1195,21 @@ class D5SmokeCustody:
                 "model_calls": self.ledger.logical_calls,
             }
         )
+        if self.ledger.mode == "binding_compile":
+            state["logical_calls_by_role"] = dict(self.ledger.calls_by_role)
         _atomic_json(self.paths.state, state)
-        _append_jsonl(
-            self.paths.journal,
-            {
-                "event": "smoke_terminal",
-                "campaign_id": self.paths.campaign_id,
-                "authorization_id": self.authorization.authorization_id,
-                "outcome": outcome,
-                "reason": reason,
-                "logical_generation_calls": self.ledger.logical_calls,
-                "physical_generation_attempts": self.ledger.physical_attempts,
-            },
-        )
+        journal_terminal = {
+            "event": "smoke_terminal",
+            "campaign_id": self.paths.campaign_id,
+            "authorization_id": self.authorization.authorization_id,
+            "outcome": outcome,
+            "reason": reason,
+            "logical_generation_calls": self.ledger.logical_calls,
+            "physical_generation_attempts": self.ledger.physical_attempts,
+        }
+        if self.ledger.mode == "binding_compile":
+            journal_terminal["logical_calls_by_role"] = dict(self.ledger.calls_by_role)
+        _append_jsonl(self.paths.journal, journal_terminal)
         terminal = {
             "experiment_version": D5_EXPERIMENT_VERSION,
             "mode": "canonical_live_smoke",
@@ -1089,6 +1240,8 @@ class D5SmokeCustody:
                 if path.is_file()
             },
         }
+        if self.ledger.mode == "binding_compile":
+            terminal["logical_calls_by_role"] = dict(self.ledger.calls_by_role)
         _atomic_json(self.paths.terminal, terminal, exclusive=True)
         summary = dict(terminal)
         summary["terminal_sha256"] = _sha256_file(self.paths.terminal)
