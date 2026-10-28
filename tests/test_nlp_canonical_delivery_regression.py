@@ -964,6 +964,162 @@ def test_cbl_captured_section_output_uses_compiled_request_semantics() -> None:
         assert tracks[3].grid.vertical_secondary_visible is False
 
 
+def _request_presentation_projection(
+    action: ReconstructSectionAction,
+) -> dict[str, object]:
+    """Project only request-authoritative presentation fields for parity checks."""
+    tracks = []
+    for track in action.section.tracks:
+        track_data = {
+            "kind": track.kind,
+            "title": track.title,
+            "width_mm": track.width_mm,
+            "x_scale": (
+                {
+                    name: getattr(track.x_scale, name)
+                    for name in ("kind", "minimum", "maximum", "reverse")
+                }
+                if track.x_scale
+                else None
+            ),
+            "grid": (track.grid.model_dump(mode="json", exclude_none=True) if track.grid else None),
+            "bindings": [],
+        }
+        bindings = []
+        for binding in track.bindings:
+            binding_data = {
+                "kind": binding.kind,
+                "channel": binding.channel,
+                "label": binding.label,
+            }
+            for field_name in (
+                "scale",
+                "style",
+                "profile",
+                "colormap",
+                "colorbar_enabled",
+                "colorbar_label",
+                "colorbar_position",
+                "sample_axis",
+            ):
+                value = getattr(binding, field_name, None)
+                if field_name == "style" and value is not None:
+                    binding_data[field_name] = {
+                        name: getattr(value, name) for name in ("color", "line_style", "line_width")
+                    }
+                elif field_name == "scale" and value is not None:
+                    binding_data[field_name] = {
+                        name: getattr(value, name)
+                        for name in ("kind", "minimum", "maximum", "reverse")
+                    }
+                else:
+                    binding_data[field_name] = (
+                        value.model_dump(mode="json", exclude_none=True)
+                        if hasattr(value, "model_dump")
+                        else value
+                    )
+            bindings.append(binding_data)
+        track_data["bindings"] = bindings
+        tracks.append(track_data)
+    return {"tracks": tracks}
+
+
+def test_compiled_cbl_presentation_matches_retired_normalizers() -> None:
+    """Legacy and compiled paths preserve the same request fields on both captures."""
+    request = next(
+        case["request"] for case in d4.load_cases(REPO_ROOT) if case["turn_id"] == "D4-C01:C01"
+    )
+    captured = json.loads(
+        (REPO_ROOT / "tests/fixtures/d5_5j_qwen_smoke_003_report_sections.json").read_text()
+    )
+    _compilation, plan, compiled_actions = _compiled_cbl_capture()
+
+    for section_payload, compiled_action, section_hint in zip(
+        captured["sections"], compiled_actions, ("Main Pass", "Repeat Pass"), strict=True
+    ):
+        task = next(
+            item for item in plan.section_tasks if item.existing_section_hint == section_hint
+        )
+        proposal = ReconstructSectionAction.model_validate(section_payload)
+        legacy_action = _normalize_reconstruct_track_dimensions(
+            proposal,
+            task,
+            authoritative_request=request,
+        )
+        legacy_action = _normalize_reconstruct_request_semantics(
+            legacy_action,
+            task=task,
+            authoritative_request=request,
+        )
+
+        compiled_projection = _request_presentation_projection(compiled_action)
+        legacy_projection = _request_presentation_projection(legacy_action)
+        differences = []
+        for track_index, (compiled_track, legacy_track) in enumerate(
+            zip(compiled_projection["tracks"], legacy_projection["tracks"], strict=True)
+        ):
+            for field_name in compiled_track:
+                if field_name == "bindings":
+                    for binding_index, (compiled_binding, legacy_binding) in enumerate(
+                        zip(
+                            compiled_track["bindings"],
+                            legacy_track["bindings"],
+                            strict=True,
+                        )
+                    ):
+                        for binding_field in compiled_binding:
+                            if compiled_binding[binding_field] != legacy_binding[binding_field]:
+                                differences.append(
+                                    f"track[{track_index}].bindings[{binding_index}]"
+                                    f".{binding_field}: compiled="
+                                    f"{compiled_binding[binding_field]!r}; legacy="
+                                    f"{legacy_binding[binding_field]!r}"
+                                )
+                    continue
+                if compiled_track[field_name] != legacy_track[field_name]:
+                    differences.append(
+                        f"track[{track_index}].{field_name}: "
+                        f"compiled={compiled_track[field_name]!r}; "
+                        f"legacy={legacy_track[field_name]!r}"
+                    )
+        assert not differences, differences
+
+
+def test_compiled_kind_mismatch_is_reported_without_host_overlay() -> None:
+    """A structural kind mismatch remains visible to validation after host application."""
+    request = 'Add a reference track titled "Combo".'
+    compilation = compile_request_contract(request)
+    obligations = compilation.requirements.requirements
+    proposal = ReconstructSectionAction.model_validate(
+        {
+            "action": "reconstruct",
+            "section": {
+                "title": "Main",
+                "source_candidate": "source-1",
+                "tracks": [
+                    {
+                        "semantic_id": "combo",
+                        "kind": "normal",
+                        "title": "Combo",
+                        "bindings": [{"semantic_id": "gr", "channel": "GR"}],
+                    }
+                ],
+            },
+        }
+    )
+
+    applied = apply_compiled_requirements(proposal, obligations)
+    assert applied.section.tracks[0].kind == "normal"
+    issues = section_worker._collect_validation_issues(
+        applied,
+        obligations,
+        section_context=ResolvedSectionContext(task_index=0),
+        section_title=None,
+    )
+
+    assert [(item.field, item.expected_value) for item in issues.issues] == [("kind", "reference")]
+
+
 def test_post_lowering_verification_uses_repeated_binding_slot_identity() -> None:
     """Two same-channel CBL curves are checked against their ordered request slots."""
     _compilation, plan, _actions = _compiled_cbl_capture()

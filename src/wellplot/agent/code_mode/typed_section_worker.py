@@ -1327,8 +1327,6 @@ def _apply_track_requirements(
         field = item.field
         if field == "title":
             updated["title"] = item.value
-        elif field == "kind":
-            updated["kind"] = item.value
         elif field == "width_mm":
             updated["width_mm"] = item.value
         elif field.startswith("track_scale_"):

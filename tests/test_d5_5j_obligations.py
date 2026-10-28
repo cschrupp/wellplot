@@ -16,6 +16,7 @@ from wellplot.agent.code_mode.obligations import (
     ObligationKind,
     ObligationState,
     OwnerKind,
+    RepairOperation,
     compile_request_contract,
     extract_supported_anchors,
     extract_supported_obligations,
@@ -44,6 +45,21 @@ from wellplot.agent.code_mode.semantic_actions import (
 )
 from wellplot.model import AuthoringDocumentSpec
 from wellplot.model.intent import AuthoringCurveBindingIntent, AuthoringDocumentIntent
+
+
+@pytest.mark.parametrize("operation", ["REMOVE", "MOVE"])
+def test_repair_operation_rejects_unsupported_remove_and_move(operation: str) -> None:
+    """The bounded repair schema cannot authorize deletion or reordering."""
+    with pytest.raises(ValueError):
+        RepairOperation.model_validate(
+            {
+                "requirement_id": "requirement-1",
+                "path_prefix": "section.tracks[combo]",
+                "operation": operation,
+                "owner_kind": "track",
+                "owner_ref": "combo",
+            }
+        )
 
 
 def test_obligations_use_exact_request_and_utf8_spans() -> None:

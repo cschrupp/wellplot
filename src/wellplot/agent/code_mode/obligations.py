@@ -305,7 +305,12 @@ class ValidationIssueSet(BaseModel):
 
 
 class RepairOperation(BaseModel):
-    """One narrowly permitted semantic correction operation."""
+    """One narrowly permitted semantic correction operation.
+
+    This tranche supports only ADD and REPLACE. REMOVE and MOVE remain
+    unsupported and are rejected by schema validation, so they cannot
+    authorize deletion or reordering.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
