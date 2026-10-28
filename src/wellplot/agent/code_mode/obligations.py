@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -302,6 +303,29 @@ class ValidationIssueSet(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     issues: tuple[ValidationIssue, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class SectionObjectBindings:
+    """Host-owned proposal indices shared by one section-worker pass."""
+
+    track_indices: tuple[tuple[str, int], ...] = ()
+    binding_indices: tuple[tuple[str, str, int | None], ...] = ()
+
+    def track_index(self, owner_ref: str) -> int | None:
+        """Return the one proposal track bound to a request owner."""
+        return next((index for owner, index in self.track_indices if owner == owner_ref), None)
+
+    def binding_index(self, owner_ref: str, slot_key: str) -> int | None:
+        """Return the proposal binding bound to an owner slot, if it exists."""
+        return next(
+            (
+                index
+                for owner, slot, index in self.binding_indices
+                if owner == owner_ref and slot == slot_key
+            ),
+            None,
+        )
 
 
 class RepairOperation(BaseModel):
@@ -1974,6 +1998,7 @@ def validate_section_obligations(
     *,
     section_context: ResolvedSectionContext | None = None,
     section_title: str | None = None,
+    object_bindings: SectionObjectBindings | None = None,
 ) -> None:
     """Require every supported section obligation before canonical lowering."""
     if getattr(action, "action", None) == "update_curve_scale":
@@ -2000,6 +2025,17 @@ def validate_section_obligations(
 
     def matching_bindings(item: RequestObligation) -> list[object]:
         if item.slot_key:
+            if object_bindings is not None:
+                track_index = object_bindings.track_index(item.owner_ref)
+                binding_index = object_bindings.binding_index(item.owner_ref, item.slot_key)
+                if (
+                    track_index is None
+                    or binding_index is None
+                    or not 0 <= track_index < len(tracks)
+                    or not 0 <= binding_index < len(tracks[track_index].bindings)
+                ):
+                    return []
+                return [tracks[track_index].bindings[binding_index]]
             normalized_owner = _normalize_requirement_key(item.owner_ref)
             candidate_tracks = [
                 track
@@ -2037,6 +2073,18 @@ def validate_section_obligations(
                     if getattr(binding, "channel", None) == item.value
                 ]
             return bindings
+        if object_bindings is not None:
+            track_index = object_bindings.track_index(item.owner_ref)
+            if track_index is None or not 0 <= track_index < len(tracks):
+                return []
+            owner_bindings = list(getattr(tracks[track_index], "bindings", ()))
+            if item.field == "channel":
+                return [
+                    binding
+                    for binding in owner_bindings
+                    if getattr(binding, "channel", None) == item.value
+                ]
+            return owner_bindings
         owner = item.owner_ref.casefold()
         owner_key = _normalize_requirement_key(item.owner_ref)
         return [
@@ -2071,15 +2119,23 @@ def validate_section_obligations(
             ):
                 raise ValueError(f"Forbidden channel {item.value} was emitted.")
             continue
-        if item.owner_kind is OwnerKind.TRACK:
-            matches = [
-                track
-                for track in tracks
-                if _normalize_requirement_key(str(getattr(track, "semantic_id", "")))
-                == _normalize_requirement_key(item.owner_ref)
-                or _normalize_requirement_key(str(getattr(track, "title", "")))
-                == _normalize_requirement_key(item.owner_ref)
-            ]
+        if item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK}:
+            if object_bindings is not None:
+                track_index = object_bindings.track_index(item.owner_ref)
+                matches = (
+                    [tracks[track_index]]
+                    if track_index is not None and 0 <= track_index < len(tracks)
+                    else []
+                )
+            else:
+                matches = [
+                    track
+                    for track in tracks
+                    if _normalize_requirement_key(str(getattr(track, "semantic_id", "")))
+                    == _normalize_requirement_key(item.owner_ref)
+                    or _normalize_requirement_key(str(getattr(track, "title", "")))
+                    == _normalize_requirement_key(item.owner_ref)
+                ]
             if len(matches) != 1:
                 raise ValueError("Requested track identity is unresolved or ambiguous.")
             if item.field == "target":

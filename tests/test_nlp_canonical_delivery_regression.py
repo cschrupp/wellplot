@@ -33,6 +33,8 @@ from wellplot.agent.code_mode.enrichment import (
     SourceContext,
 )
 from wellplot.agent.code_mode.obligations import (
+    ValidationIssue,
+    ValidationIssueSet,
     compile_request_contract,
     extract_supported_obligations,
     validate_section_obligations,
@@ -63,6 +65,7 @@ from wellplot.agent.providers.base import (
     StructuredGenerationRequest,
     StructuredGenerationResult,
 )
+from wellplot.authoring import load_authoring_document
 from wellplot.model.authoring import (
     AuthoringDataSource,
     AuthoringDocumentSpec,
@@ -844,6 +847,516 @@ def _compiled_cbl_capture() -> tuple[object, ...]:
     return plan.requirement_compilation, plan, tuple(actions)
 
 
+def _authority_g_worker_context(plan: SemanticPlan) -> EnrichedSemanticContext:
+    """Build provider-free source context for the sanitized Authority-G turn."""
+    channels = tuple(
+        ChannelContext(
+            mnemonic=mnemonic,
+            kind="array" if mnemonic == "VDL" else "scalar",
+        )
+        for mnemonic in (
+            "ECGR_STGC",
+            "TT",
+            "TENS",
+            "MTEM",
+            "STIT",
+            "TDSP",
+            "VSEC",
+            "CBL",
+            "VDL",
+        )
+    )
+    sources = (
+        SourceContext(
+            candidate_id="source-1",
+            labels=("CBL_Main.dlis", "CBL_Main"),
+            canonical_path="/fixture/CBL_Main.dlis",
+            source_format="dlis",
+            channels=channels,
+        ),
+        SourceContext(
+            candidate_id="source-2",
+            labels=("CBL_Repeat.dlis", "CBL_Repeat"),
+            canonical_path="/fixture/CBL_Repeat.dlis",
+            source_format="dlis",
+            channels=channels,
+        ),
+    )
+    return EnrichedSemanticContext(
+        plan=plan,
+        sections=(
+            ResolvedSectionContext(task_index=0, section_id="main_pass", sources=sources),
+            ResolvedSectionContext(task_index=1, section_id="repeat_pass", sources=sources),
+        ),
+        report=ReportContext(),
+    )
+
+
+def _authority_g_response() -> dict[str, object]:
+    """Load the sanitized exact Main Pass response captured in Authority G."""
+    captured = json.loads(
+        (REPO_ROOT / "tests/fixtures/d5_authority_g_main_pass_section_response.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert captured["provenance"]["checkpoint"] == "59350813e19389fea06fc30f07f37969e66fb1d1"
+    assert captured["provenance"]["captured_response_digest"] == (
+        "6d3d898350bb8c1585a55ee798a2611e3180a786b37ca8a9222f5076fb4054e9"
+    )
+    return captured["response"]
+
+
+def test_authority_g_captured_response_uses_one_shared_track_binding() -> None:
+    """Exact G response grounds combo once and completes canonical validation."""
+    _compilation, plan, _actions = _compiled_cbl_capture()
+    task = next(task for task in plan.section_tasks if task.existing_section_hint == "Main Pass")
+    response = _authority_g_response()
+    action = section_worker.SectionSemanticActionResponse.model_validate(response).root
+    bindings = section_worker.resolve_section_object_bindings(action, task.obligations)
+
+    assert bindings.track_index("combo") == 0
+    applied = apply_compiled_requirements(action, task.obligations, object_bindings=bindings)
+    assert applied.section.tracks[0].width_mm == 50
+    context = _authority_g_worker_context(plan)
+    section_context = context.sections[0]
+    issues = section_worker._collect_validation_issues(
+        applied,
+        task.obligations,
+        section_context=section_context,
+        section_title=task.existing_section_hint,
+        object_bindings=bindings,
+    )
+    assert issues.issues == ()
+    validate_section_obligations(
+        applied,
+        task.obligations,
+        section_context=section_context,
+        section_title=task.existing_section_hint,
+        object_bindings=bindings,
+    )
+
+    worker_backend = _StructuredFixtureBackend([response])
+    document = load_authoring_document(
+        REPO_ROOT / "tests/fixtures/agentic_cbl/cased_hole_starter.log.yaml"
+    )
+    result = asyncio.run(
+        CanonicalSectionWorker(worker_backend).compile(
+            task_index=0,
+            context=context,
+            document=document,
+            authoritative_request=next(
+                case["request"]
+                for case in d4.load_cases(REPO_ROOT)
+                if case["turn_id"] == "D4-C01:C01"
+            ),
+            timeout_seconds=10,
+        )
+    )
+    assert result.success is True, result.diagnostics
+    assert len(worker_backend.requests) == 1
+
+
+def test_grounding_rejects_duplicate_explicit_identity() -> None:
+    """Duplicate exact titles are ambiguous even when one track looks plausible."""
+    _compilation, plan, _actions = _compiled_cbl_capture()
+    task = next(task for task in plan.section_tasks if task.existing_section_hint == "Main Pass")
+    requirements = tuple(item for item in task.obligations if item.owner_ref == "combo")
+    action = ReconstructSectionAction.model_validate(
+        {
+            "action": "reconstruct",
+            "section": {
+                "title": "Main Pass",
+                "source_candidate": "source-1",
+                "tracks": [
+                    {
+                        "semantic_id": "candidate-a",
+                        "kind": "normal",
+                        "title": "Combo",
+                        "bindings": [{"semantic_id": "a", "channel": "GR"}],
+                    },
+                    {
+                        "semantic_id": "candidate-b",
+                        "kind": "normal",
+                        "title": "Combo",
+                        "bindings": [{"semantic_id": "b", "channel": "GR"}],
+                    },
+                ],
+            },
+        }
+    )
+
+    with pytest.raises(SemanticActionError, match="multiple proposal tracks") as error:
+        section_worker.resolve_section_object_bindings(action, requirements)
+    assert error.value.code == "worker_grounding_ambiguous"
+
+
+def test_grounding_rejects_partial_channel_overlap() -> None:
+    """Two partial tracks do not satisfy one complete ordered track signature."""
+    _compilation, plan, _actions = _compiled_cbl_capture()
+    task = next(task for task in plan.section_tasks if task.existing_section_hint == "Main Pass")
+    requirements = tuple(item for item in task.obligations if item.owner_ref == "combo")
+    action = ReconstructSectionAction.model_validate(
+        {
+            "action": "reconstruct",
+            "section": {
+                "title": "Main Pass",
+                "source_candidate": "source-1",
+                "tracks": [
+                    {
+                        "semantic_id": "candidate-a",
+                        "kind": "normal",
+                        "title": "First",
+                        "bindings": [
+                            {"semantic_id": "a1", "channel": "ECGR_STGC"},
+                            {"semantic_id": "a2", "channel": "TT"},
+                        ],
+                    },
+                    {
+                        "semantic_id": "candidate-b",
+                        "kind": "normal",
+                        "title": "Second",
+                        "bindings": [
+                            {"semantic_id": "b1", "channel": "TENS"},
+                            {"semantic_id": "b2", "channel": "MTEM"},
+                        ],
+                    },
+                ],
+            },
+        }
+    )
+
+    with pytest.raises(SemanticActionError) as error:
+        section_worker.resolve_section_object_bindings(action, requirements)
+    assert error.value.code == "worker_grounding_unresolved"
+
+
+def test_grounding_rejects_two_owners_assigned_to_one_track() -> None:
+    """Global assignment detects owner collisions instead of resolving locally."""
+    _compilation, plan, _actions = _compiled_cbl_capture()
+    task = next(task for task in plan.section_tasks if task.existing_section_hint == "Main Pass")
+    requirements = tuple(item for item in task.obligations if item.owner_ref in {"combo", "depth"})
+    action = ReconstructSectionAction.model_validate(
+        {
+            "action": "reconstruct",
+            "section": {
+                "title": "Main Pass",
+                "source_candidate": "source-1",
+                "tracks": [
+                    {
+                        "semantic_id": "combo",
+                        "kind": "normal",
+                        "title": "depth",
+                        "bindings": [{"semantic_id": "gr", "channel": "GR"}],
+                    }
+                ],
+            },
+        }
+    )
+
+    with pytest.raises(SemanticActionError) as error:
+        section_worker.resolve_section_object_bindings(action, requirements)
+    assert error.value.code == "worker_grounding_conflict"
+
+
+def test_grounding_signature_preserves_repeated_binding_multiplicity() -> None:
+    """The structural signature distinguishes two CBL occurrences from one."""
+    _compilation, plan, _actions = _compiled_cbl_capture()
+    task = next(task for task in plan.section_tasks if task.existing_section_hint == "Main Pass")
+    kind_fact = next(
+        item for item in task.obligations if item.owner_ref == "combo" and item.field == "kind"
+    ).model_copy(update={"owner_ref": "repeat", "value": "normal", "requirement_id": "repeat-kind"})
+    channel_fact = next(
+        item for item in task.obligations if item.owner_ref == "combo" and item.field == "channel"
+    )
+    repeated = tuple(
+        channel_fact.model_copy(
+            update={
+                "owner_ref": "repeat",
+                "value": "CBL",
+                "slot_key": f"repeat.binding.{index}",
+                "requirement_id": f"repeat-channel-{index}",
+            }
+        )
+        for index in (1, 2)
+    )
+    action = ReconstructSectionAction.model_validate(
+        {
+            "action": "reconstruct",
+            "section": {
+                "title": "Main Pass",
+                "source_candidate": "source-1",
+                "tracks": [
+                    {
+                        "semantic_id": "candidate",
+                        "kind": "normal",
+                        "title": "Other",
+                        "bindings": [
+                            {"semantic_id": "cbl-a", "channel": "CBL"},
+                            {"semantic_id": "cbl-b", "channel": "CBL"},
+                        ],
+                    }
+                ],
+            },
+        }
+    )
+
+    bindings = section_worker.resolve_section_object_bindings(action, (kind_fact, *repeated))
+    assert bindings.track_index("repeat") == 0
+    one_occurrence = action.model_copy(
+        update={
+            "section": action.section.model_copy(
+                update={
+                    "tracks": (
+                        action.section.tracks[0].model_copy(
+                            update={"bindings": action.section.tracks[0].bindings[:1]}
+                        ),
+                    )
+                }
+            )
+        }
+    )
+    with pytest.raises(SemanticActionError) as error:
+        section_worker.resolve_section_object_bindings(one_occurrence, (kind_fact, *repeated))
+    assert error.value.code == "worker_grounding_unresolved"
+
+
+def test_grounding_does_not_repair_wrong_structural_kind() -> None:
+    """Exact identity may bind a proposal, but host application leaves wrong kind intact."""
+    _compilation, plan, _actions = _compiled_cbl_capture()
+    task = next(task for task in plan.section_tasks if task.existing_section_hint == "Main Pass")
+    kind_fact = next(
+        item for item in task.obligations if item.owner_ref == "combo" and item.field == "kind"
+    )
+    action = ReconstructSectionAction.model_validate(
+        {
+            "action": "reconstruct",
+            "section": {
+                "title": "Main Pass",
+                "source_candidate": "source-1",
+                "tracks": [
+                    {
+                        "semantic_id": "combo",
+                        "kind": "reference",
+                        "title": "Combo",
+                        "bindings": [{"semantic_id": "gr", "channel": "GR"}],
+                    }
+                ],
+            },
+        }
+    )
+    bindings = section_worker.resolve_section_object_bindings(action, (kind_fact,))
+    applied = apply_compiled_requirements(action, (kind_fact,), object_bindings=bindings)
+    assert applied.section.tracks[0].kind == "reference"
+    issues = section_worker._collect_validation_issues(
+        applied,
+        (kind_fact,),
+        section_context=ResolvedSectionContext(task_index=0),
+        section_title=None,
+        object_bindings=bindings,
+    )
+    assert [(issue.field, issue.expected_value) for issue in issues.issues] == [("kind", "normal")]
+
+
+def test_structural_fallback_requires_exact_channel_cardinality() -> None:
+    """An extra channel prevents fallback from treating a signature as equivalent."""
+    _compilation, plan, _actions = _compiled_cbl_capture()
+    task = next(task for task in plan.section_tasks if task.existing_section_hint == "Main Pass")
+    requirements = tuple(item for item in task.obligations if item.owner_ref == "combo")
+    captured = _authority_g_response()
+    payload = json.loads(json.dumps(captured))
+    payload["section"]["tracks"][0]["semantic_id"] = "candidate"
+    payload["section"]["tracks"][0]["title"] = "Unrelated"
+    payload["section"]["tracks"][0]["bindings"].append({"semantic_id": "extra", "channel": "EXTRA"})
+    action = section_worker.SectionSemanticActionResponse.model_validate(payload).root
+
+    with pytest.raises(SemanticActionError) as error:
+        section_worker.resolve_section_object_bindings(action, requirements)
+    assert error.value.code == "worker_grounding_unresolved"
+
+
+def test_grounding_rejects_conflicting_exact_and_structural_evidence() -> None:
+    """An exact owner name cannot override a different full structural match."""
+    _compilation, plan, _actions = _compiled_cbl_capture()
+    task = next(task for task in plan.section_tasks if task.existing_section_hint == "Main Pass")
+    requirements = tuple(item for item in task.obligations if item.owner_ref == "combo")
+    payload = json.loads(json.dumps(_authority_g_response()))
+    payload["section"]["tracks"][0]["semantic_id"] = "combo"
+    payload["section"]["tracks"][0]["bindings"] = [{"semantic_id": "wrong", "channel": "GR"}]
+    payload["section"]["tracks"].append(
+        {
+            "semantic_id": "structural-match",
+            "kind": "normal",
+            "title": "Other",
+            "bindings": [
+                {"semantic_id": f"binding-{index}", "channel": channel}
+                for index, channel in enumerate(("ECGR_STGC", "TT", "TENS", "MTEM"))
+            ],
+        }
+    )
+    action = section_worker.SectionSemanticActionResponse.model_validate(payload).root
+
+    with pytest.raises(SemanticActionError) as error:
+        section_worker.resolve_section_object_bindings(action, requirements)
+    assert error.value.code == "worker_grounding_ambiguous"
+
+
+def test_repair_contract_uses_the_previously_bound_track() -> None:
+    """Repair paths derive from the exact host binding, not another name lookup."""
+    _compilation, plan, _actions = _compiled_cbl_capture()
+    task = next(task for task in plan.section_tasks if task.existing_section_hint == "Main Pass")
+    response = _authority_g_response()
+    action = section_worker.SectionSemanticActionResponse.model_validate(response).root
+    bindings = section_worker.resolve_section_object_bindings(action, task.obligations)
+    baseline = apply_compiled_requirements(action, task.obligations, object_bindings=bindings)
+    requirement = next(
+        item for item in task.obligations if item.owner_ref == "combo" and item.field == "width_mm"
+    )
+    issue = ValidationIssue(
+        requirement_id=requirement.requirement_id,
+        owner_kind=requirement.owner_kind,
+        owner_ref=requirement.owner_ref,
+        field=requirement.field,
+        expected_value=requirement.value,
+        code="fixture_issue",
+    )
+
+    contract = section_worker._build_repair_contract(
+        baseline,
+        ValidationIssueSet(issues=(issue,)),
+        object_bindings=bindings,
+    )
+    assert len(contract.operations) == 1
+    assert contract.operations[0].path_prefix == "section.tracks[main_pass.combo].width_mm"
+
+
+def test_unresolved_authority_g_response_is_bounded_before_correction() -> None:
+    """An unresolved G proposal returns a worker result after one model response."""
+    _compilation, plan, _actions = _compiled_cbl_capture()
+    response = json.loads(json.dumps(_authority_g_response()))
+    combo = response["section"]["tracks"][0]
+    combo["semantic_id"] = "unrelated-track"
+    combo["title"] = "Unrelated"
+    combo["bindings"] = [{"semantic_id": "only", "channel": "GR"}]
+    backend = _StructuredFixtureBackend([response])
+    context = _authority_g_worker_context(plan)
+    document = load_authoring_document(
+        REPO_ROOT / "tests/fixtures/agentic_cbl/cased_hole_starter.log.yaml"
+    )
+
+    result = asyncio.run(
+        CanonicalSectionWorker(backend).compile(
+            task_index=0,
+            context=context,
+            document=document,
+            authoritative_request=next(
+                case["request"]
+                for case in d4.load_cases(REPO_ROOT)
+                if case["turn_id"] == "D4-C01:C01"
+            ),
+            timeout_seconds=10,
+        )
+    )
+    assert result.success is False
+    assert result.diagnostics[0].code == "worker_grounding_unresolved"
+    assert result.stage_evidence.normalization == "FAIL"
+    assert len(backend.requests) == 1
+
+
+def test_correction_identity_drift_is_rejected_with_frozen_binding() -> None:
+    """Raw correction cannot rename an existing track before host reapplication."""
+    _compilation, plan, _actions = _compiled_cbl_capture()
+    task = next(task for task in plan.section_tasks if task.existing_section_hint == "Main Pass")
+    action = section_worker.SectionSemanticActionResponse.model_validate(
+        _authority_g_response()
+    ).root
+    bindings = section_worker.resolve_section_object_bindings(action, task.obligations)
+    baseline = apply_compiled_requirements(action, task.obligations, object_bindings=bindings)
+    requirement = next(
+        item for item in task.obligations if item.owner_ref == "combo" and item.field == "width_mm"
+    )
+    issue = ValidationIssue(
+        requirement_id=requirement.requirement_id,
+        owner_kind=requirement.owner_kind,
+        owner_ref=requirement.owner_ref,
+        field=requirement.field,
+        expected_value=requirement.value,
+        code="fixture_issue",
+    )
+    contract = section_worker._build_repair_contract(
+        baseline,
+        ValidationIssueSet(issues=(issue,)),
+        object_bindings=bindings,
+    )
+    changed_track = baseline.section.tracks[0].model_copy(update={"semantic_id": "renamed-track"})
+    candidate = baseline.model_copy(
+        update={
+            "section": baseline.section.model_copy(
+                update={"tracks": (changed_track, *baseline.section.tracks[1:])}
+            )
+        }
+    )
+
+    with pytest.raises(SemanticActionError) as error:
+        section_worker._verify_repair_candidate(
+            baseline, candidate, contract, object_bindings=bindings
+        )
+    assert error.value.code == "worker_correction_scope_violation"
+
+
+def test_correction_structural_kind_change_is_rejected() -> None:
+    """A REPLACE authority for presentation cannot authorize a track-kind edit."""
+    request = (
+        "In the Main Log section.\nOn gamma: "
+        "GR -> Gamma Ray, linear 0..150, #111111, width 1; "
+        "CALI -> Caliper, linear 0..20, #111111, width 1."
+    )
+    obligations = compile_request_contract(request).requirements.requirements
+    baseline = ReconstructSectionAction.model_validate(
+        {
+            "action": "reconstruct",
+            "section": {
+                "title": "Main Log",
+                "source_candidate": "source-1",
+                "tracks": [
+                    {
+                        "semantic_id": "gamma",
+                        "kind": "normal",
+                        "title": "Gamma",
+                        "width_mm": 20,
+                        "bindings": [{"semantic_id": "gr", "channel": "GR"}],
+                    }
+                ],
+            },
+        }
+    )
+    bindings = section_worker.resolve_section_object_bindings(baseline, obligations)
+    label_issue = next(
+        item for item in obligations if item.owner_ref == "gamma" and item.field == "channel"
+    )
+    issue = ValidationIssue(
+        requirement_id=label_issue.requirement_id,
+        owner_kind=label_issue.owner_kind,
+        owner_ref=label_issue.owner_ref,
+        field=label_issue.field,
+        expected_value=label_issue.value,
+        code="fixture_issue",
+    )
+    contract = section_worker._build_repair_contract(
+        baseline,
+        ValidationIssueSet(issues=(issue,)),
+        object_bindings=bindings,
+    )
+    candidate_data = baseline.model_dump(mode="json", exclude_unset=True)
+    candidate_data["section"]["tracks"][0]["kind"] = "reference"
+    candidate = section_worker.SectionSemanticActionResponse.model_validate(candidate_data).root
+
+    with pytest.raises(SemanticActionError) as error:
+        section_worker._verify_repair_candidate(
+            baseline, candidate, contract, object_bindings=bindings
+        )
+    assert error.value.code == "worker_correction_scope_violation"
+
+
 _CBL_MIGRATION_CASES = (
     ("C01", "combo", "kind", "normal", None),
     ("C02", "combo", "width_mm", 50.0, None),
@@ -1108,13 +1621,15 @@ def test_compiled_kind_mismatch_is_reported_without_host_overlay() -> None:
         }
     )
 
-    applied = apply_compiled_requirements(proposal, obligations)
+    object_bindings = section_worker.resolve_section_object_bindings(proposal, obligations)
+    applied = apply_compiled_requirements(proposal, obligations, object_bindings=object_bindings)
     assert applied.section.tracks[0].kind == "normal"
     issues = section_worker._collect_validation_issues(
         applied,
         obligations,
         section_context=ResolvedSectionContext(task_index=0),
         section_title=None,
+        object_bindings=object_bindings,
     )
 
     assert [(item.field, item.expected_value) for item in issues.issues] == [("kind", "reference")]
@@ -1219,6 +1734,13 @@ def test_compiled_worker_path_cannot_reenter_legacy_request_parsers() -> None:
     assert "_normalize_curve_request_semantics" not in worker_body
     assert "extract_supported_obligations" not in worker_body
     assert "compile_request_contract" not in worker_body
+    assert worker_body.count("resolve_section_object_bindings(") == 1
+    assert worker_body.count("object_bindings=object_bindings") >= 4
+
+    canonical_worker_source = inspect.getsource(section_worker)
+    assert "def _resolve_requirement_track(" not in canonical_worker_source
+    assert "def _resolve_issue_track(" not in canonical_worker_source
+    assert "def _resolve_issue_binding(" not in canonical_worker_source
 
     wire_fields = set(_PlannerWireSectionTask.model_fields)
     assert not {"obligations", "requirement_refs", "scope_id"} & wire_fields
@@ -1444,13 +1966,13 @@ def test_canonical_section_worker_ignores_uncompiled_planner_dimension_prose() -
             "title": "Main Log",
             "tracks": [
                 {
-                    "semantic_id": "gamma",
+                    "semantic_id": "gr",
                     "kind": "normal",
                     "title": "Gamma Ray",
                     "width_mm": 30,
                     "bindings": [
                         {
-                            "semantic_id": "gr",
+                            "semantic_id": "gamma",
                             "channel": "GR",
                             "label": "Gamma Ray",
                             "scale": {
@@ -1776,6 +2298,31 @@ def test_canonical_section_worker_exposes_source_labels_without_paths() -> None:
     assert "canonical_path" not in json.dumps(payload)
 
 
+def test_canonical_section_worker_propagates_async_cancellation() -> None:
+    """Section-worker cancellation remains control flow, not a semantic failure."""
+
+    class CancellingBackend:
+        async def generate_structured(
+            self,
+            request: StructuredGenerationRequest,
+            *,
+            response_model: type[object],
+        ) -> StructuredGenerationResult[object]:
+            del request, response_model
+            raise asyncio.CancelledError
+
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(
+            CanonicalSectionWorker(backend=CancellingBackend()).compile(
+                task_index=0,
+                context=_context(),
+                document=_document(),
+                authoritative_request="Set the Gamma Ray scale to linear 0..150.",
+                timeout_seconds=10,
+            )
+        )
+
+
 def test_canonical_section_worker_retries_incomplete_reconstruction() -> None:
     """One missing ordered binding is repaired under its exact compiled slot."""
     base_context = _context()
@@ -1797,7 +2344,7 @@ def test_canonical_section_worker_retries_incomplete_reconstruction() -> None:
             "title": "Main",
             "tracks": [
                 {
-                    "semantic_id": "gr",
+                    "semantic_id": "gamma",
                     "kind": "normal",
                     "title": "Gamma Ray",
                     "bindings": [{"semantic_id": "gr", "channel": "GR"}],
@@ -1812,7 +2359,7 @@ def test_canonical_section_worker_retries_incomplete_reconstruction() -> None:
             "title": "Main Log",
             "tracks": [
                 {
-                    "semantic_id": "gr",
+                    "semantic_id": "gamma",
                     "kind": "normal",
                     "title": "Gamma Ray",
                     "bindings": [
@@ -1908,7 +2455,7 @@ def test_canonical_section_worker_bounds_unauthorized_correction_scope() -> None
             "title": "Main",
             "tracks": [
                 {
-                    "semantic_id": "gr",
+                    "semantic_id": "gamma",
                     "kind": "normal",
                     "title": "Gamma Ray",
                     "bindings": [{"semantic_id": "gr", "channel": "GR"}],
@@ -1923,7 +2470,7 @@ def test_canonical_section_worker_bounds_unauthorized_correction_scope() -> None
             "title": "Main Log",
             "tracks": [
                 {
-                    "semantic_id": "gr",
+                    "semantic_id": "gamma",
                     "kind": "normal",
                     "title": "Gamma Ray",
                     "bindings": [

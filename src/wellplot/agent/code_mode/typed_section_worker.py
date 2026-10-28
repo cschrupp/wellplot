@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections import Counter
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
@@ -31,6 +32,7 @@ from .obligations import (
     RepairContract,
     RepairOperation,
     RequestObligation,
+    SectionObjectBindings,
     ValidationIssue,
     ValidationIssueSet,
     validate_section_obligations,
@@ -453,23 +455,39 @@ class CanonicalSectionWorker:
         raw_action: SectionSemanticAction = generated.value.root
         correction_contract: RepairContract | None = None
         correction_baseline: SectionSemanticAction | None = None
+        object_bindings: SectionObjectBindings | None = None
         for attempt in range(2):
             try:
                 if attempt:
-                    if correction_baseline is None or correction_contract is None:
+                    if (
+                        correction_baseline is None
+                        or correction_contract is None
+                        or object_bindings is None
+                    ):
                         return _canonical_failure(
                             "worker_repair_contract_missing",
                             "Section correction lacks a frozen repair contract.",
                             correction="FAIL",
                         )
-                    _verify_repair_candidate(correction_baseline, raw_action, correction_contract)
+                    _verify_repair_candidate(
+                        correction_baseline,
+                        raw_action,
+                        correction_contract,
+                        object_bindings=object_bindings,
+                    )
                 action = _bind_compiled_source(raw_action, task.obligations, section_context)
-                action = apply_compiled_requirements(action, task.obligations)
+                if not attempt:
+                    object_bindings = resolve_section_object_bindings(action, task.obligations)
+                assert object_bindings is not None
+                action = apply_compiled_requirements(
+                    action, task.obligations, object_bindings=object_bindings
+                )
                 issues = _collect_validation_issues(
                     action,
                     task.obligations,
                     section_context=section_context,
                     section_title=task.existing_section_hint,
+                    object_bindings=object_bindings,
                 )
                 if issues.issues:
                     raise SemanticActionError(
@@ -481,6 +499,7 @@ class CanonicalSectionWorker:
                     task.obligations,
                     section_context=section_context,
                     section_title=task.existing_section_hint,
+                    object_bindings=object_bindings,
                 )
                 try:
                     intent = lower_section_action(
@@ -523,6 +542,12 @@ class CanonicalSectionWorker:
                     normalization="FAIL",
                 )
             except SemanticActionError as error:
+                if error.code.startswith("worker_grounding_"):
+                    return _canonical_failure(
+                        error.code,
+                        "Section proposal identity could not be grounded safely.",
+                        normalization="FAIL",
+                    )
                 if error.code == "worker_correction_scope_violation":
                     return _canonical_failure(
                         error.code,
@@ -544,6 +569,7 @@ class CanonicalSectionWorker:
                     task.obligations,
                     section_context=section_context,
                     section_title=task.existing_section_hint,
+                    object_bindings=object_bindings,
                 )
                 if not issues.issues:
                     return _canonical_failure(
@@ -553,7 +579,24 @@ class CanonicalSectionWorker:
                         worker_obligation="FAIL",
                     )
                 correction_baseline = action
-                correction_contract = _build_repair_contract(correction_baseline, issues)
+                try:
+                    correction_contract = _build_repair_contract(
+                        correction_baseline, issues, object_bindings=object_bindings
+                    )
+                except SemanticActionError as repair_error:
+                    if repair_error.code not in {
+                        "worker_grounding_unresolved",
+                        "worker_grounding_ambiguous",
+                        "worker_repair_target_unresolved",
+                        "worker_repair_target_ambiguous",
+                    }:
+                        raise
+                    return _canonical_failure(
+                        repair_error.code,
+                        "A safe section repair target could not be grounded.",
+                        normalization="PASS",
+                        worker_obligation="FAIL",
+                    )
                 correction_payload = {
                     **payload,
                     "correction": {
@@ -1215,11 +1258,205 @@ def _bind_compiled_source(
     )
 
 
+def resolve_section_object_bindings(
+    action: SectionSemanticAction,
+    obligations: tuple[RequestObligation, ...],
+) -> SectionObjectBindings:
+    """Bind request owners to proposal objects once, before presentation overlay."""
+    if action.action == "reconstruct":
+        tracks = [
+            track.model_dump(mode="json", exclude_unset=True) for track in action.section.tracks
+        ]
+    elif action.action == "add_track":
+        tracks = [action.track.model_dump(mode="json", exclude_unset=True)]
+    else:
+        return SectionObjectBindings()
+
+    relevant = [
+        item
+        for item in obligations
+        if item.state is ObligationState.SET
+        and item.owner_ref != "request"
+        and item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK, OwnerKind.BINDING}
+    ]
+    owners = tuple(dict.fromkeys(item.owner_ref for item in relevant))
+    candidates_by_owner: dict[str, tuple[int, ...]] = {}
+    for owner in owners:
+        owner_facts = [item for item in relevant if item.owner_ref == owner]
+        explicit = tuple(
+            index
+            for index, track in enumerate(tracks)
+            if _normalized_identity(owner)
+            in {
+                _normalized_identity(str(track.get("semantic_id", ""))),
+                _normalized_identity(str(track.get("title", ""))),
+            }
+        )
+        structural = _structural_track_candidates(tracks, owner_facts)
+        if len(explicit) > 1:
+            raise SemanticActionError(
+                "worker_grounding_ambiguous",
+                "A request track identity matches multiple proposal tracks.",
+            )
+        if explicit:
+            if len(structural) > 1 or (structural and structural[0] != explicit[0]):
+                raise SemanticActionError(
+                    "worker_grounding_ambiguous",
+                    "Explicit and structural track identity evidence conflicts.",
+                )
+            candidates_by_owner[owner] = explicit
+        elif structural:
+            candidates_by_owner[owner] = structural
+        else:
+            raise SemanticActionError(
+                "worker_grounding_unresolved",
+                "A request track cannot be bound by exact identity or complete structure.",
+            )
+
+    assignments: list[dict[str, int]] = []
+
+    def assign(position: int, selected: dict[str, int], used: set[int]) -> None:
+        if len(assignments) > 1:
+            return
+        if position == len(owners):
+            assignments.append(dict(selected))
+            return
+        owner = owners[position]
+        for index in candidates_by_owner[owner]:
+            if index in used:
+                continue
+            selected[owner] = index
+            used.add(index)
+            assign(position + 1, selected, used)
+            used.remove(index)
+            del selected[owner]
+
+    assign(0, {}, set())
+    if len(assignments) != 1:
+        code = "worker_grounding_ambiguous" if assignments else "worker_grounding_conflict"
+        raise SemanticActionError(code, "Request track owners do not have one unique assignment.")
+
+    track_indices = assignments[0]
+    request_facts = [
+        item
+        for item in obligations
+        if item.state is ObligationState.SET
+        and item.owner_ref == "request"
+        and item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK, OwnerKind.BINDING}
+    ]
+    if request_facts:
+        request_candidates = _tracks_for_request_owned_facts(tracks, request_facts)
+        if len(request_candidates) == 1:
+            track_indices["request"] = request_candidates[0]
+
+    binding_indices: list[tuple[str, str, int | None]] = []
+    for owner, track_index in track_indices.items():
+        facts_by_slot: dict[str, list[RequestObligation]] = {}
+        for item in obligations:
+            if item.state is not ObligationState.SET:
+                continue
+            if item.owner_ref == owner and item.owner_kind is OwnerKind.BINDING and item.slot_key:
+                facts_by_slot.setdefault(item.slot_key, []).append(item)
+        bindings = list(tracks[track_index].get("bindings", []))
+        for slot, facts in facts_by_slot.items():
+            try:
+                binding_index = _resolve_binding_slot(bindings, facts, slot)
+            except SemanticActionError as error:
+                raise SemanticActionError(
+                    "worker_grounding_unresolved",
+                    "A request binding slot cannot be grounded uniquely.",
+                ) from error
+            if binding_index is None:
+                ordinal = re.search(r"\.binding\.(\d+)$", slot)
+                if ordinal is not None:
+                    binding_index = int(ordinal.group(1)) - 1
+            binding_indices.append((owner, slot, binding_index))
+
+    return SectionObjectBindings(
+        track_indices=tuple(track_indices.items()),
+        binding_indices=tuple(binding_indices),
+    )
+
+
+def _structural_track_candidates(
+    tracks: list[dict[str, object]], requirements: list[RequestObligation]
+) -> tuple[int, ...]:
+    """Find exact ordered typed signatures, preserving binding occurrences."""
+    expected_kind = next(
+        (str(item.value).casefold() for item in requirements if item.field == "kind"), None
+    )
+    if expected_kind is None and any(
+        item.owner_kind is OwnerKind.ARRAY_TRACK for item in requirements
+    ):
+        expected_kind = "array"
+    channel_facts = [
+        item
+        for item in requirements
+        if item.owner_kind is OwnerKind.BINDING and item.field == "channel"
+    ]
+    if not channel_facts or any(not item.slot_key for item in channel_facts):
+        return ()
+
+    def slot_order(item: RequestObligation) -> tuple[int, str]:
+        match = re.search(r"\.binding\.(\d+)$", item.slot_key or "")
+        if match:
+            return int(match.group(1)), item.slot_key or ""
+        if item.slot_key and item.slot_key.endswith(".binding.raster"):
+            return 2**31 - 1, item.slot_key
+        return 2**31 - 2, item.slot_key or ""
+
+    expected_channels = tuple(
+        str(item.value).casefold() for item in sorted(channel_facts, key=slot_order)
+    )
+    if len({item.slot_key for item in channel_facts}) != len(channel_facts):
+        raise SemanticActionError(
+            "worker_grounding_ambiguous", "A request owner declares duplicate binding slots."
+        )
+    raster_fields = {
+        "raster_profile",
+        "raster_colormap",
+        "colorbar_enabled",
+        "colorbar_label",
+        "colorbar_position",
+        "sample_axis_enabled",
+        "sample_axis_unit",
+        "sample_axis_source_origin",
+        "sample_axis_source_step",
+    }
+    expected_binding_kind = (
+        "raster"
+        if expected_kind == "array" or any(item.field in raster_fields for item in requirements)
+        else "curve"
+    )
+    matches: list[int] = []
+    for index, track in enumerate(tracks):
+        if expected_kind and str(track.get("kind", "")).casefold() != expected_kind:
+            continue
+        actual_signature = tuple(
+            (
+                "raster" if _is_raster_binding_data(binding) else "curve",
+                str(binding.get("channel", "")).casefold(),
+            )
+            for binding in track.get("bindings", [])
+            if isinstance(binding, dict)
+        )
+        expected_signature = tuple(
+            (expected_binding_kind, channel) for channel in expected_channels
+        )
+        if actual_signature == expected_signature:
+            matches.append(index)
+    return tuple(matches)
+
+
 def apply_compiled_requirements(
     action: SectionSemanticAction,
     obligations: tuple[RequestObligation, ...],
+    *,
+    object_bindings: SectionObjectBindings | None = None,
 ) -> SectionSemanticAction:
-    """Apply supported SET requirements by identity without using planner prose."""
+    """Apply host-owned requirements to objects in the shared binding result."""
+    if object_bindings is None:
+        object_bindings = resolve_section_object_bindings(action, obligations)
     requirements = [item for item in obligations if item.state is ObligationState.SET]
     if action.action == "update_curve_scale":
         return action
@@ -1232,14 +1469,23 @@ def apply_compiled_requirements(
             if item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK, OwnerKind.BINDING}
         ):
             owned = [item for item in requirements if item.owner_ref == owner_ref]
-            if owner_ref == "request":
-                eligible = _tracks_for_request_owned_facts(tracks, owned)
-                if len(eligible) != 1:
+            track_index = object_bindings.track_index(owner_ref)
+            if track_index is None:
+                if owner_ref == "request":
                     continue
-                track_index = eligible[0]
-            else:
-                track_index = _resolve_requirement_track(tracks, owned)
-            tracks[track_index] = _apply_track_requirements(tracks[track_index], owned)
+                raise SemanticActionError(
+                    "worker_grounding_unresolved", "A request track has no host binding."
+                )
+            if not 0 <= track_index < len(tracks):
+                raise SemanticActionError(
+                    "worker_grounding_unresolved", "A request track binding is out of range."
+                )
+            tracks[track_index] = _apply_track_requirements(
+                tracks[track_index],
+                owned,
+                object_bindings=object_bindings,
+                owner_ref=owner_ref,
+            )
         for item in requirements:
             if item.owner_kind is OwnerKind.SECTION and item.field == "target":
                 section_data["title"] = item.value
@@ -1252,66 +1498,24 @@ def apply_compiled_requirements(
         owned = [
             item for item in requirements if item.owner_kind in {OwnerKind.TRACK, OwnerKind.BINDING}
         ]
-        track_data = _apply_track_requirements(track_data, owned)
+        track_data = _apply_track_requirements(
+            track_data,
+            owned,
+            object_bindings=object_bindings,
+            owner_ref=owned[0].owner_ref if owned else "",
+        )
         return SectionSemanticActionResponse.model_validate(
             {"action": "add_track", "track": track_data}
         ).root
     return action
 
 
-def _resolve_requirement_track(
-    tracks: list[dict[str, object]],
-    requirements: list[RequestObligation],
-) -> int:
-    """Resolve a request track by local identity, then unique semantic shape."""
-    owner_ref = requirements[0].owner_ref
-    normalized = _normalized_identity(owner_ref)
-    matches = [
-        index
-        for index, track in enumerate(tracks)
-        if normalized
-        in {
-            _normalized_identity(str(track.get("semantic_id", ""))),
-            _normalized_identity(str(track.get("title", ""))),
-        }
-    ]
-    if len(matches) == 1:
-        return matches[0]
-    expected_kind = next(
-        (str(item.value).casefold() for item in requirements if item.field == "kind"), None
-    )
-    expected_width = next(
-        (float(item.value) for item in requirements if item.field == "width_mm"), None
-    )
-    channels = {
-        str(item.value).casefold()
-        for item in requirements
-        if item.owner_kind is OwnerKind.BINDING and item.field == "channel"
-    }
-    candidates = []
-    for index, track in enumerate(tracks):
-        track_channels = {
-            str(binding.get("channel", "")).casefold()
-            for binding in track.get("bindings", [])
-            if isinstance(binding, dict)
-        }
-        if expected_kind and str(track.get("kind", "")).casefold() != expected_kind:
-            continue
-        if expected_width and float(track.get("width_mm") or -1) != expected_width:
-            continue
-        if channels and not channels.intersection(track_channels):
-            continue
-        candidates.append(index)
-    if len(candidates) != 1:
-        raise SemanticActionError(
-            "semantic_contract_incomplete",
-            "A request-declared track cannot be resolved to exactly one semantic track.",
-        )
-    return candidates[0]
-
-
 def _apply_track_requirements(
-    track: dict[str, object], requirements: list[RequestObligation]
+    track: dict[str, object],
+    requirements: list[RequestObligation],
+    *,
+    object_bindings: SectionObjectBindings,
+    owner_ref: str,
 ) -> dict[str, object]:
     """Apply track and binding facts while retaining ordered collection identity."""
     updated = dict(track)
@@ -1340,8 +1544,8 @@ def _apply_track_requirements(
             grid_values[field] = item.value
 
     for slot, facts in binding_requirements.items():
-        binding_index = _resolve_binding_slot(bindings, facts, slot)
-        if binding_index is None:
+        binding_index = object_bindings.binding_index(owner_ref, slot)
+        if binding_index is None or not 0 <= binding_index < len(bindings):
             continue
         binding = bindings[binding_index]
         expected_channel = next((item.value for item in facts if item.field == "channel"), None)
@@ -1461,24 +1665,26 @@ def _tracks_for_request_owned_facts(
     tracks: list[dict[str, object]], requirements: list[RequestObligation]
 ) -> list[int]:
     """Find tracks uniquely compatible with owner-neutral compiled facts."""
-    requested_channels = {
+    requested_channels = Counter(
         str(item.value).casefold()
         for item in requirements
         if item.owner_kind is OwnerKind.BINDING and item.field == "channel"
-    }
+    )
     if not requested_channels:
         return list(range(len(tracks)))
-    return [
-        index
-        for index, track in enumerate(tracks)
-        if requested_channels.issubset(
-            {
-                str(binding.get("channel", "")).casefold()
-                for binding in track.get("bindings", [])
-                if isinstance(binding, dict)
-            }
+    eligible: list[int] = []
+    for index, track in enumerate(tracks):
+        available_channels = Counter(
+            str(binding.get("channel", "")).casefold()
+            for binding in track.get("bindings", [])
+            if isinstance(binding, dict)
         )
-    ]
+        has_requested_multiplicity = all(
+            available_channels[channel] >= count for channel, count in requested_channels.items()
+        )
+        if has_requested_multiplicity:
+            eligible.append(index)
+    return eligible
 
 
 def _collect_validation_issues(
@@ -1487,6 +1693,7 @@ def _collect_validation_issues(
     *,
     section_context: ResolvedSectionContext,
     section_title: str | None,
+    object_bindings: SectionObjectBindings,
 ) -> ValidationIssueSet:
     """Collect each unsatisfied requirement independently in stable source order."""
     issues: list[ValidationIssue] = []
@@ -1501,24 +1708,18 @@ def _collect_validation_issues(
             ):
                 continue
             slotted_channel_ids.add(item.requirement_id)
-            track_data = [
-                track.model_dump(mode="json", exclude_unset=True) for track in action.section.tracks
-            ]
+            track_index = object_bindings.track_index(item.owner_ref)
+            binding_index = object_bindings.binding_index(item.owner_ref, item.slot_key)
             try:
-                track_index = _resolve_requirement_track(track_data, [item])
-                track = action.section.tracks[track_index]
-                binding_index = _resolve_binding_slot(
-                    [
-                        binding.model_dump(mode="json", exclude_unset=True)
-                        for binding in track.bindings
-                    ],
-                    [item],
-                    item.slot_key,
-                )
+                track = action.section.tracks[track_index] if track_index is not None else None
                 actual_channel = (
-                    track.bindings[binding_index].channel if binding_index is not None else None
+                    track.bindings[binding_index].channel
+                    if track is not None
+                    and binding_index is not None
+                    and 0 <= binding_index < len(track.bindings)
+                    else None
                 )
-            except (ValueError, SemanticActionError):
+            except (IndexError, TypeError):
                 actual_channel = None
             if actual_channel != item.value:
                 issues.append(
@@ -1543,6 +1744,7 @@ def _collect_validation_issues(
                 (item,),
                 section_context=section_context,
                 section_title=section_title,
+                object_bindings=object_bindings,
             )
         except (ValueError, SemanticActionError):
             issues.append(
@@ -1562,16 +1764,32 @@ def _collect_validation_issues(
 def _build_repair_contract(
     baseline: SectionSemanticAction,
     issues: ValidationIssueSet,
+    *,
+    object_bindings: SectionObjectBindings,
 ) -> RepairContract:
     """Derive permitted edits from issue identity, not a broad field allowlist."""
     operation_groups: dict[tuple[str, str, str | None], list[ValidationIssue]] = {}
     if baseline.action == "reconstruct":
         tracks = baseline.section.tracks
         for issue in issues.issues:
-            track = _resolve_issue_track(tracks, issue.owner_ref)
+            track_index = object_bindings.track_index(issue.owner_ref)
+            if track_index is None or not 0 <= track_index < len(tracks):
+                raise SemanticActionError(
+                    "worker_repair_target_unresolved", "A repair issue has no bound track."
+                )
+            track = tracks[track_index]
             prefix = f"section.tracks[{track.semantic_id}]"
             if issue.owner_kind is OwnerKind.BINDING:
-                binding = _resolve_issue_binding(track.bindings, issue.slot_key)
+                binding_index = (
+                    object_bindings.binding_index(issue.owner_ref, issue.slot_key)
+                    if issue.slot_key
+                    else None
+                )
+                binding = (
+                    track.bindings[binding_index]
+                    if binding_index is not None and 0 <= binding_index < len(track.bindings)
+                    else None
+                )
                 if binding is None:
                     prefix += ".bindings"
                     operation_key = (prefix, "ADD", issue.slot_key)
@@ -1587,7 +1805,12 @@ def _build_repair_contract(
         first = grouped_issues[0]
         track_order: tuple[str, ...] = ()
         if operation == "ADD" and baseline.action == "reconstruct":
-            track = _resolve_issue_track(baseline.section.tracks, first.owner_ref)
+            track_index = object_bindings.track_index(first.owner_ref)
+            if track_index is None or not 0 <= track_index < len(baseline.section.tracks):
+                raise SemanticActionError(
+                    "worker_repair_target_unresolved", "An ADD operation has no bound track."
+                )
+            track = baseline.section.tracks[track_index]
             track_order = tuple(binding.semantic_id for binding in track.bindings)
         expected_channel = next(
             (issue.expected_value for issue in grouped_issues if issue.field == "channel"),
@@ -1617,47 +1840,6 @@ def _build_repair_contract(
         operations=tuple(operations),
         postconditions=issues.issues,
     )
-
-
-def _resolve_issue_track(tracks: tuple[object, ...], owner_ref: str) -> object:
-    key = _normalized_identity(owner_ref)
-    matches = [
-        track
-        for track in tracks
-        if key
-        in {
-            _normalized_identity(str(getattr(track, "semantic_id", ""))),
-            _normalized_identity(str(getattr(track, "title", ""))),
-        }
-    ]
-    if len(matches) == 1:
-        return matches[0]
-    if len(tracks) == 1:
-        return tracks[0]
-    raise SemanticActionError(
-        "worker_repair_contract_ambiguous",
-        "A repair issue does not identify one track.",
-    )
-
-
-def _resolve_issue_binding(bindings: tuple[object, ...], slot_key: str | None) -> object | None:
-    if slot_key is None:
-        return None
-    if slot_key.endswith(".binding.raster"):
-        matches = [
-            binding
-            for binding in bindings
-            if any(
-                getattr(binding, field, None) is not None
-                for field in ("profile", "colormap", "sample_axis", "colorbar_enabled")
-            )
-        ]
-        return matches[0] if len(matches) == 1 else None
-    match = re.search(r"\.binding\.(\d+)$", slot_key)
-    if match is None:
-        return None
-    index = int(match.group(1)) - 1
-    return bindings[index] if 0 <= index < len(bindings) else None
 
 
 def _semantic_field(field: str) -> str:
@@ -1697,6 +1879,8 @@ def _verify_repair_candidate(
     baseline: SectionSemanticAction,
     candidate: SectionSemanticAction,
     contract: RepairContract,
+    *,
+    object_bindings: SectionObjectBindings,
 ) -> None:
     """Reject identity/order/cardinality changes outside exact repair paths."""
     if (
@@ -1785,7 +1969,7 @@ def _verify_repair_candidate(
         )
     for operation in contract.operations:
         if operation.operation == "REPLACE":
-            actual = _read_operation_value(candidate, operation)
+            actual = _read_operation_value(candidate, operation, object_bindings=object_bindings)
             if actual != operation.expected_value:
                 raise SemanticActionError(
                     "worker_correction_scope_violation",
@@ -1817,11 +2001,29 @@ def _binding_slot_index(slot_key: str | None) -> int:
 def _read_operation_value(
     action: SectionSemanticAction,
     operation: RepairOperation,
+    *,
+    object_bindings: SectionObjectBindings,
 ) -> object:
     """Read the exact owner field authorized by one REPLACE operation."""
     if operation.owner_kind is OwnerKind.BINDING:
-        track = _resolve_issue_track(action.section.tracks, operation.owner_ref)
-        binding = _resolve_issue_binding(track.bindings, operation.slot_key)
+        track_index = object_bindings.track_index(operation.owner_ref)
+        binding_index = (
+            object_bindings.binding_index(operation.owner_ref, operation.slot_key)
+            if operation.slot_key
+            else None
+        )
+        track = (
+            action.section.tracks[track_index]
+            if track_index is not None and 0 <= track_index < len(action.section.tracks)
+            else None
+        )
+        binding = (
+            track.bindings[binding_index]
+            if track is not None
+            and binding_index is not None
+            and 0 <= binding_index < len(track.bindings)
+            else None
+        )
         if binding is None or operation.field is None:
             raise SemanticActionError(
                 "worker_correction_scope_violation",
@@ -1830,7 +2032,16 @@ def _read_operation_value(
         return _read_binding_issue_value(binding, operation.field)
     if action.action != "reconstruct":
         return None
-    track = _resolve_issue_track(action.section.tracks, operation.owner_ref)
+    track_index = object_bindings.track_index(operation.owner_ref)
+    track = (
+        action.section.tracks[track_index]
+        if track_index is not None and 0 <= track_index < len(action.section.tracks)
+        else None
+    )
+    if track is None:
+        raise SemanticActionError(
+            "worker_correction_scope_violation", "Corrected track target could not be resolved."
+        )
     if operation.field is None:
         return None
     if operation.field.startswith("track_scale_"):

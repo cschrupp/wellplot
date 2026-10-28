@@ -1,0 +1,136 @@
+{
+  "provenance": {
+    "source": "Authority-G turn-1 model-I/O, logical call 3",
+    "checkpoint": "59350813e19389fea06fc30f07f37969e66fb1d1",
+    "classification": "sanitized provider-free regression fixture",
+    "captured_response_digest": "6d3d898350bb8c1585a55ee798a2611e3180a786b37ca8a9222f5076fb4054e9"
+  },
+  "response": {
+    "action": "reconstruct",
+    "section": {
+      "title": "Cased-Hole CBL/VDL Report",
+      "source_candidate": "source-1",
+      "tracks": [
+        {
+          "semantic_id": "main_pass.combo",
+          "kind": "normal",
+          "title": "Main Pass",
+          "bindings": [
+            {
+              "semantic_id": "main_pass.combo.ecgr",
+              "channel": "ECGR_STGC",
+              "label": "Gamma Ray (ECGR_STGC) QTGC-B",
+              "scale": {"minimum": 0, "maximum": 150, "reverse": false},
+              "style": {"color": "#16a34a", "line_width": 0.8}
+            },
+            {
+              "semantic_id": "main_pass.combo.tt",
+              "channel": "TT",
+              "label": "Transit Time for CBL (TT) QSLT-B",
+              "scale": {"minimum": 200, "maximum": 400, "reverse": true},
+              "style": {"color": "#2142ff", "line_width": 0.75}
+            },
+            {
+              "semantic_id": "main_pass.combo.tens",
+              "channel": "TENS",
+              "label": "Cable Tension (TENS)",
+              "scale": {"minimum": 5000, "maximum": 0, "reverse": false},
+              "style": {
+                "color": "#111111",
+                "line_width": 0.65,
+                "fill_color": "#ffffff",
+                "fill_alpha": 0,
+                "colormap": "gray_r"
+              }
+            },
+            {
+              "semantic_id": "main_pass.combo.mtem",
+              "channel": "MTEM",
+              "label": "Mud Temperature (MTEM) LEH-MT",
+              "scale": {"minimum": 100, "maximum": 500, "reverse": false},
+              "style": {"color": "#111111", "line_width": 0.9}
+            }
+          ]
+        },
+        {
+          "semantic_id": "main_pass.depth",
+          "kind": "reference",
+          "title": "Depth",
+          "bindings": [
+            {
+              "semantic_id": "main_pass.depth.stit",
+              "channel": "STIT",
+              "label": "Stuck Tool Indicator, Total (STIT)",
+              "scale": {"minimum": 0, "maximum": 50, "reverse": false},
+              "style": {"color": "#111111", "line_width": 0.65}
+            },
+            {
+              "semantic_id": "main_pass.depth.tdsp",
+              "channel": "TDSP",
+              "label": "Cable Drag",
+              "scale": {"minimum": 0, "maximum": 50, "reverse": false},
+              "style": {"color": "#92400e", "line_width": 0.65}
+            },
+            {
+              "semantic_id": "main_pass.depth.vsec",
+              "channel": "VSEC",
+              "label": "Tool_Tot. Drag",
+              "scale": {"minimum": 0, "maximum": 50, "reverse": false},
+              "style": {"color": "#1d4ed8", "line_width": 0.65}
+            }
+          ]
+        },
+        {
+          "semantic_id": "main_pass.cbl",
+          "kind": "normal",
+          "title": "CBL",
+          "bindings": [
+            {
+              "semantic_id": "main_pass.cbl.cbl1",
+              "channel": "CBL",
+              "label": "CBL Amplitude (CBL) QSLT-B",
+              "scale": {"minimum": 0, "maximum": 100, "reverse": false},
+              "style": {"color": "#111111", "line_width": 0.75}
+            },
+            {
+              "semantic_id": "main_pass.cbl.cbl2",
+              "channel": "CBL",
+              "label": "CBL Amplitude (CBL) QSLT-B",
+              "scale": {"minimum": 0, "maximum": 10, "reverse": false},
+              "style": {
+                "color": "#2563eb",
+                "line_width": 0.65,
+                "fill_color": "#ffffff",
+                "fill_alpha": 0,
+                "colormap": "gray_r"
+              }
+            }
+          ]
+        },
+        {
+          "semantic_id": "main_pass.vdl",
+          "kind": "array",
+          "title": "VDL",
+          "x_scale": {"minimum": 200, "maximum": 1200, "reverse": false},
+          "bindings": [
+            {
+              "semantic_id": "main_pass.vdl.vdl",
+              "channel": "VDL",
+              "label": "VDL VariableDensity (VDL) QSLT-B",
+              "profile": "vdl",
+              "colormap": "gray_r",
+              "colorbar_enabled": true,
+              "colorbar_label": "Amplitude",
+              "sample_axis": {
+                "unit": "us",
+                "minimum": 200,
+                "maximum": 1200,
+                "tick_count": 7
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
