@@ -715,6 +715,31 @@ class EvidencePaths:
         """Return the optional exact model-I/O custody path."""
         return self.root / f"{self.campaign_id}{MODEL_IO_SUFFIX}"
 
+    @property
+    def compile_result(self) -> Path:
+        """Return the safe host-facing compile result for binding smoke."""
+        return self.root / f"{self.campaign_id}.compile-result.json"
+
+    @property
+    def planner_wire(self) -> Path:
+        """Return validated planner wire DTOs, one per line."""
+        return self.root / f"{self.campaign_id}.planner-wire-response.jsonl"
+
+    @property
+    def request_compilation(self) -> Path:
+        """Return the deterministic host request compilation projection."""
+        return self.root / f"{self.campaign_id}.request-compilation.json"
+
+    @property
+    def planner_context(self) -> Path:
+        """Return the sanitized planner context needed for provider-free replay."""
+        return self.root / f"{self.campaign_id}.planner-context.json"
+
+    @property
+    def stage_trace(self) -> Path:
+        """Return pre-dispatch and planner stage transitions, one per line."""
+        return self.root / f"{self.campaign_id}.stage-trace.jsonl"
+
     def all_paths(self) -> tuple[Path, ...]:
         """Return all collision-sensitive paths in deterministic order."""
         return (
@@ -724,6 +749,11 @@ class EvidencePaths:
             self.summary,
             self.evidence,
             self.model_io,
+            self.compile_result,
+            self.planner_wire,
+            self.request_compilation,
+            self.planner_context,
+            self.stage_trace,
         )
 
 
@@ -774,12 +804,16 @@ class D5SmokeCustody:
         static_preflight: Mapping[str, Any],
         readiness: D5ReadinessProjectionProtocol,
         endpoint_calls: int,
+        smoke_kind: str = "structured_ready",
+        source_asset_identities: Sequence[Mapping[str, Any]] = (),
     ) -> D5SmokeCustody:
         """Create smoke custody only after static checks and readiness pass."""
         ensure_fresh_namespace(paths)
+        safe_asset_identities = _sanitize_source_asset_identities(source_asset_identities)
         state = {
             "experiment_version": D5_EXPERIMENT_VERSION,
             "mode": "canonical_live_smoke",
+            "smoke_kind": smoke_kind,
             "campaign_id": paths.campaign_id,
             "authorization_id": authorization.authorization_id,
             "status": "SMOKE_STARTED",
@@ -795,6 +829,7 @@ class D5SmokeCustody:
             "scientific_campaign_started": False,
             "readiness": readiness.as_dict(),
             "static_preflight": dict(static_preflight),
+            "source_asset_identities": safe_asset_identities,
         }
         if not evidence_is_redacted(state):
             raise D5HarnessError("smoke state redaction failure")
@@ -811,7 +846,11 @@ class D5SmokeCustody:
             exclusive=True,
         )
         paths.model_io.touch(exist_ok=False)
-        return cls(paths=paths, authorization=authorization, state=state)
+        return cls(
+            paths=paths,
+            authorization=authorization,
+            state=state,
+        )
 
     @classmethod
     def pre_smoke_failure(
@@ -884,6 +923,90 @@ class D5SmokeCustody:
         with self.paths.model_io.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(bounded, sort_keys=True, separators=(",", ":")) + "\n")
 
+    def record_bounded_model_io(self, row: Mapping[str, Any]) -> None:
+        """Persist request/response hashes and metadata without raw payloads."""
+        allowed = {
+            "event",
+            "turn_id",
+            "logical_call_index",
+            "role",
+            "model",
+            "physical_attempt",
+            "request_sha256",
+            "response_sha256",
+            "http_status",
+            "engine_outcome",
+            "failure_category",
+            "response_reason",
+            "validation_shape",
+            "termination_kind",
+            "exception_type",
+            "exception_module",
+        }
+        bounded = {key: row[key] for key in allowed if key in row}
+        bounded.update(
+            {
+                "campaign_id": self.paths.campaign_id,
+                "authorization_id": self.authorization.authorization_id,
+            }
+        )
+        if not evidence_is_redacted(bounded):
+            raise D5HarnessError("smoke model-I/O redaction failure")
+        with self.paths.model_io.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(bounded, sort_keys=True, separators=(",", ":")) + "\n")
+
+    def record_planner_observability(self, event: Mapping[str, Any]) -> None:
+        """Route opt-in canonical planner events to bounded, replayable artifacts."""
+        name = event.get("event")
+        if name == "PLANNER_GENERATION_PASS":
+            row = {
+                "attempt": event.get("attempt"),
+                "response_schema": event.get("response_schema"),
+                "validated_response": event.get("validated_response"),
+            }
+            if not evidence_is_redacted(row):
+                raise D5HarnessError("planner wire response redaction failure")
+            with self.paths.planner_wire.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n")
+            return
+        if name == "REQUEST_COMPILATION_PASS":
+            payload = {"result": event.get("result")}
+            if not evidence_is_redacted(payload):
+                raise D5HarnessError("request compilation redaction failure")
+            _atomic_json(self.paths.request_compilation, payload, exclusive=True)
+            return
+        if name == "PLANNER_CONTEXT":
+            payload = _sanitize_planner_context(event.get("context"))
+            payload["source_asset_identities"] = self.state.get("source_asset_identities", [])
+            if not evidence_is_redacted(payload):
+                raise D5HarnessError("planner context redaction failure")
+            _atomic_json(self.paths.planner_context, payload, exclusive=True)
+            return
+        bounded = dict(event)
+        if not evidence_is_redacted(bounded):
+            raise D5HarnessError("planner stage trace redaction failure")
+        with self.paths.stage_trace.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(bounded, sort_keys=True, separators=(",", ":")) + "\n")
+
+    def record_compile_result(self, result: object) -> None:
+        """Persist public compile diagnostics even when the graph dispatched no workers."""
+        diagnostics = [item.model_dump(mode="json") for item in getattr(result, "diagnostics", ())]
+        workers = [item.model_dump(mode="json") for item in getattr(result, "workers", ())]
+        metrics = getattr(result, "metrics", None)
+        payload = {
+            "success": bool(getattr(result, "success", False)),
+            "diagnostics": diagnostics,
+            "workers": workers,
+            "metrics": None if metrics is None else metrics.model_dump(mode="json"),
+            "obligations": [
+                item.model_dump(mode="json") for item in getattr(result, "obligations", ())
+            ],
+            "merged_intent_present": getattr(result, "intent", None) is not None,
+        }
+        if not evidence_is_redacted(payload):
+            raise D5HarnessError("compile result redaction failure")
+        _atomic_json(self.paths.compile_result, payload, exclusive=True)
+
     def record_attempt(self, logical_index: int) -> None:
         """Persist one physical attempt after the observer accepts it."""
         attempt = self.ledger.physical_attempt(logical_index)
@@ -954,6 +1077,17 @@ class D5SmokeCustody:
             "state_sha256": _sha256_file(self.paths.state),
             "journal_sha256": _sha256_file(self.paths.journal),
             "model_io_sha256": _sha256_file(self.paths.model_io),
+            "observability_artifacts": {
+                path.name: _sha256_file(path)
+                for path in (
+                    self.paths.compile_result,
+                    self.paths.planner_wire,
+                    self.paths.request_compilation,
+                    self.paths.planner_context,
+                    self.paths.stage_trace,
+                )
+                if path.is_file()
+            },
         }
         _atomic_json(self.paths.terminal, terminal, exclusive=True)
         summary = dict(terminal)
@@ -1004,6 +1138,44 @@ def evidence_is_redacted(value: object) -> bool:
         lowered = value.casefold()
         return not any(marker in lowered for marker in SECRET_MARKERS)
     return True
+
+
+def _sanitize_planner_context(value: object) -> dict[str, Any]:
+    """Retain replay context while reducing filesystem paths to safe relative labels."""
+    if not isinstance(value, Mapping):
+        raise D5HarnessError("planner context is not a mapping")
+
+    path_keys = {"path", "source_path", "canonical_path", "absolute_path"}
+
+    def sanitize(item: object, *, key: str | None = None) -> object:
+        if isinstance(item, Mapping):
+            return {str(name): sanitize(child, key=str(name)) for name, child in item.items()}
+        if isinstance(item, (list, tuple)):
+            return [sanitize(child) for child in item]
+        if isinstance(item, str) and key in path_keys and Path(item).is_absolute():
+            return Path(item).name
+        return item
+
+    safe = sanitize(value)
+    if not isinstance(safe, dict):
+        raise D5HarnessError("planner context projection failed")
+    return safe
+
+
+def _sanitize_source_asset_identities(
+    identities: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Retain bounded source identity fields without absolute filesystem paths."""
+    allowed = {"asset_id", "relative_path", "path_basename", "format", "size_bytes", "sha256"}
+    result: list[dict[str, Any]] = []
+    for identity in identities:
+        bounded = {key: value for key, value in identity.items() if key in allowed}
+        if "relative_path" in bounded and Path(str(bounded["relative_path"])).is_absolute():
+            raise D5HarnessError("source asset identity contains an absolute path")
+        if not evidence_is_redacted(bounded):
+            raise D5HarnessError("source asset identity redaction failure")
+        result.append(bounded)
+    return result
 
 
 @dataclass(slots=True)
@@ -2227,6 +2399,8 @@ def create_live_adapter(
     provider_name: str | None = None,
     request_options: Mapping[str, object] | None = None,
     require_thinking_control: bool = False,
+    trace_callback: Callable[[Mapping[str, Any]], None] | None = None,
+    compile_result_callback: Callable[[Any], None] | None = None,
 ) -> _ObservedLiveAdapter:
     """Build the accepted canonical adapter with retry-visible HTTP transport."""
     import httpx
@@ -2278,6 +2452,8 @@ def create_live_adapter(
         credential_source="configured",
         timeout=project_config.provider.timeout_seconds,
         diagnostic_callback=observer.capture_worker_diagnostic,
+        trace_callback=trace_callback,
+        compile_result_callback=compile_result_callback,
     )
     inner = d4.D4CampaignAdapter(
         repo_root=repo_root,

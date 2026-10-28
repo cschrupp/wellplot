@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 from .code_mode.canonical_workers import CanonicalReportWorker
 from .code_mode.enrichment import SemanticEnricher
-from .code_mode.facade import CodeModeCompileFacade
+from .code_mode.facade import CodeModeCompileFacade, CodeModeCompileResult
 from .code_mode.planner import SemanticPlanner
 from .code_mode.source_loader import LogfileSourceLoader
 from .code_mode.typed_section_worker import CanonicalSectionWorker
@@ -93,13 +93,18 @@ def create_canonical_dependencies(
     backend: object,
     server_root: Path,
     diagnostic_callback: Callable[[Mapping[str, Any]], None] | None = None,
+    trace_callback: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> CodeModeGraphDependencies:
     """Build one worker composition shared by notebook, MCP, and experiments."""
     from ..capabilities import create_builtin_registry
 
     registry = create_builtin_registry()
     return CodeModeGraphDependencies(
-        planner=SemanticPlanner(backend=backend, registry=registry),
+        planner=SemanticPlanner(
+            backend=backend,
+            registry=registry,
+            trace_callback=trace_callback,
+        ),
         enricher=SemanticEnricher(
             loader=LogfileSourceLoader(),
             allowed_roots={"server": server_root},
@@ -107,6 +112,7 @@ def create_canonical_dependencies(
         report_compiler=CanonicalReportWorker(backend=backend),
         section_compiler=CanonicalSectionWorker(backend=backend),
         diagnostic_callback=diagnostic_callback,
+        trace_callback=trace_callback,
     )
 
 
@@ -115,14 +121,18 @@ def create_canonical_compile_facade(
     backend: object,
     server_root: Path,
     diagnostic_callback: Callable[[Mapping[str, Any]], None] | None = None,
+    trace_callback: Callable[[Mapping[str, Any]], None] | None = None,
+    result_callback: Callable[[CodeModeCompileResult], None] | None = None,
 ) -> CodeModeCompileFacade:
     """Construct the shared planner, workers, workflow, and facade."""
     return CodeModeCompileFacade(
-        create_canonical_dependencies(
+        dependencies=create_canonical_dependencies(
             backend=backend,
             server_root=server_root,
             diagnostic_callback=diagnostic_callback,
-        )
+            trace_callback=trace_callback,
+        ),
+        result_callback=result_callback,
     )
 
 

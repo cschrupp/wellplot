@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Literal
 
@@ -16,6 +16,7 @@ from ..providers.base import (
     ProviderFailureCategory,
     ProviderRequestError,
     StructuredGenerationRequest,
+    StructuredGenerationResult,
 )
 from ..providers.response_diagnostics import (
     ProviderResponseFailureReason,
@@ -409,6 +410,12 @@ class SemanticPlanner:
 
     backend: ModelBackendProtocol
     registry: CapabilityRegistry
+    trace_callback: Callable[[Mapping[str, object]], None] | None = None
+
+    def _trace(self, event: str, **fields: object) -> None:
+        """Emit opt-in, bounded planner observability without changing control flow."""
+        if self.trace_callback is not None:
+            self.trace_callback({"event": event, **fields})
 
     async def plan(
         self,
@@ -425,12 +432,22 @@ class SemanticPlanner:
         if not isinstance(request, str) or not request.strip():
             raise ValueError("Planning request must be a non-empty string.")
 
+        self._trace("REQUEST_COMPILATION_ENTER")
         compilation = compile_request_contract(request)
+        self._trace(
+            "REQUEST_COMPILATION_PASS",
+            result=compilation.model_dump(mode="json"),
+        )
         if compilation.status in {
             RequestCompilationStatus.CONFLICTING,
             RequestCompilationStatus.UNRESOLVED_SUPPORTED,
             RequestCompilationStatus.COVERAGE_FAILURE,
         }:
+            self._trace(
+                "REQUEST_COMPILATION_FAIL",
+                code=f"request_compilation_{compilation.status.value.casefold()}",
+                safe_message="The authoritative request could not be compiled consistently.",
+            )
             raise PlannerSemanticFailure(
                 f"request_compilation_{compilation.status.value.casefold()}",
                 "The authoritative request could not be compiled consistently.",
@@ -443,21 +460,55 @@ class SemanticPlanner:
             "source_summary": _safe_source_summary(source_summary),
             "capabilities": _planning_catalog(self.registry),
         }
+        self._trace("PLANNER_CONTEXT", context=context)
         invalid_response_retry_used = False
+        wire_attempt = 1
+
+        async def generate(
+            request_value: StructuredGenerationRequest,
+            *,
+            attempt: int,
+        ) -> StructuredGenerationResult[BaseModel]:
+            self._trace(
+                "PLANNER_GENERATION_ENTER",
+                attempt=attempt,
+                response_schema="_PlannerWirePlan",
+            )
+            try:
+                response = await self.backend.generate_structured(
+                    request_value,
+                    response_model=_PlannerWirePlan,
+                )
+            except ProviderRequestError as error:
+                self._trace(
+                    "PLANNER_GENERATION_FAIL",
+                    attempt=attempt,
+                    **_safe_trace_failure(error),
+                )
+                raise
+            self._trace(
+                "PLANNER_GENERATION_PASS",
+                attempt=attempt,
+                response_schema="_PlannerWirePlan",
+                validated_response=response.value.model_dump(mode="json"),
+            )
+            return response
+
         try:
-            generated = await self.backend.generate_structured(
+            generated = await generate(
                 _planning_request(
                     context=context,
                     timeout_seconds=timeout_seconds,
                     temperature=temperature,
                     max_output_tokens=max_output_tokens,
                 ),
-                response_model=_PlannerWirePlan,
+                attempt=1,
             )
         except ProviderRequestError as error:
             if error.category is not ProviderFailureCategory.INVALID_RESPONSE:
                 raise
             invalid_response_retry_used = True
+            wire_attempt = 2
             if (
                 isinstance(error, StructuredResponseProviderError)
                 and error.response_reason is ProviderResponseFailureReason.SCHEMA_VALIDATION
@@ -476,22 +527,64 @@ class SemanticPlanner:
                     temperature=temperature,
                     max_output_tokens=max_output_tokens,
                 )
-            generated = await self.backend.generate_structured(
-                retry_request,
-                response_model=_PlannerWirePlan,
-            )
-        plan = _canonical_plan_from_wire(generated.value)
-        plan = _attach_compiled_requirements(plan, compilation)
+            generated = await generate(retry_request, attempt=2)
+        self._trace("WIRE_TO_CANONICAL_ENTER", attempt=wire_attempt)
         try:
-            _validate_extraction_coverage(plan)
-            return validate_semantic_plan(plan, self.registry, mode=mode)
+            plan = _canonical_plan_from_wire(generated.value)
+        except ValidationError as error:
+            self._trace(
+                "WIRE_TO_CANONICAL_FAIL",
+                attempt=wire_attempt,
+                **_safe_trace_failure(error),
+            )
+            raise
+        self._trace("WIRE_TO_CANONICAL_PASS", attempt=wire_attempt)
+        self._trace("COMPILED_REQUIREMENT_ATTACHMENT_ENTER", attempt=wire_attempt)
+        try:
+            plan = _attach_compiled_requirements(plan, compilation)
+        except PlannerSemanticError as error:
+            self._trace(
+                "COMPILED_REQUIREMENT_ATTACHMENT_FAIL",
+                attempt=wire_attempt,
+                **_safe_trace_failure(error),
+            )
+            raise
+        self._trace("COMPILED_REQUIREMENT_ATTACHMENT_PASS", attempt=wire_attempt)
+
+        def validate_plan(candidate: SemanticPlan, *, attempt: int) -> SemanticPlan:
+            self._trace("EXTRACTION_COVERAGE_ENTER", attempt=attempt)
+            try:
+                _validate_extraction_coverage(candidate)
+            except PlannerSemanticError as error:
+                self._trace(
+                    "EXTRACTION_COVERAGE_FAIL",
+                    attempt=attempt,
+                    **_safe_trace_failure(error),
+                )
+                raise
+            self._trace("EXTRACTION_COVERAGE_PASS", attempt=attempt)
+            self._trace("SEMANTIC_PLAN_VALIDATION_ENTER", attempt=attempt)
+            try:
+                validated = validate_semantic_plan(candidate, self.registry, mode=mode)
+            except PlannerSemanticError as error:
+                self._trace(
+                    "SEMANTIC_PLAN_VALIDATION_FAIL",
+                    attempt=attempt,
+                    **_safe_trace_failure(error),
+                )
+                raise
+            self._trace("SEMANTIC_PLAN_VALIDATION_PASS", attempt=attempt)
+            return validated
+
+        try:
+            return validate_plan(plan, attempt=wire_attempt)
         except PlannerSemanticError as first_error:
             if invalid_response_retry_used:
                 raise PlannerSemanticFailure(
                     first_error.code,
                     "Planner returned a semantically invalid plan after one correction.",
                 ) from first_error
-            corrected = await self.backend.generate_structured(
+            corrected = await generate(
                 _correction_request(
                     mode=mode,
                     request=request,
@@ -504,22 +597,68 @@ class SemanticPlanner:
                     temperature=temperature,
                     max_output_tokens=max_output_tokens,
                 ),
-                response_model=_PlannerWirePlan,
+                attempt=2,
             )
-            corrected_plan = _canonical_plan_from_wire(corrected.value)
-            corrected_plan = _attach_compiled_requirements(corrected_plan, compilation)
+            self._trace("WIRE_TO_CANONICAL_ENTER", attempt=2)
+            try:
+                corrected_plan = _canonical_plan_from_wire(corrected.value)
+            except ValidationError as error:
+                self._trace(
+                    "WIRE_TO_CANONICAL_FAIL",
+                    attempt=2,
+                    **_safe_trace_failure(error),
+                )
+                raise
+            self._trace("WIRE_TO_CANONICAL_PASS", attempt=2)
+            self._trace("COMPILED_REQUIREMENT_ATTACHMENT_ENTER", attempt=2)
+            try:
+                corrected_plan = _attach_compiled_requirements(corrected_plan, compilation)
+            except PlannerSemanticError as error:
+                self._trace(
+                    "COMPILED_REQUIREMENT_ATTACHMENT_FAIL",
+                    attempt=2,
+                    **_safe_trace_failure(error),
+                )
+                raise
+            self._trace("COMPILED_REQUIREMENT_ATTACHMENT_PASS", attempt=2)
             try:
                 _assert_correction_scope(plan, corrected_plan, first_error)
-            except PlannerSemanticFailure:
+            except PlannerSemanticFailure as error:
+                self._trace(
+                    "CORRECTION_SCOPE_FAIL",
+                    attempt=2,
+                    **_safe_trace_failure(error),
+                )
                 raise
+            self._trace("CORRECTION_SCOPE_PASS", attempt=2)
             try:
-                _validate_extraction_coverage(corrected_plan)
-                return validate_semantic_plan(corrected_plan, self.registry, mode=mode)
+                return validate_plan(corrected_plan, attempt=2)
             except PlannerSemanticError as second_error:
                 raise PlannerSemanticFailure(
                     second_error.code,
                     "Planner returned a semantically invalid plan after one correction.",
                 ) from second_error
+
+
+def _safe_trace_failure(error: Exception) -> dict[str, object]:
+    """Project only allowlisted stable fields from an expected host failure."""
+    result: dict[str, object] = {
+        "exception_type": type(error).__name__,
+        "exception_module": type(error).__module__,
+    }
+    code = getattr(error, "code", None)
+    category = getattr(error, "category", None)
+    safe_message = getattr(error, "safe_message", None)
+    affected_paths = getattr(error, "affected_paths", None)
+    if isinstance(code, str):
+        result["code"] = code
+    if hasattr(category, "value") and isinstance(category.value, str):
+        result["category"] = category.value
+    if isinstance(safe_message, str):
+        result["safe_message"] = safe_message
+    if isinstance(affected_paths, tuple) and all(isinstance(path, str) for path in affected_paths):
+        result["affected_paths"] = list(affected_paths)
+    return result
 
 
 def _attach_compiled_requirements(

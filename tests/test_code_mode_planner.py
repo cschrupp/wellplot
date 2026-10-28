@@ -11,6 +11,7 @@ import pytest
 from jsonschema import Draft202012Validator
 from pydantic import BaseModel, ValidationError
 
+from wellplot.agent.code_mode import planner as planner_module
 from wellplot.agent.code_mode.planner import (
     PlannerSemanticError,
     PlannerSemanticFailure,
@@ -391,6 +392,199 @@ def test_planner_makes_one_static_structured_call() -> None:
     assert "source_path" not in prompt
     assert "main_pass" not in prompt
     assert "binding_id" not in prompt
+
+
+def test_planner_trace_replays_validated_wire_dto_deterministically() -> None:
+    """The validated wire DTO and host context are sufficient for provider-free replay."""
+    events: list[dict[str, object]] = []
+    first_backend = _SequenceBackend(responses=[_plan_payload()])
+    first_planner = SemanticPlanner(
+        backend=first_backend,
+        registry=create_builtin_registry(),
+        trace_callback=events.append,
+    )
+    kwargs = {
+        "request": "Build the CBL quicklook.",
+        "mode": "reconstruct",
+        "current_document_summary": {"sections": ["existing CBL presentation section"]},
+        "source_summary": None,
+        "timeout_seconds": 5.0,
+        "temperature": 0.0,
+        "max_output_tokens": None,
+    }
+
+    first_plan = asyncio.run(first_planner.plan(**kwargs))
+    captured_dto = next(
+        event["validated_response"]
+        for event in events
+        if event["event"] == "PLANNER_GENERATION_PASS"
+    )
+    replay_backend = _SequenceBackend(responses=[captured_dto])
+    replay_planner = SemanticPlanner(
+        backend=replay_backend,
+        registry=create_builtin_registry(),
+    )
+    replay_plan = asyncio.run(replay_planner.plan(**kwargs))
+
+    assert replay_plan.model_dump(mode="json") == first_plan.model_dump(mode="json")
+    assert [event["event"] for event in events] == [
+        "REQUEST_COMPILATION_ENTER",
+        "REQUEST_COMPILATION_PASS",
+        "PLANNER_CONTEXT",
+        "PLANNER_GENERATION_ENTER",
+        "PLANNER_GENERATION_PASS",
+        "WIRE_TO_CANONICAL_ENTER",
+        "WIRE_TO_CANONICAL_PASS",
+        "COMPILED_REQUIREMENT_ATTACHMENT_ENTER",
+        "COMPILED_REQUIREMENT_ATTACHMENT_PASS",
+        "EXTRACTION_COVERAGE_ENTER",
+        "EXTRACTION_COVERAGE_PASS",
+        "SEMANTIC_PLAN_VALIDATION_ENTER",
+        "SEMANTIC_PLAN_VALIDATION_PASS",
+    ]
+    assert len(first_backend.requests) == 1
+    assert len(replay_backend.requests) == 1
+
+
+def test_request_compilation_failure_is_traced_before_provider_delegation() -> None:
+    """The pre-provider request-contract rejection has a bounded trace record."""
+    events: list[dict[str, object]] = []
+    backend = _SequenceBackend(responses=[])
+    planner = SemanticPlanner(
+        backend=backend,
+        registry=create_builtin_registry(),
+        trace_callback=events.append,
+    )
+
+    with pytest.raises(PlannerSemanticFailure) as caught:
+        asyncio.run(
+            planner.plan(
+                request="Add a reference track, but do not add a reference track.",
+                mode="reconstruct",
+                timeout_seconds=5.0,
+            )
+        )
+
+    assert caught.value.code == "request_compilation_coverage_failure"
+    assert backend.requests == []
+    assert [event["event"] for event in events] == [
+        "REQUEST_COMPILATION_ENTER",
+        "REQUEST_COMPILATION_PASS",
+        "REQUEST_COMPILATION_FAIL",
+    ]
+
+
+def test_semantic_validation_failure_is_traced_before_bounded_correction() -> None:
+    """A rejected planner DTO and its correction remain distinguishable in trace."""
+    invalid = _plan_payload()
+    invalid["section_tasks"] = ({**invalid["section_tasks"][0], "capability_ids": ("unknown",)},)
+    events: list[dict[str, object]] = []
+    backend = _SequenceBackend(responses=[invalid, _plan_payload()])
+    planner = SemanticPlanner(
+        backend=backend,
+        registry=create_builtin_registry(),
+        trace_callback=events.append,
+    )
+
+    result = asyncio.run(
+        planner.plan(
+            request="Build the CBL quicklook.",
+            mode="reconstruct",
+            timeout_seconds=5.0,
+        )
+    )
+
+    failed = next(event for event in events if event["event"] == "SEMANTIC_PLAN_VALIDATION_FAIL")
+    assert failed["code"] == "unknown_capability"
+    assert sum(event["event"] == "PLANNER_GENERATION_PASS" for event in events) == 2
+    assert (
+        result.section_tasks[0].capability_ids
+        == _plan_payload()["section_tasks"][0]["capability_ids"]
+    )
+
+
+def test_extraction_coverage_failure_is_traced_and_corrected_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The extraction-coverage stage is separately visible from later validation."""
+    original = planner_module._validate_extraction_coverage
+    calls = 0
+
+    def fail_once(plan: SemanticPlan) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise PlannerSemanticError(
+                "planner_extraction_coverage",
+                "Synthetic extraction coverage failure.",
+            )
+        original(plan)
+
+    monkeypatch.setattr(planner_module, "_validate_extraction_coverage", fail_once)
+    monkeypatch.setattr(planner_module, "_assert_correction_scope", lambda *args: None)
+    events: list[dict[str, object]] = []
+    backend = _SequenceBackend(responses=[_plan_payload(), _plan_payload()])
+    planner = SemanticPlanner(
+        backend=backend,
+        registry=create_builtin_registry(),
+        trace_callback=events.append,
+    )
+
+    asyncio.run(
+        planner.plan(
+            request="Build the CBL quicklook.",
+            mode="reconstruct",
+            timeout_seconds=5.0,
+        )
+    )
+
+    extraction_events = [
+        event["event"] for event in events if str(event["event"]).startswith("EXTRACTION_COVERAGE_")
+    ]
+    assert extraction_events == [
+        "EXTRACTION_COVERAGE_ENTER",
+        "EXTRACTION_COVERAGE_FAIL",
+        "EXTRACTION_COVERAGE_ENTER",
+        "EXTRACTION_COVERAGE_PASS",
+    ]
+    assert len(backend.requests) == 2
+
+
+def test_planner_attachment_error_boundary_is_captured_and_preserved() -> None:
+    """Attachment PlannerSemanticError remains raw and is separately observable."""
+    payload = _plan_payload()
+    payload["section_tasks"] = (
+        {
+            **payload["section_tasks"][0],
+            "existing_section_hint": "Unrequested Section",
+        },
+    )
+    events: list[dict[str, object]] = []
+    backend = _SequenceBackend(responses=[payload])
+    planner = SemanticPlanner(
+        backend=backend,
+        registry=create_builtin_registry(),
+        trace_callback=events.append,
+    )
+
+    with pytest.raises(PlannerSemanticError) as caught:
+        asyncio.run(
+            planner.plan(
+                request="In the Main Log section, plot GR.",
+                mode="reconstruct",
+                timeout_seconds=5.0,
+            )
+        )
+
+    assert caught.value.code == "unexpected_scope_assignment"
+    assert len(backend.requests) == 1
+    assert sum(event["event"] == "PLANNER_GENERATION_ENTER" for event in events) == 1
+    failure = next(
+        event for event in events if event["event"] == "COMPILED_REQUIREMENT_ATTACHMENT_FAIL"
+    )
+    assert failure["exception_type"] == "PlannerSemanticError"
+    assert failure["code"] == "unexpected_scope_assignment"
+    assert failure["safe_message"] == caught.value.safe_message
 
 
 def test_planner_receives_path_free_source_summary_as_separate_context() -> None:

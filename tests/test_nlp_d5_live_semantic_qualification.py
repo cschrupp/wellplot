@@ -28,6 +28,11 @@ from tests.test_nlp_d4_live_acceptance import (
     _D4SessionSectionBackend,
 )
 
+from wellplot.agent.code_mode.facade import (
+    CodeModeCompileResult,
+    CompileDiagnostic,
+    CompileMetrics,
+)
 from wellplot.agent.providers.base import ProviderRequestError, StructuredGenerationRequest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -2451,6 +2456,121 @@ def test_smoke_provider_construction_failure_is_pre_start(tmp_path: Path) -> Non
         encoding="utf-8"
     )
     assert "SMOKE_STARTED" not in journal
+
+
+def test_smoke_custody_captures_planner_replay_and_zero_worker_diagnostics(
+    tmp_path: Path,
+) -> None:
+    """Opt-in capture retains replay inputs and graph diagnostics without raw I/O."""
+    authorization = _authorization(
+        campaign_id="planner-observability",
+        artifact_root=str(tmp_path / "observability"),
+    )
+    paths = d5.EvidencePaths(tmp_path / "observability", authorization.campaign_id)
+    custody = d5.D5SmokeCustody.start(
+        paths,
+        authorization=authorization,
+        static_preflight={"status": "PASS"},
+        readiness=_ready().projection,
+        endpoint_calls=2,
+        smoke_kind="planner_observability",
+        source_asset_identities=({"asset_id": "fixture-source", "sha256": "a" * 64},),
+    )
+
+    custody.record_planner_observability(
+        {
+            "event": "PLANNER_GENERATION_PASS",
+            "attempt": 1,
+            "response_schema": "_PlannerWirePlan",
+            "validated_response": {"summary": "Bounded plan", "section_tasks": []},
+        }
+    )
+    custody.record_planner_observability(
+        {
+            "event": "REQUEST_COMPILATION_PASS",
+            "result": {"status": "EXTRACTION_COMPLETE", "requirements": []},
+        }
+    )
+    custody.record_planner_observability(
+        {
+            "event": "PLANNER_CONTEXT",
+            "context": {
+                "request": "Build the requested section.",
+                "source_summary": {"sources": [{"path": "/private/assets/demo.dlis"}]},
+            },
+        }
+    )
+    custody.record_planner_observability(
+        {
+            "event": "COMPILED_REQUIREMENT_ATTACHMENT_FAIL",
+            "exception_type": "PlannerSemanticError",
+            "code": "unexpected_scope_assignment",
+            "safe_message": "Planner assigned an undeclared scope.",
+        }
+    )
+    custody.record_bounded_model_io(
+        {
+            "event": "physical_request",
+            "logical_call_index": 1,
+            "role": "planner",
+            "request_sha256": "b" * 64,
+            "request_body": "raw request body must not be retained",
+        }
+    )
+    result = CodeModeCompileResult(
+        success=False,
+        diagnostics=(
+            CompileDiagnostic(
+                stage="planner",
+                code="planner_semantic_failure",
+                message="Bounded planner failure.",
+            ),
+        ),
+        workers=(),
+        metrics=CompileMetrics(
+            worker_count=0,
+            successful_workers=0,
+            failed_workers=0,
+            total_program_chars=0,
+            total_ast_nodes=0,
+            total_statements=0,
+            total_calls=0,
+            total_repairs=0,
+            total_loop_iterations=0,
+            total_created_objects=0,
+            max_nesting_depth=0,
+        ),
+    )
+    custody.record_compile_result(result)
+
+    wire = json.loads(paths.planner_wire.read_text(encoding="utf-8").splitlines()[0])
+    compilation = json.loads(paths.request_compilation.read_text(encoding="utf-8"))
+    context = json.loads(paths.planner_context.read_text(encoding="utf-8"))
+    trace = [
+        json.loads(line) for line in paths.stage_trace.read_text(encoding="utf-8").splitlines()
+    ]
+    compile_result = json.loads(paths.compile_result.read_text(encoding="utf-8"))
+
+    assert wire["validated_response"]["summary"] == "Bounded plan"
+    assert compilation["result"]["status"] == "EXTRACTION_COMPLETE"
+    assert context["source_summary"]["sources"][0]["path"] == "demo.dlis"
+    assert context["source_asset_identities"][0]["sha256"] == "a" * 64
+    assert trace[0]["event"] == "COMPILED_REQUIREMENT_ATTACHMENT_FAIL"
+    assert compile_result["diagnostics"][0]["code"] == "planner_semantic_failure"
+    assert compile_result["workers"] == []
+    assert compile_result["metrics"]["worker_count"] == 0
+    model_io = paths.model_io.read_text(encoding="utf-8")
+    assert "request_sha256" in model_io
+    assert "raw request body" not in model_io
+    serialized = "".join(
+        path.read_text(encoding="utf-8") for path in paths.all_paths() if path.is_file()
+    )
+    assert "/private/assets" not in serialized
+    assert "raw_provider_response" not in serialized
+    terminal = custody.finish("SMOKE_HARNESS_FAIL", reason="provider-free-custody-test")
+    assert terminal["observability_artifacts"][paths.planner_wire.name] == d5._sha256_file(
+        paths.planner_wire
+    )
 
 
 def test_smoke_ledger_rejects_second_logical_and_fourth_physical_call() -> None:

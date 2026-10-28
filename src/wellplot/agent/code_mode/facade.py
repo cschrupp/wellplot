@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Literal
@@ -145,6 +145,7 @@ class CodeModeCompileFacade:
     """Own graph construction, invocation, and stable result projection."""
 
     dependencies: CodeModeGraphDependencies
+    result_callback: Callable[[CodeModeCompileResult], None] | None = None
     _graph: CompiledStateGraph = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -182,18 +183,30 @@ class CodeModeCompileFacade:
         try:
             result = await self._graph.ainvoke(state)
         except ProviderRequestError as error:
-            return _failure_result((_provider_diagnostic(error),))
+            return self._observe_result(_failure_result((_provider_diagnostic(error),)))
         except PlannerSemanticFailure as error:
-            return _failure_result((_planner_diagnostic(error),))
+            return self._observe_result(_failure_result((_planner_diagnostic(error),)))
         except CapabilitySafetyFailure as error:
-            return _failure_result((_capability_safety_failure_diagnostic(error),))
+            return self._observe_result(
+                _failure_result((_capability_safety_failure_diagnostic(error),))
+            )
         except ReportBoundarySafetyFailure as error:
-            return _failure_result((_report_boundary_safety_failure_diagnostic(error),))
+            return self._observe_result(
+                _failure_result((_report_boundary_safety_failure_diagnostic(error),))
+            )
         except SectionLeafSafetyFailure as error:
-            return _failure_result((_section_leaf_safety_failure_diagnostic(error),))
+            return self._observe_result(
+                _failure_result((_section_leaf_safety_failure_diagnostic(error),))
+            )
         except SemanticEnrichmentError as error:
-            return _failure_result((_enrichment_diagnostic(error),))
-        return _project_graph_result(result)
+            return self._observe_result(_failure_result((_enrichment_diagnostic(error),)))
+        return self._observe_result(_project_graph_result(result))
+
+    def _observe_result(self, result: CodeModeCompileResult) -> CodeModeCompileResult:
+        """Expose the same safe result to opt-in diagnostics, then return it unchanged."""
+        if self.result_callback is not None:
+            self.result_callback(result)
+        return result
 
 
 def _project_graph_result(state: dict[str, object]) -> CodeModeCompileResult:

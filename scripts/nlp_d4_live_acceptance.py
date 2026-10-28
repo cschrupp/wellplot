@@ -1631,6 +1631,8 @@ def build_notebook_session(
     credential_source: str | None,
     timeout: float,
     diagnostic_callback: Callable[[Mapping[str, Any]], None] | None = None,
+    trace_callback: Callable[[Mapping[str, Any]], None] | None = None,
+    compile_result_callback: Callable[[Any], None] | None = None,
 ) -> DirectNotebookSession:
     """Compose the unchanged production notebook graph around one backend."""
     from wellplot.agent.composition import create_canonical_compile_facade
@@ -1642,6 +1644,8 @@ def build_notebook_session(
                 backend=backend,
                 server_root=server_root,
                 diagnostic_callback=diagnostic_callback,
+                trace_callback=trace_callback,
+                result_callback=compile_result_callback,
             ),
             config=AgentSessionConfig(timeout_seconds=timeout),
         ),

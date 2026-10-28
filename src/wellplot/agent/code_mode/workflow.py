@@ -23,12 +23,13 @@ from ..providers.response_diagnostics import (
     StructuredResponseProviderError,
 )
 from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
-from .capability_safety import enforce_capability_safety
+from .capability_safety import CapabilitySafetyFailure, enforce_capability_safety
 from .enrichment import (
     EnrichedSemanticContext,
     ReportContext,
     ResolvedSectionContext,
     SemanticEnricher,
+    SemanticEnrichmentError,
     SourceCandidate,
 )
 from .planner import (
@@ -37,8 +38,8 @@ from .planner import (
     SemanticPlan,
     SemanticPlanner,
 )
-from .report_boundary_safety import enforce_report_boundary_safety
-from .section_leaf_safety import enforce_section_leaf_safety
+from .report_boundary_safety import ReportBoundarySafetyFailure, enforce_report_boundary_safety
+from .section_leaf_safety import SectionLeafSafetyFailure, enforce_section_leaf_safety
 from .state import CodeModeGraphState, CodeModeWorkerState, WorkerOutcome
 
 
@@ -54,6 +55,33 @@ class CodeModeGraphDependencies:
     report_compiler: object
     section_compiler: object
     diagnostic_callback: Callable[[Mapping[str, Any]], None] | None = None
+    trace_callback: Callable[[Mapping[str, Any]], None] | None = None
+
+
+def _trace(
+    dependencies: CodeModeGraphDependencies,
+    event: str,
+    **fields: object,
+) -> None:
+    """Emit optional orchestration evidence without changing graph results."""
+    if dependencies.trace_callback is not None:
+        dependencies.trace_callback({"event": event, **fields})
+
+
+def _trace_failure(error: Exception) -> dict[str, object]:
+    """Project only stable, explicitly safe error attributes."""
+    result: dict[str, object] = {
+        "exception_type": type(error).__name__,
+        "exception_module": type(error).__module__,
+    }
+    for attribute in ("code", "safe_message"):
+        value = getattr(error, attribute, None)
+        if isinstance(value, str):
+            result[attribute] = value
+    affected_paths = getattr(error, "affected_paths", None)
+    if isinstance(affected_paths, tuple) and all(isinstance(path, str) for path in affected_paths):
+        result["affected_paths"] = list(affected_paths)
+    return result
 
 
 def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStateGraph:
@@ -89,11 +117,17 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
         registry = getattr(dependencies.planner, "registry", None)
         if registry is None:
             registry = create_builtin_registry()
-        result = enforce_capability_safety(
-            request=state["request"],
-            plan=plan,
-            registry=registry,
-        )
+        _trace(dependencies, "CAPABILITY_SAFETY_ENTER")
+        try:
+            result = enforce_capability_safety(
+                request=state["request"],
+                plan=plan,
+                registry=registry,
+            )
+        except CapabilitySafetyFailure as error:
+            _trace(dependencies, "CAPABILITY_SAFETY_FAIL", **_trace_failure(error))
+            raise
+        _trace(dependencies, "CAPABILITY_SAFETY_PASS")
         return {
             "plan": result.safe_plan.model_dump(mode="json"),
             "capability_safety": result.evidence().model_dump(mode="json"),
@@ -102,16 +136,22 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
     async def enrich_node(state: CodeModeGraphState) -> dict[str, object]:
         """Resolve host-provided source candidates into bounded context."""
         plan = SemanticPlan.model_validate(state["plan"])
-        context = dependencies.enricher.enrich(
-            plan=plan,
-            request=state["request"],
-            document=_document(state),
-            mode=state.get("mode", "reconstruct"),
-            source_candidates=tuple(
-                SourceCandidate.model_validate(candidate)
-                for candidate in state.get("source_candidates", [])
-            ),
-        )
+        _trace(dependencies, "ENRICHMENT_ENTER")
+        try:
+            context = dependencies.enricher.enrich(
+                plan=plan,
+                request=state["request"],
+                document=_document(state),
+                mode=state.get("mode", "reconstruct"),
+                source_candidates=tuple(
+                    SourceCandidate.model_validate(candidate)
+                    for candidate in state.get("source_candidates", [])
+                ),
+            )
+        except SemanticEnrichmentError as error:
+            _trace(dependencies, "ENRICHMENT_FAIL", **_trace_failure(error))
+            raise
+        _trace(dependencies, "ENRICHMENT_PASS")
         return {"enriched_context": context.model_dump(mode="json")}
 
     async def report_boundary_safety_node(state: CodeModeGraphState) -> dict[str, object]:
@@ -120,11 +160,17 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
         registry = getattr(dependencies.planner, "registry", None)
         if registry is None:
             registry = create_builtin_registry()
-        result = enforce_report_boundary_safety(
-            request=state["request"],
-            plan=plan,
-            registry=registry,
-        )
+        _trace(dependencies, "REPORT_BOUNDARY_ENTER")
+        try:
+            result = enforce_report_boundary_safety(
+                request=state["request"],
+                plan=plan,
+                registry=registry,
+            )
+        except ReportBoundarySafetyFailure as error:
+            _trace(dependencies, "REPORT_BOUNDARY_FAIL", **_trace_failure(error))
+            raise
+        _trace(dependencies, "REPORT_BOUNDARY_PASS")
         return {
             "plan": result.safe_plan.model_dump(mode="json"),
             "report_boundary_safety": result.evidence().model_dump(mode="json"),
@@ -136,11 +182,17 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
         registry = getattr(dependencies.planner, "registry", None)
         if registry is None:
             registry = create_builtin_registry()
-        result = enforce_section_leaf_safety(
-            request=state["request"],
-            plan=plan,
-            registry=registry,
-        )
+        _trace(dependencies, "SECTION_LEAF_ENTER")
+        try:
+            result = enforce_section_leaf_safety(
+                request=state["request"],
+                plan=plan,
+                registry=registry,
+            )
+        except SectionLeafSafetyFailure as error:
+            _trace(dependencies, "SECTION_LEAF_FAIL", **_trace_failure(error))
+            raise
+        _trace(dependencies, "SECTION_LEAF_PASS")
         return {
             "plan": result.safe_plan.model_dump(mode="json"),
             "section_leaf_safety": result.evidence().model_dump(mode="json"),
@@ -148,6 +200,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
 
     async def dispatch_workers(state: CodeModeGraphState) -> list[Send]:
         """Dispatch only the task-local context required by each worker."""
+        _trace(dependencies, "DISPATCH_ENTER")
         plan = SemanticPlan.model_validate(state["plan"])
         context = EnrichedSemanticContext.model_validate(state["enriched_context"])
         sends: list[Send] = []
@@ -167,7 +220,16 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
         for task_index, task in enumerate(plan.section_tasks):
             section_context = context.sections[task_index]
             if section_context.task_index != task_index:
-                raise ValueError("Enriched section context order does not match the plan.")
+                error = ValueError("Enriched section context order does not match the plan.")
+                _trace(
+                    dependencies,
+                    "DISPATCH_FAIL",
+                    exception_type=type(error).__name__,
+                    exception_module=type(error).__module__,
+                    code="dispatch_section_context_order_mismatch",
+                    safe_message="Enriched section context order does not match the plan.",
+                )
+                raise error
             sends.append(
                 Send(
                     "compile_worker",
@@ -181,7 +243,17 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
                 )
             )
         if not sends:
-            raise ValueError("Semantic plan did not produce any graph work units.")
+            error = ValueError("Semantic plan did not produce any graph work units.")
+            _trace(
+                dependencies,
+                "DISPATCH_FAIL",
+                exception_type=type(error).__name__,
+                exception_module=type(error).__module__,
+                code="dispatch_no_work_units",
+                safe_message="Semantic plan did not produce any graph work units.",
+            )
+            raise error
+        _trace(dependencies, "DISPATCH_PASS", work_unit_count=len(sends))
         return sends
 
     async def compile_worker_node(state: dict[str, Any]) -> dict[str, object]:

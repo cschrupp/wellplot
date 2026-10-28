@@ -10,11 +10,15 @@ from dataclasses import dataclass, field
 import pytest
 from langgraph.errors import NodeCancelledError
 
+from wellplot.agent.code_mode import workflow as workflow_module
 from wellplot.agent.code_mode.enrichment import (
     EnrichedSemanticContext,
+    EnrichmentErrorCode,
     ReportContext,
     ResolvedSectionContext,
+    SemanticEnrichmentError,
 )
+from wellplot.agent.code_mode.facade import CodeModeCompileFacade
 from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan
 from wellplot.agent.code_mode.state import WorkerOutcome
 from wellplot.agent.code_mode.workflow import (
@@ -207,14 +211,17 @@ def _graph(
     planner: _Planner | None = None,
     diagnostic_callback: Callable[[Mapping[str, object]], None] | None = None,
     section_compiler: object | None = None,
+    trace_callback: Callable[[Mapping[str, object]], None] | None = None,
+    enricher: object | None = None,
 ) -> object:
     """Build a graph with host fakes at every v2 boundary."""
     dependencies = CodeModeGraphDependencies(
         planner=planner or _Planner(plan),  # type: ignore[arg-type]
-        enricher=_Enricher(),  # type: ignore[arg-type]
+        enricher=enricher or _Enricher(),  # type: ignore[arg-type]
         report_compiler=_ReportAdapter(workers),  # type: ignore[arg-type]
         section_compiler=section_compiler or _SectionAdapter(workers),  # type: ignore[arg-type]
         diagnostic_callback=diagnostic_callback,
+        trace_callback=trace_callback,
     )
     return build_compile_graph(dependencies)
 
@@ -266,6 +273,167 @@ def test_graph_merges_report_and_sections_in_plan_order() -> None:
     ]
     assert result["merged_intent"]["title"] == "Report title"
     assert "report = wp.report" not in str(result["worker_outcomes"])
+
+
+@pytest.mark.parametrize(
+    ("stage_function", "stage_event", "failure"),
+    (
+        (
+            "enforce_capability_safety",
+            "CAPABILITY_SAFETY_FAIL",
+            lambda: workflow_module.CapabilitySafetyFailure(
+                "synthetic_capability_failure", "bounded capability failure"
+            ),
+        ),
+        (
+            "enforce_report_boundary_safety",
+            "REPORT_BOUNDARY_FAIL",
+            lambda: workflow_module.ReportBoundarySafetyFailure(
+                "synthetic_report_failure", "bounded report failure"
+            ),
+        ),
+        (
+            "enforce_section_leaf_safety",
+            "SECTION_LEAF_FAIL",
+            lambda: workflow_module.SectionLeafSafetyFailure(
+                "synthetic_leaf_failure", "bounded leaf failure"
+            ),
+        ),
+    ),
+)
+def test_pre_dispatch_safety_failures_emit_stage_trace(
+    monkeypatch: pytest.MonkeyPatch,
+    stage_function: str,
+    stage_event: str,
+    failure: Callable[[], Exception],
+) -> None:
+    """Expected deterministic safety failures are traced and re-raised unchanged."""
+    error = failure()
+    events: list[dict[str, object]] = []
+
+    def fail(**_kwargs: object) -> object:
+        raise error
+
+    monkeypatch.setattr(workflow_module, stage_function, fail)
+    plan = SemanticPlan(
+        summary="report-only plan",
+        report_task=ReportTask(goal="Set the report title.", capability_ids=("report.standard",)),
+    )
+
+    with pytest.raises(type(error)) as caught:
+        asyncio.run(_graph(plan, _Workers(), trace_callback=events.append).ainvoke(_state(plan)))
+
+    assert caught.value is error
+    event = next(item for item in events if item["event"] == stage_event)
+    assert event["exception_type"] == type(error).__name__
+    assert event["code"] == error.code
+    assert event["safe_message"] == error.safe_message
+
+
+def test_enrichment_failure_emits_stage_trace_and_propagates() -> None:
+    """The pre-dispatch enrichment boundary records its typed failure only."""
+
+    class FailingEnricher:
+        def enrich(self, **_kwargs: object) -> EnrichedSemanticContext:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SOURCE_MISSING,
+                "bounded missing source",
+                task_index=0,
+            )
+
+    plan = SemanticPlan(
+        summary="one section",
+        section_tasks=(SectionTask(goal="Plot GR", capability_ids=("section.log_plot",)),),
+    )
+    events: list[dict[str, object]] = []
+
+    with pytest.raises(SemanticEnrichmentError):
+        asyncio.run(
+            _graph(
+                plan,
+                _Workers(),
+                trace_callback=events.append,
+                enricher=FailingEnricher(),
+            ).ainvoke(_state(plan))
+        )
+
+    failure = next(event for event in events if event["event"] == "ENRICHMENT_FAIL")
+    assert failure["code"] == EnrichmentErrorCode.SOURCE_MISSING
+    assert failure["exception_type"] == "SemanticEnrichmentError"
+
+
+def test_dispatch_failure_records_context_order_error() -> None:
+    """A pre-dispatch order mismatch is captured before any worker is sent."""
+
+    class MismatchedEnricher:
+        def enrich(self, *, plan: SemanticPlan, **_kwargs: object) -> EnrichedSemanticContext:
+            return EnrichedSemanticContext(
+                plan=plan,
+                sections=(ResolvedSectionContext(task_index=9),),
+                report=ReportContext(),
+            )
+
+    plan = SemanticPlan(
+        summary="one section",
+        section_tasks=(SectionTask(goal="Plot GR", capability_ids=("section.log_plot",)),),
+    )
+    events: list[dict[str, object]] = []
+
+    with pytest.raises(ValueError, match="context order"):
+        asyncio.run(
+            _graph(
+                plan,
+                _Workers(),
+                trace_callback=events.append,
+                enricher=MismatchedEnricher(),
+            ).ainvoke(_state(plan))
+        )
+
+    failure = next(event for event in events if event["event"] == "DISPATCH_FAIL")
+    assert failure["code"] == "dispatch_section_context_order_mismatch"
+
+
+def test_compile_facade_observes_zero_worker_top_level_diagnostic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The unchanged safe compile result is observable before session projection."""
+    error = workflow_module.CapabilitySafetyFailure(
+        "synthetic_capability_failure", "bounded capability failure"
+    )
+
+    def fail(**_kwargs: object) -> object:
+        raise error
+
+    monkeypatch.setattr(workflow_module, "enforce_capability_safety", fail)
+    plan = SemanticPlan(
+        summary="report-only plan",
+        report_task=ReportTask(goal="Set the report title.", capability_ids=("report.standard",)),
+    )
+    observed: list[object] = []
+    facade = CodeModeCompileFacade(
+        dependencies=workflow_module.CodeModeGraphDependencies(
+            planner=_Planner(plan),  # type: ignore[arg-type]
+            enricher=_Enricher(),  # type: ignore[arg-type]
+            report_compiler=_ReportAdapter(_Workers()),
+            section_compiler=_SectionAdapter(_Workers()),
+        ),
+        result_callback=observed.append,
+    )
+
+    result = asyncio.run(
+        facade.compile(
+            request="Set the report title.",
+            mode="reconstruct",
+            document=_document(),
+            source_candidates=(),
+            timeout_seconds=5.0,
+        )
+    )
+
+    assert result.success is False
+    assert result.workers == ()
+    assert result.diagnostics[0].code == "capability_safety.synthetic_capability_failure"
+    assert observed == [result]
 
 
 def test_graph_supports_report_only_and_section_only_plans() -> None:
