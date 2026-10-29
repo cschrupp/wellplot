@@ -260,6 +260,163 @@ def test_action_contract_rejects_missing_extra_wrong_kind_and_wrong_channel() ->
         )
 
 
+def test_track_declaration_title_is_required_even_with_correct_handle() -> None:
+    """A declared display title is authoritative independently of its handle."""
+    contract = _contract(
+        "Track Bond Index: normal, width 34 mm.\n"
+        "On Bond Index: BI -> Bond Index, linear 0..1, #111111, width 0.8."
+    )
+    assert contract.required_tracks[0].title == "Bond Index"
+
+    payload = {
+        "action": "add_track",
+        "track": {
+            "semantic_id": "bond_index",
+            "kind": "normal",
+            "title": "Wrong Display Title",
+            "width_mm": 34,
+            "bindings": [
+                {
+                    "semantic_id": "bond_index.binding.1",
+                    "channel": "BI",
+                    "label": "Bond Index",
+                    "scale": {"kind": "linear", "minimum": 0, "maximum": 1},
+                    "style": {"color": "#111111", "line_width": 0.8},
+                }
+            ],
+        },
+    }
+    with pytest.raises(SectionWorkContractError, match="Track identity"):
+        validate_section_action_contract(
+            TypeAdapter(SectionSemanticAction).validate_python(payload), contract
+        )
+
+
+def test_raster_contract_validates_colormap_profile_colorbar_and_sample_axis() -> None:
+    """Canonical raster field names satisfy all compiled raster presentation facts."""
+    request = (
+        "Track VDL: array, width 48 mm.\n"
+        'On VDL, plot VDL as a raster labelled "Synthetic VDL". '
+        "Use a linear track scale 200..1200, profile vdl, gray_r, "
+        "colorbar enabled with label Amplitude in the header, and sample axis "
+        "enabled in us from 200 to 1200 with 7 ticks, source origin 40 and step 10."
+    )
+    context = _context(section_id=None).model_copy(
+        update={
+            "sources": (
+                SourceContext(
+                    candidate_id="source-vdl",
+                    labels=("raster.las",),
+                    canonical_path="/private/source/raster.las",
+                    source_format="las",
+                    channels=(ChannelContext(mnemonic="VDL", kind="array"),),
+                ),
+            )
+        }
+    )
+    contract = _contract(request, context=context)
+    payload = {
+        "action": "reconstruct",
+        "section": {
+            "title": "Main Log",
+            "source_candidate": "source-1",
+            "tracks": [
+                {
+                    "semantic_id": "vdl",
+                    "kind": "array",
+                    "title": "VDL",
+                    "width_mm": 48,
+                    "x_scale": {"kind": "linear", "minimum": 200, "maximum": 1200},
+                    "bindings": [
+                        {
+                            "semantic_id": "vdl.binding.1",
+                            "kind": "raster",
+                            "channel": "VDL",
+                            "label": "Synthetic VDL",
+                            "profile": "vdl",
+                            "colormap": "gray_r",
+                            "colorbar_enabled": True,
+                            "colorbar_label": "Amplitude",
+                            "colorbar_position": "header",
+                            "sample_axis": {
+                                "unit": "us",
+                                "minimum": 200,
+                                "maximum": 1200,
+                                "tick_count": 7,
+                                "source_origin": 40,
+                                "source_step": 10,
+                            },
+                        }
+                    ],
+                }
+            ],
+        },
+    }
+    action = TypeAdapter(SectionSemanticAction).validate_python(payload)
+    validate_section_action_contract(action, contract)
+
+    wrong_colormap = json.loads(json.dumps(payload))
+    wrong_colormap["section"]["tracks"][0]["bindings"][0]["colormap"] = "magma"
+    with pytest.raises(SectionWorkContractError, match="Binding semantics"):
+        validate_section_action_contract(
+            TypeAdapter(SectionSemanticAction).validate_python(wrong_colormap), contract
+        )
+
+
+def _two_source_context(*, selected_channel: bool = True) -> ResolvedSectionContext:
+    """Build distinct source inventories for source-scoping regressions."""
+    second_channels = (ChannelContext(mnemonic="BI", kind="scalar"),) if selected_channel else ()
+    return ResolvedSectionContext(
+        task_index=0,
+        section_id=None,
+        sources=(
+            SourceContext(
+                candidate_id="source-a",
+                labels=("first.las",),
+                canonical_path="/private/first.las",
+                source_format="las",
+                channels=(ChannelContext(mnemonic="BI", kind="array"),),
+            ),
+            SourceContext(
+                candidate_id="source-b",
+                labels=("second.las",),
+                canonical_path="/private/second.las",
+                source_format="las",
+                channels=second_channels,
+            ),
+        ),
+    )
+
+
+def _source_selection_request(source_clause: str = 'Use source "second.las". ') -> str:
+    """Return a minimal source-bound task with one required scalar channel."""
+    return (
+        f"{source_clause}Track Bond Index: normal, width 34 mm.\n"
+        "On Bond Index: BI -> Bond Index, linear 0..1, #111111, width 0.8."
+    )
+
+
+def test_binding_channel_kind_uses_the_explicitly_selected_source() -> None:
+    """A non-selected source's conflicting kind cannot control the contract."""
+    contract = _contract(_source_selection_request(), context=_two_source_context())
+    assert contract.source_handle == "source-2"
+    assert contract.required_bindings[0].kind == "curve"
+
+
+def test_selected_source_missing_channel_and_unselected_inventory_disagreement_fail() -> None:
+    """Missing selected channels and ambiguous implicit inventories fail closed."""
+    with pytest.raises(SectionWorkContractError) as missing:
+        _contract(
+            _source_selection_request(),
+            context=_two_source_context(selected_channel=False),
+        )
+    assert missing.value.code == "section_work_channel_missing"
+
+    with pytest.raises(SectionWorkContractError) as ambiguous:
+        _contract(_source_selection_request(source_clause=""), context=_two_source_context())
+    assert ambiguous.value.code == "section_work_source_ambiguous"
+
+
 def test_action_schemas_and_static_examples_are_versioned_and_specific() -> None:
     """Each contract action has one strict schema and one hashed static example."""
     expected = {"reconstruct", "add_track", "update_curve_scale", "add_fill"}

@@ -2359,17 +2359,19 @@ def test_binding_smoke_request_is_frozen_and_provider_free_qualified() -> None:
         item.owner_ref
         for item in compilation.requirements.requirements
         if item.owner_kind.value == "track" and item.field == "kind"
-    } == {"Bond Index", "Gamma Ray"}
+    } == {"bond_index", "gamma_ray"}
     track_facts = {
         (item.owner_ref, item.field): item.value
         for item in compilation.requirements.requirements
         if item.owner_kind.value == "track"
     }
     assert track_facts == {
-        ("Bond Index", "kind"): "normal",
-        ("Bond Index", "width_mm"): 34.0,
-        ("Gamma Ray", "kind"): "normal",
-        ("Gamma Ray", "width_mm"): 26.0,
+        ("bond_index", "kind"): "normal",
+        ("bond_index", "title"): "Bond Index",
+        ("bond_index", "width_mm"): 34.0,
+        ("gamma_ray", "kind"): "normal",
+        ("gamma_ray", "title"): "Gamma Ray",
+        ("gamma_ray", "width_mm"): 26.0,
     }
     assert {
         item.value

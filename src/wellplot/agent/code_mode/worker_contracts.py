@@ -219,6 +219,57 @@ def _source_handle(
     return f"source-{matches[0] + 1}"
 
 
+def _source_index(source_handle: str) -> int:
+    """Decode one already-resolved opaque source handle."""
+    match = re.fullmatch(r"source-([1-9][0-9]*)", source_handle)
+    if match is None:
+        raise SectionWorkContractError(
+            "section_work_source_missing", "The requested source handle is invalid."
+        )
+    return int(match.group(1)) - 1
+
+
+def _channel_kind(
+    channel: object,
+    section_context: ResolvedSectionContext,
+    *,
+    selected_source_index: int | None,
+) -> str | None:
+    """Resolve channel kind only from the selected or inventory-consistent sources."""
+    if channel is None:
+        return None
+    mnemonic = str(channel).casefold()
+    if selected_source_index is not None:
+        if selected_source_index >= len(section_context.sources):
+            raise SectionWorkContractError(
+                "section_work_source_missing", "The selected source is not inspected."
+            )
+        matches = [
+            item.kind
+            for item in section_context.sources[selected_source_index].channels
+            if item.mnemonic.casefold() == mnemonic
+        ]
+        return matches[0] if len(matches) == 1 else None
+
+    if not section_context.sources:
+        return None
+    source_kinds: list[str] = []
+    for source in section_context.sources:
+        matches = [item.kind for item in source.channels if item.mnemonic.casefold() == mnemonic]
+        if len(matches) != 1:
+            raise SectionWorkContractError(
+                "section_work_source_ambiguous",
+                "Candidate source inventories disagree for a required channel.",
+            )
+        source_kinds.append(matches[0])
+    if len(set(source_kinds)) != 1:
+        raise SectionWorkContractError(
+            "section_work_source_ambiguous",
+            "Candidate source inventories disagree for a required channel.",
+        )
+    return source_kinds[0]
+
+
 def _source_name(source: object) -> str:
     """Project a basename only; never expose a canonical source path."""
     labels = tuple(getattr(source, "labels", ()))
@@ -285,6 +336,20 @@ def build_section_work_contract(
             (item.start_byte for item in obligations if item.owner_ref == owner),
             default=0,
         ),
+    )
+    source_obligation = next(
+        (item for item in obligations if item.owner_kind is OwnerKind.SOURCE),
+        None,
+    )
+    selected_source_handle = (
+        _source_handle(source_obligation.value, section_context)
+        if source_obligation is not None
+        else None
+    )
+    selected_source_index = (
+        _source_index(selected_source_handle)
+        if selected_source_handle is not None
+        else (0 if len(section_context.sources) == 1 else None)
     )
     work_tracks: list[SectionWorkTrack] = []
     work_bindings: list[SectionWorkBinding] = []
@@ -366,15 +431,10 @@ def build_section_work_contract(
             slot_facts = slot_facts_by_key[slot]
             values = {field: _unique_value(slot_facts, field) for field in _BINDING_FIELDS}
             channel = values.pop("channel")
-            channel_kind = next(
-                (
-                    channel_fact.kind
-                    for source in section_context.sources
-                    for channel_fact in source.channels
-                    if channel is not None
-                    and channel_fact.mnemonic.casefold() == str(channel).casefold()
-                ),
-                None,
+            channel_kind = _channel_kind(
+                channel,
+                section_context,
+                selected_source_index=selected_source_index,
             )
             if channel is None or channel_kind is None:
                 raise SectionWorkContractError(
@@ -510,18 +570,7 @@ def build_section_work_contract(
             item.field: item.value for item in fill_facts if item.field in {"color", "alpha"}
         }
 
-    source_obligation = next(
-        (item for item in obligations if item.owner_kind is OwnerKind.SOURCE),
-        None,
-    )
-    source_handle = (
-        _source_handle(
-            source_obligation.value if source_obligation is not None else None,
-            section_context,
-        )
-        if required_action == "reconstruct"
-        else None
-    )
+    source_handle = selected_source_handle if required_action == "reconstruct" else None
 
     sources = tuple(
         SectionWorkSource(
@@ -709,6 +758,8 @@ def _actual_binding_value(binding: object, field: str) -> object | None:
         return getattr(getattr(binding, "style", None), field, None)
     if field == "raster_profile":
         return getattr(binding, "profile", None)
+    if field == "raster_colormap":
+        return getattr(binding, "colormap", None)
     if field == "sample_axis_enabled":
         return getattr(binding, "sample_axis", None) is not None
     if field.startswith("sample_axis_"):

@@ -639,6 +639,16 @@ _INDEPENDENT_ANCHOR_PATTERNS = (
     ),
     (
         "explicit",
+        "title",
+        re.compile(
+            r"\bTrack\s+[A-Za-z0-9_. -]+?\s*:\s*"
+            r"(?:normal|reference|array)\b[^\n;]*?"
+            r"\bwidth\s+[0-9]+(?:\.[0-9]+)?\s*mm\b",
+            re.I,
+        ),
+    ),
+    (
+        "explicit",
         "width_mm",
         re.compile(
             r"\b(?:add|append)\s+(?:a|an)(?:\s+new)?\s+"
@@ -978,8 +988,14 @@ def extract_supported_obligations(request: str) -> tuple[RequestObligation, ...]
         )
     for pattern in (_ADD_TRACK_RE, _TRACK_LINE_RE):
         for match in pattern.finditer(request):
-            owner = match.groupdict().get("title") or match.group("owner")
-            if match.groupdict().get("title"):
+            owner_text = match.groupdict().get("title") or match.group("owner")
+            owner = (
+                _normalize_requirement_key(owner_text) if pattern is _TRACK_LINE_RE else owner_text
+            )
+            declared_title = match.groupdict().get("title")
+            if declared_title is None and pattern is _TRACK_LINE_RE:
+                declared_title = owner_text
+            if declared_title:
                 obligations.append(
                     _make_obligation(
                         request=request,
@@ -989,7 +1005,7 @@ def extract_supported_obligations(request: str) -> tuple[RequestObligation, ...]
                         owner_kind=OwnerKind.TRACK,
                         owner_ref=owner,
                         field="title",
-                        value=match.group("title"),
+                        value=declared_title,
                     )
                 )
             obligations.append(

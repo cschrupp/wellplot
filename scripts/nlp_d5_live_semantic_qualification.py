@@ -64,7 +64,7 @@ ROLE_LOGICAL_CALL_LIMITS = {
 SMOKE_ROLE = "smoke"
 SMOKE_TURN_ID = "D5-5J-SMOKE"
 SMOKE_BINDING_KIND = "binding_compile"
-SMOKE_BINDING_TURN_ID = "D5-5J-BINDING-SMOKE"
+SMOKE_BINDING_TURN_ID = "D5-5J-BINDING-SMOKE-002"
 SMOKE_SYSTEM_PROMPT = "Return the smoke readiness object using the supplied JSON Schema."
 SMOKE_USER_PROMPT = "Return exactly one JSON object with status READY and no other fields."
 SMOKE_MAX_LOGICAL_CALLS = 1
@@ -73,13 +73,13 @@ SMOKE_BINDING_ROLE_LIMITS = {"planner": 2, "section_worker": 2, "report_worker":
 SMOKE_BINDING_MAX_LOGICAL_CALLS = 4
 SMOKE_BINDING_MAX_PHYSICAL_ATTEMPTS_PER_CALL = 3
 SMOKE_BINDING_REQUEST = (
-    "In the Main Review section, create two tracks. "
-    "Track Bond Index: normal, width 34 mm. "
+    "In the Main Log section, add two normal tracks while preserving the existing tracks.\n"
+    "Track Bond Index: normal, width 34 mm.\n"
     "Track Gamma Ray: normal, width 26 mm.\n"
     "On Bond Index: BI -> Bond Index, linear 0..1, #111111, width 0.8.\n"
     "On Gamma Ray: GR_STGC -> Gamma Ray, linear 0..150, #16a34a, width 0.8."
 )
-SMOKE_BINDING_REQUEST_SHA256 = "cfff01272684ce6fd20f320fc7be23f778346afaf4be5ed9cb3217e7371621de"
+SMOKE_BINDING_REQUEST_SHA256 = "b60330264cf1037fec80a533bd0a7b96fdee70aa52101693a8da5c962b9914e7"
 MAX_ENDPOINT_RESPONSE_BYTES = 1_048_576
 MAX_SECTION_ACTION_EVIDENCE_BYTES = 65_536
 THINKING_CONTROL_MECHANISM = "chat_template_kwargs.enable_thinking"

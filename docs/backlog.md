@@ -91,3 +91,11 @@ rather than creating branch-management work on the current scientific path.
 
 Inventory stale clones and worktrees, then remove only after branch and commit
 reachability is proven. This is not on the current D5 critical path.
+
+## Deterministic Fill-Relation Contract
+
+The section work contract currently fixes fill target, color, and alpha when
+explicitly requested, but does not yet compile the fill relation (for example,
+`to_lower_limit`) into the deterministic contract. Keep this as a known
+semantic-contract gap; do not claim fill relation is fully request-compiled
+until a bounded provider-free implementation and regression are accepted.
