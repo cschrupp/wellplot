@@ -586,6 +586,7 @@ class SemanticPlanner:
                     attachment_error.code,
                     "Planner returned an invalid scope assignment after one correction.",
                 ) from attachment_error
+            _assert_duplicate_scope_sources_unambiguous(plan, compilation)
             corrected = await generate(
                 _correction_request(
                     mode=mode,
@@ -958,6 +959,7 @@ def _assert_duplicate_scope_consolidation_preserves_semantics(
     for scope_id, task in zip(after_scope_ids, after.section_tasks, strict=True):
         after_by_scope.setdefault(scope_id, []).append(task)
 
+    _assert_duplicate_scope_sources_unambiguous(before, compilation)
     duplicate_scopes = {scope_id for scope_id, tasks in before_by_scope.items() if len(tasks) > 1}
     if not duplicate_scopes:
         raise PlannerSemanticFailure(
@@ -991,9 +993,7 @@ def _assert_duplicate_scope_consolidation_preserves_semantics(
                 capability for task in original_tasks for capability in task.capability_ids
             )
         )
-        expected_sources = tuple(
-            dict.fromkeys(source for task in original_tasks for source in task.source_hints)
-        )
+        source_hints = original_tasks[0].source_hints
         expected_requirements = tuple(
             requirement for task in original_tasks for requirement in task.requirements
         )
@@ -1004,13 +1004,38 @@ def _assert_duplicate_scope_consolidation_preserves_semantics(
             corrected.existing_section_hint != original_hint
             or corrected.goal != expected_goal
             or corrected.capability_ids != expected_capabilities
-            or corrected.source_hints != expected_sources
+            or corrected.source_hints != source_hints
             or corrected.requirements != expected_requirements
             or corrected.constraints != expected_constraints
         ):
             raise PlannerSemanticFailure(
                 "scope_consolidation_preservation_violation",
                 "Corrected task did not preserve the original scoped semantic content.",
+            )
+
+
+def _assert_duplicate_scope_sources_unambiguous(
+    plan: SemanticPlan,
+    compilation: RequestCompilationResult,
+) -> None:
+    """Reject duplicate-scope repair when source ownership cannot survive merging."""
+    try:
+        scope_ids, _ = _resolve_section_scope_ids(plan, compilation)
+    except PlannerSemanticError as error:
+        raise PlannerSemanticFailure(error.code, error.safe_message) from error
+
+    tasks_by_scope: dict[str, list[SectionTask]] = {}
+    for scope_id, task in zip(scope_ids, plan.section_tasks, strict=True):
+        tasks_by_scope.setdefault(scope_id, []).append(task)
+
+    for tasks in tasks_by_scope.values():
+        if len(tasks) < 2:
+            continue
+        source_hints = tasks[0].source_hints
+        if any(task.source_hints != source_hints for task in tasks[1:]):
+            raise PlannerSemanticFailure(
+                "scope_consolidation_source_ambiguity",
+                "Duplicate section tasks with different source selections cannot be consolidated.",
             )
 
 

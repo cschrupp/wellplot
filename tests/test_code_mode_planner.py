@@ -6,6 +6,7 @@ import asyncio
 import inspect
 import json
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -28,6 +29,8 @@ from wellplot.agent.code_mode.planner import (
     _schema_correction_request,
     validate_semantic_plan,
 )
+from wellplot.agent.direct_notebook import _load_document_context
+from wellplot.agent.inspection import AuthoringInspectionFacade
 from wellplot.agent.providers.base import (
     ProviderFailureCategory,
     ProviderMetrics,
@@ -692,6 +695,47 @@ def test_duplicate_scope_plan_gets_one_preservation_checked_correction() -> None
     assert [event["event"] for event in events].count("CORRECTION_SCOPE_PASS") == 1
 
 
+def test_duplicate_scope_correction_in_revise_mode_uses_main_log_fixture() -> None:
+    """The corrected planner contract works in revise mode with the real smoke document."""
+    repo_root = Path(__file__).resolve().parents[1]
+    context = _load_document_context(repo_root / "examples/cbl_main.log.yaml", root=repo_root)
+    inspection = AuthoringInspectionFacade(context.document)
+    summary = inspection.document_summary().model_dump(mode="json")
+    summary["existing_section_hints"] = [
+        {"title": section.title, "subtitle": section.subtitle} for section in inspection.sections()
+    ]
+    assert summary["existing_section_hints"] == [
+        {"title": "Main Log", "subtitle": "CBL Main Configuration"}
+    ]
+
+    backend = _SequenceBackend(
+        responses=[
+            _captured_duplicate_scope_plan(),
+            _consolidated_duplicate_scope_plan(),
+        ]
+    )
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    result = asyncio.run(
+        planner.plan(
+            request=_captured_duplicate_scope_request(),
+            mode="revise",
+            current_document_summary=summary,
+            source_summary={
+                "sources": [source.model_dump(mode="json") for source in context.source_candidates]
+            },
+            timeout_seconds=5.0,
+        )
+    )
+
+    assert len(backend.requests) == 2
+    assert '"mode":"revise"' in backend.requests[0].user_prompt
+    assert result.section_tasks[0].existing_section_hint == "Main Log"
+    assert len(result.section_tasks) == 1
+    assert result.scope_binding is not None
+    assert result.scope_binding.expected_scope_ids == result.scope_binding.assigned_scope_ids
+
+
 def test_duplicate_scope_correction_rejects_reassigned_track_facts() -> None:
     """A correction cannot rewrite the goal that binds each track to its values."""
     corrected = _consolidated_duplicate_scope_plan()
@@ -711,6 +755,28 @@ def test_duplicate_scope_correction_rejects_reassigned_track_facts() -> None:
 
     assert caught.value.code == "scope_consolidation_preservation_violation"
     assert len(backend.requests) == 2
+
+
+def test_duplicate_scope_correction_rejects_different_source_hints_before_retry() -> None:
+    """Task-level source ownership cannot be merged into an ambiguous section task."""
+    captured = _captured_duplicate_scope_plan()
+    tasks = list(captured["section_tasks"])
+    tasks[1] = {**tasks[1], "source_hints": ("alternate-source.las",)}
+    captured["section_tasks"] = tuple(tasks)
+    backend = _SequenceBackend(responses=[captured])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(PlannerSemanticFailure) as caught:
+        asyncio.run(
+            planner.plan(
+                request=_captured_duplicate_scope_request(),
+                mode="reconstruct",
+                timeout_seconds=5.0,
+            )
+        )
+
+    assert caught.value.code == "scope_consolidation_source_ambiguity"
+    assert len(backend.requests) == 1
 
 
 @pytest.mark.parametrize("unrelated_change", ["report", "extra_section"])

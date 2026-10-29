@@ -2574,6 +2574,165 @@ def test_facade_projects_attachment_rejection_without_worker_dispatch() -> None:
     assert backend.calls == 1
 
 
+def test_binding_smoke_exhausted_duplicate_scope_correction_is_contract_failure(
+    tmp_path: Path,
+) -> None:
+    """Two rejected planner outputs remain a contract failure with zero worker calls."""
+    artifact_root = tmp_path / "binding-duplicate-scope-exhausted"
+    authorization = _authorization(
+        campaign_id="binding-duplicate-scope-exhausted",
+        artifact_root=str(artifact_root),
+    )
+    duplicate_plan = {
+        "summary": "Add both requested tracks to Main Log.",
+        "section_tasks": [
+            {
+                "goal": "Add the Bond Index track and bind BI with the requested scale.",
+                "capability_ids": ["track.normal", "binding.curve"],
+                "existing_section_hint": "Main Log",
+                "source_hints": ["CBL_Main_REV1.las"],
+                "requirements": [
+                    "Track Title: Bond Index",
+                    "Track Kind: normal",
+                    "Track Width: 34 mm",
+                    "Binding Source Mnemonic: BI",
+                    "Binding Scale Type: linear",
+                    "Binding Scale Min: 0",
+                    "Binding Scale Max: 1",
+                ],
+                "constraints": [],
+            },
+            {
+                "goal": "Add the Gamma Ray track and bind GR_STGC with the requested scale.",
+                "capability_ids": ["track.normal", "binding.curve"],
+                "existing_section_hint": "Main Log",
+                "source_hints": ["CBL_Main_REV1.las"],
+                "requirements": [
+                    "Track Title: Gamma Ray",
+                    "Track Kind: normal",
+                    "Track Width: 26 mm",
+                    "Binding Source Mnemonic: GR_STGC",
+                    "Binding Scale Type: linear",
+                    "Binding Scale Min: 0",
+                    "Binding Scale Max: 150",
+                ],
+                "constraints": [],
+            },
+        ],
+    }
+    model_requests: list[httpx.Request] = []
+    schema_names: list[str] = []
+    clients: list[httpx.AsyncClient] = []
+    compile_results: list[CodeModeCompileResult] = []
+
+    def client_factory(observer: object) -> httpx.AsyncClient:
+        async def handler(request: httpx.Request) -> httpx.Response:
+            model_requests.append(request)
+            body = json.loads(request.content)
+            schema_names.append(body["response_format"]["json_schema"]["name"])
+            return httpx.Response(
+                200,
+                request=request,
+                json={
+                    "choices": [
+                        {
+                            "message": {
+                                "role": "assistant",
+                                "content": json.dumps(duplicate_plan),
+                            },
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+                },
+            )
+
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            event_hooks={
+                "request": [observer.on_request],
+                "response": [observer.on_response],
+            },
+        )
+        client._platform = "Linux"
+        clients.append(client)
+        return client
+
+    def provider_factory(
+        repo_root: Path,
+        smoke_root: Path,
+        token: str,
+        *,
+        trace_callback: Callable[[dict[str, Any]], None] | None = None,
+        compile_result_callback: Callable[[Any], None] | None = None,
+        section_action_callback: Callable[[dict[str, object]], None] | None = None,
+    ) -> object:
+        def capture_compile_result(result: CodeModeCompileResult) -> None:
+            compile_results.append(result)
+            if compile_result_callback is not None:
+                compile_result_callback(result)
+
+        adapter = d5.create_live_adapter(
+            repo_root=repo_root,
+            artifact_root=smoke_root,
+            api_key=token,
+            project_config=PROJECT_CONFIG,
+            request_options=d5._thinking_control_options(),
+            require_thinking_control=True,
+            http_client_factory=client_factory,
+            trace_callback=trace_callback,
+            compile_result_callback=capture_compile_result,
+            section_action_callback=section_action_callback,
+        )
+        client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
+        client._platform = "Linux"
+        return adapter
+
+    def endpoint_get(url: str, token: str) -> object:
+        assert token == "provider-free-token"
+        if url == PROJECT_CONFIG.model_catalog_url:
+            return {"data": [{"id": d5.EXPECTED_MODEL}]}
+        assert url == PROJECT_CONFIG.props_url
+        return _props()
+
+    try:
+        result = d5.execute_live_binding_smoke(
+            repo_root=REPO_ROOT,
+            authorization=authorization,
+            artifact_root=artifact_root,
+            logfile_path=REPO_ROOT / "examples/cbl_main.log.yaml",
+            endpoint_get=endpoint_get,
+            api_key_loader=lambda: "provider-free-token",
+            static_checker=lambda *_args: {"status": "PASS"},
+            provider_factory=provider_factory,
+        )
+    finally:
+        for client in clients:
+            asyncio.run(client.aclose())
+
+    assert result["status"] == "SMOKE_CONTRACT_FAIL"
+    assert result["terminal"]["outcome"] == "SMOKE_CONTRACT_FAIL"
+    assert result["terminal"]["reason"] == "canonical_compile_rejected"
+    assert result["terminal"]["endpoint_calls"] == 2
+    assert result["terminal"]["logical_generation_calls"] == 2
+    assert result["terminal"]["physical_generation_attempts"] == 2
+    assert result["terminal"]["logical_calls_by_role"] == {"planner": 2}
+    assert result["terminal"]["scientific_population_loaded"] is False
+    assert result["terminal"]["scientific_campaign_started"] is False
+    assert len(model_requests) == 2
+    assert schema_names == ["PlannerWirePlan", "PlannerWirePlan"]
+    assert len(compile_results) == 1
+    assert compile_results[0].success is False
+    assert compile_results[0].workers == ()
+    assert compile_results[0].diagnostics[0].code == "planner.duplicate_scope_assignment"
+
+    compile_path = artifact_root / f"{authorization.campaign_id}.compile-result.json"
+    compile_record = json.loads(compile_path.read_text(encoding="utf-8"))
+    assert compile_record["success"] is False
+    assert compile_record["workers"] == []
+    assert compile_record["diagnostics"][0]["code"] == "planner.duplicate_scope_assignment"
+
+
 def test_binding_smoke_records_bounded_exception_then_reraises(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
