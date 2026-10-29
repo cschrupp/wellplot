@@ -33,6 +33,7 @@ from wellplot.agent.code_mode.enrichment import (
     SourceContext,
 )
 from wellplot.agent.code_mode.obligations import (
+    OwnerKind,
     ValidationIssue,
     ValidationIssueSet,
     compile_request_contract,
@@ -956,6 +957,33 @@ def test_authority_g_captured_response_uses_one_shared_track_binding() -> None:
     assert len(worker_backend.requests) == 1
 
 
+def test_binding_owner_slug_and_display_track_owner_share_identity() -> None:
+    """Normalized binding slugs attach to the matching display-form track owner."""
+    _compilation, plan, _actions = _compiled_cbl_capture()
+    task = next(task for task in plan.section_tasks if task.existing_section_hint == "Main Pass")
+    obligations = tuple(
+        item.model_copy(update={"owner_ref": "Combo"})
+        if item.owner_kind is OwnerKind.TRACK and item.owner_ref == "combo"
+        else item
+        for item in task.obligations
+    )
+    action = section_worker.SectionSemanticActionResponse.model_validate(
+        _authority_g_response()
+    ).root
+
+    bindings = section_worker.resolve_section_object_bindings(action, obligations)
+
+    assert bindings.track_index("Combo") == 0
+    assert bindings.track_index("combo") == 0
+    applied = apply_compiled_requirements(action, obligations, object_bindings=bindings)
+    validate_section_obligations(
+        applied,
+        obligations,
+        section_title=task.existing_section_hint,
+        object_bindings=bindings,
+    )
+
+
 def test_grounding_rejects_duplicate_explicit_identity() -> None:
     """Duplicate exact titles are ambiguous even when one track looks plausible."""
     _compilation, plan, _actions = _compiled_cbl_capture()
@@ -1277,6 +1305,21 @@ def test_incomplete_single_track_action_gets_bounded_grounding_correction(
 ) -> None:
     """A uniquely grounded partial add_track can be completed without relaxing binding."""
     _compilation, plan, _actions = _compiled_cbl_capture()
+    section_tasks = list(plan.section_tasks)
+    main_index = next(
+        index
+        for index, task in enumerate(section_tasks)
+        if task.existing_section_hint == "Main Pass"
+    )
+    main_task = section_tasks[main_index]
+    aliased_obligations = tuple(
+        item.model_copy(update={"owner_ref": "Combo"})
+        if item.owner_kind is OwnerKind.TRACK and item.owner_ref == "combo"
+        else item
+        for item in main_task.obligations
+    )
+    section_tasks[main_index] = main_task.model_copy(update={"obligations": aliased_obligations})
+    plan = plan.model_copy(update={"section_tasks": tuple(section_tasks)})
     full_response = _authority_g_response()
     first_track = full_response["section"]["tracks"][0]
     initial_response = {"action": "add_track", "track": first_track}

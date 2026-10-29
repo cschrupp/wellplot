@@ -1343,6 +1343,45 @@ def _bind_compiled_source(
     )
 
 
+def _section_owner_alias_map(
+    obligations: tuple[RequestObligation, ...],
+) -> dict[str, str]:
+    """Map binding owner slugs to their exact normalized track-owner identity."""
+    relevant = [
+        item
+        for item in obligations
+        if item.state is ObligationState.SET
+        and item.owner_ref != "request"
+        and item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK, OwnerKind.BINDING}
+    ]
+    track_owners = tuple(
+        dict.fromkeys(
+            item.owner_ref
+            for item in relevant
+            if item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK}
+        )
+    )
+    track_by_identity: dict[str, str] = {}
+    for owner in track_owners:
+        identity = _normalized_identity(owner)
+        existing = track_by_identity.get(identity)
+        if existing is not None and existing != owner:
+            raise SemanticActionError(
+                "worker_grounding_ambiguous",
+                "Distinct request track owners share one normalized identity.",
+            )
+        track_by_identity[identity] = owner
+
+    aliases = {owner: owner for owner in track_owners}
+    binding_owners = tuple(
+        dict.fromkeys(item.owner_ref for item in relevant if item.owner_kind is OwnerKind.BINDING)
+    )
+    for owner in binding_owners:
+        canonical = track_by_identity.get(_normalized_identity(owner), owner)
+        aliases[owner] = canonical
+    return aliases
+
+
 def resolve_section_object_bindings(
     action: SectionSemanticAction,
     obligations: tuple[RequestObligation, ...],
@@ -1364,18 +1403,29 @@ def resolve_section_object_bindings(
         and item.owner_ref != "request"
         and item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK, OwnerKind.BINDING}
     ]
-    owners = tuple(dict.fromkeys(item.owner_ref for item in relevant))
+    alias_map = _section_owner_alias_map(obligations)
+    owners = tuple(
+        dict.fromkeys(alias_map.get(item.owner_ref, item.owner_ref) for item in relevant)
+    )
     candidates_by_owner: dict[str, tuple[int, ...]] = {}
     for owner in owners:
-        owner_facts = [item for item in relevant if item.owner_ref == owner]
+        owner_facts = [
+            item for item in relevant if alias_map.get(item.owner_ref, item.owner_ref) == owner
+        ]
+        owner_identities = {
+            _normalized_identity(reference)
+            for reference, canonical in alias_map.items()
+            if canonical == owner
+        }
+        owner_identities.add(_normalized_identity(owner))
         explicit = tuple(
             index
             for index, track in enumerate(tracks)
-            if _normalized_identity(owner)
-            in {
+            if {
                 _normalized_identity(str(track.get("semantic_id", ""))),
                 _normalized_identity(str(track.get("title", ""))),
             }
+            & owner_identities
         )
         structural = _structural_track_candidates(tracks, owner_facts)
         if len(explicit) > 1:
@@ -1434,8 +1484,27 @@ def resolve_section_object_bindings(
         if len(request_candidates) == 1:
             track_indices["request"] = request_candidates[0]
 
+    for reference, canonical in alias_map.items():
+        if canonical in track_indices:
+            track_indices[reference] = track_indices[canonical]
+
     binding_indices: list[tuple[str, str, int | None]] = []
-    for owner, track_index in track_indices.items():
+    binding_owners = tuple(
+        dict.fromkeys(
+            item.owner_ref
+            for item in obligations
+            if item.state is ObligationState.SET and item.owner_kind is OwnerKind.BINDING
+        )
+    )
+    if (
+        any(item.owner_kind is OwnerKind.BINDING for item in request_facts)
+        and "request" not in binding_owners
+    ):
+        binding_owners = (*binding_owners, "request")
+    for owner in binding_owners:
+        track_index = track_indices.get(owner)
+        if track_index is None:
+            continue
         facts_by_slot: dict[str, list[RequestObligation]] = {}
         for item in obligations:
             if item.state is not ObligationState.SET:
@@ -1465,6 +1534,7 @@ def resolve_section_object_bindings(
 
 def _section_track_owners(obligations: tuple[RequestObligation, ...]) -> tuple[str, ...]:
     """Return request-owned track identities in compiled request order."""
+    alias_map = _section_owner_alias_map(obligations)
     relevant = (
         item
         for item in obligations
@@ -1472,7 +1542,7 @@ def _section_track_owners(obligations: tuple[RequestObligation, ...]) -> tuple[s
         and item.owner_ref != "request"
         and item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK, OwnerKind.BINDING}
     )
-    return tuple(dict.fromkeys(item.owner_ref for item in relevant))
+    return tuple(dict.fromkeys(alias_map.get(item.owner_ref, item.owner_ref) for item in relevant))
 
 
 def _recoverable_single_track_omission(
@@ -1493,8 +1563,11 @@ def _recoverable_single_track_omission(
     ):
         return None
 
+    alias_map = _section_owner_alias_map(obligations)
     for owner in owners:
-        owner_facts = tuple(item for item in obligations if item.owner_ref == owner)
+        owner_facts = tuple(
+            item for item in obligations if alias_map.get(item.owner_ref, item.owner_ref) == owner
+        )
         kind_facts = [
             item
             for item in owner_facts
@@ -1541,7 +1614,9 @@ def _recoverable_single_track_omission(
 
     matched_owners: list[str] = []
     for owner in owners:
-        owner_facts = tuple(item for item in obligations if item.owner_ref == owner)
+        owner_facts = tuple(
+            item for item in obligations if alias_map.get(item.owner_ref, item.owner_ref) == owner
+        )
         try:
             partial = resolve_section_object_bindings(action, owner_facts)
         except SemanticActionError as error:
