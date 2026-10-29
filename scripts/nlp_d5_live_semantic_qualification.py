@@ -81,6 +81,7 @@ SMOKE_BINDING_REQUEST = (
 )
 SMOKE_BINDING_REQUEST_SHA256 = "cfff01272684ce6fd20f320fc7be23f778346afaf4be5ed9cb3217e7371621de"
 MAX_ENDPOINT_RESPONSE_BYTES = 1_048_576
+MAX_SECTION_ACTION_EVIDENCE_BYTES = 65_536
 THINKING_CONTROL_MECHANISM = "chat_template_kwargs.enable_thinking"
 THINKING_CONTROL_OPTIONS_SHA256 = "220b99e47feb82851cab428f86b8fe977ae7c605400d421a91e99d4a35ec9c26"
 FROZEN_TURN_IDS = (
@@ -754,6 +755,11 @@ class EvidencePaths:
         return self.root / f"{self.campaign_id}.planner-context.json"
 
     @property
+    def section_actions(self) -> Path:
+        """Return validated section-worker action DTOs captured for diagnosis."""
+        return self.root / f"{self.campaign_id}.section-actions.jsonl"
+
+    @property
     def stage_trace(self) -> Path:
         """Return pre-dispatch and planner stage transitions, one per line."""
         return self.root / f"{self.campaign_id}.stage-trace.jsonl"
@@ -781,6 +787,7 @@ class EvidencePaths:
             self.planner_wire,
             self.request_compilation,
             self.planner_context,
+            self.section_actions,
             self.stage_trace,
             self.binding_request,
             self.binding_request_compilation,
@@ -1034,9 +1041,10 @@ class D5SmokeCustody:
 
     def record_unexpected_host_exception(
         self,
-        error: Exception,
+        error: BaseException,
         *,
         last_completed_stage: str,
+        event_name: str = "BINDING_SMOKE_HOST_EXCEPTION",
     ) -> None:
         """Record bounded exception location without locals or traceback text."""
         traceback = error.__traceback__
@@ -1059,13 +1067,32 @@ class D5SmokeCustody:
             }
         self.record_planner_observability(
             {
-                "event": "BINDING_SMOKE_HOST_EXCEPTION",
+                "event": event_name,
                 "exception_type": type(error).__name__,
                 "exception_module": type(error).__module__,
                 **location,
                 "last_completed_stage": last_completed_stage,
             }
         )
+
+    def record_section_action(self, event: Mapping[str, Any]) -> None:
+        """Persist one bounded, schema-validated worker action DTO."""
+        action = event.get("action")
+        if not isinstance(action, Mapping):
+            raise D5HarnessError("validated section action is not an object")
+        row = {
+            "event": "SECTION_ACTION_VALIDATED",
+            "attempt": event.get("attempt"),
+            "response_schema": "SectionSemanticActionResponse",
+            "action": dict(action),
+        }
+        encoded = json.dumps(row, sort_keys=True, separators=(",", ":"))
+        if len(encoded.encode("utf-8")) > MAX_SECTION_ACTION_EVIDENCE_BYTES:
+            raise D5HarnessError("validated section action evidence exceeds its bound")
+        if not evidence_is_redacted(row):
+            raise D5HarnessError("validated section action redaction failure")
+        with self.paths.section_actions.open("a", encoding="utf-8") as handle:
+            handle.write(encoded + "\n")
 
     def record_readiness(self, readiness: D5ReadinessProjectionProtocol) -> None:
         """Persist the bounded readiness projection before generation."""
@@ -1340,6 +1367,7 @@ class D5SmokeCustody:
                     self.paths.planner_wire,
                     self.paths.request_compilation,
                     self.paths.planner_context,
+                    self.paths.section_actions,
                     self.paths.stage_trace,
                     self.paths.binding_request,
                     self.paths.binding_request_compilation,
@@ -2666,6 +2694,7 @@ def create_live_adapter(
     require_thinking_control: bool = False,
     trace_callback: Callable[[Mapping[str, Any]], None] | None = None,
     compile_result_callback: Callable[[Any], None] | None = None,
+    section_action_callback: Callable[[Mapping[str, object]], None] | None = None,
 ) -> _ObservedLiveAdapter:
     """Build the accepted canonical adapter with retry-visible HTTP transport."""
     import httpx
@@ -2719,6 +2748,7 @@ def create_live_adapter(
         diagnostic_callback=observer.capture_worker_diagnostic,
         trace_callback=trace_callback,
         compile_result_callback=compile_result_callback,
+        section_action_callback=section_action_callback,
     )
     inner = d4.D4CampaignAdapter(
         repo_root=repo_root,
@@ -3057,6 +3087,37 @@ async def _close_binding_smoke_adapter(adapter: object) -> None:
         await result
 
 
+async def _run_binding_smoke_and_close(
+    adapter: object,
+    *,
+    request: str,
+    document: object,
+    sources: Sequence[object],
+) -> tuple[object | None, BaseException | None, BaseException | None]:
+    """Run compilation and close the async client before the same loop exits."""
+    from wellplot.agent.session import AgentSession
+
+    result: object | None = None
+    execution_error: BaseException | None = None
+    cleanup_error: BaseException | None = None
+    try:
+        agent_session = adapter.inner.session.session
+        if not isinstance(agent_session, AgentSession):
+            raise D5HarnessError("canonical Code Mode session is unavailable")
+        result = await agent_session.revise(
+            request=request,
+            document=document,
+            sources=sources,
+        )
+    except BaseException as error:
+        execution_error = error
+    try:
+        await _close_binding_smoke_adapter(adapter)
+    except BaseException as error:
+        cleanup_error = error
+    return result, execution_error, cleanup_error
+
+
 def execute_live_binding_smoke(
     *,
     repo_root: Path,
@@ -3142,6 +3203,7 @@ def execute_live_binding_smoke(
         raise
 
     trace_events: list[Mapping[str, Any]] = []
+    section_action_events: list[Mapping[str, Any]] = []
     compile_results: list[Any] = []
     custody_ref: dict[str, D5SmokeCustody] = {}
     last_completed_stage = "READINESS"
@@ -3162,6 +3224,12 @@ def execute_live_binding_smoke(
         if active_custody is not None:
             active_custody.record_compile_result(result)
 
+    def on_section_action(event: Mapping[str, object]) -> None:
+        section_action_events.append(dict(event))
+        active_custody = custody_ref.get("custody")
+        if active_custody is not None:
+            active_custody.record_section_action(event)
+
     load_key = api_key_loader or (lambda: d4.load_d4_api_key(repo_root))
 
     def build_provider(token: str) -> object:
@@ -3172,6 +3240,7 @@ def execute_live_binding_smoke(
                 token,
                 trace_callback=on_trace,
                 compile_result_callback=on_compile_result,
+                section_action_callback=on_section_action,
             )
         return create_live_adapter(
             repo_root=repo_root,
@@ -3182,6 +3251,7 @@ def execute_live_binding_smoke(
             require_thinking_control=True,
             trace_callback=on_trace,
             compile_result_callback=on_compile_result,
+            section_action_callback=on_section_action,
         )
 
     try:
@@ -3242,56 +3312,42 @@ def execute_live_binding_smoke(
         custody.record_planner_observability(event)
     for result in compile_results:
         custody.record_compile_result(result)
+    for event in section_action_events:
+        custody.record_section_action(event)
 
     try:
-        from wellplot.agent.session import AgentSession
-
-        agent_session = adapter.inner.session.session
-        if not isinstance(agent_session, AgentSession):
-            raise D5HarnessError("canonical Code Mode session is unavailable")
-        result = asyncio.run(
-            agent_session.revise(
+        result, execution_error, cleanup_error = asyncio.run(
+            _run_binding_smoke_and_close(
+                adapter,
                 request=request,
                 document=document_context.document,
                 sources=document_context.source_candidates,
             )
         )
-    except D5CallCapExceeded:
-        try:
-            asyncio.run(_close_binding_smoke_adapter(adapter))
-        except Exception as error:
-            custody.record_unexpected_host_exception(
-                error,
-                last_completed_stage="CLIENT_CLOSE",
-            )
-            custody.finish("SMOKE_HARNESS_FAIL", reason="client_close_failure")
-            raise
+    except BaseException as error:
+        execution_error = error
+        cleanup_error = None
+        result = None
+
+    if cleanup_error is not None:
+        custody.record_unexpected_host_exception(
+            cleanup_error,
+            last_completed_stage="CLIENT_CLOSE",
+            event_name="BINDING_SMOKE_CLEANUP_EXCEPTION",
+        )
+
+    if isinstance(execution_error, asyncio.CancelledError):
+        raise execution_error
+    if isinstance(execution_error, D5CallCapExceeded):
         terminal = custody.finish("SMOKE_CONTRACT_FAIL", reason="binding_call_cap_exceeded")
         return {"status": "SMOKE_CONTRACT_FAIL", "terminal": terminal}
-    except Exception as error:
+    if execution_error is not None:
         custody.record_unexpected_host_exception(
-            error,
+            execution_error,
             last_completed_stage=last_completed_stage,
         )
-        try:
-            asyncio.run(_close_binding_smoke_adapter(adapter))
-        except Exception as close_error:
-            custody.record_unexpected_host_exception(
-                close_error,
-                last_completed_stage="CLIENT_CLOSE",
-            )
         custody.finish("SMOKE_HARNESS_FAIL", reason="unexpected_host_exception")
-        raise
-    else:
-        try:
-            asyncio.run(_close_binding_smoke_adapter(adapter))
-        except Exception as error:
-            custody.record_unexpected_host_exception(
-                error,
-                last_completed_stage="CLIENT_CLOSE",
-            )
-            custody.finish("SMOKE_HARNESS_FAIL", reason="client_close_failure")
-            raise
+        raise execution_error
 
     if not compile_results:
         terminal = custody.finish("SMOKE_HARNESS_FAIL", reason="compile_result_not_observed")

@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 from collections import Counter
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Literal
@@ -392,6 +393,19 @@ class CanonicalSectionWorker:
     """Generate and lower the one canonical section action contract."""
 
     backend: ModelBackendProtocol
+    action_observer: Callable[[Mapping[str, object]], None] | None = None
+
+    def _observe_action(self, action: SectionSemanticAction, attempt: int) -> None:
+        """Expose an opt-in copy of a schema-validated proposal for diagnostics."""
+        if self.action_observer is None:
+            return
+        self.action_observer(
+            {
+                "event": "SECTION_ACTION_VALIDATED",
+                "attempt": attempt,
+                "action": action.model_dump(mode="json", exclude_unset=True),
+            }
+        )
 
     async def compile(
         self,
@@ -453,6 +467,7 @@ class CanonicalSectionWorker:
                 "Section output did not match the canonical semantic action schema.",
             )
         raw_action: SectionSemanticAction = generated.value.root
+        self._observe_action(raw_action, attempt=1)
         correction_contract: RepairContract | None = None
         correction_baseline: SectionSemanticAction | None = None
         object_bindings: SectionObjectBindings | None = None
@@ -631,6 +646,7 @@ class CanonicalSectionWorker:
                         correction="FAIL",
                     )
                 raw_action = corrected.value.root
+                self._observe_action(raw_action, attempt=2)
                 continue
             except ValueError:
                 return _canonical_failure(

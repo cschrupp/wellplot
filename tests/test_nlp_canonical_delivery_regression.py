@@ -1238,13 +1238,14 @@ def test_unresolved_authority_g_response_is_bounded_before_correction() -> None:
     combo["title"] = "Unrelated"
     combo["bindings"] = [{"semantic_id": "only", "channel": "GR"}]
     backend = _StructuredFixtureBackend([response])
+    observed_actions: list[dict[str, object]] = []
     context = _authority_g_worker_context(plan)
     document = load_authoring_document(
         REPO_ROOT / "tests/fixtures/agentic_cbl/cased_hole_starter.log.yaml"
     )
 
     result = asyncio.run(
-        CanonicalSectionWorker(backend).compile(
+        CanonicalSectionWorker(backend, action_observer=observed_actions.append).compile(
             task_index=0,
             context=context,
             document=document,
@@ -1260,6 +1261,15 @@ def test_unresolved_authority_g_response_is_bounded_before_correction() -> None:
     assert result.diagnostics[0].code == "worker_grounding_unresolved"
     assert result.stage_evidence.normalization == "FAIL"
     assert len(backend.requests) == 1
+    assert observed_actions == [
+        {
+            "event": "SECTION_ACTION_VALIDATED",
+            "attempt": 1,
+            "action": section_worker.SectionSemanticActionResponse.model_validate(
+                response
+            ).root.model_dump(mode="json", exclude_unset=True),
+        }
+    ]
 
 
 def test_correction_identity_drift_is_rejected_with_frozen_binding() -> None:

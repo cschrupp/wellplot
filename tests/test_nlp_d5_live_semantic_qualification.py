@@ -2257,6 +2257,7 @@ def _smoke_provider_factory(
         *,
         trace_callback: Callable[[dict[str, Any]], None] | None = None,
         compile_result_callback: Callable[[Any], None] | None = None,
+        section_action_callback: Callable[[dict[str, object]], None] | None = None,
     ) -> object:
         adapter = d5.create_live_adapter(
             repo_root=repo_root,
@@ -2268,6 +2269,7 @@ def _smoke_provider_factory(
             http_client_factory=factory,
             trace_callback=trace_callback,
             compile_result_callback=compile_result_callback,
+            section_action_callback=section_action_callback,
         )
         client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
         client._platform = "Linux"
@@ -2571,6 +2573,45 @@ def test_binding_smoke_records_bounded_exception_then_reraises(
     assert exception["line_number"] > 0
     assert exception["last_completed_stage"] == "READINESS"
     assert "exception detail must not be persisted" not in json.dumps(trace)
+
+
+def test_binding_smoke_compilation_and_async_client_close_share_event_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The async client closes before the loop used for generation is shut down."""
+    result = object()
+    loop_ids: list[int] = []
+    cleanup_error = RuntimeError("cleanup failure")
+
+    async def fake_revise(*_args: object, **_kwargs: object) -> object:
+        loop_ids.append(id(asyncio.get_running_loop()))
+        return result
+
+    async def fail_close() -> None:
+        loop_ids.append(id(asyncio.get_running_loop()))
+        raise cleanup_error
+
+    monkeypatch.setattr(AgentSession, "revise", fake_revise)
+    client = SimpleNamespace(close=fail_close)
+    backend = SimpleNamespace(delegate=SimpleNamespace(client=client))
+    planner = SimpleNamespace(backend=backend)
+    compiler = SimpleNamespace(dependencies=SimpleNamespace(planner=planner))
+    agent_session = AgentSession(compiler=compiler)
+    adapter = SimpleNamespace(inner=SimpleNamespace(session=SimpleNamespace(session=agent_session)))
+
+    run_result, execution_error, close_error = asyncio.run(
+        d5._run_binding_smoke_and_close(
+            adapter,
+            request=d5.SMOKE_BINDING_REQUEST,
+            document=object(),
+            sources=(),
+        )
+    )
+
+    assert run_result is result
+    assert execution_error is None
+    assert close_error is cleanup_error
+    assert len(loop_ids) == 2 and loop_ids[0] == loop_ids[1]
 
 
 def _execute_provider_free_smoke(
@@ -3007,6 +3048,21 @@ def test_binding_smoke_wires_canonical_calls_and_bounded_model_io(tmp_path: Path
             "api_key": "private-secret",
         }
     )
+    custody.record_section_action(
+        {
+            "event": "SECTION_ACTION_VALIDATED",
+            "attempt": 1,
+            "action": {
+                "action": "add_track",
+                "track": {
+                    "semantic_id": "gamma_ray",
+                    "title": "Gamma Ray",
+                    "kind": "normal",
+                    "bindings": [{"semantic_id": "gr", "channel": "GR_STGC"}],
+                },
+            },
+        }
+    )
     terminal = custody.finish("SMOKE_PASS")
 
     journal = [json.loads(line) for line in paths.journal.read_text(encoding="utf-8").splitlines()]
@@ -3020,6 +3076,9 @@ def test_binding_smoke_wires_canonical_calls_and_bounded_model_io(tmp_path: Path
     assert terminal["provider_calls"] == terminal["model_calls"] == 2
     assert terminal["physical_generation_attempts"] == 2
     assert terminal["logical_calls_by_role"] == {"planner": 1, "section_worker": 1}
+    assert paths.section_actions.name in terminal["observability_artifacts"]
+    section_action = json.loads(paths.section_actions.read_text().splitlines()[0])
+    assert section_action["action"]["track"]["bindings"][0]["channel"] == "GR_STGC"
 
     model_io = paths.model_io.read_text(encoding="utf-8")
     assert '"request_sha256"' in model_io
@@ -3050,6 +3109,122 @@ def test_binding_smoke_wires_canonical_calls_and_bounded_model_io(tmp_path: Path
         "private-secret",
     ):
         assert forbidden not in serialized
+
+
+def test_binding_smoke_cleanup_failure_does_not_replace_compile_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cleanup evidence is recorded separately from the primary compile terminal."""
+    artifact_root = tmp_path / "binding-cleanup-failure"
+    authorization = _authorization(
+        campaign_id="binding-cleanup-failure",
+        artifact_root=str(artifact_root),
+    )
+    diagnostic = CompileDiagnostic(
+        stage="semantic_worker",
+        code="worker_grounding_conflict",
+        message="section owner assignment was not unique",
+        worker_kind="section",
+        plan_order=0,
+    )
+    compile_result = CodeModeCompileResult(
+        success=False,
+        diagnostics=(diagnostic,),
+        workers=(
+            CompileWorkerEvidence(
+                kind="section",
+                plan_order=0,
+                success=False,
+                diagnostics=(diagnostic,),
+            ),
+        ),
+        metrics=CompileMetrics(
+            worker_count=1,
+            successful_workers=0,
+            failed_workers=1,
+            total_program_chars=0,
+            total_ast_nodes=0,
+            total_statements=0,
+            total_calls=0,
+            total_repairs=0,
+            total_loop_iterations=0,
+            total_created_objects=0,
+            max_nesting_depth=0,
+        ),
+    )
+    session_result = SimpleNamespace(success=False, diagnostics=(diagnostic,))
+    cleanup_error = RuntimeError("private cleanup detail")
+    clients: list[httpx.AsyncClient] = []
+    monkeypatch.setattr(
+        d5,
+        "_binding_smoke_asset_identities",
+        lambda *_args: [
+            {
+                "asset_id": "demo-source",
+                "relative_path": "tests/fixtures/demo.las",
+                "path_basename": "demo.las",
+                "format": "las",
+                "size_bytes": 1,
+                "sha256": "a" * 64,
+            }
+        ],
+    )
+
+    async def fake_run_and_close(
+        *_args: object,
+        **_kwargs: object,
+    ) -> tuple[object, None, RuntimeError]:
+        return session_result, None, cleanup_error
+
+    monkeypatch.setattr(d5, "_run_binding_smoke_and_close", fake_run_and_close)
+    build_provider = _smoke_provider_factory(clients=clients)
+
+    def provider_factory(*args: object, **kwargs: object) -> object:
+        callback = kwargs.get("compile_result_callback")
+        assert callable(callback)
+        callback(compile_result)
+        return build_provider(*args, **kwargs)
+
+    endpoint_calls = 0
+
+    def endpoint_get(url: str, _token: str) -> object:
+        nonlocal endpoint_calls
+        endpoint_calls += 1
+        if url == PROJECT_CONFIG.model_catalog_url:
+            return {"data": [{"id": d5.EXPECTED_MODEL}]}
+        return _props()
+
+    try:
+        result = d5.execute_live_binding_smoke(
+            repo_root=REPO_ROOT,
+            authorization=authorization,
+            artifact_root=artifact_root,
+            logfile_path=REPO_ROOT / "tests/fixtures/agentic_cbl/cased_hole_starter.log.yaml",
+            endpoint_get=endpoint_get,
+            api_key_loader=lambda: "provider-free-token",
+            static_checker=lambda *_args: {"status": "PASS"},
+            provider_factory=provider_factory,
+        )
+    finally:
+        for client in clients:
+            asyncio.run(client.aclose())
+
+    assert endpoint_calls == 2
+    assert result["status"] == "SMOKE_CONTRACT_FAIL"
+    terminal = result["terminal"]
+    assert terminal["outcome"] == "SMOKE_CONTRACT_FAIL"
+    assert terminal["reason"] == "canonical_compile_rejected"
+    trace = [
+        json.loads(line)
+        for line in (artifact_root / f"{authorization.campaign_id}.stage-trace.jsonl")
+        .read_text()
+        .splitlines()
+    ]
+    cleanup = next(row for row in trace if row["event"] == "BINDING_SMOKE_CLEANUP_EXCEPTION")
+    assert cleanup["exception_type"] == "RuntimeError"
+    assert cleanup["last_completed_stage"] == "CLIENT_CLOSE"
+    assert "private cleanup detail" not in json.dumps(trace)
 
 
 def test_binding_smoke_ledger_enforces_role_and_per_call_attempt_caps() -> None:
