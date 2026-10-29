@@ -36,7 +36,12 @@ from wellplot.agent.code_mode.facade import (
 )
 from wellplot.agent.composition import create_canonical_compile_facade
 from wellplot.agent.direct_notebook import _load_document_context
-from wellplot.agent.providers.base import ProviderRequestError, StructuredGenerationRequest
+from wellplot.agent.providers.base import (
+    ProviderMetrics,
+    ProviderRequestError,
+    StructuredGenerationRequest,
+    StructuredGenerationResult,
+)
 from wellplot.agent.session import AgentSession
 from wellplot.model.intent import AuthoringDocumentIntent
 
@@ -2515,6 +2520,58 @@ def test_canonical_facade_projects_planner_failure_without_worker_dispatch() -> 
     assert result.diagnostics[0].code == "planner.request_compilation_conflicting"
     assert observed == [result]
     assert backend.calls == 0
+
+
+def test_facade_projects_attachment_rejection_without_worker_dispatch() -> None:
+    """Expected attachment errors become planner diagnostics, not harness exceptions."""
+
+    class _UnexpectedSectionBackend:
+        calls = 0
+
+        async def generate_structured(
+            self,
+            _request: StructuredGenerationRequest,
+            *,
+            response_model: type[BaseModel],
+        ) -> StructuredGenerationResult[BaseModel]:
+            self.calls += 1
+            payload = {
+                "summary": "Add a track to Main Log.",
+                "section_tasks": [
+                    {
+                        "goal": "Add a normal Gamma Ray track.",
+                        "capability_ids": ["track.normal", "binding.curve"],
+                        "existing_section_hint": "Unrequested Section",
+                        "requirements": ["Plot GR."],
+                    }
+                ],
+            }
+            return StructuredGenerationResult(
+                value=response_model.model_validate(payload),
+                metrics=ProviderMetrics(),
+            )
+
+    backend = _UnexpectedSectionBackend()
+    context = _load_document_context(
+        REPO_ROOT / "tests/fixtures/agentic_cbl/cased_hole_starter.log.yaml",
+        root=REPO_ROOT,
+    )
+    facade = create_canonical_compile_facade(backend=backend, server_root=REPO_ROOT)
+    result = asyncio.run(
+        facade.compile(
+            request=("In the Main Log section, plot GR."),
+            mode="reconstruct",
+            document=context.document,
+            source_candidates=tuple(source._internal() for source in context.source_candidates),
+            timeout_seconds=5.0,
+        )
+    )
+
+    assert result.success is False
+    assert result.workers == ()
+    assert result.diagnostics[0].stage == "planner"
+    assert result.diagnostics[0].code == "planner.unexpected_scope_assignment"
+    assert backend.calls == 1
 
 
 def test_binding_smoke_records_bounded_exception_then_reraises(

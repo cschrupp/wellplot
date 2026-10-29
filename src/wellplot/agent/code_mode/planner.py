@@ -540,6 +540,7 @@ class SemanticPlanner:
             raise
         self._trace("WIRE_TO_CANONICAL_PASS", attempt=wire_attempt)
         self._trace("COMPILED_REQUIREMENT_ATTACHMENT_ENTER", attempt=wire_attempt)
+        attachment_error: PlannerSemanticError | None = None
         try:
             plan = _attach_compiled_requirements(plan, compilation)
         except PlannerSemanticError as error:
@@ -548,8 +549,11 @@ class SemanticPlanner:
                 attempt=wire_attempt,
                 **_safe_trace_failure(error),
             )
-            raise
-        self._trace("COMPILED_REQUIREMENT_ATTACHMENT_PASS", attempt=wire_attempt)
+            if error.code != "duplicate_scope_assignment":
+                raise PlannerSemanticFailure(error.code, error.safe_message) from error
+            attachment_error = error
+        else:
+            self._trace("COMPILED_REQUIREMENT_ATTACHMENT_PASS", attempt=wire_attempt)
 
         def validate_plan(candidate: SemanticPlan, *, attempt: int) -> SemanticPlan:
             self._trace("EXTRACTION_COVERAGE_ENTER", attempt=attempt)
@@ -575,6 +579,71 @@ class SemanticPlanner:
                 raise
             self._trace("SEMANTIC_PLAN_VALIDATION_PASS", attempt=attempt)
             return validated
+
+        if attachment_error is not None:
+            if invalid_response_retry_used:
+                raise PlannerSemanticFailure(
+                    attachment_error.code,
+                    "Planner returned an invalid scope assignment after one correction.",
+                ) from attachment_error
+            corrected = await generate(
+                _correction_request(
+                    mode=mode,
+                    request=request,
+                    current_document_summary=current_document_summary,
+                    source_summary=source_summary,
+                    previous_plan=plan,
+                    diagnostic=attachment_error,
+                    registry=self.registry,
+                    timeout_seconds=timeout_seconds,
+                    temperature=temperature,
+                    max_output_tokens=max_output_tokens,
+                ),
+                attempt=2,
+            )
+            self._trace("WIRE_TO_CANONICAL_ENTER", attempt=2)
+            try:
+                corrected_plan = _canonical_plan_from_wire(corrected.value)
+            except ValidationError as error:
+                self._trace(
+                    "WIRE_TO_CANONICAL_FAIL",
+                    attempt=2,
+                    **_safe_trace_failure(error),
+                )
+                raise
+            self._trace("WIRE_TO_CANONICAL_PASS", attempt=2)
+            try:
+                _assert_duplicate_scope_consolidation_preserves_semantics(
+                    plan,
+                    corrected_plan,
+                    compilation,
+                )
+            except PlannerSemanticFailure as error:
+                self._trace(
+                    "CORRECTION_SCOPE_FAIL",
+                    attempt=2,
+                    **_safe_trace_failure(error),
+                )
+                raise
+            self._trace("CORRECTION_SCOPE_PASS", attempt=2)
+            self._trace("COMPILED_REQUIREMENT_ATTACHMENT_ENTER", attempt=2)
+            try:
+                corrected_plan = _attach_compiled_requirements(corrected_plan, compilation)
+            except PlannerSemanticError as error:
+                self._trace(
+                    "COMPILED_REQUIREMENT_ATTACHMENT_FAIL",
+                    attempt=2,
+                    **_safe_trace_failure(error),
+                )
+                raise PlannerSemanticFailure(error.code, error.safe_message) from error
+            self._trace("COMPILED_REQUIREMENT_ATTACHMENT_PASS", attempt=2)
+            try:
+                return validate_plan(corrected_plan, attempt=2)
+            except PlannerSemanticError as error:
+                raise PlannerSemanticFailure(
+                    error.code,
+                    "Planner returned a semantically invalid plan after one correction.",
+                ) from error
 
         try:
             return validate_plan(plan, attempt=wire_attempt)
@@ -619,7 +688,7 @@ class SemanticPlanner:
                     attempt=2,
                     **_safe_trace_failure(error),
                 )
-                raise
+                raise PlannerSemanticFailure(error.code, error.safe_message) from error
             self._trace("COMPILED_REQUIREMENT_ATTACHMENT_PASS", attempt=2)
             try:
                 _assert_correction_scope(plan, corrected_plan, first_error)
@@ -687,63 +756,14 @@ def _attach_compiled_requirements(
             "unresolved_supported_scope",
             "Section planner output has no independently declared request scope.",
         )
-    expected_by_selector: dict[str, str] = {}
-    for declaration in scopes:
-        if declaration.selector_text is None:
-            continue
-        key = _scope_key(declaration.selector_text)
-        if key in expected_by_selector:
-            raise PlannerSemanticError(
-                "ambiguous_scope_resolution",
-                "Two request scope declarations resolve to the same section selector.",
-            )
-        expected_by_selector[key] = (
-            f"existing:{key}" if declaration.kind == "EXISTING_SECTION" else f"new:{key}"
-        )
-
-    assigned_scope_ids: list[str] = []
-    task_scope_ids: list[str] = []
-    new_scopes = [scope for scope in scopes if scope.kind == "NEW_SECTION"]
-    anonymous_new_scopes = [scope for scope in new_scopes if scope.selector_text is None]
-    for _task_index, task in enumerate(plan.section_tasks):
-        if len(scopes) == 1 and len(anonymous_new_scopes) == 1:
-            assigned = f"new:{_scope_key(anonymous_new_scopes[0].declaration_id)}"
-        elif task.existing_section_hint:
-            key = _scope_key(task.existing_section_hint)
-            assigned = expected_by_selector.get(key)
-            if assigned is None:
-                raise PlannerSemanticError(
-                    "unexpected_scope_assignment",
-                    "Planner assigned a section that was not declared by the request.",
-                )
-        else:
-            if len(scopes) == 1 and len(plan.section_tasks) == 1:
-                declaration = scopes[0]
-                assigned = (
-                    expected_by_selector.get(_scope_key(declaration.selector_text or ""))
-                    or f"new:{_scope_key(declaration.declaration_id)}"
-                )
-            elif len(anonymous_new_scopes) == 1:
-                declaration = anonymous_new_scopes[0]
-                assigned = f"new:{_scope_key(declaration.declaration_id)}"
-            else:
-                raise PlannerSemanticError(
-                    "unresolved_existing_object",
-                    "Planner section task could not be bound to one requested scope.",
-                )
-        assigned_scope_ids.append(assigned)
-        task_scope_ids.append(assigned)
+    assigned_scope_ids, expected_scope_ids = _resolve_section_scope_ids(plan, compilation)
+    task_scope_ids = assigned_scope_ids
 
     if len(set(assigned_scope_ids)) != len(assigned_scope_ids):
         raise PlannerSemanticError(
             "duplicate_scope_assignment",
             "Multiple planner tasks resolve to the same requested section scope.",
         )
-    expected_scope_ids = tuple(expected_by_selector.values()) + tuple(
-        f"new:{_scope_key(scope.declaration_id)}"
-        for scope in new_scopes
-        if scope.selector_text is None
-    )
     if set(assigned_scope_ids) != set(expected_scope_ids):
         missing = set(expected_scope_ids) - set(assigned_scope_ids)
         if missing:
@@ -849,6 +869,149 @@ def _attach_compiled_requirements(
             "scope_binding": binding,
         }
     )
+
+
+def _resolve_section_scope_ids(
+    plan: SemanticPlan,
+    compilation: RequestCompilationResult,
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Resolve planner tasks against declared scopes without enforcing cardinality."""
+    scopes = compilation.requirements.scopes.scopes
+    expected_by_selector: dict[str, str] = {}
+    for declaration in scopes:
+        if declaration.selector_text is None:
+            continue
+        key = _scope_key(declaration.selector_text)
+        if key in expected_by_selector:
+            raise PlannerSemanticError(
+                "ambiguous_scope_resolution",
+                "Two request scope declarations resolve to the same section selector.",
+            )
+        expected_by_selector[key] = (
+            f"existing:{key}" if declaration.kind == "EXISTING_SECTION" else f"new:{key}"
+        )
+
+    new_scopes = [scope for scope in scopes if scope.kind == "NEW_SECTION"]
+    anonymous_new_scopes = [scope for scope in new_scopes if scope.selector_text is None]
+    assigned_scope_ids: list[str] = []
+    for task in plan.section_tasks:
+        if len(scopes) == 1 and len(anonymous_new_scopes) == 1:
+            assigned = f"new:{_scope_key(anonymous_new_scopes[0].declaration_id)}"
+        elif task.existing_section_hint:
+            key = _scope_key(task.existing_section_hint)
+            assigned = expected_by_selector.get(key)
+            if assigned is None:
+                raise PlannerSemanticError(
+                    "unexpected_scope_assignment",
+                    "Planner assigned a section that was not declared by the request.",
+                )
+        elif len(scopes) == 1 and len(plan.section_tasks) == 1:
+            declaration = scopes[0]
+            assigned = (
+                expected_by_selector.get(_scope_key(declaration.selector_text or ""))
+                or f"new:{_scope_key(declaration.declaration_id)}"
+            )
+        elif len(anonymous_new_scopes) == 1:
+            declaration = anonymous_new_scopes[0]
+            assigned = f"new:{_scope_key(declaration.declaration_id)}"
+        else:
+            raise PlannerSemanticError(
+                "unresolved_existing_object",
+                "Planner section task could not be bound to one requested scope.",
+            )
+        assigned_scope_ids.append(assigned)
+
+    expected_scope_ids = tuple(expected_by_selector.values()) + tuple(
+        f"new:{_scope_key(scope.declaration_id)}"
+        for scope in new_scopes
+        if scope.selector_text is None
+    )
+    return tuple(assigned_scope_ids), expected_scope_ids
+
+
+def _assert_duplicate_scope_consolidation_preserves_semantics(
+    before: SemanticPlan,
+    after: SemanticPlan,
+    compilation: RequestCompilationResult,
+) -> None:
+    """Permit only exact, content-preserving consolidation of duplicate-scope tasks."""
+    if (
+        before.summary != after.summary
+        or before.report_task != after.report_task
+        or before.unresolved_requirements != after.unresolved_requirements
+    ):
+        raise PlannerSemanticFailure(
+            "unauthorized_correction_change",
+            "Scope consolidation changed unrelated planner work.",
+        )
+
+    try:
+        before_scope_ids, expected_scope_ids = _resolve_section_scope_ids(before, compilation)
+        after_scope_ids, _ = _resolve_section_scope_ids(after, compilation)
+    except PlannerSemanticError as error:
+        raise PlannerSemanticFailure(error.code, error.safe_message) from error
+
+    before_by_scope: dict[str, list[SectionTask]] = {}
+    after_by_scope: dict[str, list[SectionTask]] = {}
+    for scope_id, task in zip(before_scope_ids, before.section_tasks, strict=True):
+        before_by_scope.setdefault(scope_id, []).append(task)
+    for scope_id, task in zip(after_scope_ids, after.section_tasks, strict=True):
+        after_by_scope.setdefault(scope_id, []).append(task)
+
+    duplicate_scopes = {scope_id for scope_id, tasks in before_by_scope.items() if len(tasks) > 1}
+    if not duplicate_scopes:
+        raise PlannerSemanticFailure(
+            "scope_consolidation_not_applicable",
+            "Planner correction did not address duplicate section-scope assignment.",
+        )
+    if set(after_by_scope) != set(expected_scope_ids) or any(
+        len(tasks) != 1 for tasks in after_by_scope.values()
+    ):
+        raise PlannerSemanticFailure(
+            "duplicate_scope_assignment",
+            "Corrected plan must contain exactly one task for each requested section scope.",
+        )
+
+    for scope_id in expected_scope_ids:
+        original_tasks = before_by_scope.get(scope_id, [])
+        corrected_tasks = after_by_scope[scope_id]
+        if scope_id not in duplicate_scopes:
+            if len(original_tasks) != 1 or corrected_tasks[0] != original_tasks[0]:
+                raise PlannerSemanticFailure(
+                    "unauthorized_correction_change",
+                    "Scope consolidation changed unrelated section work.",
+                )
+            continue
+
+        corrected = corrected_tasks[0]
+        original_hint = original_tasks[0].existing_section_hint
+        expected_goal = "\n".join(task.goal for task in original_tasks)
+        expected_capabilities = tuple(
+            dict.fromkeys(
+                capability for task in original_tasks for capability in task.capability_ids
+            )
+        )
+        expected_sources = tuple(
+            dict.fromkeys(source for task in original_tasks for source in task.source_hints)
+        )
+        expected_requirements = tuple(
+            requirement for task in original_tasks for requirement in task.requirements
+        )
+        expected_constraints = tuple(
+            constraint for task in original_tasks for constraint in task.constraints
+        )
+        if (
+            corrected.existing_section_hint != original_hint
+            or corrected.goal != expected_goal
+            or corrected.capability_ids != expected_capabilities
+            or corrected.source_hints != expected_sources
+            or corrected.requirements != expected_requirements
+            or corrected.constraints != expected_constraints
+        ):
+            raise PlannerSemanticFailure(
+                "scope_consolidation_preservation_violation",
+                "Corrected task did not preserve the original scoped semantic content.",
+            )
 
 
 def _attach_request_obligations(plan: SemanticPlan, request: str) -> SemanticPlan:
@@ -1192,6 +1355,11 @@ def _correction_request(
             "message": diagnostic.safe_message,
             "affected_paths": list(diagnostic.affected_paths),
             "authorized_repair_scope": list(diagnostic.affected_paths),
+            "repair_contract": (
+                "duplicate_section_scope_consolidation"
+                if diagnostic.code == "duplicate_scope_assignment"
+                else "authorized_json_paths"
+            ),
         },
     }
     return StructuredGenerationRequest(
@@ -1201,11 +1369,27 @@ def _correction_request(
             "previous plan, the diagnostic, and the capability catalogue. Preserve "
             "all explicit source and scientific semantics while correcting the "
             "reported problem. Return the corrected structured response model."
-            "\n\nCorrection context:\n" + json.dumps(context, sort_keys=True, separators=(",", ":"))
+            + _scope_consolidation_instruction(diagnostic.code)
+            + "\n\nCorrection context:\n"
+            + json.dumps(context, sort_keys=True, separators=(",", ":"))
         ),
         timeout_seconds=timeout_seconds,
         temperature=temperature,
         max_output_tokens=max_output_tokens,
+    )
+
+
+def _scope_consolidation_instruction(code: str) -> str:
+    """Add the narrow correction rule for duplicate section-scope assignments."""
+    if code != "duplicate_scope_assignment":
+        return ""
+    return (
+        " For this duplicate-scope error, produce exactly one SectionTask per "
+        "requested section scope, not one task per track or object operation. "
+        "Consolidate the repeated-scope tasks into one task. Preserve each prior "
+        "goal verbatim in original order, joining goals with a newline; preserve "
+        "the ordered capability union, ordered unique source hints, and the full "
+        "ordered requirements and constraints. Do not alter other work units."
     )
 
 
@@ -1404,6 +1588,11 @@ report_task or a non-empty section_tasks array. A summary alone is never an
 executable plan. For a section edit, include one SectionTask with the required
 existing_section_hint key, including an explicit null only when reconstruction
 has no existing target.
+
+SectionTask cardinality follows the requested section scopes, not the number of
+tracks or object operations. Put all requested edits for the same section in
+that section's single SectionTask; use separate SectionTasks only for distinct
+requested section scopes.
 
 Select capability IDs exactly as listed in the static capability catalogue. A
 SectionTask describes what one logical section should accomplish; its list order

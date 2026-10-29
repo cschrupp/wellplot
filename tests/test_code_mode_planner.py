@@ -124,6 +124,89 @@ def _plan_payload() -> dict[str, object]:
     }
 
 
+def _captured_duplicate_scope_plan() -> dict[str, object]:
+    """Return the safe validated planner projection captured by binding smoke 001."""
+    return {
+        "summary": "Add the requested tracks to Main Log.",
+        "section_tasks": (
+            {
+                "goal": (
+                    "Add a new normal track titled 'Bond Index' with width 34 mm. "
+                    "Bind the scalar source channel 'BI' to this track using a "
+                    "linear scale from 0 to 1, color #111111, and line width 0.8."
+                ),
+                "capability_ids": ("track.normal", "binding.curve"),
+                "existing_section_hint": "Main Log",
+                "source_hints": ("CBL_Main_REV1.las",),
+                "requirements": (
+                    "Track Title: Bond Index",
+                    "Track Kind: normal",
+                    "Track Width: 34 mm",
+                    "Binding Source Mnemonic: BI",
+                    "Binding Scale Type: linear",
+                    "Binding Scale Min: 0",
+                    "Binding Scale Max: 1",
+                    "Binding Color: #111111",
+                    "Binding Line Width: 0.8",
+                ),
+                "constraints": (),
+            },
+            {
+                "goal": (
+                    "Add a new normal track titled 'Gamma Ray' with width 26 mm. "
+                    "Bind the scalar source channel 'GR_STGC' to this track using "
+                    "a linear scale from 0 to 150, color #16a34a, and line width 0.8."
+                ),
+                "capability_ids": ("track.normal", "binding.curve"),
+                "existing_section_hint": "Main Log",
+                "source_hints": ("CBL_Main_REV1.las",),
+                "requirements": (
+                    "Track Title: Gamma Ray",
+                    "Track Kind: normal",
+                    "Track Width: 26 mm",
+                    "Binding Source Mnemonic: GR_STGC",
+                    "Binding Scale Type: linear",
+                    "Binding Scale Min: 0",
+                    "Binding Scale Max: 150",
+                    "Binding Color: #16a34a",
+                    "Binding Line Width: 0.8",
+                ),
+                "constraints": (),
+            },
+        ),
+    }
+
+
+def _consolidated_duplicate_scope_plan() -> dict[str, object]:
+    """Return the exact content-preserving one-task correction for smoke 001."""
+    original = _captured_duplicate_scope_plan()
+    tasks = original["section_tasks"]
+    return {
+        "summary": original["summary"],
+        "section_tasks": (
+            {
+                "goal": "\n".join(task["goal"] for task in tasks),
+                "capability_ids": ("track.normal", "binding.curve"),
+                "existing_section_hint": "Main Log",
+                "source_hints": ("CBL_Main_REV1.las",),
+                "requirements": tuple(item for task in tasks for item in task["requirements"]),
+                "constraints": (),
+            },
+        ),
+    }
+
+
+def _captured_duplicate_scope_request() -> str:
+    """Return the exact non-scientific request used by the binding smoke."""
+    return (
+        "In the Main Log section, add two normal tracks while preserving the existing tracks.\n"
+        "Track Bond Index: normal, width 34 mm.\n"
+        "Track Gamma Ray: normal, width 26 mm.\n"
+        "On Bond Index: BI -> Bond Index, linear 0..1, #111111, width 0.8.\n"
+        "On Gamma Ray: GR_STGC -> Gamma Ray, linear 0..150, #16a34a, width 0.8."
+    )
+
+
 def test_semantic_schema_contains_no_document_identity_fields() -> None:
     """The static v2 schema cannot ask the provider for canonical object IDs."""
     schema_text = json.dumps(_PlannerWirePlan.model_json_schema(), sort_keys=True)
@@ -550,8 +633,167 @@ def test_extraction_coverage_failure_is_traced_and_corrected_once(
     assert len(backend.requests) == 2
 
 
-def test_planner_attachment_error_boundary_is_captured_and_preserved() -> None:
-    """Attachment PlannerSemanticError remains raw and is separately observable."""
+def test_duplicate_scope_plan_gets_one_preservation_checked_correction() -> None:
+    """Captured per-track tasks consolidate once and retain host-owned associations."""
+    request = (
+        "In the Main Log section, add two normal tracks while preserving the existing tracks.\n"
+        "Track Bond Index: normal, width 34 mm.\n"
+        "Track Gamma Ray: normal, width 26 mm.\n"
+        "On Bond Index: BI -> Bond Index, linear 0..1, #111111, width 0.8.\n"
+        "On Gamma Ray: GR_STGC -> Gamma Ray, linear 0..150, #16a34a, width 0.8."
+    )
+    captured = _captured_duplicate_scope_plan()
+    corrected = _consolidated_duplicate_scope_plan()
+    events: list[dict[str, object]] = []
+    backend = _SequenceBackend(responses=[captured, corrected])
+    planner = SemanticPlanner(
+        backend=backend,
+        registry=create_builtin_registry(),
+        trace_callback=events.append,
+    )
+
+    result = asyncio.run(planner.plan(request=request, mode="reconstruct", timeout_seconds=5.0))
+
+    assert len(backend.requests) == 2
+    assert len(result.section_tasks) == 1
+    assert result.scope_binding is not None
+    assert result.scope_binding.expected_scope_ids == result.scope_binding.assigned_scope_ids
+    assert result.section_tasks[0].goal == corrected["section_tasks"][0]["goal"]
+    assert "one SectionTask per requested section scope" in backend.requests[1].user_prompt
+    correction_context = json.loads(
+        backend.requests[1].user_prompt.split("Correction context:\n", 1)[1]
+    )
+    assert (
+        correction_context["diagnostic"]["repair_contract"]
+        == "duplicate_section_scope_consolidation"
+    )
+
+    obligations_by_owner = {
+        owner: {
+            item.field: item.value
+            for item in result.section_tasks[0].obligations
+            if item.owner_ref == owner
+        }
+        for owner in ("bond_index", "gamma_ray")
+    }
+    assert obligations_by_owner["bond_index"]["title"] == "Bond Index"
+    assert obligations_by_owner["bond_index"]["channel"] == "BI"
+    assert obligations_by_owner["bond_index"]["scale_minimum"] == 0.0
+    assert obligations_by_owner["bond_index"]["scale_maximum"] == 1.0
+    assert obligations_by_owner["bond_index"]["color"] == "#111111"
+    assert obligations_by_owner["bond_index"]["width_mm"] == 34.0
+    assert obligations_by_owner["gamma_ray"]["title"] == "Gamma Ray"
+    assert obligations_by_owner["gamma_ray"]["channel"] == "GR_STGC"
+    assert obligations_by_owner["gamma_ray"]["scale_minimum"] == 0.0
+    assert obligations_by_owner["gamma_ray"]["scale_maximum"] == 150.0
+    assert obligations_by_owner["gamma_ray"]["color"] == "#16a34a"
+    assert obligations_by_owner["gamma_ray"]["width_mm"] == 26.0
+    assert [event["event"] for event in events].count("COMPILED_REQUIREMENT_ATTACHMENT_FAIL") == 1
+    assert [event["event"] for event in events].count("CORRECTION_SCOPE_PASS") == 1
+
+
+def test_duplicate_scope_correction_rejects_reassigned_track_facts() -> None:
+    """A correction cannot rewrite the goal that binds each track to its values."""
+    corrected = _consolidated_duplicate_scope_plan()
+    task = corrected["section_tasks"][0]
+    corrected["section_tasks"] = ({**task, "goal": task["goal"].replace("'BI'", "'GR_STGC'", 1)},)
+    backend = _SequenceBackend(responses=[_captured_duplicate_scope_plan(), corrected])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(PlannerSemanticFailure) as caught:
+        asyncio.run(
+            planner.plan(
+                request=_captured_duplicate_scope_request(),
+                mode="reconstruct",
+                timeout_seconds=5.0,
+            )
+        )
+
+    assert caught.value.code == "scope_consolidation_preservation_violation"
+    assert len(backend.requests) == 2
+
+
+@pytest.mark.parametrize("unrelated_change", ["report", "extra_section"])
+def test_duplicate_scope_correction_rejects_unrelated_work_changes(
+    unrelated_change: str,
+) -> None:
+    """Consolidating section tasks cannot alter report or other section work."""
+    corrected = _consolidated_duplicate_scope_plan()
+    if unrelated_change == "report":
+        corrected["report_task"] = {
+            "goal": "Replace the report heading.",
+            "capability_ids": ("report.standard",),
+        }
+    else:
+        corrected["section_tasks"] = (
+            *corrected["section_tasks"],
+            {
+                **corrected["section_tasks"][0],
+                "existing_section_hint": "Repeat Log",
+            },
+        )
+    backend = _SequenceBackend(responses=[_captured_duplicate_scope_plan(), corrected])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(PlannerSemanticFailure) as caught:
+        asyncio.run(
+            planner.plan(
+                request=_captured_duplicate_scope_request(),
+                mode="reconstruct",
+                timeout_seconds=5.0,
+            )
+        )
+
+    assert caught.value.code in {
+        "unauthorized_correction_change",
+        "unexpected_scope_assignment",
+    }
+    assert len(backend.requests) == 2
+
+
+def test_duplicate_scope_correction_exhaustion_is_structured_and_bounded() -> None:
+    """A repeated duplicate assignment fails as a planner error after two calls."""
+    captured = _captured_duplicate_scope_plan()
+    backend = _SequenceBackend(responses=[captured, captured])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(PlannerSemanticFailure) as caught:
+        asyncio.run(
+            planner.plan(
+                request=_captured_duplicate_scope_request(),
+                mode="reconstruct",
+                timeout_seconds=5.0,
+            )
+        )
+
+    assert caught.value.code == "duplicate_scope_assignment"
+    assert len(backend.requests) == 2
+
+
+def test_duplicate_scope_after_schema_retry_does_not_exceed_two_calls() -> None:
+    """The schema retry consumes the sole retry slot before attachment runs."""
+    schema_failure = StructuredResponseProviderError(
+        "Planner returned invalid structured output.",
+        response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
+    )
+    backend = _SequenceBackend(responses=[schema_failure, _captured_duplicate_scope_plan()])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    with pytest.raises(PlannerSemanticFailure) as caught:
+        asyncio.run(
+            planner.plan(
+                request=_captured_duplicate_scope_request(),
+                mode="reconstruct",
+                timeout_seconds=5.0,
+            )
+        )
+
+    assert caught.value.code == "duplicate_scope_assignment"
+    assert len(backend.requests) == 2
+
+
+def test_nonduplicate_attachment_error_is_structured_without_correction() -> None:
+    """Expected non-recoverable attachment errors do not escape or trigger retry."""
     payload = _plan_payload()
     payload["section_tasks"] = (
         {
@@ -567,7 +809,7 @@ def test_planner_attachment_error_boundary_is_captured_and_preserved() -> None:
         trace_callback=events.append,
     )
 
-    with pytest.raises(PlannerSemanticError) as caught:
+    with pytest.raises(PlannerSemanticFailure) as caught:
         asyncio.run(
             planner.plan(
                 request="In the Main Log section, plot GR.",
