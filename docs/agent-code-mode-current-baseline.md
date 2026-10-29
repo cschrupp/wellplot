@@ -497,6 +497,58 @@ Residual semantic mappings and repaired-baseline end-to-end model behavior are
 also open questions. These remain separately bounded work; they do not reopen
 settled architecture or authorize model comparison.
 
+### Accepted binding-path repair checkpoint
+
+The independently reviewed and Human-accepted binding-path repair checkpoint is
+`e9c7d9ec414dbf5d0ea945bc61780e537a63e0d2`. It establishes the current
+implementation authority for exact normalized owner-alias binding (for example,
+display-form track owners and normalized binding-owner slugs), fail-closed alias
+collisions, one global one-to-one `SectionObjectBindings` result reused through
+host application and validation, bounded validated-action custody, and
+client-cleanup behavior that does not mask the primary compile result.
+
+The accepted checkpoint preserves T-03: the only model-backed section correction
+protocol is the canonical `ValidationIssueSet -> RepairContract -> correction ->
+_verify_repair_candidate()` path. Grounding failures fail closed and do not
+invoke a second correction protocol.
+
+The earlier passing engineering smoke `d5-binding-smoke-b97e8a9e-005` was run on
+`00ec0924a14be47e72f45126227efaf7681a05ea`, not on the final canon-reworked
+checkpoint. It remains useful engineering evidence for the owner-alias repair,
+but a fresh smoke on the exact accepted checkpoint is still required before it
+can satisfy any exact-checkpoint live prerequisite. This is engineering
+validation, not a scientific campaign.
+
+### Nonblocking technical debt
+
+The following debt is recorded explicitly and is **not** a blocker for the
+current binding-path repair or the next engineering smoke:
+
+- `src/wellplot/agent/code_mode/typed_section_worker.py` still contains the
+  dormant historical `TypedSectionCompiler` / `TypedSectionGenerationResult`
+  typed-draft path. The canonical composition root does not instantiate it, and
+  no alternate production route was found, but its own docstring still refers
+  to "shadow compilation". Leaving an unused alternate compiler implementation
+  inside an allowed canonical module creates future re-wiring risk and should
+  be cleaned up after the current D5 critical path.
+- `docs/typed-section-worker-contract.md` still describes the older
+  transitional CM-54/55 architecture, including future/transitional compiler
+  language that no longer represents current production routing. It must be
+  treated as historical design evidence until reconciled or archived.
+- The D5 single-engine manifest/reachability audit is strong at the
+  module/import/entry-point level, but it does not mechanically prove that an
+  allowed canonical module contains no dormant alternate compiler class. A
+  later hardening pass should either remove the dormant compiler or add an
+  AST/source-level guard for prohibited alternate semantic compiler symbols.
+- The current one-correction-protocol regression intentionally uses source
+  inspection as a narrow guard. It is useful now, but refactor-sensitive; after
+  the dormant compiler cleanup, prefer a more semantic AST/call-graph invariant
+  or equivalent behaviorally anchored check.
+
+These items must not be used to justify a new fallback route, shadow engine, or
+parallel correction protocol. Cleanup is architectural hygiene only unless new
+runtime evidence makes one a demonstrated blocker.
+
 ## 10. Provenance Map
 
 - Methodology and authority lifecycle: `docs/project-decision-protocol.md`,
@@ -549,6 +601,12 @@ of current authority.
   explicit source inspection states, bounded negative grading, semantic
   report-title ownership, semantic CBL verification, and deterministic
   correction-scope preservation.
+- The independently reviewed and Human-accepted binding-path repair at
+  `e9c7d9ec414dbf5d0ea945bc61780e537a63e0d2` is current implementation
+  authority for exact normalized owner-alias grounding, fail-closed collision
+  handling, shared `SectionObjectBindings`, and the single canonical
+  `RepairContract` correction protocol. Exact-checkpoint live smoke remains a
+  separate engineering qualification step.
 
 ### Changed
 
