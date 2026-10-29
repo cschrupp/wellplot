@@ -1,5 +1,16 @@
 # Typed Section-Worker Contract
 
+> **Historical/transitional contract notice.** This document records the CM-54/55
+> typed-worker design lineage and is retained for provenance. It is **not** the
+> current production routing authority. Current production uses the shared
+> composition root and `CanonicalSectionWorker` under
+> [the active baseline](agent-code-mode-current-baseline.md). The dormant
+> `TypedSectionCompiler` / typed-draft implementation still present in
+> `typed_section_worker.py` is technical debt, not an authorized shadow route;
+> its removal or archival is tracked in [the backlog](backlog.md). Do not wire
+> it into production or use this historical document to reopen a parallel
+> section-worker path.
+
 - **Status:** Implemented deterministic substrate; CM-56 validation pending
 - **Implementation:** CM-55/CM-55R complete (`34c6491`; implementation `c2173f7`); routing remains unchanged
 - **Design baseline:** `5c98ad1`
