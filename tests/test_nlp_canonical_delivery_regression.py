@@ -1300,10 +1300,8 @@ def test_unresolved_authority_g_response_is_bounded_before_correction() -> None:
     ]
 
 
-def test_incomplete_single_track_action_gets_bounded_grounding_correction(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A uniquely grounded partial add_track can be completed without relaxing binding."""
+def test_incomplete_multitrack_add_track_fails_closed_without_second_call() -> None:
+    """An incomplete multi-track action does not trigger a grounding correction call."""
     _compilation, plan, _actions = _compiled_cbl_capture()
     section_tasks = list(plan.section_tasks)
     main_index = next(
@@ -1323,34 +1321,12 @@ def test_incomplete_single_track_action_gets_bounded_grounding_correction(
     full_response = _authority_g_response()
     first_track = full_response["section"]["tracks"][0]
     initial_response = {"action": "add_track", "track": first_track}
-    backend = _StructuredFixtureBackend([initial_response, full_response])
+    backend = _StructuredFixtureBackend([initial_response])
     context = _authority_g_worker_context(plan)
     document = load_authoring_document(
         REPO_ROOT / "tests/fixtures/agentic_cbl/cased_hole_starter.log.yaml"
     )
 
-    binding_refs: list[object] = []
-    original_apply = section_worker.apply_compiled_requirements
-    original_collect = section_worker._collect_validation_issues
-    original_validate = section_worker.validate_section_obligations
-
-    def apply_spy(
-        action: object, obligations: tuple[object, ...], *, object_bindings: object
-    ) -> object:
-        binding_refs.append(object_bindings)
-        return original_apply(action, obligations, object_bindings=object_bindings)
-
-    def collect_spy(*args: object, **kwargs: object) -> object:
-        binding_refs.append(kwargs["object_bindings"])
-        return original_collect(*args, **kwargs)
-
-    def validate_spy(*args: object, **kwargs: object) -> object:
-        binding_refs.append(kwargs["object_bindings"])
-        return original_validate(*args, **kwargs)
-
-    monkeypatch.setattr(section_worker, "apply_compiled_requirements", apply_spy)
-    monkeypatch.setattr(section_worker, "_collect_validation_issues", collect_spy)
-    monkeypatch.setattr(section_worker, "validate_section_obligations", validate_spy)
     observed_actions: list[dict[str, object]] = []
     result = asyncio.run(
         CanonicalSectionWorker(backend, action_observer=observed_actions.append).compile(
@@ -1366,69 +1342,23 @@ def test_incomplete_single_track_action_gets_bounded_grounding_correction(
         )
     )
 
-    assert result.success is True, result.diagnostics
-    assert result.stage_evidence.normalization == "PASS"
-    assert result.stage_evidence.worker_obligation == "PASS"
-    assert result.stage_evidence.semantic_lowering == "PASS"
-    assert result.stage_evidence.correction == "PASS"
-    assert len(backend.requests) == 2
-    assert [event["attempt"] for event in observed_actions] == [1, 2]
-    assert observed_actions[0]["action"]["action"] == "add_track"
-    assert observed_actions[1]["action"]["action"] == "reconstruct"
-    assert len(binding_refs) >= 3
-    assert all(item is binding_refs[0] for item in binding_refs)
-
-
-def test_grounding_correction_cannot_change_the_already_matched_track() -> None:
-    """A correction cannot exploit the shape repair to rewrite its grounded sibling."""
-    _compilation, plan, _actions = _compiled_cbl_capture()
-    full_response = _authority_g_response()
-    initial_response = {
-        "action": "add_track",
-        "track": full_response["section"]["tracks"][0],
-    }
-    corrected_response = json.loads(json.dumps(full_response))
-    corrected_response["section"]["tracks"][0]["title"] = "Renamed track"
-    backend = _StructuredFixtureBackend([initial_response, corrected_response])
-    context = _authority_g_worker_context(plan)
-    document = load_authoring_document(
-        REPO_ROOT / "tests/fixtures/agentic_cbl/cased_hole_starter.log.yaml"
-    )
-
-    result = asyncio.run(
-        CanonicalSectionWorker(backend).compile(
-            task_index=0,
-            context=context,
-            document=document,
-            authoritative_request=next(
-                case["request"]
-                for case in d4.load_cases(REPO_ROOT)
-                if case["turn_id"] == "D4-C01:C01"
-            ),
-            timeout_seconds=10,
-        )
-    )
-
     assert result.success is False
-    assert result.diagnostics[0].code == "worker_correction_scope_violation"
-    assert result.stage_evidence.normalization == "PASS"
-    assert result.stage_evidence.worker_obligation == "FAIL"
-    assert len(backend.requests) == 2
+    assert result.diagnostics[0].code == "worker_grounding_unresolved"
+    assert result.stage_evidence.normalization == "FAIL"
+    assert len(backend.requests) == 1
+    assert len(observed_actions) == 1
+    assert observed_actions[0]["attempt"] == 1
+    assert observed_actions[0]["action"]["action"] == "add_track"
 
 
-def test_grounding_correction_fails_closed_on_identity_structure_disagreement() -> None:
-    """An identity/title collision cannot be treated as a recoverable omission."""
-    _compilation, plan, _actions = _compiled_cbl_capture()
-    response = _authority_g_response()
-    track = json.loads(json.dumps(response["section"]["tracks"][0]))
-    track["title"] = "Depth"
-    action = section_worker.SectionSemanticActionResponse.model_validate(
-        {"action": "add_track", "track": track}
-    ).root
-    task = next(task for task in plan.section_tasks if task.existing_section_hint == "Main Pass")
-    relevant = tuple(item for item in task.obligations if item.owner_ref in {"combo", "depth"})
+def test_section_worker_has_one_model_backed_correction_protocol() -> None:
+    """The worker keeps only its canonical RepairContract correction path."""
+    source = inspect.getsource(CanonicalSectionWorker.compile)
 
-    assert section_worker._recoverable_single_track_omission(action, relevant) is None
+    assert source.count("self.backend.generate_structured(") == 2
+    assert "_build_repair_contract(" in source
+    assert "_verify_repair_candidate(" in source
+    assert "grounding_correction" not in source
 
 
 def test_correction_identity_drift_is_rejected_with_frozen_binding() -> None:

@@ -27,7 +27,7 @@
     "src/wellplot/agent/code_mode/semantic_section_compiler.py": "cdc0ac065f16f56a662d37a6cbec7113e91feb30630fb4561bdcec8bf3629914",
     "src/wellplot/agent/code_mode/source_loader.py": "2035c31f4f1efb459683f47c9d8b7565a74d8eeddceda6e8bca6e0591bc05a3d",
     "src/wellplot/agent/code_mode/state.py": "143636111db580f8a2405d1e1cba349aa3747156e2ea14a7dde852b64dc7974b",
-    "src/wellplot/agent/code_mode/typed_section_worker.py": "5075879e297b067d15c48ade30d1c85f0c15be7a33b1b0898a1cf12cff6c8d90",
+    "src/wellplot/agent/code_mode/typed_section_worker.py": "2170532d1ae18e5dbb36b9cc42198ee103c04321d063745c851bab5468fcd1d4",
     "src/wellplot/agent/code_mode/worker_contracts.py": "48b929d8d60a5de1cdebc341a3901a1f7f955b94cc1ddcac30a4656816f91286",
     "src/wellplot/agent/code_mode/workflow.py": "350c5df6b2ccc08f3ec58cfd3ae9a34881542e87b8d2077ef3fa471b040dc55d",
     "src/wellplot/agent/composition.py": "895982b9adf75b6df842777fda08b5ba3e5fdca8d5473b22775cbedfd8639c69",

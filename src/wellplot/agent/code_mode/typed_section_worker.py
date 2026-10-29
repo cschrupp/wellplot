@@ -471,7 +471,6 @@ class CanonicalSectionWorker:
         correction_contract: RepairContract | None = None
         correction_baseline: SectionSemanticAction | None = None
         object_bindings: SectionObjectBindings | None = None
-        grounding_correction_used = False
         for attempt in range(2):
             try:
                 if attempt:
@@ -493,69 +492,7 @@ class CanonicalSectionWorker:
                     )
                 action = _bind_compiled_source(raw_action, task.obligations, section_context)
                 if not attempt:
-                    try:
-                        object_bindings = resolve_section_object_bindings(action, task.obligations)
-                    except SemanticActionError as grounding_error:
-                        matched_owner = _recoverable_single_track_omission(action, task.obligations)
-                        if (
-                            grounding_error.code != "worker_grounding_unresolved"
-                            or matched_owner is None
-                        ):
-                            raise
-                        grounding_baseline = action
-                        try:
-                            corrected = await self.backend.generate_structured(
-                                StructuredGenerationRequest(
-                                    system_prompt=(
-                                        "The previous action contains only one of multiple "
-                                        "distinct request-owned tracks. Return one complete "
-                                        "reconstruct action with exactly one track for each "
-                                        "request owner, in request order. Preserve the "
-                                        "already-grounded track exactly. Do not merge, omit, "
-                                        "rename, reorder, or add track owners. The authoritative "
-                                        "request and section task define ownership."
-                                    ),
-                                    user_prompt=_json_payload(
-                                        {
-                                            **payload,
-                                            "grounding_correction": {
-                                                "failure_code": grounding_error.code,
-                                                "matched_owner": matched_owner,
-                                                "required_track_owners": _section_track_owners(
-                                                    task.obligations
-                                                ),
-                                                "prior_action": action.model_dump(
-                                                    mode="json", exclude_unset=True
-                                                ),
-                                            },
-                                        }
-                                    ),
-                                    timeout_seconds=timeout_seconds,
-                                    temperature=temperature,
-                                    max_output_tokens=max_output_tokens,
-                                ),
-                                response_model=SectionSemanticActionResponse,
-                            )
-                        except ProviderRequestError:
-                            raise
-                        except ValidationError:
-                            return _canonical_failure(
-                                "structured_schema_validation_failure",
-                                "Section correction did not match the canonical semantic schema.",
-                                correction="FAIL",
-                            )
-                        raw_action = corrected.value.root
-                        self._observe_action(raw_action, attempt=2)
-                        action = _bind_compiled_source(
-                            raw_action, task.obligations, section_context
-                        )
-                        object_bindings = _verify_grounding_repair_candidate(
-                            baseline=grounding_baseline,
-                            candidate=action,
-                            obligations=task.obligations,
-                            matched_owner=matched_owner,
-                        )
-                        grounding_correction_used = True
+                    object_bindings = resolve_section_object_bindings(action, task.obligations)
                 assert object_bindings is not None
                 action = apply_compiled_requirements(
                     action, task.obligations, object_bindings=object_bindings
@@ -610,9 +547,7 @@ class CanonicalSectionWorker:
                         normalization="PASS",
                         worker_obligation="PASS",
                         semantic_lowering="PASS",
-                        correction=(
-                            "PASS" if attempt or grounding_correction_used else "NOT_REACHED"
-                        ),
+                        correction="PASS" if attempt else "NOT_REACHED",
                     ),
                 )
             except ValidationError:
@@ -636,11 +571,7 @@ class CanonicalSectionWorker:
                         worker_obligation="FAIL",
                         correction="FAIL",
                     )
-                if (
-                    attempt
-                    or grounding_correction_used
-                    or error.code != "semantic_contract_incomplete"
-                ):
+                if attempt or error.code != "semantic_contract_incomplete":
                     return _canonical_failure(
                         error.code,
                         "Section semantics could not be validated safely.",
@@ -1530,143 +1461,6 @@ def resolve_section_object_bindings(
         track_indices=tuple(track_indices.items()),
         binding_indices=tuple(binding_indices),
     )
-
-
-def _section_track_owners(obligations: tuple[RequestObligation, ...]) -> tuple[str, ...]:
-    """Return request-owned track identities in compiled request order."""
-    alias_map = _section_owner_alias_map(obligations)
-    relevant = (
-        item
-        for item in obligations
-        if item.state is ObligationState.SET
-        and item.owner_ref != "request"
-        and item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK, OwnerKind.BINDING}
-    )
-    return tuple(dict.fromkeys(alias_map.get(item.owner_ref, item.owner_ref) for item in relevant))
-
-
-def _recoverable_single_track_omission(
-    action: SectionSemanticAction,
-    obligations: tuple[RequestObligation, ...],
-) -> str | None:
-    """Identify one unambiguous add-track proposal missing other complete owners."""
-    if action.action != "add_track":
-        return None
-    owners = _section_track_owners(obligations)
-    if len(owners) < 2:
-        return None
-    if any(
-        item.state is ObligationState.SET
-        and item.owner_ref == "request"
-        and item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK, OwnerKind.BINDING}
-        for item in obligations
-    ):
-        return None
-
-    alias_map = _section_owner_alias_map(obligations)
-    for owner in owners:
-        owner_facts = tuple(
-            item for item in obligations if alias_map.get(item.owner_ref, item.owner_ref) == owner
-        )
-        kind_facts = [
-            item
-            for item in owner_facts
-            if item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK}
-            and item.field == "kind"
-            and item.state is ObligationState.SET
-        ]
-        channel_facts = [
-            item
-            for item in owner_facts
-            if item.owner_kind is OwnerKind.BINDING
-            and item.field == "channel"
-            and item.state is ObligationState.SET
-        ]
-        binding_facts = [
-            item
-            for item in owner_facts
-            if item.owner_kind is OwnerKind.BINDING and item.state is ObligationState.SET
-        ]
-        slots = tuple(dict.fromkeys(item.slot_key for item in binding_facts if item.slot_key))
-        channel_slots = [item.slot_key for item in channel_facts]
-        kind_values = {str(item.value).casefold() for item in kind_facts}
-        if (
-            not kind_facts
-            or len(kind_values) != 1
-            or not channel_facts
-            or any(
-                not isinstance(item.value, str) or not item.value.strip() for item in channel_facts
-            )
-            or not slots
-            or (
-                all(slot is not None for slot in channel_slots)
-                and (
-                    len(set(channel_slots)) != len(channel_slots)
-                    or set(channel_slots) != set(slots)
-                )
-            )
-            or (
-                any(slot is None for slot in channel_slots)
-                and not (len(channel_facts) == 1 and channel_slots == [None])
-            )
-        ):
-            return None
-
-    matched_owners: list[str] = []
-    for owner in owners:
-        owner_facts = tuple(
-            item for item in obligations if alias_map.get(item.owner_ref, item.owner_ref) == owner
-        )
-        try:
-            partial = resolve_section_object_bindings(action, owner_facts)
-        except SemanticActionError as error:
-            if error.code != "worker_grounding_unresolved":
-                return None
-            continue
-        if partial.track_index(owner) is not None:
-            matched_owners.append(owner)
-
-    if len(matched_owners) != 1 or matched_owners[0] != owners[0]:
-        return None
-    return matched_owners[0]
-
-
-def _verify_grounding_repair_candidate(
-    *,
-    baseline: SectionSemanticAction,
-    candidate: SectionSemanticAction,
-    obligations: tuple[RequestObligation, ...],
-    matched_owner: str,
-) -> SectionObjectBindings:
-    """Authorize only a complete ordered reconstruction preserving the grounded track."""
-    owners = _section_track_owners(obligations)
-    if (
-        baseline.action != "add_track"
-        or candidate.action != "reconstruct"
-        or not owners
-        or owners[0] != matched_owner
-        or len(candidate.section.tracks) != len(owners)
-    ):
-        raise SemanticActionError(
-            "worker_correction_scope_violation",
-            "Grounding correction changed the bounded reconstruction shape.",
-        )
-
-    bindings = resolve_section_object_bindings(candidate, obligations)
-    if tuple(bindings.track_index(owner) for owner in owners) != tuple(range(len(owners))):
-        raise SemanticActionError(
-            "worker_correction_scope_violation",
-            "Grounding correction changed request-owned track order.",
-        )
-    preserved_track = candidate.section.tracks[bindings.track_index(matched_owner)]
-    if preserved_track.model_dump(mode="json", exclude_unset=True) != baseline.track.model_dump(
-        mode="json", exclude_unset=True
-    ):
-        raise SemanticActionError(
-            "worker_correction_scope_violation",
-            "Grounding correction changed the already-matched track.",
-        )
-    return bindings
 
 
 def _structural_track_candidates(
