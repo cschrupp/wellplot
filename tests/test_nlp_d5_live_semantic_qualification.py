@@ -34,7 +34,10 @@ from wellplot.agent.code_mode.facade import (
     CompileMetrics,
     CompileWorkerEvidence,
 )
+from wellplot.agent.composition import create_canonical_compile_facade
+from wellplot.agent.direct_notebook import _load_document_context
 from wellplot.agent.providers.base import ProviderRequestError, StructuredGenerationRequest
+from wellplot.agent.session import AgentSession
 from wellplot.model.intent import AuthoringDocumentIntent
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -2247,7 +2250,14 @@ def _smoke_provider_factory(
         clients.append(client)
         return client
 
-    def build(repo_root: Path, artifact_root: Path, token: str) -> object:
+    def build(
+        repo_root: Path,
+        artifact_root: Path,
+        token: str,
+        *,
+        trace_callback: Callable[[dict[str, Any]], None] | None = None,
+        compile_result_callback: Callable[[Any], None] | None = None,
+    ) -> object:
         adapter = d5.create_live_adapter(
             repo_root=repo_root,
             artifact_root=artifact_root,
@@ -2256,12 +2266,311 @@ def _smoke_provider_factory(
             request_options=d5._thinking_control_options(),
             require_thinking_control=True,
             http_client_factory=factory,
+            trace_callback=trace_callback,
+            compile_result_callback=compile_result_callback,
         )
         client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
         client._platform = "Linux"
         return adapter
 
     return build
+
+
+@pytest.mark.parametrize(
+    ("smoke_request", "expected_reason"),
+    [
+        (
+            "Track gamma: normal, width 30 mm. Track gamma: normal, width 32 mm.",
+            "request_compilation_conflicting",
+        ),
+        (
+            "In the Main Log section, use GR_STGC on a linear scale from 0 to 150.",
+            "request_compilation_coverage_failure",
+        ),
+    ],
+)
+def test_binding_smoke_rejects_invalid_request_before_readiness(
+    tmp_path: Path,
+    smoke_request: str,
+    expected_reason: str,
+) -> None:
+    """Invalid engineering requests are sealed before credentials or endpoint access."""
+    artifact_root = tmp_path / "invalid-binding-smoke"
+    authorization = _authorization(
+        campaign_id="invalid-binding-smoke",
+        artifact_root=str(artifact_root),
+    )
+    calls = {"credential": 0, "endpoint": 0, "provider": 0}
+
+    def endpoint_get(_url: str, _token: str) -> object:
+        calls["endpoint"] += 1
+        raise AssertionError("invalid request must not reach readiness")
+
+    def provider_factory(*_args: object, **_kwargs: object) -> object:
+        calls["provider"] += 1
+        raise AssertionError("invalid request must not construct a provider")
+
+    result = d5.execute_live_binding_smoke(
+        repo_root=REPO_ROOT,
+        authorization=authorization,
+        artifact_root=artifact_root,
+        logfile_path=REPO_ROOT / "missing-demo-log.yaml",
+        request=smoke_request,
+        endpoint_get=endpoint_get,
+        api_key_loader=lambda: calls.__setitem__("credential", calls["credential"] + 1) or "unused",
+        static_checker=lambda *_args: {"status": "PASS"},
+        provider_factory=provider_factory,
+    )
+
+    assert result["status"] == "SMOKE_CONTRACT_FAIL"
+    assert result["terminal"]["reason"] == expected_reason
+    assert result["terminal"]["endpoint_calls"] == 0
+    assert result["terminal"]["logical_generation_calls"] == 0
+    assert result["terminal"]["physical_generation_attempts"] == 0
+    assert calls == {"credential": 0, "endpoint": 0, "provider": 0}
+    request_record = json.loads(
+        (artifact_root / f"{authorization.campaign_id}.binding-request.json").read_text()
+    )
+    compilation = json.loads(
+        (
+            artifact_root / f"{authorization.campaign_id}.binding-request-compilation.json"
+        ).read_text()
+    )
+    assert request_record["request"] == smoke_request
+    assert compilation["status"] == (
+        "CONFLICTING" if "conflicting" in expected_reason else "COVERAGE_FAILURE"
+    )
+    journal = (artifact_root / f"{authorization.campaign_id}.journal.jsonl").read_text()
+    assert "SMOKE_STARTED" not in journal
+
+
+def test_binding_smoke_request_is_frozen_and_provider_free_qualified() -> None:
+    """The sole live request has one scope and two explicit distinct track bindings."""
+    request = d5.SMOKE_BINDING_REQUEST
+    compilation = d5.compile_request_contract(request)
+
+    assert hashlib.sha256(request.encode()).hexdigest() == d5.SMOKE_BINDING_REQUEST_SHA256
+    assert compilation.status.value == "EXTRACTION_COMPLETE"
+    assert d5._binding_smoke_contract_issue(request, compilation) is None
+    assert len(compilation.requirements.scopes.scopes) == 1
+    assert {
+        item.owner_ref
+        for item in compilation.requirements.requirements
+        if item.owner_kind.value == "track" and item.field == "kind"
+    } == {"Bond Index", "Gamma Ray"}
+    track_facts = {
+        (item.owner_ref, item.field): item.value
+        for item in compilation.requirements.requirements
+        if item.owner_kind.value == "track"
+    }
+    assert track_facts == {
+        ("Bond Index", "kind"): "normal",
+        ("Bond Index", "width_mm"): 34.0,
+        ("Gamma Ray", "kind"): "normal",
+        ("Gamma Ray", "width_mm"): 26.0,
+    }
+    assert {
+        item.value
+        for item in compilation.requirements.requirements
+        if item.owner_kind.value == "binding" and item.field == "channel"
+    } == {"BI", "GR_STGC"}
+
+
+def test_binding_smoke_persists_valid_request_before_readiness(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The exact accepted request and compilation are durable before the first GET."""
+    artifact_root = tmp_path / "valid-binding-preflight"
+    authorization = _authorization(
+        campaign_id="valid-binding-preflight",
+        artifact_root=str(artifact_root),
+    )
+    monkeypatch.setattr(
+        "wellplot.agent.direct_notebook._load_document_context",
+        lambda *_args, **_kwargs: SimpleNamespace(document=None, source_candidates=()),
+    )
+    monkeypatch.setattr(
+        d5,
+        "_binding_smoke_asset_identities",
+        lambda *_args: [
+            {
+                "asset_id": "demo",
+                "relative_path": "tests/fixtures/demo.las",
+                "path_basename": "demo.las",
+                "format": "las",
+                "size_bytes": 1,
+                "sha256": "b" * 64,
+            }
+        ],
+    )
+    compile_request = d5.compile_request_contract
+
+    def assert_request_persisted_first(request: str) -> d5.RequestCompilationResult:
+        request_path = artifact_root / f"{authorization.campaign_id}.binding-request.json"
+        assert request_path.is_file()
+        assert json.loads(request_path.read_text())["request"] == request
+        return compile_request(request)
+
+    monkeypatch.setattr(d5, "compile_request_contract", assert_request_persisted_first)
+    observed_request_artifacts: list[bool] = []
+    provider_calls = 0
+
+    def endpoint_get(_url: str, _token: str) -> object:
+        observed_request_artifacts.append(
+            (artifact_root / f"{authorization.campaign_id}.binding-request.json").is_file()
+            and (
+                artifact_root / f"{authorization.campaign_id}.binding-request-compilation.json"
+            ).is_file()
+        )
+        raise d5.D5ReadinessError("endpoint_server_error", 1)
+
+    def provider_factory(*_args: object, **_kwargs: object) -> object:
+        nonlocal provider_calls
+        provider_calls += 1
+        raise AssertionError("readiness failed before provider construction")
+
+    result = d5.execute_live_binding_smoke(
+        repo_root=REPO_ROOT,
+        authorization=authorization,
+        artifact_root=artifact_root,
+        logfile_path=REPO_ROOT / "demo.log.yaml",
+        endpoint_get=endpoint_get,
+        api_key_loader=lambda: "provider-free-token",
+        static_checker=lambda *_args: {"status": "PASS"},
+        provider_factory=provider_factory,
+    )
+
+    assert observed_request_artifacts == [True]
+    assert provider_calls == 0
+    assert result["status"] == "SMOKE_NOT_READY"
+    assert result["terminal"]["endpoint_calls"] == 1
+    assert result["terminal"]["logical_generation_calls"] == 0
+    compilation = json.loads(
+        (
+            artifact_root / f"{authorization.campaign_id}.binding-request-compilation.json"
+        ).read_text()
+    )
+    assert compilation["status"] == "EXTRACTION_COMPLETE"
+
+
+def test_canonical_facade_projects_planner_failure_without_worker_dispatch() -> None:
+    """A compiler-level PlannerSemanticFailure remains a safe zero-worker result."""
+
+    class _NoCallBackend:
+        calls = 0
+
+        async def generate_structured(self, *_args: object, **_kwargs: object) -> object:
+            self.calls += 1
+            raise AssertionError("conflicting request must fail before provider delegation")
+
+    backend = _NoCallBackend()
+    context = _load_document_context(
+        REPO_ROOT / "tests/fixtures/agentic_cbl/cased_hole_starter.log.yaml",
+        root=REPO_ROOT,
+    )
+    observed: list[CodeModeCompileResult] = []
+    facade = create_canonical_compile_facade(
+        backend=backend,
+        server_root=REPO_ROOT,
+        result_callback=observed.append,
+    )
+    result = asyncio.run(
+        facade.compile(
+            request="Track gamma: normal, width 30 mm. Track gamma: normal, width 32 mm.",
+            mode="revise",
+            document=context.document,
+            source_candidates=tuple(source._internal() for source in context.source_candidates),
+            timeout_seconds=5.0,
+        )
+    )
+
+    assert result.success is False
+    assert result.merged_intent is None
+    assert result.workers == ()
+    assert result.metrics.worker_count == 0
+    assert result.diagnostics[0].stage == "planner"
+    assert result.diagnostics[0].code == "planner.request_compilation_conflicting"
+    assert observed == [result]
+    assert backend.calls == 0
+
+
+def test_binding_smoke_records_bounded_exception_then_reraises(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unexpected host errors are located in custody and retain exception semantics."""
+    artifact_root = tmp_path / "binding-host-exception"
+    authorization = _authorization(
+        campaign_id="binding-host-exception",
+        artifact_root=str(artifact_root),
+    )
+    error = RuntimeError("exception detail must not be persisted")
+    clients: list[httpx.AsyncClient] = []
+    monkeypatch.setattr(
+        d5,
+        "_binding_smoke_asset_identities",
+        lambda *_args: [
+            {
+                "asset_id": "demo-source",
+                "relative_path": "tests/fixtures/demo.las",
+                "path_basename": "demo.las",
+                "format": "las",
+                "size_bytes": 1,
+                "sha256": "a" * 64,
+            }
+        ],
+    )
+
+    async def fail_revise(*_args: object, **_kwargs: object) -> object:
+        raise error
+
+    monkeypatch.setattr(AgentSession, "revise", fail_revise)
+    endpoint_calls = 0
+
+    def endpoint_get(url: str, _token: str) -> object:
+        nonlocal endpoint_calls
+        endpoint_calls += 1
+        if url == PROJECT_CONFIG.model_catalog_url:
+            return {"data": [{"id": d5.EXPECTED_MODEL}]}
+        return _props()
+
+    try:
+        with pytest.raises(RuntimeError) as caught:
+            d5.execute_live_binding_smoke(
+                repo_root=REPO_ROOT,
+                authorization=authorization,
+                artifact_root=artifact_root,
+                logfile_path=(REPO_ROOT / "tests/fixtures/agentic_cbl/cased_hole_starter.log.yaml"),
+                endpoint_get=endpoint_get,
+                api_key_loader=lambda: "provider-free-token",
+                static_checker=lambda *_args: {"status": "PASS"},
+                provider_factory=_smoke_provider_factory(clients=clients),
+            )
+    finally:
+        for client in clients:
+            asyncio.run(client.aclose())
+
+    assert caught.value is error
+    assert endpoint_calls == 2
+    terminal = json.loads(
+        (artifact_root / f"{authorization.campaign_id}.terminal.json").read_text()
+    )
+    assert terminal["outcome"] == "SMOKE_HARNESS_FAIL"
+    assert terminal["logical_generation_calls"] == 0
+    trace = [
+        json.loads(line)
+        for line in (artifact_root / f"{authorization.campaign_id}.stage-trace.jsonl")
+        .read_text()
+        .splitlines()
+    ]
+    exception = next(row for row in trace if row["event"] == "BINDING_SMOKE_HOST_EXCEPTION")
+    assert exception["exception_type"] == "RuntimeError"
+    assert exception["function"] == "fail_revise"
+    assert exception["source_file_basename"] == Path(__file__).name
+    assert exception["line_number"] > 0
+    assert exception["last_completed_stage"] == "READINESS"
+    assert "exception detail must not be persisted" not in json.dumps(trace)
 
 
 def _execute_provider_free_smoke(

@@ -32,6 +32,11 @@ from pydantic import BaseModel
 from scripts import d5_5_final_population as final_population
 from scripts import nlp_d4_live_acceptance as d4
 from scripts.d5_5_c02_contract_grader import grade_c02_artifact
+from wellplot.agent.code_mode.facade import CodeModeCompileResult
+from wellplot.agent.code_mode.obligations import (
+    RequestCompilationResult,
+    compile_request_contract,
+)
 from wellplot.agent.providers.base import ProviderRequestError, StructuredGenerationRequest
 from wellplot.project_config import ProjectConfig, load_project_config
 
@@ -67,6 +72,14 @@ SMOKE_MAX_PHYSICAL_ATTEMPTS = 3
 SMOKE_BINDING_ROLE_LIMITS = {"planner": 2, "section_worker": 2, "report_worker": 0}
 SMOKE_BINDING_MAX_LOGICAL_CALLS = 4
 SMOKE_BINDING_MAX_PHYSICAL_ATTEMPTS_PER_CALL = 3
+SMOKE_BINDING_REQUEST = (
+    "In the Main Review section, create two tracks. "
+    "Track Bond Index: normal, width 34 mm. "
+    "Track Gamma Ray: normal, width 26 mm.\n"
+    "On Bond Index: BI -> Bond Index, linear 0..1, #111111, width 0.8.\n"
+    "On Gamma Ray: GR_STGC -> Gamma Ray, linear 0..150, #16a34a, width 0.8."
+)
+SMOKE_BINDING_REQUEST_SHA256 = "cfff01272684ce6fd20f320fc7be23f778346afaf4be5ed9cb3217e7371621de"
 MAX_ENDPOINT_RESPONSE_BYTES = 1_048_576
 THINKING_CONTROL_MECHANISM = "chat_template_kwargs.enable_thinking"
 THINKING_CONTROL_OPTIONS_SHA256 = "220b99e47feb82851cab428f86b8fe977ae7c605400d421a91e99d4a35ec9c26"
@@ -745,6 +758,16 @@ class EvidencePaths:
         """Return pre-dispatch and planner stage transitions, one per line."""
         return self.root / f"{self.campaign_id}.stage-trace.jsonl"
 
+    @property
+    def binding_request(self) -> Path:
+        """Return the exact non-scientific binding-smoke request record."""
+        return self.root / f"{self.campaign_id}.binding-request.json"
+
+    @property
+    def binding_request_compilation(self) -> Path:
+        """Return provider-free compilation evidence for the binding request."""
+        return self.root / f"{self.campaign_id}.binding-request-compilation.json"
+
     def all_paths(self) -> tuple[Path, ...]:
         """Return all collision-sensitive paths in deterministic order."""
         return (
@@ -759,6 +782,8 @@ class EvidencePaths:
             self.request_compilation,
             self.planner_context,
             self.stage_trace,
+            self.binding_request,
+            self.binding_request_compilation,
         )
 
 
@@ -859,9 +884,17 @@ class D5SmokeCustody:
         endpoint_calls: int,
         smoke_kind: str = "structured_ready",
         source_asset_identities: Sequence[Mapping[str, Any]] = (),
+        binding_input_preflighted: bool = False,
     ) -> D5SmokeCustody:
         """Create smoke custody only after static checks and readiness pass."""
-        ensure_fresh_namespace(paths)
+        ensure_fresh_namespace(
+            paths,
+            existing_allowed=(
+                (paths.binding_request, paths.binding_request_compilation)
+                if binding_input_preflighted
+                else ()
+            ),
+        )
         safe_asset_identities = _sanitize_source_asset_identities(source_asset_identities)
         ledger = D5SmokeCallLedger(
             mode="binding_compile" if smoke_kind == SMOKE_BINDING_KIND else "structured_ready"
@@ -920,9 +953,18 @@ class D5SmokeCustody:
         static_preflight: Mapping[str, Any],
         endpoint_calls: int,
         reason: str,
+        binding_input_preflighted: bool = False,
+        smoke_kind: str | None = None,
     ) -> D5SmokeCustody:
         """Create durable pre-smoke evidence without asserting smoke started."""
-        ensure_fresh_namespace(paths)
+        ensure_fresh_namespace(
+            paths,
+            existing_allowed=(
+                (paths.binding_request, paths.binding_request_compilation)
+                if binding_input_preflighted
+                else ()
+            ),
+        )
         state = {
             "experiment_version": D5_EXPERIMENT_VERSION,
             "mode": "canonical_live_smoke",
@@ -943,6 +985,8 @@ class D5SmokeCustody:
             "static_preflight": dict(static_preflight),
             "reason": reason,
         }
+        if smoke_kind is not None:
+            state["smoke_kind"] = smoke_kind
         if not evidence_is_redacted(state):
             raise D5HarnessError("smoke state redaction failure")
         _atomic_json(paths.state, state, exclusive=True)
@@ -961,6 +1005,67 @@ class D5SmokeCustody:
         )
         paths.model_io.touch(exist_ok=False)
         return cls(paths=paths, authorization=authorization, state=state)
+
+    def record_binding_request(self, request: str) -> None:
+        """Persist the exact safe engineering request before compiling it."""
+        request_hash = hashlib.sha256(request.encode("utf-8")).hexdigest()
+        request_record = {
+            "smoke_kind": SMOKE_BINDING_KIND,
+            "request_sha256": request_hash,
+            "request": request,
+        }
+        if not evidence_is_redacted(request_record):
+            raise D5HarnessError("binding-smoke input redaction failure")
+        _atomic_json(self.paths.binding_request, request_record, exclusive=True)
+
+    def record_binding_request_compilation(
+        self,
+        compilation: RequestCompilationResult,
+    ) -> None:
+        """Persist the deterministic provider-free request compilation result."""
+        compilation_record = compilation.model_dump(mode="json")
+        if not evidence_is_redacted(compilation_record):
+            raise D5HarnessError("binding-smoke compilation redaction failure")
+        _atomic_json(
+            self.paths.binding_request_compilation,
+            compilation_record,
+            exclusive=True,
+        )
+
+    def record_unexpected_host_exception(
+        self,
+        error: Exception,
+        *,
+        last_completed_stage: str,
+    ) -> None:
+        """Record bounded exception location without locals or traceback text."""
+        traceback = error.__traceback__
+        last_frame = None
+        while traceback is not None:
+            last_frame = traceback.tb_frame
+            line_number = traceback.tb_lineno
+            traceback = traceback.tb_next
+        if last_frame is None:
+            location = {
+                "source_file_basename": None,
+                "function": None,
+                "line_number": None,
+            }
+        else:
+            location = {
+                "source_file_basename": Path(last_frame.f_code.co_filename).name,
+                "function": last_frame.f_code.co_name,
+                "line_number": line_number,
+            }
+        self.record_planner_observability(
+            {
+                "event": "BINDING_SMOKE_HOST_EXCEPTION",
+                "exception_type": type(error).__name__,
+                "exception_module": type(error).__module__,
+                **location,
+                "last_completed_stage": last_completed_stage,
+            }
+        )
 
     def record_readiness(self, readiness: D5ReadinessProjectionProtocol) -> None:
         """Persist the bounded readiness projection before generation."""
@@ -1236,6 +1341,8 @@ class D5SmokeCustody:
                     self.paths.request_compilation,
                     self.paths.planner_context,
                     self.paths.stage_trace,
+                    self.paths.binding_request,
+                    self.paths.binding_request_compilation,
                 )
                 if path.is_file()
             },
@@ -1250,9 +1357,14 @@ class D5SmokeCustody:
         return terminal
 
 
-def ensure_fresh_namespace(paths: EvidencePaths) -> None:
+def ensure_fresh_namespace(
+    paths: EvidencePaths,
+    *,
+    existing_allowed: Sequence[Path] = (),
+) -> None:
     """Reject any collision before readiness or campaign creation."""
-    if any(path.exists() for path in paths.all_paths()):
+    allowed = set(existing_allowed)
+    if any(path.exists() for path in paths.all_paths() if path not in allowed):
         raise D5StaticPreflightError("campaign artifact collision")
     paths.root.mkdir(parents=True, exist_ok=True)
 
@@ -2856,6 +2968,349 @@ def execute_live_smoke(
     except Exception:
         terminal = custody.finish("SMOKE_HARNESS_FAIL", reason="unclassified_failure")
         return {"status": "SMOKE_HARNESS_FAIL", "terminal": terminal}
+    terminal = custody.finish("SMOKE_PASS")
+    return {
+        "status": "SMOKE_PASS",
+        "terminal": terminal,
+        "readiness": readiness.projection.as_dict(),
+    }
+
+
+def _binding_smoke_contract_issue(
+    request: str,
+    compilation: RequestCompilationResult,
+) -> str | None:
+    """Require the one frozen, structurally useful binding-smoke request."""
+    if compilation.status.value != "EXTRACTION_COMPLETE":
+        return f"request_compilation_{compilation.status.value.casefold()}"
+    request_hash = hashlib.sha256(request.encode("utf-8")).hexdigest()
+    if request_hash != SMOKE_BINDING_REQUEST_SHA256:
+        return "binding_smoke_request_identity_mismatch"
+
+    requirements = compilation.requirements.requirements
+    if len(compilation.requirements.scopes.scopes) != 1:
+        return "binding_smoke_scope_shape_invalid"
+    track_fields: dict[str, set[str]] = {}
+    binding_channels: dict[str, set[str]] = {}
+    for requirement in requirements:
+        if requirement.state.value != "SET":
+            return "binding_smoke_requirement_not_explicit"
+        if requirement.owner_kind.value == "track":
+            track_fields.setdefault(requirement.owner_ref, set()).add(requirement.field)
+        elif requirement.owner_kind.value == "binding" and requirement.field == "channel":
+            binding_channels.setdefault(requirement.owner_ref, set()).add(str(requirement.value))
+        elif requirement.owner_kind.value == "report":
+            return "binding_smoke_unexpected_report_requirement"
+
+    if len(track_fields) != 2 or any(
+        not {"kind", "width_mm"}.issubset(fields) for fields in track_fields.values()
+    ):
+        return "binding_smoke_track_shape_invalid"
+    expected_track_refs = {"bond_index", "gamma_ray"}
+    if set(binding_channels) != expected_track_refs or any(
+        len(channels) != 1 for channels in binding_channels.values()
+    ):
+        return "binding_smoke_binding_shape_invalid"
+    if {next(iter(values)) for values in binding_channels.values()} != {"BI", "GR_STGC"}:
+        return "binding_smoke_channel_membership_invalid"
+    return None
+
+
+def _binding_smoke_asset_identities(context: object, repo_root: Path) -> list[dict[str, Any]]:
+    """Return bounded identities for the local inputs declared by the demo."""
+    candidates = getattr(context, "source_candidates", ())
+    identities: list[dict[str, Any]] = []
+    for candidate in candidates:
+        path = Path(candidate.path).resolve()
+        try:
+            relative_path = path.relative_to(repo_root.resolve()).as_posix()
+        except ValueError as error:
+            raise D5HarnessError("binding-smoke source escapes repository root") from error
+        if not path.is_file():
+            raise D5HarnessError("binding-smoke source asset is unavailable")
+        identities.append(
+            {
+                "asset_id": str(candidate.candidate_id),
+                "relative_path": relative_path,
+                "path_basename": path.name,
+                "format": candidate.trusted_format or path.suffix.lstrip("."),
+                "size_bytes": path.stat().st_size,
+                "sha256": _sha256_file(path),
+            }
+        )
+    if not identities:
+        raise D5HarnessError("binding-smoke has no declared source asset")
+    return identities
+
+
+async def _close_binding_smoke_adapter(adapter: object) -> None:
+    """Close the canonical OpenAI client without entering notebook projection."""
+    try:
+        client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
+    except AttributeError as error:
+        raise D5HarnessError("canonical binding-smoke client is unavailable") from error
+    close = getattr(client, "close", None)
+    if not callable(close):
+        raise D5HarnessError("canonical binding-smoke client cannot be closed")
+    result = close()
+    if inspect.isawaitable(result):
+        await result
+
+
+def execute_live_binding_smoke(
+    *,
+    repo_root: Path,
+    authorization: D5Authorization,
+    artifact_root: Path,
+    logfile_path: Path,
+    request: str = SMOKE_BINDING_REQUEST,
+    endpoint_get: Callable[[str, str], object] = _credential_bearing_json_get,
+    api_key_loader: Callable[[], str] | None = None,
+    static_checker: Callable[[Path, D5Authorization, EvidencePaths], dict[str, Any]] | None = None,
+    provider_factory: Callable[..., object] | None = None,
+) -> dict[str, Any]:
+    """Run the fixed engineering binding request through the canonical compile facade."""
+    if artifact_root.resolve() != _authorized_artifact_root(repo_root, authorization):
+        raise D5StaticPreflightError("artifact root is not authorized")
+    project_config = load_project_config(repo_root)
+    _validate_project_config(project_config)
+    if authorization.project_config_fingerprint_sha256 != project_config.fingerprint_sha256:
+        raise D5StaticPreflightError("project configuration fingerprint mismatch")
+    paths = EvidencePaths(artifact_root, authorization.campaign_id)
+    static = (static_checker or _default_smoke_static_checks)(repo_root, authorization, paths)
+    if static.get("status") != "PASS":
+        raise D5StaticPreflightError("smoke static preflight failed")
+    ensure_fresh_namespace(paths)
+
+    input_custody = D5SmokeCustody(paths, authorization, state={})
+    input_custody.record_binding_request(request)
+    try:
+        compilation = compile_request_contract(request)
+    except Exception as error:
+        custody = D5SmokeCustody.pre_smoke_failure(
+            paths,
+            authorization=authorization,
+            static_preflight=static,
+            endpoint_calls=0,
+            reason="request_compilation_exception",
+            binding_input_preflighted=True,
+            smoke_kind=SMOKE_BINDING_KIND,
+        )
+        custody.record_unexpected_host_exception(
+            error,
+            last_completed_stage="REQUEST_COMPILATION_ENTER",
+        )
+        custody.finish("SMOKE_HARNESS_FAIL", reason="unexpected_host_exception")
+        raise
+    input_custody.record_binding_request_compilation(compilation)
+    contract_issue = _binding_smoke_contract_issue(request, compilation)
+    if contract_issue is not None:
+        custody = D5SmokeCustody.pre_smoke_failure(
+            paths,
+            authorization=authorization,
+            static_preflight=static,
+            endpoint_calls=0,
+            reason=contract_issue,
+            binding_input_preflighted=True,
+            smoke_kind=SMOKE_BINDING_KIND,
+        )
+        terminal = custody.finish("SMOKE_CONTRACT_FAIL", reason=contract_issue)
+        return {"status": "SMOKE_CONTRACT_FAIL", "terminal": terminal}
+
+    try:
+        resolved_logfile = logfile_path.resolve()
+        resolved_logfile.relative_to(repo_root.resolve())
+        from wellplot.agent.direct_notebook import _load_document_context
+
+        document_context = _load_document_context(resolved_logfile, root=repo_root)
+        asset_identities = _binding_smoke_asset_identities(document_context, repo_root)
+    except Exception as error:
+        custody = D5SmokeCustody.pre_smoke_failure(
+            paths,
+            authorization=authorization,
+            static_preflight=static,
+            endpoint_calls=0,
+            reason="binding_smoke_input_unavailable",
+            binding_input_preflighted=True,
+            smoke_kind=SMOKE_BINDING_KIND,
+        )
+        custody.record_unexpected_host_exception(
+            error,
+            last_completed_stage="REQUEST_COMPILATION_PASS",
+        )
+        custody.finish("SMOKE_HARNESS_FAIL", reason="binding_smoke_input_unavailable")
+        raise
+
+    trace_events: list[Mapping[str, Any]] = []
+    compile_results: list[Any] = []
+    custody_ref: dict[str, D5SmokeCustody] = {}
+    last_completed_stage = "READINESS"
+
+    def on_trace(event: Mapping[str, Any]) -> None:
+        nonlocal last_completed_stage
+        trace_events.append(dict(event))
+        name = str(event.get("event", ""))
+        if name.endswith("_PASS") or name.endswith("_COMPLETED"):
+            last_completed_stage = name
+        active_custody = custody_ref.get("custody")
+        if active_custody is not None:
+            active_custody.record_planner_observability(event)
+
+    def on_compile_result(result: CodeModeCompileResult) -> None:
+        compile_results.append(result)
+        active_custody = custody_ref.get("custody")
+        if active_custody is not None:
+            active_custody.record_compile_result(result)
+
+    load_key = api_key_loader or (lambda: d4.load_d4_api_key(repo_root))
+
+    def build_provider(token: str) -> object:
+        if provider_factory is not None:
+            return provider_factory(
+                repo_root,
+                artifact_root,
+                token,
+                trace_callback=on_trace,
+                compile_result_callback=on_compile_result,
+            )
+        return create_live_adapter(
+            repo_root=repo_root,
+            artifact_root=artifact_root,
+            api_key=token,
+            project_config=project_config,
+            request_options=authorization.thinking_control_options,
+            require_thinking_control=True,
+            trace_callback=on_trace,
+            compile_result_callback=on_compile_result,
+        )
+
+    try:
+        readiness = prepare_readiness(
+            authorization=authorization,
+            project_config=project_config,
+            api_key_loader=load_key,
+            endpoint_get=endpoint_get,
+            static_preflight=static,
+            provider_factory=build_provider,
+        )
+    except D5ReadinessError as error:
+        custody = D5SmokeCustody.pre_smoke_failure(
+            paths,
+            authorization=authorization,
+            static_preflight=static,
+            endpoint_calls=error.endpoint_calls,
+            reason=error.reason,
+            binding_input_preflighted=True,
+            smoke_kind=SMOKE_BINDING_KIND,
+        )
+        terminal = custody.finish("SMOKE_NOT_READY", reason=error.reason)
+        return {
+            "status": "SMOKE_NOT_READY",
+            "terminal": terminal,
+            "readiness": _readiness_failure_result(error),
+            "provider_calls": 0,
+            "model_calls": 0,
+        }
+
+    adapter = readiness.adapter
+    if not isinstance(adapter, _ObservedLiveAdapter):
+        custody = D5SmokeCustody.pre_smoke_failure(
+            paths,
+            authorization=authorization,
+            static_preflight=static,
+            endpoint_calls=len(readiness.endpoint_calls),
+            reason="canonical_adapter_unavailable",
+            binding_input_preflighted=True,
+            smoke_kind=SMOKE_BINDING_KIND,
+        )
+        terminal = custody.finish("SMOKE_HARNESS_FAIL", reason="canonical_adapter_unavailable")
+        return {"status": "SMOKE_HARNESS_FAIL", "terminal": terminal}
+
+    custody = D5SmokeCustody.start(
+        paths,
+        authorization=authorization,
+        static_preflight=static,
+        readiness=readiness.projection,
+        endpoint_calls=len(readiness.endpoint_calls),
+        smoke_kind=SMOKE_BINDING_KIND,
+        source_asset_identities=asset_identities,
+        binding_input_preflighted=True,
+    )
+    custody_ref["custody"] = custody
+    custody.bind_binding_smoke_observability(adapter)
+    for event in trace_events:
+        custody.record_planner_observability(event)
+    for result in compile_results:
+        custody.record_compile_result(result)
+
+    try:
+        from wellplot.agent.session import AgentSession
+
+        agent_session = adapter.inner.session.session
+        if not isinstance(agent_session, AgentSession):
+            raise D5HarnessError("canonical Code Mode session is unavailable")
+        result = asyncio.run(
+            agent_session.revise(
+                request=request,
+                document=document_context.document,
+                sources=document_context.source_candidates,
+            )
+        )
+    except D5CallCapExceeded:
+        try:
+            asyncio.run(_close_binding_smoke_adapter(adapter))
+        except Exception as error:
+            custody.record_unexpected_host_exception(
+                error,
+                last_completed_stage="CLIENT_CLOSE",
+            )
+            custody.finish("SMOKE_HARNESS_FAIL", reason="client_close_failure")
+            raise
+        terminal = custody.finish("SMOKE_CONTRACT_FAIL", reason="binding_call_cap_exceeded")
+        return {"status": "SMOKE_CONTRACT_FAIL", "terminal": terminal}
+    except Exception as error:
+        custody.record_unexpected_host_exception(
+            error,
+            last_completed_stage=last_completed_stage,
+        )
+        try:
+            asyncio.run(_close_binding_smoke_adapter(adapter))
+        except Exception as close_error:
+            custody.record_unexpected_host_exception(
+                close_error,
+                last_completed_stage="CLIENT_CLOSE",
+            )
+        custody.finish("SMOKE_HARNESS_FAIL", reason="unexpected_host_exception")
+        raise
+    else:
+        try:
+            asyncio.run(_close_binding_smoke_adapter(adapter))
+        except Exception as error:
+            custody.record_unexpected_host_exception(
+                error,
+                last_completed_stage="CLIENT_CLOSE",
+            )
+            custody.finish("SMOKE_HARNESS_FAIL", reason="client_close_failure")
+            raise
+
+    if not compile_results:
+        terminal = custody.finish("SMOKE_HARNESS_FAIL", reason="compile_result_not_observed")
+        return {"status": "SMOKE_HARNESS_FAIL", "terminal": terminal}
+    compile_result = compile_results[-1]
+    if not result.success or not compile_result.success:
+        provider_failure = any(item.stage == "provider" for item in result.diagnostics)
+        outcome = "SMOKE_PROVIDER_INCONCLUSIVE" if provider_failure else "SMOKE_CONTRACT_FAIL"
+        reason = "provider_compile_failure" if provider_failure else "canonical_compile_rejected"
+        terminal = custody.finish(outcome, reason=reason)
+        return {"status": outcome, "terminal": terminal}
+    section_workers = [worker for worker in result.workers if worker.kind == "section"]
+    successful_lowering = bool(section_workers) and all(
+        worker.success and worker.stage_evidence.semantic_lowering == "PASS"
+        for worker in section_workers
+    )
+    if not successful_lowering or any(worker.kind == "report" for worker in result.workers):
+        terminal = custody.finish("SMOKE_CONTRACT_FAIL", reason="binding_compile_stage_missing")
+        return {"status": "SMOKE_CONTRACT_FAIL", "terminal": terminal}
     terminal = custody.finish("SMOKE_PASS")
     return {
         "status": "SMOKE_PASS",
