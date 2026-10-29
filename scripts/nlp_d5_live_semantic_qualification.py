@@ -3033,7 +3033,7 @@ def _binding_smoke_contract_issue(
             return "binding_smoke_unexpected_report_requirement"
 
     if len(track_fields) != 2 or any(
-        not {"kind", "width_mm"}.issubset(fields) for fields in track_fields.values()
+        not {"kind", "title", "width_mm"}.issubset(fields) for fields in track_fields.values()
     ):
         return "binding_smoke_track_shape_invalid"
     expected_track_refs = {"bond_index", "gamma_ray"}

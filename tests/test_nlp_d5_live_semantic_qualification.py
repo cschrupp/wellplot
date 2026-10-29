@@ -2379,6 +2379,24 @@ def test_binding_smoke_request_is_frozen_and_provider_free_qualified() -> None:
         if item.owner_kind.value == "binding" and item.field == "channel"
     } == {"BI", "GR_STGC"}
 
+    without_track_titles = compilation.model_copy(
+        update={
+            "requirements": compilation.requirements.model_copy(
+                update={
+                    "requirements": tuple(
+                        item
+                        for item in compilation.requirements.requirements
+                        if not (item.owner_kind.value == "track" and item.field == "title")
+                    )
+                }
+            )
+        }
+    )
+    assert (
+        d5._binding_smoke_contract_issue(request, without_track_titles)
+        == "binding_smoke_track_shape_invalid"
+    )
+
 
 def test_binding_smoke_persists_valid_request_before_readiness(
     tmp_path: Path,
