@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import ast
 import asyncio
-import hashlib
 import inspect
 import json
+import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
@@ -37,7 +38,6 @@ from wellplot.agent.code_mode.obligations import (
     ValidationIssue,
     ValidationIssueSet,
     compile_request_contract,
-    extract_supported_obligations,
     validate_section_obligations,
     verify_document_obligations,
 )
@@ -61,6 +61,7 @@ from wellplot.agent.code_mode.typed_section_worker import (
     _normalize_reconstruct_track_dimensions,
     apply_compiled_requirements,
 )
+from wellplot.agent.code_mode.worker_contracts import build_section_work_contract
 from wellplot.agent.providers.base import (
     ProviderMetrics,
     StructuredGenerationRequest,
@@ -173,22 +174,32 @@ def _context() -> EnrichedSemanticContext:
 def _context_for_request(request: str) -> EnrichedSemanticContext:
     """Attach one compiled request contract to the canonical worker fixture."""
     base = _context()
-    plan = _attach_compiled_requirements(
-        base.plan.model_copy(update={"section_tasks": (base.plan.section_tasks[0],)}),
-        compile_request_contract(request),
+    compiled = compile_request_contract(request)
+    task = base.plan.section_tasks[0].model_copy(
+        update={"obligations": compiled.requirements.requirements}
     )
+    plan = base.plan.model_copy(update={"section_tasks": (task,)})
     return base.model_copy(update={"plan": plan})
 
 
-def _run_section(response: dict[str, object]) -> object:
+def _work_contract(context: EnrichedSemanticContext, task_index: int = 0) -> object:
+    """Build the same deterministic work contract supplied at graph dispatch."""
+    return build_section_work_contract(
+        context.plan.section_tasks[task_index], context.sections[task_index]
+    )
+
+
+def _run_section(response: dict[str, object], request: str) -> object:
     """Compile one response through the canonical section worker."""
     backend = _StructuredFixtureBackend([response])
+    context = _context_for_request(request)
     return asyncio.run(
         CanonicalSectionWorker(backend=backend).compile(
             task_index=0,
-            context=_context(),
+            context=context,
             document=_document(),
-            authoritative_request="Apply the requested semantic change.",
+            authoritative_request=request,
+            work_contract=_work_contract(context),
             timeout_seconds=10,
         )
     )
@@ -950,10 +961,12 @@ def test_authority_g_captured_response_uses_one_shared_track_binding() -> None:
                 for case in d4.load_cases(REPO_ROOT)
                 if case["turn_id"] == "D4-C01:C01"
             ),
+            work_contract=_work_contract(context),
             timeout_seconds=10,
         )
     )
-    assert result.success is True, result.diagnostics
+    assert result.success is False
+    assert result.diagnostics[0].code == "worker_contract_target_mismatch"
     assert len(worker_backend.requests) == 1
 
 
@@ -1282,22 +1295,15 @@ def test_unresolved_authority_g_response_is_bounded_before_correction() -> None:
                 for case in d4.load_cases(REPO_ROOT)
                 if case["turn_id"] == "D4-C01:C01"
             ),
+            work_contract=_work_contract(context),
             timeout_seconds=10,
         )
     )
     assert result.success is False
-    assert result.diagnostics[0].code == "worker_grounding_unresolved"
-    assert result.stage_evidence.normalization == "FAIL"
+    assert result.diagnostics[0].code == "worker_contract_target_mismatch"
+    assert result.stage_evidence.normalization == "PASS"
     assert len(backend.requests) == 1
-    assert observed_actions == [
-        {
-            "event": "SECTION_ACTION_VALIDATED",
-            "attempt": 1,
-            "action": section_worker.SectionSemanticActionResponse.model_validate(
-                response
-            ).root.model_dump(mode="json", exclude_unset=True),
-        }
-    ]
+    assert observed_actions == []
 
 
 def test_incomplete_multitrack_add_track_fails_closed_without_second_call() -> None:
@@ -1338,27 +1344,63 @@ def test_incomplete_multitrack_add_track_fails_closed_without_second_call() -> N
                 for case in d4.load_cases(REPO_ROOT)
                 if case["turn_id"] == "D4-C01:C01"
             ),
+            work_contract=_work_contract(context),
             timeout_seconds=10,
         )
     )
 
     assert result.success is False
-    assert result.diagnostics[0].code == "worker_grounding_unresolved"
-    assert result.stage_evidence.normalization == "FAIL"
+    assert result.diagnostics[0].code == "structured_schema_validation_failure"
+    assert result.stage_evidence.normalization == "NOT_REACHED"
     assert len(backend.requests) == 1
-    assert len(observed_actions) == 1
-    assert observed_actions[0]["attempt"] == 1
-    assert observed_actions[0]["action"]["action"] == "add_track"
+    assert observed_actions == []
 
 
 def test_section_worker_has_one_model_backed_correction_protocol() -> None:
-    """The worker keeps only its canonical RepairContract correction path."""
-    source = inspect.getsource(CanonicalSectionWorker.compile)
+    """Only initial generation and the typed RepairContract branch delegate."""
+    tree = ast.parse(textwrap.dedent(inspect.getsource(CanonicalSectionWorker.compile)))
+    calls = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "generate_structured"
+        and isinstance(node.func.value, ast.Attribute)
+        and node.func.value.attr == "backend"
+    ]
+    assert len(calls) == 2
+    assert calls[0].lineno < calls[1].lineno
+    assert calls[0].args
+    assert calls[1].args
 
-    assert source.count("self.backend.generate_structured(") == 2
-    assert "_build_repair_contract(" in source
-    assert "_verify_repair_candidate(" in source
-    assert "grounding_correction" not in source
+    correction_call = calls[1]
+    parents: dict[ast.AST, ast.AST] = {
+        child: parent for parent in ast.walk(tree) for child in ast.iter_child_nodes(parent)
+    }
+    ancestors: list[ast.AST] = []
+    parent = parents[correction_call]
+    while parent is not tree:
+        ancestors.append(parent)
+        parent = parents[parent]
+    assert any(isinstance(node, ast.For) for node in ancestors)
+    assert any(
+        isinstance(node, ast.ExceptHandler)
+        and isinstance(node.type, ast.Name)
+        and node.type.id == "SemanticActionError"
+        for node in ancestors
+    )
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_build_repair_contract"
+        for node in ast.walk(tree)
+    )
+    assert any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "_verify_repair_candidate"
+        for node in ast.walk(tree)
+    )
 
 
 def test_correction_identity_drift_is_rejected_with_frozen_binding() -> None:
@@ -2051,7 +2093,11 @@ def test_cbl_dimension_forms_and_task_title_are_normalized_by_host() -> None:
 
 def test_canonical_section_worker_ignores_uncompiled_planner_dimension_prose() -> None:
     """Planner task prose does not become downstream semantic authority."""
-    base_context = _context()
+    request = (
+        "Track Gamma Ray: normal, width 30 mm.\n"
+        "On Gamma Ray: GR -> Gamma Ray, linear 0..150, #111111, width 1."
+    )
+    base_context = _context_for_request(request)
     task = base_context.plan.section_tasks[0].model_copy(
         update={"requirements": ("Track 1 (gamma): reference, 42 mm",)}
     )
@@ -2059,86 +2105,61 @@ def test_canonical_section_worker_ignores_uncompiled_planner_dimension_prose() -
         update={"plan": base_context.plan.model_copy(update={"section_tasks": (task,)})}
     )
     response = {
-        "action": "reconstruct",
-        "section": {
-            "source_candidate": "source-1",
-            "title": "Main Log",
-            "tracks": [
+        "action": "add_track",
+        "track": {
+            "semantic_id": "gamma_ray",
+            "kind": "normal",
+            "title": "Gamma Ray",
+            "width_mm": 30,
+            "bindings": [
                 {
-                    "semantic_id": "gr",
-                    "kind": "normal",
-                    "title": "Gamma Ray",
-                    "width_mm": 30,
-                    "bindings": [
-                        {
-                            "semantic_id": "gamma",
-                            "channel": "GR",
-                            "label": "Gamma Ray",
-                            "scale": {
-                                "kind": "linear",
-                                "minimum": 0,
-                                "maximum": 150,
-                                "reverse": False,
-                            },
-                            "style": {
-                                "color": "#111111",
-                                "line_width": 1,
-                                "line_style": "solid",
-                            },
-                        }
-                    ],
+                    "semantic_id": "gamma_ray.binding.1",
+                    "channel": "GR",
+                    "label": "Gamma Ray",
+                    "scale": {"kind": "linear", "minimum": 0, "maximum": 150},
+                    "style": {"color": "#111111", "line_width": 1, "line_style": "solid"},
                 }
             ],
         },
     }
-    backend = _StructuredFixtureBackend([response, response])
+    backend = _StructuredFixtureBackend([response])
     result = asyncio.run(
         CanonicalSectionWorker(backend=backend).compile(
             task_index=0,
             context=context,
             document=_document(),
-            authoritative_request="Build the requested track.",
+            authoritative_request=request,
+            work_contract=_work_contract(context),
             timeout_seconds=10,
         )
     )
     assert result.success is True
     assert result.stage_evidence.normalization == "PASS"
+    assert len(backend.requests) == 1
 
 
 def test_canonical_section_worker_marks_obligation_failure_separately(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An obligation failure records normalization success and obligation failure."""
-    request = "Track gamma: normal, width 30 mm."
+    request = (
+        "Track Gamma Ray: normal, width 30 mm.\n"
+        "On Gamma Ray: GR -> Gamma Ray, linear 0..150, #111111, width 1."
+    )
     response = {
-        "action": "reconstruct",
-        "section": {
-            "source_candidate": "source-1",
-            "title": "Main Log",
-            "tracks": [
+        "action": "add_track",
+        "track": {
+            "semantic_id": "gamma_ray",
+            "kind": "normal",
+            "title": "Gamma Ray",
+            "width_mm": 30,
+            "bindings": [
                 {
-                    "semantic_id": "gamma",
-                    "kind": "normal",
-                    "title": "Gamma Ray",
-                    "width_mm": 30,
-                    "bindings": [
-                        {
-                            "semantic_id": "gr",
-                            "channel": "GR",
-                            "label": "Gamma Ray",
-                            "scale": {
-                                "kind": "linear",
-                                "minimum": 0,
-                                "maximum": 150,
-                                "reverse": False,
-                            },
-                            "style": {
-                                "color": "#111111",
-                                "line_width": 1,
-                                "line_style": "solid",
-                            },
-                        }
-                    ],
+                    "semantic_id": "gamma_ray.binding.1",
+                    "channel": "GR",
+                    "label": "Gamma Ray",
+                    "scale": {"kind": "linear", "minimum": 0, "maximum": 150},
+                    "style": {"color": "#111111", "line_width": 1, "line_style": "solid"},
                 }
             ],
         },
@@ -2160,6 +2181,7 @@ def test_canonical_section_worker_marks_obligation_failure_separately(
             context=context,
             document=_document(),
             authoritative_request=request,
+            work_contract=_work_contract(context),
             timeout_seconds=10,
         )
     )
@@ -2169,8 +2191,14 @@ def test_canonical_section_worker_marks_obligation_failure_separately(
     assert result.stage_evidence.semantic_lowering == "NOT_REACHED"
 
 
-def test_canonical_section_worker_marks_lowering_action_error_separately() -> None:
+def test_canonical_section_worker_marks_lowering_action_error_separately(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A canonical lowering error records both prior stages as passed."""
+    request = (
+        "Track Quality: normal, width 28 mm.\n"
+        "On Quality: GR -> Gamma Ray, linear 0..150, #111111, width 1."
+    )
     response = {
         "action": "add_track",
         "track": {
@@ -2181,23 +2209,29 @@ def test_canonical_section_worker_marks_lowering_action_error_separately() -> No
             "bindings": [
                 {
                     "kind": "curve",
-                    "semantic_id": "gr",
+                    "semantic_id": "quality.binding.1",
                     "channel": "GR",
                     "label": "Gamma Ray",
                     "scale": {"kind": "linear", "minimum": 0, "maximum": 150},
+                    "style": {"color": "#111111", "line_width": 1, "line_style": "solid"},
                 }
             ],
         },
     }
-    context = _context()
-    ungrounded_section = context.sections[0].model_copy(update={"section_id": None})
-    context = context.model_copy(update={"sections": (ungrounded_section,)})
+    context = _context_for_request(request)
+
+    def fail_lowering(*args: object, **kwargs: object) -> None:
+        del args, kwargs
+        raise SemanticActionError("section_missing", "synthetic lowering boundary")
+
+    monkeypatch.setattr(section_worker, "lower_section_action", fail_lowering)
     result = asyncio.run(
         CanonicalSectionWorker(backend=_StructuredFixtureBackend([response])).compile(
             task_index=0,
             context=context,
             document=_document(),
-            authoritative_request="Build the requested track.",
+            authoritative_request=request,
+            work_contract=_work_contract(context),
             timeout_seconds=10,
         )
     )
@@ -2367,33 +2401,55 @@ def test_section_normalization_extracts_inline_raster_clause_and_label() -> None
 
 
 def test_canonical_section_worker_exposes_source_labels_without_paths() -> None:
-    """Section workers receive bounded source names needed for grounded selection."""
+    """Section workers receive safe opaque source handles without host paths."""
     backend = _StructuredFixtureBackend(
         [
             {
                 "action": "add_track",
                 "track": {
-                    "semantic_id": "cali-qc",
+                    "semantic_id": "cali_qc",
                     "kind": "normal",
                     "title": "CALI QC",
-                    "bindings": [{"kind": "curve", "semantic_id": "cali", "channel": "CALI"}],
+                    "width_mm": 28,
+                    "bindings": [
+                        {
+                            "kind": "curve",
+                            "semantic_id": "cali_qc.binding.1",
+                            "channel": "CALI",
+                            "label": "CALI QC",
+                            "scale": {"kind": "linear", "minimum": 6, "maximum": 12},
+                            "style": {
+                                "color": "#111111",
+                                "line_width": 1,
+                                "line_style": "solid",
+                            },
+                        }
+                    ],
                 },
             }
         ]
     )
+    request = (
+        "Track CALI QC: normal, width 28 mm.\n"
+        "On CALI QC: CALI -> CALI QC, linear 6..12, #111111, width 1."
+    )
+    context = _context_for_request(request)
     result = asyncio.run(
         CanonicalSectionWorker(backend=backend).compile(
             task_index=0,
-            context=_context(),
+            context=context,
             document=_document(),
-            authoritative_request="Add CALI from fixture.las.",
+            authoritative_request=request,
+            work_contract=_work_contract(context),
             timeout_seconds=10,
         )
     )
     assert result.success is True
     payload = json.loads(backend.requests[0].user_prompt)
     source = payload["section_context"]["sources"][0]
-    assert source["labels"] == ["fixture.las", "fixture"]
+    assert source["handle"] == "source-1"
+    assert source["name"] == "fixture.las"
+    assert "candidate_id" not in json.dumps(payload)
     assert "canonical_path" not in json.dumps(payload)
 
 
@@ -2410,127 +2466,74 @@ def test_canonical_section_worker_propagates_async_cancellation() -> None:
             del request, response_model
             raise asyncio.CancelledError
 
+    request = "Change Gamma Ray scale to linear 0..150."
+    context = _context_for_request(request)
     with pytest.raises(asyncio.CancelledError):
         asyncio.run(
             CanonicalSectionWorker(backend=CancellingBackend()).compile(
                 task_index=0,
-                context=_context(),
+                context=context,
                 document=_document(),
-                authoritative_request="Set the Gamma Ray scale to linear 0..150.",
+                authoritative_request=request,
+                work_contract=_work_contract(context),
                 timeout_seconds=10,
             )
         )
 
 
-def test_canonical_section_worker_retries_incomplete_reconstruction() -> None:
-    """One missing ordered binding is repaired under its exact compiled slot."""
-    base_context = _context()
+def test_incomplete_work_contract_response_fails_before_repair_call() -> None:
+    """A missing required binding is rejected before the RepairContract path."""
     request = (
-        "In the Main Log section.\nOn gamma: "
-        "GR -> Gamma Ray, linear 0..150, #111111, width 1; "
+        "Track Gamma Ray: normal, width 30 mm.\n"
+        "On Gamma Ray: GR -> Gamma Ray, linear 0..150, #111111, width 1; "
         "CALI -> Caliper, linear 0..20, #111111, width 1."
     )
-    task = base_context.plan.section_tasks[0].model_copy(
-        update={"obligations": extract_supported_obligations(request)}
-    )
-    context = base_context.model_copy(
-        update={"plan": base_context.plan.model_copy(update={"section_tasks": (task,)})}
-    )
+    context = _context_for_request(request)
     incomplete = {
-        "action": "reconstruct",
-        "section": {
-            "source_candidate": "source-1",
-            "title": "Main",
-            "tracks": [
+        "action": "add_track",
+        "track": {
+            "semantic_id": "gamma_ray",
+            "kind": "normal",
+            "title": "Gamma Ray",
+            "width_mm": 30,
+            "bindings": [
                 {
-                    "semantic_id": "gamma",
-                    "kind": "normal",
-                    "title": "Gamma Ray",
-                    "bindings": [{"semantic_id": "gr", "channel": "GR"}],
+                    "semantic_id": "gamma_ray.binding.1",
+                    "channel": "GR",
+                    "label": "Gamma Ray",
+                    "scale": {"kind": "linear", "minimum": 0, "maximum": 150},
+                    "style": {"color": "#111111", "line_width": 1, "line_style": "solid"},
                 }
             ],
         },
     }
-    complete = {
-        "action": "reconstruct",
-        "section": {
-            "source_candidate": "source-1",
-            "title": "Main Log",
-            "tracks": [
-                {
-                    "semantic_id": "gamma",
-                    "kind": "normal",
-                    "title": "Gamma Ray",
-                    "bindings": [
-                        {
-                            "semantic_id": "gr",
-                            "channel": "GR",
-                            "label": "Gamma Ray",
-                            "scale": {
-                                "kind": "linear",
-                                "minimum": 0,
-                                "maximum": 150,
-                                "reverse": False,
-                            },
-                            "style": {
-                                "color": "#111111",
-                                "line_width": 1,
-                                "line_style": "solid",
-                            },
-                        }
-                    ],
-                },
-            ],
-        },
-    }
-    complete["section"]["tracks"][0]["bindings"].append(
-        {
-            "semantic_id": "cali",
-            "channel": "CALI",
-            "label": "Caliper",
-            "scale": {"kind": "linear", "minimum": 0, "maximum": 20, "reverse": False},
-            "style": {"color": "#111111", "line_width": 1, "line_style": "solid"},
-        }
-    )
-    backend = _StructuredFixtureBackend([incomplete, complete])
+    backend = _StructuredFixtureBackend([incomplete, incomplete])
     result = asyncio.run(
         CanonicalSectionWorker(backend=backend).compile(
             task_index=0,
             context=context,
             document=_document(),
             authoritative_request=request,
+            work_contract=_work_contract(context),
             timeout_seconds=10,
         )
     )
-    assert result.success is True, result.diagnostics
-    assert len(backend.requests) == 2
-    correction = json.loads(backend.requests[1].user_prompt)["correction"]
-    host_baseline = correction["host_applied_candidate"]
-    canonical_baseline = json.dumps(
-        host_baseline, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    )
-    assert (
-        correction["repair_contract"]["baseline_sha256"]
-        == hashlib.sha256(canonical_baseline.encode()).hexdigest()
-    )
-    assert len(correction["repair_contract"]["operations"]) == 1
-    assert correction["repair_contract"]["operations"][0]["operation"] == "ADD"
-    assert result.intent_fragment is not None
-    assert [
-        binding.channel
-        for track in result.intent_fragment.sections[0].tracks
-        for binding in track.bindings
-    ] == ["GR", "CALI"]
+    assert result.success is False
+    assert result.diagnostics[0].code == "worker_contract_incomplete"
+    assert result.stage_evidence.normalization == "PASS"
+    assert len(backend.requests) == 1
 
 
 def test_canonical_section_worker_updates_existing_scale() -> None:
     """D1 existing-curve scale changes use a request-local handle."""
+    request = "Change Gamma Ray scale to linear 10..100."
     result = _run_section(
         {
             "action": "update_curve_scale",
             "target": {"handle": "curve-1"},
             "scale": {"kind": "linear", "minimum": 10, "maximum": 100},
-        }
+        },
+        request,
     )
     assert result.success is True
     assert result.intent_fragment is not None
@@ -2539,181 +2542,37 @@ def test_canonical_section_worker_updates_existing_scale() -> None:
     assert binding.scale.minimum == 10
 
 
-def test_canonical_section_worker_bounds_unauthorized_correction_scope() -> None:
-    """An invalid correction is reported without escaping as a harness exception."""
-    request = (
-        "In the Main Log section.\nOn gamma: "
-        "GR -> Gamma Ray, linear 0..150, #111111, width 1; "
-        "CALI -> Caliper, linear 0..20, #111111, width 1."
-    )
-    context = _context_for_request(request)
-    incomplete = {
-        "action": "reconstruct",
-        "section": {
-            "source_candidate": "source-1",
-            "title": "Main",
-            "tracks": [
-                {
-                    "semantic_id": "gamma",
-                    "kind": "normal",
-                    "title": "Gamma Ray",
-                    "bindings": [{"semantic_id": "gr", "channel": "GR"}],
-                }
-            ],
-        },
-    }
-    unauthorized_correction = {
-        "action": "reconstruct",
-        "section": {
-            "source_candidate": "source-1",
-            "title": "Main Log",
-            "tracks": [
-                {
-                    "semantic_id": "gamma",
-                    "kind": "normal",
-                    "title": "Gamma Ray",
-                    "bindings": [
-                        {
-                            "semantic_id": "gr",
-                            "channel": "GR",
-                            "label": "Gamma Ray",
-                            "scale": {
-                                "kind": "linear",
-                                "minimum": 0,
-                                "maximum": 150,
-                                "reverse": False,
-                            },
-                            "style": {
-                                "color": "#111111",
-                                "line_width": 1,
-                                "line_style": "solid",
-                            },
-                        }
-                    ],
-                },
-                {
-                    "semantic_id": "cali",
-                    "kind": "normal",
-                    "title": "Caliper",
-                    "bindings": [{"semantic_id": "cali", "channel": "CALI"}],
-                },
-            ],
-        },
-    }
-    result = asyncio.run(
-        CanonicalSectionWorker(
-            backend=_StructuredFixtureBackend([incomplete, unauthorized_correction])
-        ).compile(
-            task_index=0,
-            context=context,
-            document=_document(),
-            authoritative_request=request,
-            timeout_seconds=10,
-        )
-    )
-    assert result.success is False
-    assert result.diagnostics[0].code == "worker_correction_scope_violation"
-    assert result.stage_evidence.normalization == "PASS"
-    assert result.stage_evidence.worker_obligation == "FAIL"
-    assert result.stage_evidence.semantic_lowering == "NOT_REACHED"
-
-
-def test_repair_matrix_r23_r28_rejects_raw_sibling_change_before_overlay() -> None:
-    """Adding a missing binding cannot authorize a sibling width replacement."""
-    request = (
-        "In the Main Log section.\nTrack combo: normal, width 50 mm.\n\n"
-        "On gamma:\n"
-        'GR -> "Gamma Ray", linear 0..100, #111111, width 0.75.\n'
-        'GR -> "Gamma Ray", linear 0..10, #2563eb dashed, width 0.65.'
-    )
-    initial = {
-        "action": "reconstruct",
-        "section": {
-            "title": "Main Log",
-            "source_candidate": "source-1",
-            "tracks": [
-                {
-                    "semantic_id": "combo",
-                    "kind": "normal",
-                    "title": "Combo",
-                    "width_mm": 50,
-                    "bindings": [
-                        {
-                            "semantic_id": "combo-cali",
-                            "channel": "CALI",
-                            "label": "Caliper",
-                            "scale": {"minimum": 0, "maximum": 20},
-                        }
-                    ],
-                },
-                {
-                    "semantic_id": "gamma",
-                    "kind": "normal",
-                    "title": "Gamma Ray",
-                    "bindings": [
-                        {
-                            "semantic_id": "gamma-main",
-                            "channel": "GR",
-                            "label": "Gamma Ray",
-                            "scale": {"minimum": 0, "maximum": 100},
-                        }
-                    ],
-                },
-            ],
-        },
-    }
-    unauthorized_correction = json.loads(json.dumps(initial))
-    unauthorized_correction["section"]["tracks"][0]["width_mm"] = 60
-    unauthorized_correction["section"]["tracks"][1]["bindings"].append(
-        {
-            "semantic_id": "gamma-zoom",
-            "channel": "GR",
-            "label": "Gamma Ray",
-            "scale": {"kind": "linear", "minimum": 0, "maximum": 10, "reverse": False},
-            "style": {"color": "#2563eb", "line_width": 0.65, "line_style": "dashed"},
-        }
-    )
-    backend = _StructuredFixtureBackend([initial, unauthorized_correction])
-    result = asyncio.run(
-        CanonicalSectionWorker(backend=backend).compile(
-            task_index=0,
-            context=_context_for_request(request),
-            document=_document(),
-            authoritative_request=request,
-            timeout_seconds=10,
-        )
-    )
-    assert result.success is False
-    assert result.diagnostics[0].code == "worker_correction_scope_violation"
-    assert len(backend.requests) == 2
-    correction = json.loads(backend.requests[1].user_prompt)["correction"]
-    assert correction["host_applied_candidate"]["section"]["tracks"][0]["width_mm"] == 50
-    assert any(
-        operation["operation"] == "ADD" for operation in correction["repair_contract"]["operations"]
-    )
-
-
 def test_canonical_section_worker_creates_grounded_track_and_curve() -> None:
     """D2B creation resolves the CALI channel from inspected source context."""
+    request = (
+        "Track Caliper QC: normal, width 28 mm.\n"
+        "On Caliper QC: CALI -> Caliper QC, linear 6..12, #111111, width 1."
+    )
     result = _run_section(
         {
             "action": "add_track",
             "track": {
-                "semantic_id": "caliper-qc",
+                "semantic_id": "caliper_qc",
                 "kind": "normal",
                 "title": "Caliper QC",
                 "width_mm": 28,
                 "bindings": [
                     {
                         "kind": "curve",
-                        "semantic_id": "cali",
+                        "semantic_id": "caliper_qc.binding.1",
                         "channel": "CALI",
                         "label": "Caliper QC",
                         "scale": {"kind": "linear", "minimum": 6, "maximum": 12},
+                        "style": {
+                            "color": "#111111",
+                            "line_width": 1,
+                            "line_style": "solid",
+                        },
                     }
                 ],
             },
-        }
+        },
+        request,
     )
     assert result.success is True
     assert result.intent_fragment is not None
@@ -2724,6 +2583,7 @@ def test_canonical_section_worker_creates_grounded_track_and_curve() -> None:
 
 def test_canonical_section_worker_creates_grounded_fill() -> None:
     """D2C fill creation preserves the grounded parent binding identity."""
+    request = "Fill the Gamma Ray curve to lower limit using #f2e8a0 at 20% opacity."
     result = _run_section(
         {
             "action": "add_fill",
@@ -2731,11 +2591,12 @@ def test_canonical_section_worker_creates_grounded_fill() -> None:
             "fill": {
                 "kind": "to_lower_limit",
                 "semantic_id": "gr-fill",
-                "target_binding": "GR",
+                "target_binding": "curve-1",
                 "color": "#f2e8a0",
                 "alpha": 0.2,
             },
-        }
+        },
+        request,
     )
     assert result.success is True
     assert result.intent_fragment is not None
@@ -2745,21 +2606,15 @@ def test_canonical_section_worker_creates_grounded_fill() -> None:
 
 
 def test_canonical_section_worker_rejects_unavailable_channel_without_intent() -> None:
-    """D2D/D2E missing-channel semantics fail closed before reconciliation."""
-    result = _run_section(
-        {
-            "action": "add_track",
-            "track": {
-                "semantic_id": "nphi-qc",
-                "kind": "normal",
-                "title": "NPHI QC",
-                "bindings": [{"kind": "curve", "semantic_id": "nphi", "channel": "NPHI"}],
-            },
-        }
+    """Unavailable channels fail during deterministic contract projection."""
+    request = (
+        "Track NPHI QC: normal, width 28 mm.\n"
+        "On NPHI QC: NPHI -> NPHI QC, linear 0..1, #111111, width 1."
     )
-    assert result.success is False
-    assert result.intent_fragment is None
-    assert result.diagnostics[0].code == "channel_missing"
+    context = _context_for_request(request)
+    with pytest.raises(section_worker.SectionWorkContractError) as error:
+        _work_contract(context)
+    assert error.value.code == "section_work_channel_missing"
 
 
 def test_canonical_cbl_verifier_accepts_generated_artifact() -> None:

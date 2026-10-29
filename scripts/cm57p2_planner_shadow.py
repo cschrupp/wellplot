@@ -17,13 +17,13 @@ import os
 import re
 import subprocess
 from collections import Counter
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
-from scripts.cm56_post_r4_typed_shadow import production_source_summary
 from wellplot.agent.code_mode.planner import (
     PlannerSemanticFailure,
     SemanticPlan,
@@ -53,6 +53,23 @@ MAX_OUTPUT_TOKENS = 16384
 MAX_TOKENS_PARAMETER = "max_tokens"
 TIMEOUT_SECONDS = 900.0
 ATTEMPTS = 2
+
+
+def production_source_summary(case: Mapping[str, object]) -> dict[str, object]:
+    """Project the pre-enrichment source facts used by the canonical planner."""
+    return {
+        "version": "cm56r3.source-summary.v1",
+        "sources": [
+            {
+                "labels": list(source.get("labels", ())),
+                "channels": [],
+                "inspection_state": "not_inspected",
+            }
+            for source in case.get("sources", ())
+            if isinstance(source, dict)
+        ],
+    }
+
 
 EXPECTED_PROMPT_SHA256 = "5e7a0732af01e4b1f16b3ccf019c005ea2e9ba5c0e93e94870a56a261e2bca18"
 EXPECTED_PLANNER_SOURCE_SHA256 = "0189b290ef4f76bdd776fe2612c454809ff77725379def7d8c5a98d9ae165413"

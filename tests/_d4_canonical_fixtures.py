@@ -343,7 +343,7 @@ def _plan_for(request: str) -> SemanticPlan:
 def _section_response(request: str, payload: dict[str, Any]) -> dict[str, object]:
     """Return one canonical section action for a frozen request."""
     if request.startswith("Using CBL_Main.dlis"):
-        source = payload["section_context"]["sources"][0]["candidate_id"]
+        source = payload["section_work_contract"]["source_handle"]
         title = (
             "Main Pass"
             if payload["section_task"]["existing_section_hint"] == "Main Pass"

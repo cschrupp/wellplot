@@ -54,6 +54,11 @@ D5_RETIRED_SOURCE_PATHS = (
     "src/wellplot/authoring_program/validator.py",
 )
 
+RETIRED_SECTION_COMPILER_SYMBOLS = frozenset(
+    {"TypedSectionCompiler", "TypedSectionGenerationResult"}
+)
+EXECUTABLE_AUDIT_ROOTS = ("src", "scripts", "tests")
+
 
 def _module_path(repo_root: Path, module: str) -> Path | None:
     """Resolve one internal module name to a source path."""
@@ -148,6 +153,43 @@ def current_components(repo_root: Path = REPO_ROOT) -> dict[str, str]:
     return {relative: sha256_file(repo_root / relative) for relative in components}
 
 
+def retired_section_compiler_violations(repo_root: Path = REPO_ROOT) -> list[str]:
+    """Find executable references or alternate section-compiler definitions."""
+    violations: list[str] = []
+    for root_name in EXECUTABLE_AUDIT_ROOTS:
+        root = repo_root / root_name
+        if not root.exists():
+            continue
+        for path in sorted(root.rglob("*.py")):
+            relative = path.relative_to(repo_root).as_posix()
+            tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Name) and node.id in RETIRED_SECTION_COMPILER_SYMBOLS:
+                    violations.append(f"{relative}:{node.lineno}: retired symbol {node.id}")
+                elif (
+                    isinstance(node, ast.Attribute)
+                    and node.attr in RETIRED_SECTION_COMPILER_SYMBOLS
+                ):
+                    violations.append(f"{relative}:{node.lineno}: retired symbol {node.attr}")
+                elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                    for alias in node.names:
+                        if alias.name.rsplit(".", 1)[-1] in RETIRED_SECTION_COMPILER_SYMBOLS:
+                            violations.append(
+                                f"{relative}:{node.lineno}: retired import {alias.name}"
+                            )
+                elif isinstance(node, ast.ClassDef):
+                    normalized_name = node.name.casefold()
+                    if (
+                        "section" in normalized_name
+                        and "compiler" in normalized_name
+                        and not node.name.startswith("_")
+                    ):
+                        violations.append(
+                            f"{relative}:{node.lineno}: alternate section compiler {node.name}"
+                        )
+    return violations
+
+
 def build_manifest(repo_root: Path = REPO_ROOT) -> dict[str, Any]:
     """Build the deterministic successor manifest."""
     return {
@@ -165,6 +207,9 @@ def verify_manifest(repo_root: Path = REPO_ROOT) -> dict[str, Any]:
     expected = build_manifest(repo_root)
     if manifest != expected:
         raise RuntimeError("D5 production component attestation drifted.")
+    violations = retired_section_compiler_violations(repo_root)
+    if violations:
+        raise RuntimeError("Retired executable section compiler found: " + "; ".join(violations))
     return expected
 
 

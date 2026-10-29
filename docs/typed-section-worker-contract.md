@@ -1,17 +1,15 @@
 # Typed Section-Worker Contract
 
-> **Historical/transitional contract notice.** This document records the CM-54/55
-> typed-worker design lineage and is retained for provenance. It is **not** the
-> current production routing authority. Current production uses the shared
-> composition root and `CanonicalSectionWorker` under
-> [the active baseline](agent-code-mode-current-baseline.md). The dormant
-> `TypedSectionCompiler` / typed-draft implementation still present in
-> `typed_section_worker.py` is technical debt, not an authorized shadow route;
-> its removal or archival is tracked in [the backlog](backlog.md). Do not wire
-> it into production or use this historical document to reopen a parallel
-> section-worker path.
+> **Historical archive.** This document records the CM-54/55 typed-worker
+> design lineage and is retained only as provenance. `TypedSectionCompiler`
+> and its typed-draft architecture have been retired; the heterogeneous/shadow
+> worker architecture is neither executable nor authorized. Current authority
+> is the shared LangGraph workflow with `CanonicalSectionWorker`, deterministic
+> work contracts, validation, and lowering, as described in
+> [the active baseline](agent-code-mode-current-baseline.md). Nothing below
+> specifies an available or future production route.
 
-- **Status:** Implemented deterministic substrate; CM-56 validation pending
+- **Status:** Historical design; implementation retired
 - **Implementation:** CM-55/CM-55R complete (`34c6491`; implementation `c2173f7`); routing remains unchanged
 - **Design baseline:** `5c98ad1`
 - **Architecture authority:** [Code Mode architecture contract](agent-code-mode-architecture.md)
@@ -475,7 +473,7 @@ heterogeneous:
 
 ```text
 report task   -> ReportProgramCompiler
-section task  -> future TypedSectionCompiler
+section task  -> historical typed compiler (retired; not executable)
 ```
 
 Both produce section/report-local `AuthoringDocumentIntent` fragments for the

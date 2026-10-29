@@ -77,6 +77,8 @@ class CodeModeWorkerState(TypedDict, total=False):
     report_context: NotRequired[dict[str, Any]]
     section_task: NotRequired[dict[str, Any]]
     section_context: NotRequired[dict[str, Any]]
+    section_work_contract: NotRequired[dict[str, Any]]
+    section_work_contract_error: NotRequired[str]
     document: dict[str, Any]
     timeout_seconds: float
     temperature: float | None

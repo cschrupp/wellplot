@@ -37,6 +37,12 @@ from wellplot.agent.code_mode.canonical_workers import (
     SectionSemanticActionResponse as DeliverySectionResponse,
 )
 from wellplot.agent.code_mode.planner import SemanticPlan, _PlannerWirePlan
+from wellplot.agent.code_mode.semantic_actions import (
+    AddFillAction,
+    AddTrackAction,
+    ReconstructSectionAction,
+    UpdateCurveScaleAction,
+)
 from wellplot.agent.direct_notebook import DirectNotebookSession
 from wellplot.agent.providers.base import (
     ModelBackendProtocol,
@@ -339,7 +345,17 @@ class CountingBackend:
             _PlannerWirePlan: "planner",
             DeliveryReportResponse: "report_worker",
             DeliverySectionResponse: "section_worker",
+            ReconstructSectionAction: "section_worker",
+            AddTrackAction: "section_worker",
+            UpdateCurveScaleAction: "section_worker",
         }
+        if response_model in {
+            ReconstructSectionAction,
+            AddTrackAction,
+            UpdateCurveScaleAction,
+            AddFillAction,
+        }:
+            return "section_worker"
         try:
             return roles[response_model]
         except KeyError:
@@ -1439,7 +1455,11 @@ def _is_actionable_safe_diagnostic(code: str, message: str) -> bool:
     """Recognize only bounded diagnostics for deterministic safe rejection."""
     if code in {"enrichment.section_hint_ambiguous", "enrichment.source_missing"}:
         return True
-    if code in {"channel_missing", "typed.channel_missing"}:
+    if code in {
+        "channel_missing",
+        "typed.channel_missing",
+        "section_work_binding_missing",
+    }:
         return True
     return (
         code == "program.dry_run_error"

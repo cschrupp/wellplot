@@ -12,13 +12,16 @@ from langgraph.errors import NodeCancelledError
 
 from wellplot.agent.code_mode import workflow as workflow_module
 from wellplot.agent.code_mode.enrichment import (
+    ChannelContext,
     EnrichedSemanticContext,
     EnrichmentErrorCode,
     ReportContext,
     ResolvedSectionContext,
     SemanticEnrichmentError,
+    SourceContext,
 )
 from wellplot.agent.code_mode.facade import CodeModeCompileFacade
+from wellplot.agent.code_mode.obligations import ObligationState, compile_request_contract
 from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan
 from wellplot.agent.code_mode.state import WorkerOutcome
 from wellplot.agent.code_mode.workflow import (
@@ -36,6 +39,11 @@ from wellplot.authoring_program.models import (
 )
 from wellplot.model.authoring import AuthoringDocumentSpec
 from wellplot.model.intent import AuthoringDocumentIntent
+
+_SECTION_WORK_REQUEST = (
+    "Track Example: normal, width 25 mm.\n"
+    "On Example: GR -> Example, linear 0..150, #111111, width 1."
+)
 
 
 def _document() -> AuthoringDocumentSpec:
@@ -61,9 +69,17 @@ def _document() -> AuthoringDocumentSpec:
 
 
 def _section_contexts(plan: SemanticPlan) -> tuple[ResolvedSectionContext, ...]:
-    """Build one empty bounded context for each planned section."""
+    """Build bounded source context for each planned section."""
+    source = SourceContext(
+        candidate_id="source-1",
+        labels=("fixture.las",),
+        canonical_path="/fixture.las",
+        source_format="las",
+        channels=(ChannelContext(mnemonic="GR", kind="scalar", unit="gAPI"),),
+    )
     return tuple(
-        ResolvedSectionContext(task_index=index) for index, _task in enumerate(plan.section_tasks)
+        ResolvedSectionContext(task_index=index, sources=(source,))
+        for index, _task in enumerate(plan.section_tasks)
     )
 
 
@@ -103,7 +119,12 @@ class _Planner:
         self.summaries.append(kwargs["current_document_summary"])
         self.temperatures.append(kwargs["temperature"])
         self.source_summaries.append(kwargs["source_summary"])
-        return self.plan_value
+        obligations = compile_request_contract(str(kwargs["request"])).requirements.requirements
+        tasks = tuple(
+            task if task.obligations else task.model_copy(update={"obligations": obligations})
+            for task in self.plan_value.section_tasks
+        )
+        return self.plan_value.model_copy(update={"section_tasks": tasks})
 
 
 @dataclass
@@ -228,8 +249,14 @@ def _graph(
 
 def _state(plan: SemanticPlan) -> dict[str, object]:
     """Build JSON-safe graph input state."""
+    request_parts: list[str] = []
+    if plan.report_task is not None:
+        request_parts.append("Set the report title to Current report.")
+    if plan.section_tasks:
+        request_parts.append(_SECTION_WORK_REQUEST)
+    request = " ".join(request_parts)
     return {
-        "request": "compile the requested work",
+        "request": request,
         "mode": "reconstruct",
         "document": _document().model_dump(mode="json"),
         "source_candidates": [],
@@ -621,6 +648,31 @@ def test_graph_failure_is_atomic_and_keeps_bounded_diagnostics() -> None:
 
     assert result["merged_intent"] == {}
     assert json.loads(result["diagnostics"][0])["code"] == "program.dry_run_error"
+
+
+def test_invalid_section_work_contract_fails_before_worker_invocation() -> None:
+    """A deterministic dispatch-contract failure becomes bounded worker evidence."""
+    task = SectionTask(
+        goal="first section",
+        capability_ids=("section.log_plot",),
+        existing_section_hint=None,
+        obligations=tuple(
+            obligation.model_copy(update={"state": ObligationState.UNRESOLVED, "value": None})
+            for obligation in compile_request_contract(
+                _SECTION_WORK_REQUEST
+            ).requirements.requirements
+        ),
+    )
+    plan = SemanticPlan(summary="contract failure", section_tasks=(task,))
+    workers = _Workers()
+
+    result = _invoke(plan, workers)
+
+    assert workers.completion_order == []
+    outcome = json.loads(result["worker_outcomes"][0])
+    assert outcome["success"] is False
+    assert outcome["diagnostics"][0]["stage"] == "worker_obligation"
+    assert outcome["diagnostics"][0]["code"] == "section_work_contract_unresolved"
 
 
 def test_graph_rejects_duplicate_section_id_at_merge() -> None:

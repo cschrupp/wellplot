@@ -11,6 +11,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 import yaml
@@ -33,6 +34,7 @@ from wellplot.agent.code_mode.planner import (
     SemanticPlan,
     _PlannerWirePlan,
 )
+from wellplot.agent.code_mode.typed_section_worker import _ACTION_RESPONSE_MODELS
 from wellplot.agent.providers.base import (
     ProviderMetrics,
     StructuredGenerationRequest,
@@ -1643,8 +1645,8 @@ class _D4SessionSectionBackend:
         self,
         request: StructuredGenerationRequest,
         *,
-        response_model: type[SectionSemanticActionResponse],
-    ) -> StructuredGenerationResult[SectionSemanticActionResponse]:
+        response_model: type[Any],
+    ) -> StructuredGenerationResult[Any]:
         """Return one typed section response for the requested D4 turn."""
         payload = json.loads(request.user_prompt)
         requirement = str(payload["authoritative_request"])
@@ -1676,10 +1678,8 @@ class _D4SessionBackend:
             return await self.report.generate_structured(
                 request, response_model=ReportSemanticResponse
             )
-        if response_model is SectionSemanticActionResponse:
-            return await self.section.generate_structured(
-                request, response_model=SectionSemanticActionResponse
-            )
+        if response_model in set(_ACTION_RESPONSE_MODELS.values()):
+            return await self.section.generate_structured(request, response_model=response_model)
         raise AssertionError(f"unexpected D4 response model: {response_model!r}")
 
 
@@ -1838,7 +1838,7 @@ def test_observed_negative_outcomes_distinguish_safe_rejection_from_bad_output()
 
 
 def test_d4_l04_unavailable_requested_channel_is_a_safe_rejection() -> None:
-    """A sparse add-track source fact resolves before lowering rejects unavailable RT."""
+    """An unavailable requested channel fails its work contract without mutation."""
     with TemporaryDirectory(dir=REPO_ROOT) as temporary:
         root = Path(temporary)
         harness = _D4SessionHarness.create(root)
@@ -1849,7 +1849,7 @@ def test_d4_l04_unavailable_requested_channel_is_a_safe_rejection() -> None:
 
         actual = asyncio.run(harness.adapter.execute_turn(case, expected))
 
-        assert actual["worker_diagnostic_code"] == "channel_missing"
+        assert actual["worker_diagnostic_code"] == "section_work_binding_missing"
         assert actual["persisted"] is False
         assert actual["rendered"] is False
         assert actual["intent_applied"] is False

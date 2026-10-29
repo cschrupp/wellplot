@@ -41,6 +41,11 @@ from .planner import (
 from .report_boundary_safety import ReportBoundarySafetyFailure, enforce_report_boundary_safety
 from .section_leaf_safety import SectionLeafSafetyFailure, enforce_section_leaf_safety
 from .state import CodeModeGraphState, CodeModeWorkerState, WorkerOutcome
+from .worker_contracts import (
+    SectionWorkContract,
+    SectionWorkContractError,
+    build_section_work_contract,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,6 +235,27 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
                     safe_message="Enriched section context order does not match the plan.",
                 )
                 raise error
+            try:
+                work_contract = build_section_work_contract(task, section_context)
+            except SectionWorkContractError as error:
+                _trace(
+                    dependencies,
+                    "SECTION_WORK_CONTRACT_FAIL",
+                    code=error.code,
+                    plan_order=task_index + 1,
+                )
+                sends.append(
+                    Send(
+                        "compile_worker",
+                        _worker_payload(
+                            state,
+                            kind="section",
+                            plan_order=task_index + 1,
+                            section_work_contract_error=error.code,
+                        ),
+                    )
+                )
+                continue
             sends.append(
                 Send(
                     "compile_worker",
@@ -239,6 +265,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
                         plan_order=task_index + 1,
                         section_task=task.model_dump(mode="json"),
                         section_context=section_context.model_dump(mode="json"),
+                        section_work_contract=work_contract.model_dump(mode="json"),
                     ),
                 )
             )
@@ -261,6 +288,21 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
         worker_state = cast(CodeModeWorkerState, state)
         kind = worker_state["kind"]
         plan_order = worker_state["plan_order"]
+        contract_error = worker_state.get("section_work_contract_error")
+        if contract_error is not None:
+            outcome = WorkerOutcome(
+                kind="section",
+                plan_order=plan_order,
+                success=False,
+                diagnostics=(
+                    SemanticDiagnostic(
+                        stage="worker_obligation",
+                        code=contract_error,
+                        message="The section work contract could not be established.",
+                    ),
+                ),
+            )
+            return _outcome_state(outcome)
         document = AuthoringDocumentSpec.model_validate(worker_state["document"])
         try:
             if kind == "report":
@@ -278,12 +320,16 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
                 section_context = ResolvedSectionContext.model_validate(
                     worker_state["section_context"]
                 )
+                work_contract = SectionWorkContract.model_validate(
+                    worker_state["section_work_contract"]
+                )
                 isolated_context = _isolated_section_context(task, section_context)
                 result = await dependencies.section_compiler.compile(
                     task_index=0,
                     context=isolated_context,
                     document=document,
                     authoritative_request=worker_state["authoritative_request"],
+                    work_contract=work_contract,
                     timeout_seconds=worker_state["timeout_seconds"],
                     temperature=worker_state.get("temperature"),
                     max_output_tokens=worker_state.get("max_output_tokens"),
@@ -477,7 +523,7 @@ def _worker_payload(
     *,
     kind: str,
     plan_order: int,
-    **scoped: dict[str, Any],
+    **scoped: object,
 ) -> CodeModeWorkerState:
     """Build a JSON-safe Send payload with no full enriched context."""
     return cast(

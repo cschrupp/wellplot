@@ -519,35 +519,22 @@ but a fresh smoke on the exact accepted checkpoint is still required before it
 can satisfy any exact-checkpoint live prerequisite. This is engineering
 validation, not a scientific campaign.
 
-### Nonblocking technical debt
+### Historical typed compiler retirement
 
-The following debt is recorded explicitly and is **not** a blocker for the
-current binding-path repair or the next engineering smoke:
+`TypedSectionCompiler` and `TypedSectionGenerationResult` are retired. The
+canonical section path is the shared LangGraph workflow, its deterministic
+`SectionWorkContract` projection, `CanonicalSectionWorker`, and the existing
+validation/lowering/reconciliation path. Historical CM-54 through CM-57
+documents and immutable result records remain provenance only; their old
+shadow compiler is not an executable or authorized route.
 
-- `src/wellplot/agent/code_mode/typed_section_worker.py` still contains the
-  dormant historical `TypedSectionCompiler` / `TypedSectionGenerationResult`
-  typed-draft path. The canonical composition root does not instantiate it, and
-  no alternate production route was found, but its own docstring still refers
-  to "shadow compilation". Leaving an unused alternate compiler implementation
-  inside an allowed canonical module creates future re-wiring risk and should
-  be cleaned up after the current D5 critical path.
-- `docs/typed-section-worker-contract.md` still describes the older
-  transitional CM-54/55 architecture, including future/transitional compiler
-  language that no longer represents current production routing. It must be
-  treated as historical design evidence until reconciled or archived.
-- The D5 single-engine manifest/reachability audit is strong at the
-  module/import/entry-point level, but it does not mechanically prove that an
-  allowed canonical module contains no dormant alternate compiler class. A
-  later hardening pass should either remove the dormant compiler or add an
-  AST/source-level guard for prohibited alternate semantic compiler symbols.
-- The current one-correction-protocol regression intentionally uses source
-  inspection as a narrow guard. It is useful now, but refactor-sensitive; after
-  the dormant compiler cleanup, prefer a more semantic AST/call-graph invariant
-  or equivalent behaviorally anchored check.
-
-These items must not be used to justify a new fallback route, shadow engine, or
-parallel correction protocol. Cleanup is architectural hygiene only unless new
-runtime evidence makes one a demonstrated blocker.
+The provider-free cleanup candidate removes the dormant compiler and its
+shadow-specific executable consumers, migrates applicable invariants to
+canonical worker/work-contract tests, archives the old design language, and
+adds AST-based retirement checks to the D5 attestation. The candidate is
+awaiting independent review; it does not authorize live execution or alter
+scientific qualification status. The single-correction-path invariant remains
+unchanged.
 
 ## 10. Provenance Map
 

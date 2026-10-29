@@ -12,6 +12,7 @@ from pathlib import Path
 from d5_single_engine_attestation import (
     D5_RETIRED_SOURCE_PATHS,
     canonical_component_paths,
+    retired_section_compiler_violations,
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -83,6 +84,10 @@ def run_audit(repo_root: Path = REPO_ROOT) -> dict[str, object]:
     if retired:
         raise RuntimeError(f"Retired production sources remain: {retired!r}")
 
+    retired_compilers = retired_section_compiler_violations(repo_root)
+    if retired_compilers:
+        raise RuntimeError(f"Retired executable section compilers remain: {retired_compilers!r}")
+
     components = canonical_component_paths(repo_root)
     required_components = {
         "src/wellplot/agent/composition.py",
@@ -117,6 +122,7 @@ def run_audit(repo_root: Path = REPO_ROOT) -> dict[str, object]:
         "canonical_component_count": len(components),
         "canonical_components": list(components),
         "forbidden_modules_loaded": [],
+        "retired_section_compiler_violations": [],
         "source_violations": [],
         "status": "PASS",
     }

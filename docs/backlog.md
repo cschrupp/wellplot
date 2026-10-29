@@ -35,31 +35,13 @@ design/closeout commit; do not create a standalone blocking slice:
 
 ## Canonical Section-Worker Cleanup / Attestation Hardening
 
-Nonblocking architectural hygiene discovered during independent review of the
-accepted binding-path repair `e9c7d9ec414dbf5d0ea945bc61780e537a63e0d2`:
-
-- Remove or relocate the dormant historical `TypedSectionCompiler` and
-  `TypedSectionGenerationResult` path from
-  `src/wellplot/agent/code_mode/typed_section_worker.py` after proving there
-  are no required callers, exports, fixtures, or migration dependencies. Do not
-  wire it into the canonical composition while it remains.
-- Reconcile or archive `docs/typed-section-worker-contract.md`. Its CM-54/55
-  language describes a transitional future/heterogeneous worker architecture
-  and must not be mistaken for current routing authority.
-- Harden `scripts/check_d5_single_engine_reachability.py` (or a companion
-  check) so canon compliance can detect prohibited dormant alternate compiler
-  classes/symbols inside otherwise allowed canonical modules, not only
-  alternate modules/imports/entry points.
-- Replace the current source-string guard for "one model-backed correction
-  protocol" with an AST/call-graph or equivalently semantic invariant when the
-  cleanup is undertaken, while preserving the behavioral one-call fail-closed
-  regression for grounding failures.
-
-This cleanup is deliberately **outside the current D5 critical path**. The
-accepted runtime remains the shared composition root with one
-`CanonicalSectionWorker` and one `RepairContract` correction protocol. Promote
-this backlog item only if the dormant code becomes reachable, causes ambiguity
-in active maintenance, or the current qualification work closes.
+The provider-free implementation tranche is complete as candidate work and is
+pending independent review. It retires the dormant `TypedSectionCompiler` /
+`TypedSectionGenerationResult` implementation and its shadow-specific
+executable consumers, preserves applicable invariants on the canonical worker
+path, archives the historical contract wording, and adds AST-based retirement
+checks. This backlog item closes only after independent review accepts the
+candidate; no live smoke or scientific execution is implied.
 
 ## Legacy Roadmap / Release-Wording Reconciliation
 

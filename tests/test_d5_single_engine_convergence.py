@@ -137,6 +137,30 @@ def test_package_relative_imports_use_package_aware_closure() -> None:
     } <= discovered
 
 
+def test_attestation_rejects_executable_retired_compiler_and_alternate_class(
+    tmp_path: Path,
+) -> None:
+    """AST retirement checks reject code while ignoring prose references."""
+    attestation = _attestation_module()
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "history.md").write_text(
+        "Historical note: TypedSectionCompiler was retired.\n", encoding="utf-8"
+    )
+    script = tmp_path / "scripts" / "candidate.py"
+    script.write_text(
+        "from archive import TypedSectionCompiler\nclass AlternateSectionCompiler:\n    pass\n",
+        encoding="utf-8",
+    )
+
+    violations = attestation.retired_section_compiler_violations(tmp_path)
+
+    assert any("TypedSectionCompiler" in violation for violation in violations)
+    assert any("AlternateSectionCompiler" in violation for violation in violations)
+    script.write_text("# TypedSectionCompiler was used in historical evidence.\n", encoding="utf-8")
+    assert attestation.retired_section_compiler_violations(tmp_path) == []
+
+
 def test_relative_import_resolution_covers_package_and_module_cases() -> None:
     """Relative imports resolve correctly for packages and ordinary modules."""
     attestation = _attestation_module()
