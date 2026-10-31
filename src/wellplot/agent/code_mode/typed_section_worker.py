@@ -7,7 +7,8 @@ import json
 import re
 from collections import Counter
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from typing import Literal
 
 from pydantic import TypeAdapter, ValidationError
 
@@ -215,24 +216,115 @@ _ORDINAL_CURVE_REQUIREMENT_RE = re.compile(
 )
 
 
+class SectionActionEvidenceError(RuntimeError):
+    """An explicitly requested diagnostic observation could not be retained."""
+
+    def __init__(self, original: SectionWorkContractError | None = None) -> None:
+        self.original = original
+        super().__init__("Section action evidence could not be retained.")
+
+
 @dataclass(frozen=True, slots=True)
 class CanonicalSectionWorker:
     """Generate and lower the one canonical section action contract."""
 
     backend: ModelBackendProtocol
     action_observer: Callable[[Mapping[str, object]], None] | None = None
+    action_capture_mode: Literal["off", "diagnostics", "validated_dto"] = "off"
 
-    def _observe_action(self, action: SectionSemanticAction, attempt: int) -> None:
+    def _observe_action(
+        self,
+        action: SectionSemanticAction,
+        attempt: int,
+        *,
+        common: Mapping[str, object] | None = None,
+    ) -> None:
         """Expose an opt-in copy of a schema-validated proposal for diagnostics."""
         if self.action_observer is None:
             return
-        self.action_observer(
-            {
-                "event": "SECTION_ACTION_VALIDATED",
+        if self.action_capture_mode == "off":
+            self.action_observer(
+                {
+                    "event": "SECTION_ACTION_VALIDATED",
+                    "attempt": attempt,
+                    "action": action.model_dump(mode="json", exclude_unset=True),
+                }
+            )
+        else:
+            self.action_observer({**(common or {}), "event": "SECTION_ACTION_VALIDATED"})
+
+    def _validate_observed_action(
+        self,
+        action: SectionSemanticAction,
+        contract: SectionWorkContract,
+        *,
+        task_index: int,
+        attempt: int,
+        logical_call_index: int | None,
+    ) -> SectionWorkContractError | None:
+        """Observe schema-valid actions before applying the unchanged contract check."""
+        enabled = self.action_capture_mode != "off"
+        if self.action_capture_mode not in {"off", "diagnostics", "validated_dto"}:
+            raise SectionActionEvidenceError()
+        common: dict[str, object] = {}
+        if enabled:
+            if self.action_observer is None or logical_call_index is None:
+                raise SectionActionEvidenceError()
+            dto = action.model_dump(mode="json", exclude_unset=True)
+            encoded = json.dumps(
+                dto, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+            ).encode()
+            common = {
+                "event_version": "wellplot.section-action-observation.v1",
+                "worker_role": "section_worker",
+                "task_index": task_index,
                 "attempt": attempt,
-                "action": action.model_dump(mode="json", exclude_unset=True),
+                "logical_call_index": logical_call_index,
+                "response_schema": type(action).__name__,
+                "dto_sha256": hashlib.sha256(encoded).hexdigest(),
+                "dto_size_bytes": len(encoded),
             }
-        )
+            event = {
+                **common,
+                "event": "SECTION_ACTION_SCHEMA_VALIDATED",
+                "capture_state": "complete"
+                if self.action_capture_mode == "validated_dto"
+                else "metadata_only",
+                "contract_outcome": "NOT_EVALUATED",
+            }
+            if self.action_capture_mode == "validated_dto":
+                event["action"] = dto
+            try:
+                self.action_observer(event)
+            except Exception:
+                raise SectionActionEvidenceError() from None
+        error: SectionWorkContractError | None = None
+        try:
+            validate_section_action_contract(action, contract)
+        except SectionWorkContractError as caught:
+            error = caught
+        if enabled:
+            assert self.action_observer is not None
+            try:
+                self.action_observer(
+                    {
+                        **common,
+                        "event": "SECTION_ACTION_CONTRACT_RESULT",
+                        "contract_outcome": "FAIL" if error is not None else "PASS",
+                        "diagnostic_code": error.code if error is not None else None,
+                        "mismatch": error.details if error is not None else None,
+                    }
+                )
+            except Exception:
+                raise SectionActionEvidenceError(error) from None
+        if error is None:
+            try:
+                self._observe_action(action, attempt, common=common)
+            except Exception:
+                if enabled:
+                    raise SectionActionEvidenceError() from None
+                raise
+        return error
 
     async def compile(
         self,
@@ -295,15 +387,22 @@ class CanonicalSectionWorker:
             generated.value
         )
         try:
-            validate_section_action_contract(raw_action, work_contract)
-        except SectionWorkContractError as error:
+            error = self._validate_observed_action(
+                raw_action,
+                work_contract,
+                task_index=task_index,
+                attempt=1,
+                logical_call_index=getattr(generated, "logical_call_index", None),
+            )
+        except SectionActionEvidenceError as evidence_error:
+            return _action_evidence_failure(evidence_error)
+        if error is not None:
             return _canonical_failure(
                 error.code,
                 "Section response did not satisfy the deterministic work contract.",
                 normalization="PASS",
                 worker_obligation="FAIL",
             )
-        self._observe_action(raw_action, attempt=1)
         correction_contract: RepairContract | None = None
         correction_baseline: SectionSemanticAction | None = None
         object_bindings: SectionObjectBindings | None = None
@@ -487,8 +586,16 @@ class CanonicalSectionWorker:
                     )
                 raw_action = TypeAdapter(SectionSemanticAction).validate_python(corrected.value)
                 try:
-                    validate_section_action_contract(raw_action, work_contract)
-                except SectionWorkContractError as error:
+                    error = self._validate_observed_action(
+                        raw_action,
+                        work_contract,
+                        task_index=task_index,
+                        attempt=2,
+                        logical_call_index=getattr(corrected, "logical_call_index", None),
+                    )
+                except SectionActionEvidenceError as evidence_error:
+                    return _action_evidence_failure(evidence_error, correction="FAIL")
+                if error is not None:
                     return _canonical_failure(
                         error.code,
                         "Corrected response did not satisfy the deterministic work contract.",
@@ -496,7 +603,6 @@ class CanonicalSectionWorker:
                         worker_obligation="FAIL",
                         correction="FAIL",
                     )
-                self._observe_action(raw_action, attempt=2)
                 continue
             except ValueError:
                 return _canonical_failure(
@@ -1041,6 +1147,30 @@ def _canonical_failure(
             worker_obligation=worker_obligation,
             semantic_lowering=semantic_lowering,
             correction=correction,
+        ),
+    )
+
+
+def _action_evidence_failure(
+    error: SectionActionEvidenceError, *, correction: str = "NOT_REACHED"
+) -> CanonicalWorkerResult:
+    """Fail closed without discarding an already known contract rejection."""
+    result = _canonical_failure(
+        "worker_evidence_integrity_failure",
+        "Section action evidence could not be retained safely.",
+        correction=correction,
+    )
+    if error.original is None:
+        return result
+    return replace(
+        result,
+        diagnostics=result.diagnostics
+        + (
+            SemanticDiagnostic(
+                stage="semantic_worker",
+                code=error.original.code,
+                message="Section response did not satisfy the deterministic work contract.",
+            ),
         ),
     )
 

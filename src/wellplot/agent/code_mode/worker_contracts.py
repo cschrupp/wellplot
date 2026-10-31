@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from typing import Literal
@@ -18,10 +19,50 @@ from .planner import SectionTask
 class SectionWorkContractError(ValueError):
     """Deterministic failure while projecting authoritative section work."""
 
-    def __init__(self, code: str, message: str) -> None:
+    def __init__(
+        self, code: str, message: str, *, details: dict[str, object] | None = None
+    ) -> None:
         """Initialize the stable diagnostic code and safe message."""
         self.code = code
+        self.details = details
         super().__init__(message)
+
+
+def _handle_mismatch_details(
+    classification: str,
+    expected: list[str],
+    actual: list[str],
+    *,
+    owners: dict[str, str] | None = None,
+) -> dict[str, object]:
+    """Bound untrusted handle evidence to counts and stable digests."""
+
+    def digest(value: str) -> str:
+        return hashlib.sha256(value.encode("utf-8", errors="surrogatepass")).hexdigest()
+
+    missing = sorted(set(expected) - set(actual))
+    unexpected = sorted(set(actual) - set(expected))
+    limit = 32
+    result: dict[str, object] = {
+        "stage": "section_work_contract",
+        "classification": classification,
+        "expected_count": len(expected),
+        "actual_count": len(actual),
+        "missing_count": len(missing),
+        "unexpected_count": len(unexpected),
+        "missing_handle_sha256": [digest(item) for item in missing[:limit]],
+        "unexpected_handle_sha256": [digest(item) for item in unexpected[:limit]],
+        "handles_truncated": len(missing) > limit or len(unexpected) > limit,
+    }
+    if owners is None:
+        result["binding_validation"] = "NOT_EVALUATED"
+    else:
+        result["expected_ownership_sha256"] = [
+            {"binding": digest(handle), "track": digest(owners[handle])}
+            for handle in sorted(owners)[:limit]
+        ]
+        result["ownership_truncated"] = len(owners) > limit
+    return result
 
 
 class SectionWorkTarget(BaseModel):
@@ -657,7 +698,11 @@ def validate_section_action_contract(action: object, contract: SectionWorkContra
     actual_handles = [track.semantic_id for track in tracks]
     if len(actual_handles) != len(expected_tracks) or set(actual_handles) != set(expected_tracks):
         raise SectionWorkContractError(
-            "worker_contract_incomplete", "Section response omitted or added required tracks."
+            "worker_contract_incomplete",
+            "Section response omitted or added required tracks.",
+            details=_handle_mismatch_details(
+                "TRACK_HANDLE_SET_MISMATCH", list(expected_tracks), actual_handles
+            ),
         )
     expected_bindings = {binding.handle: binding for binding in contract.required_bindings}
     actual_bindings: dict[str, tuple[str, object]] = {}
@@ -704,7 +749,16 @@ def validate_section_action_contract(action: object, contract: SectionWorkContra
             actual_bindings[binding.semantic_id] = (track.semantic_id, binding)
     if set(actual_bindings) != set(expected_bindings):
         raise SectionWorkContractError(
-            "worker_contract_incomplete", "Section response omitted or added required bindings."
+            "worker_contract_incomplete",
+            "Section response omitted or added required bindings.",
+            details=_handle_mismatch_details(
+                "BINDING_HANDLE_SET_MISMATCH",
+                list(expected_bindings),
+                list(actual_bindings),
+                owners={
+                    handle: binding.track_handle for handle, binding in expected_bindings.items()
+                },
+            ),
         )
     for handle, expected in expected_bindings.items():
         track_handle, actual = actual_bindings[handle]

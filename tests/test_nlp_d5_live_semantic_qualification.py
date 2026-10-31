@@ -3314,7 +3314,9 @@ def test_binding_smoke_wires_canonical_calls_and_bounded_model_io(tmp_path: Path
     assert terminal["logical_calls_by_role"] == {"planner": 1, "section_worker": 1}
     assert paths.section_actions.name in terminal["observability_artifacts"]
     section_action = json.loads(paths.section_actions.read_text().splitlines()[0])
-    assert section_action["action"]["track"]["bindings"][0]["channel"] == "GR_STGC"
+    assert section_action["event"] == "SECTION_ACTION_VALIDATED"
+    assert "action" not in section_action
+    assert "GR_STGC" not in paths.section_actions.read_text()
 
     model_io = paths.model_io.read_text(encoding="utf-8")
     assert '"request_sha256"' in model_io

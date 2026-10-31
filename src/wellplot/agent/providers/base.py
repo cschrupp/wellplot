@@ -67,6 +67,7 @@ class StructuredGenerationResult(Generic[TModel]):
 
     value: TModel
     metrics: ProviderMetrics
+    logical_call_index: int | None = None
 
 
 class ProviderFailureCategory(StrEnum):
@@ -153,6 +154,7 @@ class ModelBackendProtocol(Protocol):
         response_model: type[TModel],
     ) -> StructuredGenerationResult[TModel]:
         """Return a response validated as the supplied Pydantic model."""
+
 
 def _require_text(value: object, field_name: str) -> None:
     """Require one non-empty string without retaining provider payloads."""

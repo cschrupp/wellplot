@@ -15,7 +15,10 @@ from wellplot.agent.code_mode.enrichment import (
     ResolvedSectionContext,
     SourceContext,
 )
-from wellplot.agent.code_mode.obligations import compile_request_contract
+from wellplot.agent.code_mode.obligations import (
+    compile_request_contract,
+    validate_section_obligations,
+)
 from wellplot.agent.code_mode.planner import SectionTask
 from wellplot.agent.code_mode.semantic_actions import (
     SectionSemanticAction,
@@ -26,6 +29,8 @@ from wellplot.agent.code_mode.typed_section_worker import (
     _SECTION_ACTION_EXAMPLES,
     _bind_compiled_source,
     _section_action_example,
+    apply_compiled_requirements,
+    resolve_section_object_bindings,
 )
 from wellplot.agent.code_mode.worker_contracts import (
     SectionWorkContract,
@@ -35,7 +40,9 @@ from wellplot.agent.code_mode.worker_contracts import (
 )
 from wellplot.agent.providers.base import StructuredGenerationRequest
 from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
+from wellplot.authoring_executor import AuthoringExecutor
 from wellplot.authoring_reconciler import reconcile_authoring
+from wellplot.authoring_service import AuthoringService
 from wellplot.model.authoring import AuthoringDocumentSpec
 
 
@@ -474,8 +481,8 @@ def test_action_schema_is_the_schema_sent_by_existing_openai_compat_adapter(
     assert response_format["json_schema"]["schema"] == model.model_json_schema()
 
 
-def test_reconstruct_reconciliation_preserves_unrequested_existing_depth_track() -> None:
-    """Sparse reconstruction adds requested tracks without deleting Depth."""
+def test_reconstruct_execution_preserves_all_unrequested_existing_tracks() -> None:
+    """Two requested tracks execute while six existing tracks and report fields survive."""
     request = _smoke_request()
     compilation = compile_request_contract(request)
     task = SectionTask(
@@ -493,9 +500,22 @@ def test_reconstruct_reconciliation_preserves_unrequested_existing_depth_track()
         context,
         work_contract=contract,
     )
+    object_bindings = resolve_section_object_bindings(grounded, task.obligations)
+    grounded = apply_compiled_requirements(
+        grounded, task.obligations, object_bindings=object_bindings
+    )
+    validate_section_obligations(
+        grounded,
+        task.obligations,
+        section_context=context,
+        section_title="Main Log",
+        object_bindings=object_bindings,
+    )
     document = AuthoringDocumentSpec.model_validate(
         {
             "name": "binding-smoke-preservation",
+            "title": "Existing report",
+            "subtitle": "Preserve report metadata",
             "sections": [
                 {
                     "id": "main",
@@ -517,9 +537,26 @@ def test_reconstruct_reconciliation_preserves_unrequested_existing_depth_track()
                                     "channel": "DEPT",
                                 }
                             ],
-                        }
+                        },
+                        *[
+                            {"id": track_id, "kind": "normal", "title": title, "width_mm": 28}
+                            for track_id, title in (
+                                ("cbl", "CBL"),
+                                ("vdl", "VDL"),
+                                ("gr", "GR"),
+                                ("cali", "CALI"),
+                                ("rt", "RT"),
+                            )
+                        ],
                     ],
-                }
+                },
+                {
+                    "id": "other",
+                    "title": "Unrelated Section",
+                    "tracks": [
+                        {"id": "other-track", "kind": "normal", "title": "Other", "width_mm": 19}
+                    ],
+                },
             ],
         }
     )
@@ -536,3 +573,38 @@ def test_reconstruct_reconciliation_preserves_unrequested_existing_depth_track()
         for operation in plan.operations
     )
     assert all(operation.action.value != "remove" for operation in plan.operations)
+    result = AuthoringExecutor(AuthoringService(document)).execute(plan)
+    assert result.success, result.errors
+    before = document.model_dump(mode="json")
+    after = result.document.model_dump(mode="json")
+    assert {key: value for key, value in before.items() if key != "sections"} == {
+        key: value for key, value in after.items() if key != "sections"
+    }
+    before_section = before["sections"][0]
+    after_section = after["sections"][0]
+    assert before["sections"][1:] == after["sections"][1:]
+    assert {key: value for key, value in before_section.items() if key != "tracks"} == {
+        key: value for key, value in after_section.items() if key != "tracks"
+    }
+    after_tracks = {track["id"]: track for track in after_section["tracks"]}
+    assert all(after_tracks[track["id"]] == track for track in before_section["tracks"])
+    added = {
+        track["title"]: track
+        for track in after_section["tracks"]
+        if track["id"] not in {item["id"] for item in before_section["tracks"]}
+    }
+    assert set(added) == {"Bond Index", "Gamma Ray"}
+    for title, channel, width, maximum, color in (
+        ("Bond Index", "BI", 34, 1, "#111111"),
+        ("Gamma Ray", "GR_STGC", 26, 150, "#16a34a"),
+    ):
+        track = added[title]
+        assert track["width_mm"] == width
+        assert len(track["bindings"]) == 1
+        binding = track["bindings"][0]
+        assert binding["channel"] == channel
+        assert binding["scale"]["kind"] == "linear"
+        assert binding["scale"]["minimum"] == 0
+        assert binding["scale"]["maximum"] == maximum
+        assert binding["style"]["color"] == color
+        assert binding["style"]["line_width"] == 0.8

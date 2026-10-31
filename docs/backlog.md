@@ -99,3 +99,11 @@ explicitly requested, but does not yet compile the fill relation (for example,
 `to_lower_limit`) into the deterministic contract. Keep this as a known
 semantic-contract gap; do not claim fill relation is fully request-compiled
 until a bounded provider-free implementation and regression are accepted.
+
+## Section Action Observability
+
+D5-WORKER-OBS-01 is an implementation candidate pending independent review.
+The previous binding-smoke response remains unavailable; do not reinterpret
+its sealed terminal or treat the candidate as a live qualification. The
+controlled-capture policy and 30-day authorized-deletion procedure are recorded
+in `docs/architecture/D5_WORKER_ACTION_OBSERVABILITY.md`.

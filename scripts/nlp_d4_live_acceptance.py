@@ -23,9 +23,9 @@ import urllib.request
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from contextvars import ContextVar
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from pydantic import ValidationError
@@ -327,6 +327,7 @@ class CountingBackend:
     prompt_guard: Callable[[str], None] | None = None
     calls: list[LogicalCall] = field(default_factory=list)
     ledger: LogicalCallLedger | None = None
+    capture_logical_identity: bool = False
 
     def __post_init__(self) -> None:
         """Give standalone wrappers a ledger while allowing campaign sharing."""
@@ -582,7 +583,9 @@ class CountingBackend:
             metrics=result.metrics,
             diagnostic=None,
         )
-        return result
+        return (
+            replace(result, logical_call_index=index) if self.capture_logical_identity else result
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -1654,6 +1657,7 @@ def build_notebook_session(
     trace_callback: Callable[[Mapping[str, Any]], None] | None = None,
     compile_result_callback: Callable[[Any], None] | None = None,
     section_action_callback: Callable[[Mapping[str, object]], None] | None = None,
+    section_action_capture_mode: Literal["off", "diagnostics", "validated_dto"] = "off",
 ) -> DirectNotebookSession:
     """Compose the unchanged production notebook graph around one backend."""
     from wellplot.agent.composition import create_canonical_compile_facade
@@ -1668,6 +1672,7 @@ def build_notebook_session(
                 trace_callback=trace_callback,
                 result_callback=compile_result_callback,
                 section_action_callback=section_action_callback,
+                section_action_capture_mode=section_action_capture_mode,
             ),
             config=AgentSessionConfig(timeout_seconds=timeout),
         ),

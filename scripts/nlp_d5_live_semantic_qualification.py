@@ -16,6 +16,8 @@ import importlib.metadata
 import inspect
 import json
 import os
+import re
+import stat
 import subprocess
 import sys
 import time
@@ -24,6 +26,7 @@ import urllib.request
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
@@ -291,6 +294,7 @@ class D5Authorization:
     sdk_version: str = EXPECTED_OPENAI_VERSION
     sdk_max_retries: int = EXPECTED_SDK_MAX_RETRIES
     artifact_root: str = "workspace/evaluations/d5-4-live-qualification"
+    section_action_capture_mode: Literal["off", "diagnostics", "validated_dto"] = "off"
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> D5Authorization:
@@ -322,6 +326,13 @@ class D5Authorization:
         digest = value["thinking_control_options_sha256"]
         if digest != THINKING_CONTROL_OPTIONS_SHA256:
             raise D5StaticPreflightError("thinking-off request control digest drifted")
+        capture_mode = value.get("section_action_capture_mode", "off")
+        if not isinstance(capture_mode, str) or capture_mode not in {
+            "off",
+            "diagnostics",
+            "validated_dto",
+        }:
+            raise D5StaticPreflightError("invalid section action capture mode")
         return cls(
             implementation_checkpoint=str(value["implementation_checkpoint"]),
             authorization_id=str(value["authorization_id"]),
@@ -363,6 +374,7 @@ class D5Authorization:
             artifact_root=str(
                 value.get("artifact_root", "workspace/evaluations/d5-4-live-qualification")
             ),
+            section_action_capture_mode=capture_mode,
         )
 
 
@@ -652,6 +664,10 @@ def _default_smoke_static_checks(
         raise D5StaticPreflightError("project configuration fingerprint mismatch")
     if authorization.provider != EXPECTED_PROVIDER or authorization.model != EXPECTED_MODEL:
         raise D5StaticPreflightError("provider/model contract drifted")
+    if not isinstance(authorization.section_action_capture_mode, str) or (
+        authorization.section_action_capture_mode not in {"off", "diagnostics", "validated_dto"}
+    ):
+        raise D5StaticPreflightError("invalid section action capture mode")
     if authorization.sdk_version != EXPECTED_OPENAI_VERSION:
         raise D5StaticPreflightError("OpenAI package contract drifted")
     if authorization.sdk_max_retries != EXPECTED_SDK_MAX_RETRIES:
@@ -760,6 +776,16 @@ class EvidencePaths:
         return self.root / f"{self.campaign_id}.section-actions.jsonl"
 
     @property
+    def validated_section_dtos(self) -> Path:
+        """Return the private, independently expirable DTO directory."""
+        return self.root / f"{self.campaign_id}.validated-section-dtos"
+
+    @property
+    def dto_deletion_receipt(self) -> Path:
+        """Return the separate authorization receipt for expired DTO deletion."""
+        return self.root / f"{self.campaign_id}.dto-deletion.json"
+
+    @property
     def stage_trace(self) -> Path:
         """Return pre-dispatch and planner stage transitions, one per line."""
         return self.root / f"{self.campaign_id}.stage-trace.jsonl"
@@ -788,6 +814,8 @@ class EvidencePaths:
             self.request_compilation,
             self.planner_context,
             self.section_actions,
+            self.validated_section_dtos,
+            self.dto_deletion_receipt,
             self.stage_trace,
             self.binding_request,
             self.binding_request_compilation,
@@ -894,6 +922,8 @@ class D5SmokeCustody:
         binding_input_preflighted: bool = False,
     ) -> D5SmokeCustody:
         """Create smoke custody only after static checks and readiness pass."""
+        if authorization.section_action_capture_mode != "off":
+            _prepare_private_campaign_root(paths.root)
         ensure_fresh_namespace(
             paths,
             existing_allowed=(
@@ -929,6 +959,9 @@ class D5SmokeCustody:
         }
         if ledger.mode == "binding_compile":
             state["logical_calls_by_role"] = {}
+            if authorization.section_action_capture_mode != "off":
+                state["section_action_capture_mode"] = authorization.section_action_capture_mode
+                state["validated_dto_retention_days"] = 30
         if not evidence_is_redacted(state):
             raise D5HarnessError("smoke state redaction failure")
         _atomic_json(paths.state, state, exclusive=True)
@@ -964,6 +997,8 @@ class D5SmokeCustody:
         smoke_kind: str | None = None,
     ) -> D5SmokeCustody:
         """Create durable pre-smoke evidence without asserting smoke started."""
+        if authorization.section_action_capture_mode != "off":
+            _prepare_private_campaign_root(paths.root)
         ensure_fresh_namespace(
             paths,
             existing_allowed=(
@@ -1077,6 +1112,10 @@ class D5SmokeCustody:
 
     def record_section_action(self, event: Mapping[str, Any]) -> None:
         """Persist one bounded, schema-validated worker action DTO."""
+        mode = self.authorization.section_action_capture_mode
+        if mode != "off":
+            self._record_section_action_observation(event, mode=mode)
+            return
         action = event.get("action")
         if not isinstance(action, Mapping):
             raise D5HarnessError("validated section action is not an object")
@@ -1084,7 +1123,6 @@ class D5SmokeCustody:
             "event": "SECTION_ACTION_VALIDATED",
             "attempt": event.get("attempt"),
             "response_schema": "SectionSemanticActionResponse",
-            "action": dict(action),
         }
         encoded = json.dumps(row, sort_keys=True, separators=(",", ":"))
         if len(encoded.encode("utf-8")) > MAX_SECTION_ACTION_EVIDENCE_BYTES:
@@ -1093,6 +1131,154 @@ class D5SmokeCustody:
             raise D5HarnessError("validated section action redaction failure")
         with self.paths.section_actions.open("a", encoding="utf-8") as handle:
             handle.write(encoded + "\n")
+
+    def _record_section_action_observation(self, event: Mapping[str, Any], *, mode: str) -> None:
+        """Retain opt-in metadata and, when authorized, one complete screened DTO."""
+        name = event.get("event")
+        created_dto: Path | None = None
+        if name in {
+            "SECTION_ACTION_SCHEMA_VALIDATED",
+            "SECTION_ACTION_CONTRACT_RESULT",
+            "SECTION_ACTION_VALIDATED",
+        }:
+            allowed = {
+                "event",
+                "event_version",
+                "worker_role",
+                "task_index",
+                "attempt",
+                "logical_call_index",
+                "response_schema",
+                "dto_sha256",
+                "dto_size_bytes",
+                "capture_state",
+                "contract_outcome",
+                "diagnostic_code",
+                "mismatch",
+            }
+            row = {key: value for key, value in event.items() if key in allowed}
+            index = row.get("logical_call_index")
+            if (
+                not isinstance(index, int)
+                or isinstance(index, bool)
+                or self.ledger.roles_by_index.get(index) != "section_worker"
+            ):
+                raise D5HarnessError("section observation call identity mismatch")
+            if row.get("worker_role") != "section_worker" or row.get("attempt") not in {1, 2}:
+                raise D5HarnessError("section observation identity is invalid")
+            if (
+                not isinstance(row.get("task_index"), int)
+                or isinstance(row["task_index"], bool)
+                or row["task_index"] < 0
+            ):
+                raise D5HarnessError("section observation task identity is invalid")
+            if row.get("event_version") != "wellplot.section-action-observation.v1":
+                raise D5HarnessError("section observation version is invalid")
+            if row.get("response_schema") not in {
+                "ReconstructSectionAction",
+                "AddTrackAction",
+                "UpdateCurveScaleAction",
+                "AddFillAction",
+            }:
+                raise D5HarnessError("section observation schema is invalid")
+            if not isinstance(row.get("dto_size_bytes"), int) or row["dto_size_bytes"] < 0:
+                raise D5HarnessError("section observation size is invalid")
+            if not isinstance(row.get("dto_sha256"), str) or not re.fullmatch(
+                r"[0-9a-f]{64}", row["dto_sha256"]
+            ):
+                raise D5HarnessError("section observation digest is invalid")
+            if name == "SECTION_ACTION_SCHEMA_VALIDATED":
+                expected_state = "complete" if mode == "validated_dto" else "metadata_only"
+                if (
+                    row.get("capture_state") != expected_state
+                    or row.get("contract_outcome") != "NOT_EVALUATED"
+                ):
+                    raise D5HarnessError("section observation capture state is invalid")
+                if mode == "diagnostics" and "action" in event:
+                    raise D5HarnessError("diagnostics-only capture cannot retain a DTO")
+            if name == "SECTION_ACTION_SCHEMA_VALIDATED" and mode == "validated_dto":
+                action = event.get("action")
+                if not isinstance(action, Mapping):
+                    raise D5HarnessError("complete validated action is unavailable")
+                encoded = json.dumps(
+                    action, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+                ).encode("utf-8")
+                if hashlib.sha256(encoded).hexdigest() != row["dto_sha256"] or len(
+                    encoded
+                ) != row.get("dto_size_bytes"):
+                    raise D5HarnessError("validated action digest mismatch")
+                directory = self.paths.validated_section_dtos
+                filename = f"task-{row['task_index']}-call-{index}-attempt-{row['attempt']}.json"
+                destination = directory / filename
+                now = _utc_now()
+                complete_metadata = {
+                    "authorization_id": self.authorization.authorization_id,
+                    "campaign_id": self.paths.campaign_id,
+                    "dto_path": destination.relative_to(self.paths.root).as_posix(),
+                    "captured_at_utc": now.isoformat(),
+                    "retention_until_utc": (now + timedelta(days=30)).isoformat(),
+                    "retention_days": 30,
+                }
+                full_size = len(
+                    json.dumps(
+                        {**row, **complete_metadata, "action": action},
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        ensure_ascii=True,
+                    ).encode("utf-8")
+                )
+                reason = None
+                if full_size > MAX_SECTION_ACTION_EVIDENCE_BYTES:
+                    reason = "DTO_OVERSIZE"
+                elif not _safe_validated_action(action):
+                    reason = "DTO_SCREENING_REJECTED"
+                if reason is not None:
+                    row["capture_state"] = "INCOMPLETE"
+                    row["capture_failure"] = reason
+                    self._append_section_observation(row)
+                    raise D5HarnessError("validated action capture rejected")
+                directory.mkdir(mode=0o700, exist_ok=True)
+                _require_private_directory(directory)
+                _write_private_exclusive(destination, encoded)
+                created_dto = destination
+                row.update(complete_metadata)
+        else:
+            raise D5HarnessError("unknown section observation event")
+        try:
+            self._append_section_observation(row)
+        except Exception:
+            if created_dto is not None:
+                created_dto.unlink()
+            raise
+
+    def _append_section_observation(self, row: Mapping[str, Any]) -> None:
+        """Append bounded observation metadata without persisting model-controlled text."""
+        bounded = dict(row)
+        bounded.update(
+            {
+                "authorization_id": self.authorization.authorization_id,
+                "campaign_id": self.paths.campaign_id,
+            }
+        )
+        encoded = json.dumps(
+            bounded, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+        ).encode("utf-8")
+        if len(encoded) > MAX_SECTION_ACTION_EVIDENCE_BYTES or not _safe_validated_action(bounded):
+            raise D5HarnessError("section observation metadata rejected")
+        flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(self.paths.section_actions, flags, 0o600)
+        try:
+            info = os.fstat(fd)
+            if (
+                not stat.S_ISREG(info.st_mode)
+                or stat.S_IMODE(info.st_mode) != 0o600
+                or info.st_uid != os.geteuid()
+            ):
+                raise D5HarnessError("section observation file is not private")
+            with os.fdopen(fd, "ab", closefd=False) as handle:
+                handle.write(encoded + b"\n")
+        finally:
+            os.close(fd)
 
     def record_readiness(self, readiness: D5ReadinessProjectionProtocol) -> None:
         """Persist the bounded readiness projection before generation."""
@@ -1314,6 +1500,47 @@ class D5SmokeCustody:
         }
         if outcome not in allowed or self.terminal_written or self.paths.terminal.exists():
             raise D5HarnessError("invalid or duplicate smoke terminal")
+        dto_paths: list[Path] = []
+        if (
+            self.paths.validated_section_dtos.is_symlink()
+            or self.paths.validated_section_dtos.exists()
+        ):
+            if self.authorization.section_action_capture_mode != "validated_dto":
+                raise D5HarnessError("validated DTO capture was not authorized")
+            _require_private_directory(self.paths.validated_section_dtos)
+            dto_paths = sorted(self.paths.validated_section_dtos.iterdir())
+        for path in dto_paths:
+            info = path.lstat()
+            if (
+                not re.fullmatch(r"task-\d+-call-\d+-attempt-[12]\.json", path.name)
+                or path.is_symlink()
+                or not stat.S_ISREG(info.st_mode)
+                or stat.S_IMODE(info.st_mode) != 0o600
+                or info.st_uid != os.geteuid()
+            ):
+                raise D5HarnessError("validated DTO file is not private")
+        if dto_paths and not self.paths.section_actions.is_file():
+            raise D5HarnessError("validated DTO metadata is unavailable")
+        if (
+            self.authorization.section_action_capture_mode == "validated_dto"
+            and self.paths.section_actions.is_file()
+        ):
+            captured: dict[str, str] = {}
+            for line in self.paths.section_actions.read_text(encoding="utf-8").splitlines():
+                row = json.loads(line)
+                if (
+                    row.get("event") == "SECTION_ACTION_SCHEMA_VALIDATED"
+                    and row.get("capture_state") == "complete"
+                ):
+                    relative = str(row.get("dto_path", ""))
+                    if relative in captured:
+                        raise D5HarnessError("duplicate validated DTO metadata")
+                    captured[relative] = str(row.get("dto_sha256", ""))
+            actual = {path.relative_to(self.paths.root).as_posix(): path for path in dto_paths}
+            if set(actual) != set(captured):
+                raise D5HarnessError("validated DTO custody set does not match metadata")
+            if any(_sha256_file(path) != captured[relative] for relative, path in actual.items()):
+                raise D5HarnessError("validated DTO custody digest mismatch")
         state = json.loads(self.paths.state.read_text(encoding="utf-8"))
         endpoint_calls = int(state.get("endpoint_calls", 0))
         state.update(
@@ -1361,7 +1588,7 @@ class D5SmokeCustody:
             "journal_sha256": _sha256_file(self.paths.journal),
             "model_io_sha256": _sha256_file(self.paths.model_io),
             "observability_artifacts": {
-                path.name: _sha256_file(path)
+                path.relative_to(self.paths.root).as_posix(): _sha256_file(path)
                 for path in (
                     self.paths.compile_result,
                     self.paths.planner_wire,
@@ -1371,6 +1598,7 @@ class D5SmokeCustody:
                     self.paths.stage_trace,
                     self.paths.binding_request,
                     self.paths.binding_request_compilation,
+                    *dto_paths,
                 )
                 if path.is_file()
             },
@@ -1431,6 +1659,347 @@ def evidence_is_redacted(value: object) -> bool:
         lowered = value.casefold()
         return not any(marker in lowered for marker in SECRET_MARKERS)
     return True
+
+
+def _safe_validated_action(value: object) -> bool:
+    """Best-effort secret and absolute-path screening of untrusted DTO strings."""
+    if isinstance(value, Mapping):
+        return all(
+            str(key).casefold() not in {item.casefold() for item in SECRET_KEYS}
+            and _safe_validated_action(str(key))
+            and _safe_validated_action(item)
+            for key, item in value.items()
+        )
+    if isinstance(value, (list, tuple)):
+        return all(_safe_validated_action(item) for item in value)
+    if isinstance(value, str):
+        if not evidence_is_redacted(value):
+            return False
+        if any(ord(character) < 32 or ord(character) == 127 for character in value):
+            return False
+        if re.search(
+            r"(?i)\b(?:sk-[a-z0-9_-]{12,}|akia[a-z0-9]{16})\b|-----begin [^-]*private key-----",
+            value,
+        ):
+            return False
+        return (
+            re.search(r"(?<![A-Za-z0-9])/(?!/)|(?<![A-Za-z0-9])[A-Za-z]:[\\/]|\\\\", value) is None
+        )
+    return value is None or isinstance(value, (bool, int, float))
+
+
+def _utc_now() -> datetime:
+    """Return the current UTC time for the local retention boundary."""
+    return datetime.now(UTC)
+
+
+def _require_private_directory(path: Path) -> None:
+    """Require an owned real directory that is inaccessible to group and others."""
+    info = path.lstat()
+    if (
+        not stat.S_ISDIR(info.st_mode)
+        or stat.S_IMODE(info.st_mode) != 0o700
+        or info.st_uid != os.geteuid()
+    ):
+        raise D5HarnessError("validated DTO directory is not private")
+
+
+def _prepare_private_campaign_root(root: Path) -> None:
+    """Require private campaign files and a process umask that keeps new files private."""
+    root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    _require_private_directory(root)
+    try:
+        status = Path("/proc/self/status").read_text(encoding="utf-8")
+        umask_line = next(line for line in status.splitlines() if line.startswith("Umask:"))
+        current_umask = int(umask_line.split()[1], 8)
+    except (OSError, StopIteration, ValueError, IndexError):
+        raise D5HarnessError("private campaign umask cannot be verified") from None
+    if current_umask & 0o077 != 0o077:
+        raise D5HarnessError("private campaign requires umask 077")
+    for child in root.iterdir():
+        info = child.lstat()
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or stat.S_IMODE(info.st_mode) != 0o600
+            or info.st_uid != os.geteuid()
+        ):
+            raise D5HarnessError("pre-existing campaign entry is not a private file")
+
+
+def _validate_section_capture_location(repo_root: Path, root: Path) -> None:
+    """Keep opt-in section custody under the ignored local evaluation workspace."""
+    repository = repo_root.resolve()
+    workspace = (repository / "workspace/evaluations").resolve()
+    destination = root.resolve()
+    if destination == workspace or not destination.is_relative_to(workspace):
+        raise D5StaticPreflightError("section capture must be under workspace/evaluations")
+    probe = (destination / "validated-dto-probe.json").relative_to(repository)
+    ignored = subprocess.run(
+        ["git", "check-ignore", "-q", "--no-index", "--", str(probe)],
+        cwd=repository,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    if ignored.returncode != 0:
+        raise D5StaticPreflightError("section capture is not Git-ignored")
+
+
+def _write_private_exclusive(path: Path, data: bytes) -> None:
+    """Create a private DTO atomically without following an existing path."""
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags, 0o600)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o600:
+            raise D5HarnessError("validated DTO file is not private")
+        with os.fdopen(fd, "wb", closefd=False) as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except BaseException:
+        os.unlink(path)
+        raise
+    finally:
+        os.close(fd)
+
+
+def verify_smoke_observability(paths: EvidencePaths) -> dict[str, object]:
+    """Verify sealed smoke evidence, allowing only recorded DTO retention deletions."""
+    terminal = json.loads(paths.terminal.read_text(encoding="utf-8"))
+    summary = json.loads(paths.summary.read_text(encoding="utf-8"))
+    terminal_sha = _sha256_file(paths.terminal)
+    if summary.get("terminal_sha256") != terminal_sha:
+        raise D5HarnessError("smoke terminal digest mismatch")
+    for path, digest_field in (
+        (paths.state, "state_sha256"),
+        (paths.journal, "journal_sha256"),
+        (paths.model_io, "model_io_sha256"),
+    ):
+        if _sha256_file(path) != terminal.get(digest_field):
+            raise D5HarnessError("smoke custody digest mismatch")
+    deleted: dict[str, str] = {}
+    if paths.dto_deletion_receipt.is_symlink() or paths.dto_deletion_receipt.exists():
+        receipt_info = paths.dto_deletion_receipt.lstat()
+        if (
+            not stat.S_ISREG(receipt_info.st_mode)
+            or stat.S_IMODE(receipt_info.st_mode) != 0o600
+            or receipt_info.st_uid != os.geteuid()
+        ):
+            raise D5HarnessError("DTO deletion receipt is not private")
+        receipt = json.loads(paths.dto_deletion_receipt.read_text(encoding="utf-8"))
+        if (
+            receipt.get("terminal_sha256") != terminal_sha
+            or receipt.get("campaign_id") != paths.campaign_id
+            or not re.fullmatch(
+                r"[A-Za-z0-9_-]{1,128}", str(receipt.get("deletion_authorization_id", ""))
+            )
+        ):
+            raise D5HarnessError("DTO deletion receipt is invalid")
+        deleted = dict(receipt.get("authorized_files", {}))
+    artifacts = terminal.get("observability_artifacts", {})
+    if deleted:
+        if artifacts.get(paths.section_actions.name) != _sha256_file(paths.section_actions):
+            raise D5HarnessError("DTO metadata digest mismatch")
+        try:
+            authorized_at = datetime.fromisoformat(str(receipt.get("authorized_at_utc", "")))
+        except ValueError:
+            raise D5HarnessError("DTO deletion receipt time is invalid") from None
+        if authorized_at.tzinfo is None:
+            raise D5HarnessError("DTO deletion receipt time is invalid")
+        rows = [
+            json.loads(line)
+            for line in paths.section_actions.read_text(encoding="utf-8").splitlines()
+        ]
+        captured = {
+            row.get("dto_path"): row
+            for row in rows
+            if row.get("event") == "SECTION_ACTION_SCHEMA_VALIDATED"
+            and row.get("capture_state") == "complete"
+        }
+        for name, digest in deleted.items():
+            row = captured.get(name)
+            if row is None or row.get("dto_sha256") != digest:
+                raise D5HarnessError("DTO deletion receipt lacks matching capture metadata")
+            try:
+                expiry = datetime.fromisoformat(str(row.get("retention_until_utc", "")))
+            except ValueError:
+                raise D5HarnessError("DTO retention time is invalid") from None
+            if expiry.tzinfo is None or authorized_at < expiry:
+                raise D5HarnessError("DTO deletion receipt predates retention expiry")
+    missing_dtos = 0
+    if paths.validated_section_dtos.is_symlink() or paths.validated_section_dtos.exists():
+        _require_private_directory(paths.validated_section_dtos)
+        for path in paths.validated_section_dtos.iterdir():
+            relative = path.relative_to(paths.root).as_posix()
+            if relative not in artifacts or path.is_symlink():
+                raise D5HarnessError("unsealed validated DTO entry")
+            info = path.lstat()
+            if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o600:
+                raise D5HarnessError("validated DTO file is not private")
+    for relative, expected in artifacts.items():
+        path = paths.root / relative
+        if path.is_symlink() or not path.resolve().is_relative_to(paths.root.resolve()):
+            raise D5HarnessError("smoke evidence path is unsafe")
+        if path.is_file():
+            if _sha256_file(path) != expected:
+                raise D5HarnessError("smoke observation digest mismatch")
+        elif (
+            relative.startswith(paths.validated_section_dtos.name + "/")
+            and deleted.get(relative) == expected
+        ):
+            missing_dtos += 1
+        else:
+            raise D5HarnessError("smoke observation is missing")
+    if any(artifacts.get(name) != digest for name, digest in deleted.items()):
+        raise D5HarnessError("DTO deletion receipt does not match the terminal")
+    state = json.loads(paths.state.read_text(encoding="utf-8"))
+    if state.get("section_action_capture_mode") in {"diagnostics", "validated_dto"}:
+        _require_private_directory(paths.root)
+        for path in paths.root.rglob("*"):
+            info = path.lstat()
+            if path.is_symlink() or info.st_uid != os.geteuid():
+                raise D5HarnessError("private campaign entry is unsafe")
+            expected_mode = 0o700 if stat.S_ISDIR(info.st_mode) else 0o600
+            if not (stat.S_ISREG(info.st_mode) or stat.S_ISDIR(info.st_mode)):
+                raise D5HarnessError("private campaign entry is unsafe")
+            if stat.S_IMODE(info.st_mode) != expected_mode:
+                raise D5HarnessError("private campaign entry permissions drifted")
+    if state.get("section_action_capture_mode") in {"diagnostics", "validated_dto"}:
+        starts = {
+            row.get("logical_call_index"): row.get("generation_role")
+            for row in (
+                json.loads(line) for line in paths.journal.read_text(encoding="utf-8").splitlines()
+            )
+            if row.get("event") == "logical_call_started"
+        }
+        observed: dict[tuple[object, ...], str | None] = {}
+        metadata_dtos: set[str] = set()
+        if paths.section_actions.exists():
+            for line in paths.section_actions.read_text(encoding="utf-8").splitlines():
+                row = json.loads(line)
+                if (
+                    row.get("campaign_id") != paths.campaign_id
+                    or row.get("authorization_id") != terminal.get("authorization_id")
+                    or row.get("worker_role") != "section_worker"
+                    or starts.get(row.get("logical_call_index")) != "section_worker"
+                ):
+                    raise D5HarnessError("section observation identity mismatch")
+                key = tuple(
+                    row.get(name)
+                    for name in ("task_index", "attempt", "logical_call_index", "dto_sha256")
+                )
+                if row.get("event") == "SECTION_ACTION_SCHEMA_VALIDATED":
+                    if key in observed:
+                        raise D5HarnessError("duplicate section observation")
+                    observed[key] = None
+                    if row.get("capture_state") == "complete" and artifacts.get(
+                        row.get("dto_path")
+                    ) != row.get("dto_sha256"):
+                        raise D5HarnessError("validated DTO digest is not sealed")
+                    if row.get("capture_state") == "complete":
+                        expected_path = (
+                            f"{paths.validated_section_dtos.name}/task-{row['task_index']}"
+                            f"-call-{row['logical_call_index']}-attempt-{row['attempt']}.json"
+                        )
+                        if row.get("dto_path") != expected_path:
+                            raise D5HarnessError("validated DTO path is uncorrelated")
+                        metadata_dtos.add(expected_path)
+                        try:
+                            captured_at = datetime.fromisoformat(
+                                str(row.get("captured_at_utc", ""))
+                            )
+                            expiry = datetime.fromisoformat(str(row.get("retention_until_utc", "")))
+                        except ValueError:
+                            raise D5HarnessError(
+                                "validated DTO retention metadata is invalid"
+                            ) from None
+                        if (
+                            captured_at.tzinfo is None
+                            or expiry.tzinfo is None
+                            or row.get("retention_days") != 30
+                            or expiry - captured_at != timedelta(days=30)
+                        ):
+                            raise D5HarnessError("validated DTO retention metadata is invalid")
+                elif row.get("event") == "SECTION_ACTION_CONTRACT_RESULT":
+                    if key not in observed or observed[key] is not None:
+                        raise D5HarnessError("section contract result is uncorrelated")
+                    outcome = row.get("contract_outcome")
+                    if outcome not in {"PASS", "FAIL"}:
+                        raise D5HarnessError("section contract outcome is invalid")
+                    observed[key] = outcome
+                elif row.get("event") == "SECTION_ACTION_VALIDATED":
+                    if observed.get(key) != "PASS":
+                        raise D5HarnessError("accepted section action lacks a passing contract")
+                else:
+                    raise D5HarnessError("unknown section observation")
+        sealed_dtos = {
+            name for name in artifacts if name.startswith(paths.validated_section_dtos.name + "/")
+        }
+        if sealed_dtos != metadata_dtos:
+            raise D5HarnessError("sealed DTO set does not match observation metadata")
+        if (
+            any(outcome is None for outcome in observed.values())
+            and terminal.get("reason") != "section_action_evidence_integrity"
+        ):
+            raise D5HarnessError("section observation lacks a contract outcome")
+    return {"terminal_sha256": terminal_sha, "authorized_deleted_dtos": missing_dtos}
+
+
+def delete_expired_validated_dtos(
+    paths: EvidencePaths,
+    *,
+    deletion_authorization_id: str,
+) -> dict[str, object]:
+    """Delete expired private DTOs only under an explicit local authorization."""
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", deletion_authorization_id):
+        raise D5HarnessError("DTO deletion authorization is invalid")
+    if paths.dto_deletion_receipt.exists():
+        raise D5HarnessError("DTO deletion was already authorized")
+    verification = verify_smoke_observability(paths)
+    terminal = json.loads(paths.terminal.read_text(encoding="utf-8"))
+    current = _utc_now()
+    if current.tzinfo is None:
+        raise D5HarnessError("DTO deletion time must include a timezone")
+    files: dict[str, str] = {}
+    for line in paths.section_actions.read_text(encoding="utf-8").splitlines():
+        row = json.loads(line)
+        if (
+            row.get("event") != "SECTION_ACTION_SCHEMA_VALIDATED"
+            or row.get("capture_state") != "complete"
+        ):
+            continue
+        relative = str(row.get("dto_path", ""))
+        if not relative.startswith(paths.validated_section_dtos.name + "/"):
+            raise D5HarnessError("DTO retention path is invalid")
+        try:
+            expiry = datetime.fromisoformat(str(row.get("retention_until_utc", "")))
+        except ValueError:
+            raise D5HarnessError("DTO retention time is invalid") from None
+        if expiry.tzinfo is None or current < expiry:
+            raise D5HarnessError("DTO retention period has not expired")
+        digest = terminal.get("observability_artifacts", {}).get(relative)
+        if digest != row.get("dto_sha256"):
+            raise D5HarnessError("DTO retention digest mismatch")
+        files[relative] = digest
+    if not files:
+        raise D5HarnessError("no retained DTOs are eligible for deletion")
+    receipt = {
+        "campaign_id": paths.campaign_id,
+        "deletion_authorization_id": deletion_authorization_id,
+        "terminal_sha256": verification["terminal_sha256"],
+        "authorized_at_utc": current.isoformat(),
+        "authorized_files": files,
+    }
+    if not evidence_is_redacted(receipt):
+        raise D5HarnessError("DTO deletion receipt failed screening")
+    _write_private_exclusive(
+        paths.dto_deletion_receipt,
+        (json.dumps(receipt, sort_keys=True, indent=2) + "\n").encode("utf-8"),
+    )
+    for relative in files:
+        (paths.root / relative).unlink()
+    return receipt
 
 
 def _sanitize_planner_context(value: object) -> dict[str, Any]:
@@ -2695,6 +3264,7 @@ def create_live_adapter(
     trace_callback: Callable[[Mapping[str, Any]], None] | None = None,
     compile_result_callback: Callable[[Any], None] | None = None,
     section_action_callback: Callable[[Mapping[str, object]], None] | None = None,
+    section_action_capture_mode: Literal["off", "diagnostics", "validated_dto"] = "off",
 ) -> _ObservedLiveAdapter:
     """Build the accepted canonical adapter with retry-visible HTTP transport."""
     import httpx
@@ -2703,6 +3273,10 @@ def create_live_adapter(
     from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
 
     _validate_project_config(project_config)
+    if section_action_capture_mode not in {"off", "diagnostics", "validated_dto"}:
+        raise D5StaticPreflightError("invalid section action capture mode")
+    if section_action_capture_mode != "off" and section_action_callback is None:
+        raise D5StaticPreflightError("section action observer is required")
     if require_thinking_control:
         request_options = _validated_thinking_control_options(request_options)
     observer = _PhysicalAttemptObserver()
@@ -2737,6 +3311,7 @@ def create_live_adapter(
         model=resolved_model,
         calls=calls,
         ledger=ledger,
+        capture_logical_identity=section_action_capture_mode != "off",
     )
     session = d4.build_notebook_session(
         backend=counted,
@@ -2749,6 +3324,7 @@ def create_live_adapter(
         trace_callback=trace_callback,
         compile_result_callback=compile_result_callback,
         section_action_callback=section_action_callback,
+        section_action_capture_mode=section_action_capture_mode,
     )
     inner = d4.D4CampaignAdapter(
         repo_root=repo_root,
@@ -2914,6 +3490,8 @@ def execute_live_smoke(
     provider_factory: Callable[[Path, Path, str], object] | None = None,
 ) -> dict[str, Any]:
     """Run one non-scientific structured generation through the canonical adapter."""
+    if authorization.section_action_capture_mode != "off":
+        raise D5StaticPreflightError("section action capture requires binding-smoke mode")
     if artifact_root.resolve() != _authorized_artifact_root(repo_root, authorization):
         raise D5StaticPreflightError("artifact root is not authorized")
     project_config = load_project_config(repo_root)
@@ -3141,6 +3719,9 @@ def execute_live_binding_smoke(
     static = (static_checker or _default_smoke_static_checks)(repo_root, authorization, paths)
     if static.get("status") != "PASS":
         raise D5StaticPreflightError("smoke static preflight failed")
+    if authorization.section_action_capture_mode != "off":
+        _validate_section_capture_location(repo_root, paths.root)
+        _prepare_private_campaign_root(paths.root)
     ensure_fresh_namespace(paths)
 
     input_custody = D5SmokeCustody(paths, authorization, state={})
@@ -3225,8 +3806,11 @@ def execute_live_binding_smoke(
             active_custody.record_compile_result(result)
 
     def on_section_action(event: Mapping[str, object]) -> None:
-        section_action_events.append(dict(event))
         active_custody = custody_ref.get("custody")
+        if authorization.section_action_capture_mode == "off":
+            section_action_events.append(dict(event))
+        elif active_custody is None:
+            raise D5HarnessError("section action custody is not active")
         if active_custody is not None:
             active_custody.record_section_action(event)
 
@@ -3234,6 +3818,11 @@ def execute_live_binding_smoke(
 
     def build_provider(token: str) -> object:
         if provider_factory is not None:
+            extra = (
+                {"section_action_capture_mode": authorization.section_action_capture_mode}
+                if authorization.section_action_capture_mode != "off"
+                else {}
+            )
             return provider_factory(
                 repo_root,
                 artifact_root,
@@ -3241,6 +3830,7 @@ def execute_live_binding_smoke(
                 trace_callback=on_trace,
                 compile_result_callback=on_compile_result,
                 section_action_callback=on_section_action,
+                **extra,
             )
         return create_live_adapter(
             repo_root=repo_root,
@@ -3252,6 +3842,7 @@ def execute_live_binding_smoke(
             trace_callback=on_trace,
             compile_result_callback=on_compile_result,
             section_action_callback=on_section_action,
+            section_action_capture_mode=authorization.section_action_capture_mode,
         )
 
     try:
@@ -3295,6 +3886,29 @@ def execute_live_binding_smoke(
         )
         terminal = custody.finish("SMOKE_HARNESS_FAIL", reason="canonical_adapter_unavailable")
         return {"status": "SMOKE_HARNESS_FAIL", "terminal": terminal}
+
+    if authorization.section_action_capture_mode != "off":
+        try:
+            dependencies = adapter.inner.session.session.compiler.dependencies
+            configured_mode = dependencies.section_compiler.action_capture_mode
+            correlation_enabled = dependencies.planner.backend.capture_logical_identity
+        except AttributeError:
+            configured_mode = None
+            correlation_enabled = False
+        if configured_mode != authorization.section_action_capture_mode or not correlation_enabled:
+            custody = D5SmokeCustody.pre_smoke_failure(
+                paths,
+                authorization=authorization,
+                static_preflight=static,
+                endpoint_calls=len(readiness.endpoint_calls),
+                reason="section_action_capture_unavailable",
+                binding_input_preflighted=True,
+                smoke_kind=SMOKE_BINDING_KIND,
+            )
+            terminal = custody.finish(
+                "SMOKE_NOT_READY", reason="section_action_capture_unavailable"
+            )
+            return {"status": "SMOKE_NOT_READY", "terminal": terminal}
 
     custody = D5SmokeCustody.start(
         paths,
@@ -3354,6 +3968,11 @@ def execute_live_binding_smoke(
         return {"status": "SMOKE_HARNESS_FAIL", "terminal": terminal}
     compile_result = compile_results[-1]
     if not result.success or not compile_result.success:
+        if any(item.code == "worker_evidence_integrity_failure" for item in result.diagnostics):
+            terminal = custody.finish(
+                "SMOKE_HARNESS_FAIL", reason="section_action_evidence_integrity"
+            )
+            return {"status": "SMOKE_HARNESS_FAIL", "terminal": terminal}
         provider_failure = any(item.stage == "provider" for item in result.diagnostics)
         outcome = "SMOKE_PROVIDER_INCONCLUSIVE" if provider_failure else "SMOKE_CONTRACT_FAIL"
         reason = "provider_compile_failure" if provider_failure else "canonical_compile_rejected"

@@ -95,6 +95,7 @@ def create_canonical_dependencies(
     diagnostic_callback: Callable[[Mapping[str, Any]], None] | None = None,
     trace_callback: Callable[[Mapping[str, Any]], None] | None = None,
     section_action_callback: Callable[[Mapping[str, object]], None] | None = None,
+    section_action_capture_mode: Literal["off", "diagnostics", "validated_dto"] = "off",
 ) -> CodeModeGraphDependencies:
     """Build one worker composition shared by notebook, MCP, and experiments."""
     from ..capabilities import create_builtin_registry
@@ -114,6 +115,7 @@ def create_canonical_dependencies(
         section_compiler=CanonicalSectionWorker(
             backend=backend,
             action_observer=section_action_callback,
+            action_capture_mode=section_action_capture_mode,
         ),
         diagnostic_callback=diagnostic_callback,
         trace_callback=trace_callback,
@@ -128,6 +130,7 @@ def create_canonical_compile_facade(
     trace_callback: Callable[[Mapping[str, Any]], None] | None = None,
     result_callback: Callable[[CodeModeCompileResult], None] | None = None,
     section_action_callback: Callable[[Mapping[str, object]], None] | None = None,
+    section_action_capture_mode: Literal["off", "diagnostics", "validated_dto"] = "off",
 ) -> CodeModeCompileFacade:
     """Construct the shared planner, workers, workflow, and facade."""
     return CodeModeCompileFacade(
@@ -137,6 +140,7 @@ def create_canonical_compile_facade(
             diagnostic_callback=diagnostic_callback,
             trace_callback=trace_callback,
             section_action_callback=section_action_callback,
+            section_action_capture_mode=section_action_capture_mode,
         ),
         result_callback=result_callback,
     )
