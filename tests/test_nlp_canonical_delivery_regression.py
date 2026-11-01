@@ -46,8 +46,6 @@ from wellplot.agent.code_mode.planner import (
     SectionTask,
     SemanticPlan,
     _attach_compiled_requirements,
-    _canonical_plan_from_wire,
-    _PlannerWirePlan,
     _PlannerWireSectionTask,
     _validate_extraction_coverage,
 )
@@ -1842,7 +1840,7 @@ def test_authority_f_planner_phrase_is_not_a_compiled_track_identity() -> None:
     assert phrase in captured_plan["section_tasks"][0]["requirements"][0]
 
     plan = _attach_compiled_requirements(
-        _canonical_plan_from_wire(_PlannerWirePlan.model_validate(captured_plan)),
+        SemanticPlan.model_validate(captured_plan),
         compile_request_contract(request),
     )
     assert plan.requirement_compilation is not None

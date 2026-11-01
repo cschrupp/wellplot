@@ -607,6 +607,36 @@ An A00 architecture decision is promoted to the active baseline after independen
 | OD-11 | Architectural decision requiring A00 acceptance | Preserve current bounded correction authority; no second correction protocol or retry class for the same violation. Per-stage interplay is verified, not expanded. | A02/A05 consume at planner/worker correction boundaries; A05 proves unchanged limits. |
 | OD-12 | Implementation-interface decision | Numeric plan/read/context/schema/time budgets remain unset; do not invent values during A00. | A03 sets inspection/context budgets; A04/A05 set operation/response limits before contract/schema use. |
 | OD-13 | Implementation-interface decision | Do not claim request-level atomic persistence from per-operation CRUD atomicity; audit publication, rollback and reload failure. | A08 completes audit before implementation/documentation claims whole-request atomicity. |
+
+### A02 Planner V2 Implementation Candidate (2026-11-01)
+
+Status: implementation candidate, pending independent review. This records the
+provider-facing contract introduced in the existing `planner.py` module; it
+does not change the accepted A00 architecture or claim completion of later
+contract-compilation slices.
+
+- The wire envelope is versioned as `wellplot.semantic-plan.v2`.
+- Each report work unit has a non-empty operation inventory in the fixed
+  `report` scope. Each section work unit has a required request-local
+  `scope_ref` and a non-empty operation inventory in that same scope.
+- Operations use the bounded `CREATE`, `UPDATE`, `ENSURE`, `MOVE`, `REMOVE`,
+  and `SET` vocabulary, typed semantic field values (`SET` versus `CLEAR`),
+  local object references, optional evidence-qualified conditions, and
+  request-local presentation relations. The DTO has no canonical object IDs,
+  paths, CRUD scripts, or request-obligation provenance.
+- Structural validation enforces unique local/object references, same-scope
+  parent/anchor references, valid report/section scope ownership, declared
+  unresolved-semantic scopes, and rejection of path-shaped provider text. A
+  batch has no invented numeric operation-count cap in this slice.
+- Provider DTO to canonical `SemanticPlan` remains one conversion. The existing
+  deterministic requirement attachment remains the sole provenance owner.
+- Exact operation-to-request coverage, host handle resolution, operation
+  eligibility, and action-specific executable contracts are not claimed here;
+  they remain assigned to A03/A04 and later consumers. A non-empty inventory
+  proves representation, not completeness.
+- Duplicate-scope correction preserves the ordered operation inventory and
+  user presentation constraints along with the existing task content. It does
+  not add a correction protocol or weaken the two-call ceiling.
 ________________________________________
 15. Suggested Codex implementation handoff (after design acceptance only)
 Task: Implement the accepted WELLPLOT-NLP-CANONICAL-AUTHORING-ARCH-001 architecture through the existing canonical Code Mode graph, in bounded slices A01–A11, only after A00 independent/Human acceptance, architecture Knowledge Delta promotion into the active baseline as not yet implemented, and explicit Human implementation authorization. Preserve the current authoring YAML, AuthoringService, AuthoringDocumentIntent, reconcile_authoring(), AuthoringExecutor, provider composition and existing single-engine attestation. Do not introduce parallel compilers, planners, engines, direct LLM CRUD or agent loops. Maintain strict semantic operation inventories and read-only source/document inspection. For every slice, provide design delta, exact code changes, provider-free tests, baseline/regression impact, development memory, and remaining gaps. Stop at the agreed implementation-review gate. Do not run endpoint/model calls, reuse D5 sealed namespaces, or start scientific qualification without separate exact-checkpoint authorization.

@@ -23,6 +23,7 @@ from ..providers.response_diagnostics import (
     StructuredResponseProviderError,
 )
 from .obligations import (
+    FieldName,
     RequestCompilationResult,
     RequestCompilationStatus,
     RequestObligation,
@@ -53,6 +54,111 @@ class _SemanticModel(BaseModel):
     )
 
 
+class SemanticFieldValue(_SemanticModel):
+    """One explicit semantic field assignment in a planner operation."""
+
+    field: FieldName
+    state: Literal["SET", "CLEAR"]
+    value: str | float | int | bool | None = None
+
+    @model_validator(mode="after")
+    def validate_value_state(self) -> SemanticFieldValue:
+        """Keep clear distinct from setting a nullable semantic value."""
+        if self.state == "CLEAR" and self.value is not None:
+            raise ValueError("CLEAR field values cannot also provide a value.")
+        if self.state == "SET" and self.value is None:
+            raise ValueError("SET field values require an explicit value.")
+        return self
+
+
+class OperationCondition(_SemanticModel):
+    """Evidence-qualified condition for an optional semantic operation."""
+
+    predicate: Literal[
+        "source_channel_available",
+        "source_channel_absent",
+        "target_exists",
+        "target_absent",
+    ]
+    evidence_kind: Literal["inspected_source", "document_snapshot"]
+    evidence_ref: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
+    channel_clue: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def validate_evidence_kind(self) -> OperationCondition:
+        """Require source inspection evidence for channel availability claims."""
+        channel_predicate = self.predicate in {
+            "source_channel_available",
+            "source_channel_absent",
+        }
+        expected = "inspected_source" if channel_predicate else "document_snapshot"
+        if self.evidence_kind != expected:
+            raise ValueError("Operation condition evidence kind does not match its predicate.")
+        if channel_predicate and self.channel_clue is None:
+            raise ValueError("Channel conditions require a channel clue.")
+        if not channel_predicate and self.channel_clue is not None:
+            raise ValueError("Target conditions cannot carry a channel clue.")
+        return self
+
+
+class SemanticOperation(_SemanticModel):
+    """Request-local semantic proposal; never a canonical CRUD instruction."""
+
+    local_ref: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
+    scope_ref: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
+    verb: Literal["CREATE", "UPDATE", "ENSURE", "MOVE", "REMOVE", "SET"]
+    object_kind: Literal[
+        "report_field",
+        "service_title",
+        "remark",
+        "section",
+        "track",
+        "binding",
+        "fill",
+    ]
+    semantic_ref: str | None = Field(default=None, pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
+    parent_ref: str | None = Field(default=None, pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
+    target_clue: str | None = Field(default=None, min_length=1)
+    field_values: tuple[SemanticFieldValue, ...] = ()
+    condition: OperationCondition | None = None
+    relation: Literal["before", "after"] | None = None
+    anchor_ref: str | None = Field(default=None, pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
+
+    @model_validator(mode="after")
+    def validate_operation_shape(self) -> SemanticOperation:
+        """Require the minimum semantic operands for each declared verb."""
+        if self.verb in {"CREATE", "ENSURE"} and self.semantic_ref is None:
+            raise ValueError(f"{self.verb} requires a request-local semantic_ref.")
+        if self.verb in {"UPDATE", "REMOVE", "SET"} and self.target_clue is None:
+            raise ValueError(f"{self.verb} requires a natural-language target_clue.")
+        if self.verb == "MOVE":
+            if self.semantic_ref is None or self.relation is None or self.anchor_ref is None:
+                raise ValueError("MOVE requires semantic_ref, relation, and anchor_ref.")
+        elif self.relation is not None or self.anchor_ref is not None:
+            raise ValueError("Only MOVE operations may define presentation relation fields.")
+        if self.verb == "SET" and len(self.field_values) != 1:
+            raise ValueError("SET requires exactly one field value.")
+        return self
+
+
+class UnresolvedSemantic(_SemanticModel):
+    """Planner-declared ambiguity that must not be silently guessed."""
+
+    local_ref: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
+    scope_ref: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
+    question: str = Field(min_length=1)
+    candidate_clues: tuple[str, ...] = ()
+
+
+class PresentationConstraint(_SemanticModel):
+    """User-requested semantic ordering, separate from host execution order."""
+
+    scope_ref: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
+    item_ref: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
+    relation: Literal["before", "after"]
+    anchor_ref: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
+
+
 class ReportTask(_SemanticModel):
     """Semantic requirements for report-wide work."""
 
@@ -60,6 +166,8 @@ class ReportTask(_SemanticModel):
     capability_ids: tuple[str, ...] = ()
     requirements: tuple[str, ...] = ()
     constraints: tuple[str, ...] = ()
+    operations: tuple[SemanticOperation, ...] = ()
+    presentation_constraints: tuple[PresentationConstraint, ...] = ()
     obligations: tuple[RequestObligation, ...] = ()
 
     @field_validator("capability_ids", "requirements", "constraints")
@@ -88,6 +196,9 @@ class SectionTask(_SemanticModel):
     source_hints: tuple[str, ...] = ()
     requirements: tuple[str, ...] = ()
     constraints: tuple[str, ...] = ()
+    scope_ref: str | None = Field(default=None, pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
+    operations: tuple[SemanticOperation, ...] = ()
+    presentation_constraints: tuple[PresentationConstraint, ...] = ()
     obligations: tuple[RequestObligation, ...] = ()
     requirement_refs: tuple[str, ...] = ()
     scope_id: str | None = None
@@ -121,6 +232,8 @@ class _PlannerWireReportTask(_SemanticModel):
     capability_ids: tuple[str, ...] = ()
     requirements: tuple[str, ...] = ()
     constraints: tuple[str, ...] = ()
+    operations: tuple[SemanticOperation, ...] = Field(min_length=1)
+    presentation_constraints: tuple[PresentationConstraint, ...] = ()
 
     @field_validator("capability_ids", "requirements", "constraints")
     @classmethod
@@ -139,6 +252,9 @@ class _PlannerWireSectionTask(_SemanticModel):
     source_hints: tuple[str, ...] = ()
     requirements: tuple[str, ...] = ()
     constraints: tuple[str, ...] = ()
+    scope_ref: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
+    operations: tuple[SemanticOperation, ...] = Field(min_length=1)
+    presentation_constraints: tuple[PresentationConstraint, ...] = ()
 
     model_config = ConfigDict(
         extra="forbid",
@@ -165,10 +281,12 @@ class _PlannerWireSectionTask(_SemanticModel):
 class _PlannerWirePlan(_SemanticModel):
     """Provider-facing semantic plan containing no deterministic provenance."""
 
+    version: Literal["wellplot.semantic-plan.v2"]
     summary: str = Field(min_length=1)
     report_task: _PlannerWireReportTask | None = None
     section_tasks: tuple[_PlannerWireSectionTask, ...] = ()
     unresolved_requirements: tuple[str, ...] = ()
+    unresolved_semantics: tuple[UnresolvedSemantic, ...] = ()
 
     model_config = ConfigDict(
         extra="forbid",
@@ -193,6 +311,13 @@ class _PlannerWirePlan(_SemanticModel):
         """Keep the canonical executable-work invariant at the wire boundary."""
         if self.report_task is None and not self.section_tasks:
             raise ValueError("SemanticPlan must contain a report task or section tasks.")
+        if _contains_path_text(self.model_dump(mode="python")):
+            raise ValueError("Planner output cannot contain filesystem paths.")
+        _validate_operation_references(
+            self.report_task,
+            self.section_tasks,
+            self.unresolved_semantics,
+        )
         return self
 
     @field_validator("unresolved_requirements")
@@ -233,10 +358,12 @@ class PlannerSemanticFailure(RuntimeError):
 class SemanticPlan(_SemanticModel):
     """Small planner result that describes work without document mechanics."""
 
+    version: Literal["wellplot.semantic-plan.v2"] = "wellplot.semantic-plan.v2"
     summary: str = Field(min_length=1)
     report_task: ReportTask | None = None
     section_tasks: tuple[SectionTask, ...] = ()
     unresolved_requirements: tuple[str, ...] = ()
+    unresolved_semantics: tuple[UnresolvedSemantic, ...] = ()
     obligations: tuple[RequestObligation, ...] = ()
     requirement_compilation: RequestCompilationResult | None = None
     scope_binding: ScopeBindingResult | None = None
@@ -264,6 +391,11 @@ class SemanticPlan(_SemanticModel):
         """Require at least one report or section work unit."""
         if self.report_task is None and not self.section_tasks:
             raise ValueError("SemanticPlan must contain a report task or section tasks.")
+        _validate_operation_references(
+            self.report_task,
+            tuple(self.section_tasks),
+            self.unresolved_semantics,
+        )
         return self
 
     @field_validator("unresolved_requirements")
@@ -297,6 +429,66 @@ def _add_work_unit_schema_constraint(schema: dict[str, object]) -> None:
             ]
         }
     )
+
+
+def _validate_operation_references(
+    report_task: _PlannerWireReportTask | ReportTask | None,
+    section_tasks: tuple[_PlannerWireSectionTask | SectionTask, ...],
+    unresolved: tuple[UnresolvedSemantic, ...],
+) -> None:
+    """Validate request-local references and enforce work-unit scope ownership."""
+    operations: list[SemanticOperation] = []
+    if report_task is not None:
+        for operation in report_task.operations:
+            if operation.scope_ref != "report":
+                raise ValueError("Report operations must use the report scope_ref.")
+            operations.append(operation)
+
+    for task in section_tasks:
+        for operation in task.operations:
+            if operation.scope_ref != task.scope_ref:
+                raise ValueError("Section operations must remain within their task scope_ref.")
+            operations.append(operation)
+
+    local_refs = [operation.local_ref for operation in operations]
+    local_refs.extend(item.local_ref for item in unresolved)
+    if len(local_refs) != len(set(local_refs)):
+        raise ValueError("Semantic operation local_ref values must be unique per plan.")
+
+    semantic_ref_scopes: dict[str, str] = {}
+    for operation in operations:
+        if operation.semantic_ref is not None:
+            if operation.semantic_ref in semantic_ref_scopes:
+                raise ValueError("Semantic object refs must be unique per plan.")
+            semantic_ref_scopes[operation.semantic_ref] = operation.scope_ref
+
+    for operation in operations:
+        for reference in (operation.parent_ref, operation.anchor_ref):
+            if reference is None:
+                continue
+            if reference not in semantic_ref_scopes:
+                raise ValueError("Semantic operation references an unknown local object ref.")
+            if semantic_ref_scopes[reference] != operation.scope_ref:
+                raise ValueError("Semantic operation references cannot cross work-unit scopes.")
+
+    for task in (report_task, *section_tasks):
+        if task is None:
+            continue
+        if isinstance(task, (_PlannerWireReportTask, ReportTask)):
+            scope_ref = "report"
+        else:
+            scope_ref = task.scope_ref
+        for constraint in task.presentation_constraints:
+            if constraint.scope_ref != scope_ref:
+                raise ValueError("Presentation constraints must remain within their task scope.")
+            for reference in (constraint.item_ref, constraint.anchor_ref):
+                if semantic_ref_scopes.get(reference) != scope_ref:
+                    raise ValueError("Presentation constraints require same-scope semantic refs.")
+
+    declared_scope_refs = {task.scope_ref for task in section_tasks if task.scope_ref is not None}
+    for item in unresolved:
+        if item.scope_ref != "report" and item.scope_ref not in declared_scope_refs:
+            raise ValueError("Unresolved semantics must refer to a declared work-unit scope.")
 
 
 def _canonical_plan_from_wire(wire_plan: _PlannerWirePlan) -> SemanticPlan:
@@ -940,6 +1132,7 @@ def _assert_duplicate_scope_consolidation_preserves_semantics(
         before.summary != after.summary
         or before.report_task != after.report_task
         or before.unresolved_requirements != after.unresolved_requirements
+        or before.unresolved_semantics != after.unresolved_semantics
     ):
         raise PlannerSemanticFailure(
             "unauthorized_correction_change",
@@ -987,6 +1180,7 @@ def _assert_duplicate_scope_consolidation_preserves_semantics(
 
         corrected = corrected_tasks[0]
         original_hint = original_tasks[0].existing_section_hint
+        original_scope_ref = original_tasks[0].scope_ref
         expected_goal = "\n".join(task.goal for task in original_tasks)
         expected_capabilities = tuple(
             dict.fromkeys(
@@ -1000,13 +1194,22 @@ def _assert_duplicate_scope_consolidation_preserves_semantics(
         expected_constraints = tuple(
             constraint for task in original_tasks for constraint in task.constraints
         )
+        expected_operations = tuple(
+            operation for task in original_tasks for operation in task.operations
+        )
+        expected_presentation = tuple(
+            item for task in original_tasks for item in task.presentation_constraints
+        )
         if (
             corrected.existing_section_hint != original_hint
+            or corrected.scope_ref != original_scope_ref
             or corrected.goal != expected_goal
             or corrected.capability_ids != expected_capabilities
             or corrected.source_hints != source_hints
             or corrected.requirements != expected_requirements
             or corrected.constraints != expected_constraints
+            or corrected.operations != expected_operations
+            or corrected.presentation_constraints != expected_presentation
         ):
             raise PlannerSemanticFailure(
                 "scope_consolidation_preservation_violation",
@@ -1414,7 +1617,9 @@ def _scope_consolidation_instruction(code: str) -> str:
         "Consolidate the repeated-scope tasks into one task. Preserve each prior "
         "goal verbatim in original order, joining goals with a newline; preserve "
         "the ordered capability union, ordered unique source hints, and the full "
-        "ordered requirements and constraints. Do not alter other work units."
+        "ordered requirements and constraints. Concatenate operations and "
+        "presentation constraints in their original order without changing any "
+        "local refs, values, conditions, or scopes. Do not alter other work units."
     )
 
 
@@ -1422,9 +1627,19 @@ def _safe_plan_for_correction(plan: SemanticPlan) -> dict[str, object]:
     """Project semantic intent without host identities or canonical source IDs."""
     report_task = None if plan.report_task is None else _safe_task_for_correction(plan.report_task)
     return {
+        "version": plan.version,
         "summary": _safe_correction_text(plan.summary),
         "report_task": report_task,
         "section_tasks": [_safe_task_for_correction(task) for task in plan.section_tasks],
+        "unresolved_semantics": [
+            {
+                "local_ref": item.local_ref,
+                "scope_ref": item.scope_ref,
+                "question": _safe_correction_text(item.question),
+                "candidate_clues": [_safe_correction_text(clue) for clue in item.candidate_clues],
+            }
+            for item in plan.unresolved_semantics
+        ],
     }
 
 
@@ -1440,17 +1655,49 @@ def _safe_task_for_correction(task: ReportTask | SectionTask) -> dict[str, objec
         ),
         "requirements": [_safe_correction_text(value) for value in task.requirements],
         "constraints": [_safe_correction_text(value) for value in task.constraints],
+        "operations": [_safe_operation_for_correction(item) for item in task.operations],
+        "presentation_constraints": [
+            item.model_dump(mode="json") for item in task.presentation_constraints
+        ],
     }
     if isinstance(task, SectionTask):
         payload["source_hints"] = [_safe_correction_text(value) for value in task.source_hints]
+        payload["scope_ref"] = task.scope_ref
     else:
         payload.pop("existing_section_hint")
+    return payload
+
+
+def _safe_operation_for_correction(operation: SemanticOperation) -> dict[str, object]:
+    """Redact path-shaped natural-language clues before model echo-back."""
+    payload = operation.model_dump(mode="json")
+    if payload.get("target_clue") is not None:
+        payload["target_clue"] = _safe_correction_text(str(payload["target_clue"]))
+    condition = payload.get("condition")
+    if isinstance(condition, dict) and condition.get("channel_clue") is not None:
+        condition["channel_clue"] = _safe_correction_text(str(condition["channel_clue"]))
+    field_values = payload.get("field_values")
+    if isinstance(field_values, list):
+        for field_value in field_values:
+            if isinstance(field_value, dict) and isinstance(field_value.get("value"), str):
+                field_value["value"] = _safe_correction_text(field_value["value"])
     return payload
 
 
 def _safe_correction_text(value: str) -> str:
     """Redact path-shaped text from provider-controlled semantic prose."""
     return re.sub(r"(?<!\w)(?:[A-Za-z]:[\\/]|/)[^\s,;]+", "[redacted-path]", value)
+
+
+def _contains_path_text(value: object) -> bool:
+    """Detect path-shaped text recursively in provider-facing model data."""
+    if isinstance(value, str):
+        return re.search(r"(?<!\w)(?:[A-Za-z]:[\\/]|/)[^\s,;]+", value) is not None
+    if isinstance(value, Mapping):
+        return any(_contains_path_text(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_contains_path_text(item) for item in value)
+    return False
 
 
 def _safe_source_summary(summary: Mapping[str, object] | None) -> dict[str, object]:
@@ -1601,28 +1848,36 @@ def _require_nonempty_items(values: tuple[str, ...]) -> None:
 
 
 _PLANNER_SYSTEM_PROMPT = """You are the semantic planning stage of Wellplot Code Mode v2.
-Describe semantic work units only. Do not emit document object IDs, section IDs,
-track IDs, binding IDs, component trees, parent relationships, operation order,
-insert positions, source paths, source formats, header slot IDs, or data-source
-objects. Do not describe SDK calls or mutation steps. Do not emit request hashes,
-span hashes, byte offsets, or other provenance; the host derives those facts from
-the authoritative request.
+Return version `wellplot.semantic-plan.v2`. Propose typed request-local semantic
+operations inside the existing report_task and one SectionTask per requested
+section scope. An operation is semantic intent, never a canonical CRUD command.
+Use local_ref, semantic_ref, parent_ref, natural-language target clues,
+registered verbs/object kinds, and explicit typed field_values. Do not emit
+canonical document IDs, component trees, source paths, source formats, header
+slot IDs, data-source objects, SDK calls, mutation steps, or host execution
+dependencies. Do not emit request hashes, span hashes, byte offsets, or other
+provenance; the host derives those facts from the authoritative request.
 
 The response must contain at least one executable work unit: a non-null
 report_task or a non-empty section_tasks array. A summary alone is never an
-executable plan. For a section edit, include one SectionTask with the required
+executable plan. Every report_task and SectionTask must contain at least one
+typed semantic operation. For a section edit, include one SectionTask with the required
 existing_section_hint key, including an explicit null only when reconstruction
 has no existing target.
 
 SectionTask cardinality follows the requested section scopes, not the number of
 tracks or object operations. Put all requested edits for the same section in
 that section's single SectionTask; use separate SectionTasks only for distinct
-requested section scopes.
+requested section scopes. Give each task a request-local scope_ref and use it
+for every operation and presentation constraint in that task. Report operations
+use scope_ref `report`.
 
 Select capability IDs exactly as listed in the static capability catalogue. A
-SectionTask describes what one logical section should accomplish; its list order
-does not specify document order or execution order. Existing-section hints are
-advisory natural-language clues only and are resolved later by host code.
+SectionTask describes what one logical section should accomplish. SectionTask
+list order does not specify document or execution order. Presentation
+constraints may express only user-requested semantic order using local refs;
+they never specify host CRUD/dependency execution order. Existing-section hints
+remain natural-language clues only and are resolved later by host code.
 
 For each work unit, select the complete set of capability types needed to
 represent the requested structure. Capability IDs identify capability types,
@@ -1654,6 +1909,14 @@ explicit values or categorical semantics that a downstream worker needs without
 the original request. Use requirements and constraints for this semantic text;
 do not emit document mechanics or implementation details.
 
+For each supported requested change, emit the corresponding SemanticOperation
+inside its owning task. Use only CREATE, UPDATE, ENSURE, MOVE, REMOVE, and SET
+with their declared meaning; do not substitute one verb for another. Put
+unresolved domain ambiguity in unresolved_semantics with its scope and candidate
+clues. Conditions must state which evidence kind is needed to evaluate them.
+An inspected source proving absence is distinct from a source that is
+uninspected or unavailable.
+
 Report-only requests must use report_task with an empty section_tasks collection;
 do not invent a dummy section task.
 
@@ -1661,7 +1924,18 @@ In revise mode, include only materially changed or newly requested semantic
 work. Omitted report or section areas are preserved by later deterministic
 stages. Preserve explicit user requirements and constraints verbatim where
 possible. Put unsupported requests in unresolved_requirements instead of
-inventing capabilities or identities.
+inventing capabilities or identities. Put semantic ambiguities in the typed
+unresolved_semantics collection, including a request-local scope_ref and safe
+candidate clues. For every supported requested change, emit the corresponding
+SemanticOperation in its owning task's operations collection. Use only the
+declared verbs CREATE, UPDATE, ENSURE, MOVE, REMOVE, and SET. Operation and
+presentation refs are request-local aliases, never canonical identifiers.
+
+An optional condition must identify whether its evidence comes from an
+inspected source inventory or the current document snapshot. Channel absence
+may be conditioned only on inspected-source evidence; not-inspected and
+unavailable do not mean absent. Preserve presentation constraints only when
+explicitly requested. Never use them to specify dependency/CRUD execution order.
 """
 
 
@@ -1669,9 +1943,14 @@ __all__ = [
     "CompilationMode",
     "PlannerSemanticError",
     "PlannerSemanticFailure",
+    "OperationCondition",
+    "PresentationConstraint",
     "ReportTask",
+    "SemanticFieldValue",
+    "SemanticOperation",
     "SectionTask",
     "SemanticPlan",
     "SemanticPlanner",
+    "UnresolvedSemantic",
     "validate_semantic_plan",
 ]

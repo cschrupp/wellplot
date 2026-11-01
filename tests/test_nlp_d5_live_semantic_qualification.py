@@ -2536,12 +2536,23 @@ def test_facade_projects_attachment_rejection_without_worker_dispatch() -> None:
         ) -> StructuredGenerationResult[BaseModel]:
             self.calls += 1
             payload = {
+                "version": "wellplot.semantic-plan.v2",
                 "summary": "Add a track to Main Log.",
                 "section_tasks": [
                     {
                         "goal": "Add a normal Gamma Ray track.",
                         "capability_ids": ["track.normal", "binding.curve"],
                         "existing_section_hint": "Unrequested Section",
+                        "scope_ref": "main_log",
+                        "operations": [
+                            {
+                                "local_ref": "create_gamma_ray_track",
+                                "scope_ref": "main_log",
+                                "verb": "CREATE",
+                                "object_kind": "track",
+                                "semantic_ref": "gamma_ray_track",
+                            }
+                        ],
                         "requirements": ["Plot GR."],
                     }
                 ],
@@ -2584,12 +2595,23 @@ def test_binding_smoke_exhausted_duplicate_scope_correction_is_contract_failure(
         artifact_root=str(artifact_root),
     )
     duplicate_plan = {
+        "version": "wellplot.semantic-plan.v2",
         "summary": "Add both requested tracks to Main Log.",
         "section_tasks": [
             {
                 "goal": "Add the Bond Index track and bind BI with the requested scale.",
                 "capability_ids": ["track.normal", "binding.curve"],
                 "existing_section_hint": "Main Log",
+                "scope_ref": "main_log",
+                "operations": [
+                    {
+                        "local_ref": "create_bond_index_track",
+                        "scope_ref": "main_log",
+                        "verb": "CREATE",
+                        "object_kind": "track",
+                        "semantic_ref": "bond_index_track",
+                    }
+                ],
                 "source_hints": ["CBL_Main_REV1.las"],
                 "requirements": [
                     "Track Title: Bond Index",
@@ -2606,6 +2628,16 @@ def test_binding_smoke_exhausted_duplicate_scope_correction_is_contract_failure(
                 "goal": "Add the Gamma Ray track and bind GR_STGC with the requested scale.",
                 "capability_ids": ["track.normal", "binding.curve"],
                 "existing_section_hint": "Main Log",
+                "scope_ref": "main_log",
+                "operations": [
+                    {
+                        "local_ref": "create_gamma_ray_track",
+                        "scope_ref": "main_log",
+                        "verb": "CREATE",
+                        "object_kind": "track",
+                        "semantic_ref": "gamma_ray_track",
+                    }
+                ],
                 "source_hints": ["CBL_Main_REV1.las"],
                 "requirements": [
                     "Track Title: Gamma Ray",

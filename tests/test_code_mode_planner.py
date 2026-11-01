@@ -24,6 +24,7 @@ from wellplot.agent.code_mode.planner import (
     _canonical_plan_from_wire,
     _correction_request,
     _PlannerWirePlan,
+    _safe_plan_for_correction,
     _safe_source_summary,
     _safe_task_for_correction,
     _schema_correction_request,
@@ -107,20 +108,40 @@ class _SequenceBackend:
 def _plan_payload() -> dict[str, object]:
     """Return a semantic plan without canonical document identities."""
     return {
+        "version": "wellplot.semantic-plan.v2",
         "summary": "Add a CBL presentation section.",
         "report_task": {
             "goal": "Preserve the existing report heading.",
             "capability_ids": ("report.standard",),
             "requirements": ("Keep the current heading layout.",),
+            "operations": (
+                {
+                    "local_ref": "preserve_report_heading",
+                    "scope_ref": "report",
+                    "verb": "ENSURE",
+                    "object_kind": "report_field",
+                    "semantic_ref": "report_heading",
+                },
+            ),
         },
         "section_tasks": (
             {
                 "goal": "Show the main CBL and VDL interpretation.",
                 "capability_ids": ("section.log_plot", "track.normal", "binding.curve"),
                 "existing_section_hint": "Main Pass",
+                "scope_ref": "main_pass",
                 "source_hints": ("use the staged CBL DLIS",),
                 "requirements": ("Include depth and cement-bond measurements.",),
                 "constraints": ("Keep the section readable.",),
+                "operations": (
+                    {
+                        "local_ref": "ensure_main_pass",
+                        "scope_ref": "main_pass",
+                        "verb": "ENSURE",
+                        "object_kind": "section",
+                        "semantic_ref": "main_pass_section",
+                    },
+                ),
             },
         ),
         "unresolved_requirements": (),
@@ -130,6 +151,7 @@ def _plan_payload() -> dict[str, object]:
 def _captured_duplicate_scope_plan() -> dict[str, object]:
     """Return the safe validated planner projection captured by binding smoke 001."""
     return {
+        "version": "wellplot.semantic-plan.v2",
         "summary": "Add the requested tracks to Main Log.",
         "section_tasks": (
             {
@@ -140,6 +162,7 @@ def _captured_duplicate_scope_plan() -> dict[str, object]:
                 ),
                 "capability_ids": ("track.normal", "binding.curve"),
                 "existing_section_hint": "Main Log",
+                "scope_ref": "main_log",
                 "source_hints": ("CBL_Main_REV1.las",),
                 "requirements": (
                     "Track Title: Bond Index",
@@ -153,6 +176,20 @@ def _captured_duplicate_scope_plan() -> dict[str, object]:
                     "Binding Line Width: 0.8",
                 ),
                 "constraints": (),
+                "operations": (
+                    {
+                        "local_ref": "create_bond_index_track",
+                        "scope_ref": "main_log",
+                        "verb": "CREATE",
+                        "object_kind": "track",
+                        "semantic_ref": "bond_index_track",
+                        "field_values": (
+                            {"field": "title", "state": "SET", "value": "Bond Index"},
+                            {"field": "kind", "state": "SET", "value": "normal"},
+                            {"field": "width_mm", "state": "SET", "value": 34},
+                        ),
+                    },
+                ),
             },
             {
                 "goal": (
@@ -162,6 +199,7 @@ def _captured_duplicate_scope_plan() -> dict[str, object]:
                 ),
                 "capability_ids": ("track.normal", "binding.curve"),
                 "existing_section_hint": "Main Log",
+                "scope_ref": "main_log",
                 "source_hints": ("CBL_Main_REV1.las",),
                 "requirements": (
                     "Track Title: Gamma Ray",
@@ -175,6 +213,20 @@ def _captured_duplicate_scope_plan() -> dict[str, object]:
                     "Binding Line Width: 0.8",
                 ),
                 "constraints": (),
+                "operations": (
+                    {
+                        "local_ref": "create_gamma_ray_track",
+                        "scope_ref": "main_log",
+                        "verb": "CREATE",
+                        "object_kind": "track",
+                        "semantic_ref": "gamma_ray_track",
+                        "field_values": (
+                            {"field": "title", "state": "SET", "value": "Gamma Ray"},
+                            {"field": "kind", "state": "SET", "value": "normal"},
+                            {"field": "width_mm", "state": "SET", "value": 26},
+                        ),
+                    },
+                ),
             },
         ),
     }
@@ -185,15 +237,18 @@ def _consolidated_duplicate_scope_plan() -> dict[str, object]:
     original = _captured_duplicate_scope_plan()
     tasks = original["section_tasks"]
     return {
+        "version": original["version"],
         "summary": original["summary"],
         "section_tasks": (
             {
                 "goal": "\n".join(task["goal"] for task in tasks),
                 "capability_ids": ("track.normal", "binding.curve"),
                 "existing_section_hint": "Main Log",
+                "scope_ref": tasks[0]["scope_ref"],
                 "source_hints": ("CBL_Main_REV1.las",),
                 "requirements": tuple(item for task in tasks for item in task["requirements"]),
                 "constraints": (),
+                "operations": tuple(item for task in tasks for item in task["operations"]),
             },
         ),
     }
@@ -241,6 +296,9 @@ def test_provider_schema_requires_work_unit_and_revision_hint_key() -> None:
     schema = _PlannerWirePlan.model_json_schema()
     section_schema = schema["$defs"]["_PlannerWireSectionTask"]
     assert "existing_section_hint" in section_schema["required"]
+    assert "scope_ref" in section_schema["required"]
+    assert "operations" in section_schema["required"]
+    assert "version" in schema["required"]
     assert list(Draft202012Validator(schema).iter_errors({"summary": "No work"}))
     assert list(
         Draft202012Validator(schema).iter_errors({"summary": "No work", "report_task": None})
@@ -254,29 +312,67 @@ def test_provider_schema_requires_work_unit_and_revision_hint_key() -> None:
         )
     )
     report_only = {
+        "version": "wellplot.semantic-plan.v2",
         "summary": "Update the report.",
-        "report_task": {"goal": "Update the report."},
+        "report_task": {
+            "goal": "Update the report.",
+            "operations": [
+                {
+                    "local_ref": "set_report_title",
+                    "scope_ref": "report",
+                    "verb": "SET",
+                    "object_kind": "report_field",
+                    "target_clue": "report title",
+                    "field_values": [{"field": "title", "state": "SET", "value": "New report"}],
+                }
+            ],
+        },
     }
     assert not list(Draft202012Validator(schema).iter_errors(report_only))
     section_only = {
+        "version": "wellplot.semantic-plan.v2",
         "summary": "Build a section.",
         "section_tasks": [
             {
                 "goal": "Build the section.",
                 "capability_ids": ["section.log_plot"],
                 "existing_section_hint": None,
+                "scope_ref": "main_scope",
+                "operations": [
+                    {
+                        "local_ref": "create_section",
+                        "scope_ref": "main_scope",
+                        "verb": "CREATE",
+                        "object_kind": "section",
+                        "semantic_ref": "main_section",
+                    }
+                ],
             }
         ],
     }
     assert not list(Draft202012Validator(schema).iter_errors(section_only))
+    missing_operations = json.loads(json.dumps(section_only))
+    del missing_operations["section_tasks"][0]["operations"]
+    assert list(Draft202012Validator(schema).iter_errors(missing_operations))
     assert _PlannerWirePlan.model_validate(
         {
+            "version": "wellplot.semantic-plan.v2",
             "summary": "Reconstruct a section.",
             "section_tasks": [
                 {
                     "goal": "Build the section.",
                     "capability_ids": ["section.log_plot"],
                     "existing_section_hint": None,
+                    "scope_ref": "main_scope",
+                    "operations": [
+                        {
+                            "local_ref": "create_section",
+                            "scope_ref": "main_scope",
+                            "verb": "CREATE",
+                            "object_kind": "section",
+                            "semantic_ref": "main_section",
+                        }
+                    ],
                 }
             ],
         }
@@ -284,6 +380,7 @@ def test_provider_schema_requires_work_unit_and_revision_hint_key() -> None:
     with pytest.raises(ValidationError):
         _PlannerWirePlan.model_validate(
             {
+                "version": "wellplot.semantic-plan.v2",
                 "summary": "Reconstruct a section.",
                 "section_tasks": [
                     {"goal": "Build the section.", "capability_ids": ["section.log_plot"]}
@@ -381,6 +478,7 @@ def test_wire_plan_converts_once_then_receives_host_provenance() -> None:
     )
     wire = _PlannerWirePlan.model_validate(
         {
+            "version": "wellplot.semantic-plan.v2",
             "summary": "Add the requested resistivity track.",
             "section_tasks": [
                 {
@@ -391,6 +489,16 @@ def test_wire_plan_converts_once_then_receives_host_provenance() -> None:
                         "binding.curve",
                     ],
                     "existing_section_hint": "Main Log",
+                    "scope_ref": "main_log",
+                    "operations": [
+                        {
+                            "local_ref": "create_resistivity_track",
+                            "scope_ref": "main_log",
+                            "verb": "CREATE",
+                            "object_kind": "track",
+                            "semantic_ref": "resistivity_qc",
+                        }
+                    ],
                     "requirements": [request],
                 }
             ],
@@ -403,6 +511,316 @@ def test_wire_plan_converts_once_then_receives_host_provenance() -> None:
     assert attached.obligations
     assert all(task.obligations for task in attached.section_tasks)
     assert {item.field for item in attached.obligations} >= {"title", "kind", "width_mm"}
+
+
+def test_versioned_plan_carries_scoped_semantic_operations_without_host_identity() -> None:
+    """Convert the versioned proposal once while retaining the existing plan boundary."""
+    payload = {
+        "version": "wellplot.semantic-plan.v2",
+        "summary": "Add Bond Index to Main Log.",
+        "section_tasks": [
+            {
+                "goal": "Add the requested curve to Main Log.",
+                "capability_ids": ["section.log_plot", "track.normal", "binding.curve"],
+                "existing_section_hint": "Main Log",
+                "scope_ref": "main_scope",
+                "operations": [
+                    {
+                        "local_ref": "create_bi_track",
+                        "scope_ref": "main_scope",
+                        "verb": "CREATE",
+                        "object_kind": "track",
+                        "semantic_ref": "bond_index",
+                        "field_values": [
+                            {"field": "title", "state": "SET", "value": "Bond Index"},
+                            {"field": "kind", "state": "SET", "value": "normal"},
+                            {"field": "width_mm", "state": "SET", "value": 34},
+                        ],
+                    },
+                    {
+                        "local_ref": "create_bi_binding",
+                        "scope_ref": "main_scope",
+                        "verb": "CREATE",
+                        "object_kind": "binding",
+                        "semantic_ref": "bond_index_curve",
+                        "parent_ref": "bond_index",
+                        "condition": {
+                            "predicate": "source_channel_available",
+                            "evidence_kind": "inspected_source",
+                            "evidence_ref": "source_main",
+                            "channel_clue": "BI",
+                        },
+                        "field_values": [
+                            {"field": "channel", "state": "SET", "value": "BI"},
+                            {"field": "scale_minimum", "state": "SET", "value": 0},
+                            {"field": "scale_maximum", "state": "SET", "value": 1},
+                        ],
+                    },
+                ],
+                "presentation_constraints": [],
+            }
+        ],
+    }
+
+    wire = _PlannerWirePlan.model_validate(payload)
+    canonical = _canonical_plan_from_wire(wire)
+    serialized_schema = json.dumps(_PlannerWirePlan.model_json_schema(), sort_keys=True)
+    assert canonical.version == "wellplot.semantic-plan.v2"
+    assert [operation.local_ref for operation in canonical.section_tasks[0].operations] == [
+        "create_bi_track",
+        "create_bi_binding",
+    ]
+    assert "RequestObligation" not in serialized_schema
+    assert "request_sha256" not in serialized_schema
+    assert "canonical_path" not in serialized_schema
+    assert "section_id" not in serialized_schema
+
+
+def test_operation_schema_accepts_large_batch_without_invented_numeric_cap() -> None:
+    """Represent twenty requested objects without applying an unstated cap."""
+    operations = [
+        {
+            "local_ref": f"create_track_{index}",
+            "scope_ref": "main_scope",
+            "verb": "CREATE",
+            "object_kind": "track",
+            "semantic_ref": f"track_{index}",
+            "field_values": [
+                {"field": "title", "state": "SET", "value": f"Track {index}"},
+                {"field": "kind", "state": "SET", "value": "normal"},
+            ],
+        }
+        for index in range(20)
+    ]
+    payload = _plan_payload()
+    task = dict(payload["section_tasks"][0])
+    task.update({"scope_ref": "main_scope", "operations": operations})
+    payload["section_tasks"] = (task,)
+
+    plan = _PlannerWirePlan.model_validate(payload)
+    assert len(plan.section_tasks[0].operations) == 20
+
+
+def test_operations_support_report_and_multiple_independent_section_scopes() -> None:
+    """A plan may combine report work with one task per distinct section scope."""
+    payload = _plan_payload()
+    original = dict(payload["section_tasks"][0])
+    second_scope = {
+        **original,
+        "existing_section_hint": "Repeat Pass",
+        "scope_ref": "repeat_pass",
+        "operations": [
+            {
+                **original["operations"][0],
+                "local_ref": "ensure_repeat_pass",
+                "scope_ref": "repeat_pass",
+                "semantic_ref": "repeat_pass_section",
+            }
+        ],
+    }
+    payload["section_tasks"] = (original, second_scope)
+
+    plan = _PlannerWirePlan.model_validate(payload)
+
+    assert plan.report_task is not None and plan.report_task.operations
+    assert [task.scope_ref for task in plan.section_tasks] == ["main_pass", "repeat_pass"]
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("duplicate_ref", "local_ref values must be unique"),
+        ("cross_scope", "remain within their task scope_ref"),
+        ("unsupported_verb", "Input should be 'CREATE'"),
+    ],
+)
+def test_operation_inventory_rejects_duplicate_cross_scope_and_unknown_verbs(
+    mutation: str,
+    message: str,
+) -> None:
+    """Reject malformed local references before obligation attachment."""
+    payload = _plan_payload()
+    task = dict(payload["section_tasks"][0])
+    operation = {
+        "local_ref": "operation_one",
+        "scope_ref": "main_scope",
+        "verb": "CREATE",
+        "object_kind": "track",
+        "semantic_ref": "track_one",
+        "field_values": [{"field": "title", "state": "SET", "value": "Track One"}],
+    }
+    if mutation == "duplicate_ref":
+        second = {**operation, "semantic_ref": "track_two"}
+        task.update({"scope_ref": "main_scope", "operations": [operation, second]})
+    elif mutation == "cross_scope":
+        task.update(
+            {
+                "scope_ref": "main_scope",
+                "operations": [{**operation, "scope_ref": "other_scope"}],
+            }
+        )
+    else:
+        task.update({"scope_ref": "main_scope", "operations": [{**operation, "verb": "EXECUTE"}]})
+    payload["section_tasks"] = (task,)
+
+    with pytest.raises(ValidationError, match=message):
+        _PlannerWirePlan.model_validate(payload)
+
+
+def test_semantic_field_values_distinguish_set_from_clear() -> None:
+    """A nullable field is not confused with an explicit clear operation."""
+    payload = _plan_payload()
+    task = dict(payload["section_tasks"][0])
+    operation = {
+        "local_ref": "clear_optional_label",
+        "scope_ref": "main_scope",
+        "verb": "SET",
+        "object_kind": "binding",
+        "target_clue": "the gamma-ray binding",
+        "field_values": [{"field": "label", "state": "CLEAR", "value": None}],
+    }
+    task.update({"scope_ref": "main_scope", "operations": [operation]})
+    payload["section_tasks"] = (task,)
+    parsed = _PlannerWirePlan.model_validate(payload)
+    assert parsed.section_tasks[0].operations[0].field_values[0].state == "CLEAR"
+
+    operation["field_values"] = [{"field": "label", "state": "CLEAR", "value": "Gamma"}]
+    with pytest.raises(ValidationError, match="CLEAR field values"):
+        _PlannerWirePlan.model_validate(payload)
+
+    operation["field_values"] = [{"field": "label", "state": "SET", "value": None}]
+    with pytest.raises(ValidationError, match="SET field values"):
+        _PlannerWirePlan.model_validate(payload)
+
+
+def test_conditions_and_presentation_constraints_require_scoped_refs() -> None:
+    """Inspection conditions and user ordering refer only to declared local objects."""
+    payload = _plan_payload()
+    task = dict(payload["section_tasks"][0])
+    task.update(
+        {
+            "scope_ref": "main_scope",
+            "operations": [
+                {
+                    "local_ref": "create_bi",
+                    "scope_ref": "main_scope",
+                    "verb": "CREATE",
+                    "object_kind": "track",
+                    "semantic_ref": "bond_index",
+                },
+                {
+                    "local_ref": "create_bi_binding",
+                    "scope_ref": "main_scope",
+                    "verb": "CREATE",
+                    "object_kind": "binding",
+                    "semantic_ref": "bi_curve",
+                    "parent_ref": "bond_index",
+                    "condition": {
+                        "predicate": "source_channel_available",
+                        "evidence_kind": "inspected_source",
+                        "evidence_ref": "source_main",
+                        "channel_clue": "BI",
+                    },
+                },
+            ],
+            "presentation_constraints": [
+                {
+                    "scope_ref": "main_scope",
+                    "item_ref": "bi_curve",
+                    "relation": "after",
+                    "anchor_ref": "bond_index",
+                }
+            ],
+        }
+    )
+    payload["section_tasks"] = (task,)
+    parsed = _PlannerWirePlan.model_validate(payload)
+    assert parsed.section_tasks[0].operations[1].condition.evidence_kind == "inspected_source"
+
+    task["presentation_constraints"] = [
+        {
+            "scope_ref": "other_scope",
+            "item_ref": "bi_curve",
+            "relation": "after",
+            "anchor_ref": "bond_index",
+        }
+    ]
+    with pytest.raises(ValidationError, match="remain within their task scope"):
+        _PlannerWirePlan.model_validate(payload)
+
+    task["presentation_constraints"] = []
+    task["operations"][1]["condition"]["evidence_kind"] = "document_snapshot"
+    with pytest.raises(ValidationError, match="evidence kind"):
+        _PlannerWirePlan.model_validate(payload)
+
+
+def test_unresolved_semantics_are_scoped_and_correction_text_is_redacted() -> None:
+    """Unresolved questions remain explicit without echoing filesystem paths."""
+    payload = _plan_payload()
+    payload["unresolved_semantics"] = [
+        {
+            "local_ref": "ambiguous_curve",
+            "scope_ref": "main_scope",
+            "question": "Which source should supply this curve?",
+            "candidate_clues": ["the survey GR channel"],
+        }
+    ]
+    task = dict(payload["section_tasks"][0])
+    task.update(
+        {
+            "scope_ref": "main_scope",
+            "operations": [
+                {
+                    "local_ref": "set_curve_label",
+                    "scope_ref": "main_scope",
+                    "verb": "SET",
+                    "object_kind": "binding",
+                    "target_clue": "the gamma-ray curve",
+                    "field_values": [
+                        {
+                            "field": "label",
+                            "state": "SET",
+                            "value": "Gamma Ray",
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+    payload["section_tasks"] = (task,)
+    unsafe_payload = json.loads(json.dumps(payload))
+    unsafe_payload["unresolved_semantics"][0]["question"] = (
+        "Which source at /private/survey.las should supply this curve?"
+    )
+    unsafe_payload["unresolved_semantics"][0]["candidate_clues"] = ["/private/survey.las:GR"]
+    unsafe_payload["section_tasks"][0]["operations"][0]["target_clue"] = (
+        "curve at /private/source.las"
+    )
+    unsafe_payload["section_tasks"][0]["operations"][0]["field_values"][0]["value"] = (
+        "/private/source.las:Gamma Ray"
+    )
+    plan = SemanticPlan.model_validate(unsafe_payload)
+    safe = json.dumps(_safe_plan_for_correction(plan), sort_keys=True)
+
+    assert "/private/" not in safe
+    assert "[redacted-path]" in safe
+
+    payload["unresolved_semantics"][0]["scope_ref"] = "missing_scope"
+    with pytest.raises(ValidationError, match="declared work-unit scope"):
+        _PlannerWirePlan.model_validate(payload)
+
+
+def test_wire_plan_rejects_path_text_in_model_generated_semantics() -> None:
+    """Provider-facing clues cannot smuggle machine-local paths into the plan."""
+    payload = _plan_payload()
+    task = dict(payload["section_tasks"][0])
+    operation = dict(task["operations"][0])
+    operation["field_values"] = [{"field": "title", "state": "SET", "value": "/private/survey.las"}]
+    task["operations"] = [operation]
+    payload["section_tasks"] = (task,)
+
+    with pytest.raises(ValidationError, match="filesystem paths"):
+        _PlannerWirePlan.model_validate(payload)
 
 
 def test_source_inventory_distinguishes_inspection_states() -> None:
@@ -779,23 +1197,50 @@ def test_duplicate_scope_correction_rejects_different_source_hints_before_retry(
     assert len(backend.requests) == 1
 
 
-@pytest.mark.parametrize("unrelated_change", ["report", "extra_section"])
+@pytest.mark.parametrize("unrelated_change", ["report", "extra_section", "unresolved"])
 def test_duplicate_scope_correction_rejects_unrelated_work_changes(
     unrelated_change: str,
 ) -> None:
-    """Consolidating section tasks cannot alter report or other section work."""
+    """Consolidation cannot alter report, other sections, or unresolved semantics."""
     corrected = _consolidated_duplicate_scope_plan()
     if unrelated_change == "report":
         corrected["report_task"] = {
             "goal": "Replace the report heading.",
             "capability_ids": ("report.standard",),
+            "operations": (
+                {
+                    "local_ref": "replace_report_heading",
+                    "scope_ref": "report",
+                    "verb": "SET",
+                    "object_kind": "report_field",
+                    "target_clue": "report heading",
+                    "field_values": ({"field": "title", "state": "SET", "value": "New heading"},),
+                },
+            ),
         }
-    else:
+    elif unrelated_change == "extra_section":
         corrected["section_tasks"] = (
             *corrected["section_tasks"],
             {
                 **corrected["section_tasks"][0],
                 "existing_section_hint": "Repeat Log",
+                "scope_ref": "repeat_log",
+                "operations": (
+                    {
+                        **corrected["section_tasks"][0]["operations"][0],
+                        "local_ref": "repeat_log_extra_operation",
+                        "scope_ref": "repeat_log",
+                        "semantic_ref": "repeat_log_extra_section",
+                    },
+                ),
+            },
+        )
+    else:
+        corrected["unresolved_semantics"] = (
+            {
+                "local_ref": "new_ambiguity",
+                "scope_ref": "main_log",
+                "question": "Which additional curve should be included?",
             },
         )
     backend = _SequenceBackend(responses=[_captured_duplicate_scope_plan(), corrected])

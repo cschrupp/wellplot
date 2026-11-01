@@ -1597,20 +1597,66 @@ class _D4PlannerBackend:
             max_output_tokens=request.max_output_tokens,
         )
         payload = value.model_dump(mode="python")
+        payload["version"] = "wellplot.semantic-plan.v2"
         payload.pop("obligations", None)
         payload.pop("requirement_compilation", None)
         payload.pop("scope_binding", None)
         if isinstance(payload.get("report_task"), dict):
             payload["report_task"].pop("obligations", None)
-        for task in payload.get("section_tasks", ()):
+            payload["report_task"]["operations"] = [
+                {
+                    "local_ref": "ensure_report_scope",
+                    "scope_ref": "report",
+                    "verb": "ENSURE",
+                    "object_kind": "report_field",
+                    "semantic_ref": "report_scope",
+                }
+            ]
+        for index, task in enumerate(payload.get("section_tasks", ())):
             if isinstance(task, dict):
                 task.pop("obligations", None)
                 task.pop("requirement_refs", None)
                 task.pop("scope_id", None)
+                scope_ref = task.get("scope_ref") or f"section_{index + 1}"
+                task["scope_ref"] = scope_ref
+                task["operations"] = [
+                    {
+                        "local_ref": f"ensure_{scope_ref}",
+                        "scope_ref": scope_ref,
+                        "verb": "ENSURE",
+                        "object_kind": "section",
+                        "semantic_ref": f"object_{scope_ref}",
+                    }
+                ]
         return StructuredGenerationResult(
             value=response_model.model_validate(payload),
             metrics=ProviderMetrics(input_tokens=1, output_tokens=1, total_tokens=2),
         )
+
+
+def test_d4_planner_test_adapter_emits_versioned_operation_inventory() -> None:
+    """The deterministic backend double conforms to the current planner DTO."""
+    backend = _D4PlannerBackend(_D4SessionPlanner(calls=[]))
+    context = {
+        "request": "In Main Log, revise the Gamma Ray scale.",
+        "mode": "revise",
+        "current_document_summary": None,
+        "source_summary": None,
+    }
+    result = asyncio.run(
+        backend.generate_structured(
+            StructuredGenerationRequest(
+                system_prompt="synthetic planner fixture",
+                user_prompt="Context:\n" + json.dumps(context),
+                timeout_seconds=1.0,
+            ),
+            response_model=_PlannerWirePlan,
+        )
+    )
+
+    assert result.value.version == "wellplot.semantic-plan.v2"
+    assert result.value.section_tasks
+    assert all(task.scope_ref and task.operations for task in result.value.section_tasks)
 
 
 @dataclass
