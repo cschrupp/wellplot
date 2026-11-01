@@ -39,7 +39,7 @@ from .section_leaf_safety import (
     SectionLeafSafetyEvidence,
     SectionLeafSafetyFailure,
 )
-from .state import CodeModeGraphState, WorkerOutcome
+from .state import CodeModeGraphState, ConditionalOmissionEvidence, WorkerOutcome
 from .workflow import CodeModeGraphDependencies, build_compile_graph
 
 
@@ -78,6 +78,7 @@ class CompileWorkerEvidence(_CompileModel):
     diagnostics: tuple[CompileDiagnostic, ...] = ()
     metrics: SemanticMetrics = Field(default_factory=SemanticMetrics)
     stage_evidence: SemanticStageEvidence = Field(default_factory=SemanticStageEvidence)
+    conditional_omissions: tuple[ConditionalOmissionEvidence, ...] = ()
 
     @model_validator(mode="before")
     @classmethod
@@ -218,6 +219,18 @@ def _project_graph_result(state: dict[str, object]) -> CodeModeCompileResult:
         for payload in state.get("worker_outcomes", [])
     )
     _validate_projected_work_units(outcomes, plan)
+    omitted_requirement_ids = {
+        requirement_id
+        for outcome in outcomes
+        for omission in outcome.conditional_omissions
+        for requirement_id in omission.requirement_ids
+    }
+    known_requirement_ids = {item.requirement_id for item in plan.obligations}
+    if not omitted_requirement_ids <= known_requirement_ids:
+        raise ValueError("Conditional omission references an unknown request obligation.")
+    remaining_obligations = tuple(
+        item for item in plan.obligations if item.requirement_id not in omitted_requirement_ids
+    )
     workers = tuple(
         _worker_evidence(outcome) for outcome in sorted(outcomes, key=lambda item: item.plan_order)
     )
@@ -235,17 +248,18 @@ def _project_graph_result(state: dict[str, object]) -> CodeModeCompileResult:
             diagnostics=diagnostics,
             workers=workers,
             metrics=metrics,
-            obligations=plan.obligations,
+            obligations=remaining_obligations,
         )
 
     merged_payload = state.get("merged_intent")
-    if not isinstance(merged_payload, dict) or not merged_payload:
+    has_verified_noop = bool(omitted_requirement_ids)
+    if not isinstance(merged_payload, dict) or (not merged_payload and not has_verified_noop):
         raise ValueError("Successful Code Mode graph completed without merged intent.")
     merged_intent = AuthoringDocumentIntent.model_validate(merged_payload)
     return CodeModeCompileResult(
         success=True,
         merged_intent=merged_intent,
-        obligations=plan.obligations,
+        obligations=remaining_obligations,
         diagnostics=diagnostics,
         workers=workers,
         metrics=metrics,
@@ -268,6 +282,7 @@ def _worker_evidence(outcome: WorkerOutcome) -> CompileWorkerEvidence:
         ),
         metrics=outcome.metrics,
         stage_evidence=outcome.stage_evidence,
+        conditional_omissions=outcome.conditional_omissions,
     )
 
 

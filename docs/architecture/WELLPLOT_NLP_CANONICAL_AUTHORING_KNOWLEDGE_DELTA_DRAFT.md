@@ -48,6 +48,148 @@ does not claim runtime capability and does not authorize A01 by itself.
 
 Stage one is promoted; no implementation capability is claimed.
 
+## A03 Snapshot/Inspection Implementation Candidate
+
+```yaml
+status: IMPLEMENTATION CANDIDATE / NOT INDEPENDENTLY ACCEPTED
+slice: A03
+provider_model_endpoint_calls: 0
+scientific_population_access: 0
+```
+
+The current provider-free A03 candidate extends the existing
+`AuthoringInspectionFacade` and `SemanticEnricher`; it adds no query loop,
+loader, graph, or execution path.
+
+- A canonical document revision is SHA-256 over sorted-key canonical JSON of
+  the immutable `AuthoringDocumentSpec` projection.
+- Each selected source has a request-local `source-N` handle assigned from a
+  deterministic candidate ordering. Existing sections receive `section-N`
+  handles from canonical section order. Host contexts retain their private
+  identity mapping; worker contracts receive only opaque handles.
+- A shared `wellplot.document-inspection.v1` snapshot digest binds the
+  document revision to the selected source handles, inspection states, and
+  source revision tokens. Report and section worker contexts carry the same
+  snapshot ID. The graph validates it before dispatch and before intent merge.
+- Source revision tokens hash the canonical path plus filesystem device,
+  inode, byte size, and nanosecond modification time. This is an optimistic
+  metadata revision token, not a content hash; it avoids rereading potentially
+  large LAS/DLIS assets. A later publication/commit boundary must perform the
+  authoritative current-state check before writes.
+- `not_inspected` channels are not represented as an authoritative empty
+  inventory. Selected not-inspected sources pass through the existing loader;
+  `unavailable` remains explicit and has no channel inventory; inspected-empty
+  remains `inspected` with zero channels.
+- Serialized enriched context is capped at 1,048,576 UTF-8 bytes and fails
+  deterministically with `enrichment.inspection_context_limit`. The cap
+  includes internal host-side context fields, making it conservative relative
+  to the smaller model-facing worker contract.
+- Absolute/canonical paths and channel descriptions remain excluded from the
+  worker contract; a safe basename/approved label may identify a source.
+  Injected descriptions are untrusted metadata and do not enter prompts.
+
+This candidate does not implement optional worker queries, operation coverage,
+or publication-time concurrency control. Those remain assigned to their
+specified slices. The source revision token's metadata limitation is explicit
+and must not be reported as byte-integrity verification.
+
+## A04–A05 Host Operation Contract and Sparse Track Batch Candidate
+
+```yaml
+status: IMPLEMENTATION CANDIDATE / NOT INDEPENDENTLY ACCEPTED
+slices: [A04, A05]
+provider_model_endpoint_calls: 0
+scientific_population_access: 0
+```
+
+- The canonical section work-contract builder now selects `add_tracks` for
+  multiple track additions to an existing section. Track count no longer
+  selects `reconstruct`; new-section construction continues to use the
+  existing reconstruction action.
+- `build_section_operation_contract()` compiles the planner inventory into
+  `wellplot.section-operation-contract.v1`: bounded at 20 operations (the
+  shared planner-wire/worker-schema maximum), with deterministic operation
+  IDs, request hash, scope/snapshot binding, target-local handles, conditional
+  evidence, requirement IDs, ordering relations, and a schema digest. The
+  count is a finite response-size guard, not a provider compatibility claim.
+  Track facts must be covered once; planner-proposed explicit values must
+  agree with compiled obligations. Existing `SectionWorkContract` remains the
+  authority for semantic field values and preservation rules.
+- Existing-section multi-add output is one `add_tracks` DTO containing one
+  `operation_ref` and one sparse track patch per authorized `ADD_TRACK`. The
+  canonical worker checks operation-set equality and operation-to-track
+  ownership before grounding. The six-or-eight-existing-track reconstruction
+  DTO is not accepted as an additive response.
+- The existing `CanonicalSectionWorker`, graph dispatch, provider adapter, and
+  `lower_section_action()` remain the only execution path. For shared legacy
+  obligation validators only, the worker constructs a private, non-serialized
+  section-shaped validation projection from the sparse patches. Lowering still
+  receives `AddTracksAction` and independently invokes the existing single-
+  track canonical lowerer for each patch, combining the resulting intent
+  fragments; it does not compile or replace the existing section.
+- Only `CREATE track` / `ADD_TRACK` is admitted by this contract slice; mixed
+  fill, binding-update, move, remove, and section-field inventories fail closed
+  before worker dispatch. The corresponding `add_tracks` DTO shares the
+  planner's 20-operation schema bound.
+- Source-channel conditions are evaluated against the named inspected source.
+  True operations are admitted; false operations are recorded as explicit
+  no-ops with their source/channel evidence and owned requirement IDs, which
+  are excluded from final compile obligations. Not-inspected, unavailable,
+  ambiguous, and generic target conditions fail closed. Conditions never
+  imply absence without inspected evidence.
+- Report-operation projection now requires exact request-obligation coverage
+  and rejects fieldless `ENSURE` as an unverifiable no-op. Single-track
+  operation-ref binding, report worker mapping, full canonical
+  operation-to-intent coverage, transactional publication, and migration of
+  remaining worker action families are not claimed complete here. They remain
+  assigned to A06–A08 and require explicit regressions before acceptance.
+
+Provider-free evidence currently covers operation ownership/value conflicts,
+ missing track coverage, true/false/unknown conditional admission, explicit
+no-op output and obligation filtering, source-specific evidence, exact
+multi-add operation references, worker-level two-track validation and
+lowering, preservation/reconciliation with pre-existing unrelated tracks,
+schema strictness, and the existing planner/enrichment/work-contract suites.
+This is not live provider compatibility or end-to-end persistence/render
+qualification.
+
+## A06 Report Operation Contract Candidate
+
+```yaml
+status: IMPLEMENTATION CANDIDATE / NOT INDEPENDENTLY ACCEPTED
+provider_model_endpoint_calls: 0
+scientific_population_access: 0
+```
+
+- The existing graph compiles a report operation contract from the one
+  `ReportTask`, its request obligations, and the shared report snapshot.
+  Request-local operation refs bind to an exact report-owned field and target
+  slot; ambiguous metadata slots, unresolved values, unsupported object kinds,
+  and out-of-scope ordering refs fail before report-worker dispatch.
+- `CanonicalReportWorker` remains the only report worker. It receives the
+  host-owned projection, preserves `ReportSemanticResponse`, applies the
+  existing compiled report requirements and slot-group checks, validates
+  obligations, then checks the final sparse target/value projection before
+  existing intent lowering. No report-specific wire DTO, executor, or CRUD
+  route was introduced.
+- Explicit metadata slot resolution currently uses exact normalized equality
+  against inspected slot keys/labels. It does not invent aliases. Service
+  titles and remarks bind to request-local ordered slots. Existing typed
+  report presentation order constraints are checked only when their targets
+  resolve to ordered service-title/remark facts.
+- The report DTO does not echo operation refs. The host retains the
+  operation-to-target binding and verifies the resulting normalized field,
+  target, and value; it does not claim model-output provenance per operation.
+  The request-obligation compiler remains the authority for exact requested
+  values, and unsupported report operation fields fail closed rather than
+  being guessed.
+
+Provider-free evidence covers exact metadata slot mapping, ambiguity refusal,
+output value drift, ordering constraints, and integration with the existing
+  planner, report worker, enrichment, workflow, and section-work-contract
+  suites. This does not establish live provider compatibility or persistence,
+rendering, or full mixed-request transaction behavior.
+
 ## Stage 2: Implementation Promotion
 
 After independent implementation acceptance, update the baseline with only

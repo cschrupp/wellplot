@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -22,6 +24,7 @@ from .obligations import ObligationKind
 from .planner import CompilationMode, SectionTask, SemanticPlan
 
 SourceFormat = Literal["las", "dlis"]
+MAX_SERIALIZED_INSPECTION_CONTEXT_BYTES = 1_048_576
 
 
 class _EnrichmentModel(BaseModel):
@@ -84,10 +87,12 @@ class SourceContext(_EnrichmentModel):
     """One normalized, inspected source attached to a semantic task."""
 
     candidate_id: str = Field(min_length=1)
+    handle: str = Field(default="source-1", min_length=1)
     labels: tuple[str, ...] = ()
-    canonical_path: str = Field(min_length=1)
-    source_format: SourceFormat
+    canonical_path: str | None = None
+    source_format: SourceFormat | None = None
     inspection_state: Literal["inspected", "not_inspected", "unavailable"] = "inspected"
+    revision_token: str | None = None
     dataset_name: str = ""
     well_metadata: tuple[SourceMetadata, ...] = ()
     channels: tuple[ChannelContext, ...] = ()
@@ -113,6 +118,8 @@ class ResolvedSectionContext(_EnrichmentModel):
 
     task_index: int = Field(ge=0)
     section_id: str | None = Field(default=None, min_length=1)
+    section_handle: str | None = Field(default=None, min_length=1)
+    snapshot_id: str | None = Field(default=None, min_length=1)
     sources: tuple[SourceContext, ...] = ()
     channels: tuple[ChannelInspectionSummary, ...] = ()
     existing_curves: tuple[ExistingCurveContext, ...] = ()
@@ -121,10 +128,28 @@ class ResolvedSectionContext(_EnrichmentModel):
 class ReportContext(_EnrichmentModel):
     """Read-only report inventory exposed to a future worker."""
 
+    snapshot_id: str | None = None
     header_slots: tuple[HeaderSlotInspectionSummary, ...] = ()
     general_slot_ids: tuple[str, ...] = ()
     service_title_slot_ids: tuple[str, ...] = ()
     detail_slot_ids: tuple[str, ...] = ()
+
+
+class SnapshotSource(_EnrichmentModel):
+    """Opaque source identity and explicit inspection state in one snapshot."""
+
+    handle: str = Field(min_length=1)
+    inspection_state: Literal["inspected", "not_inspected", "unavailable"]
+    revision_token: str | None = None
+
+
+class DocumentInspectionSnapshot(_EnrichmentModel):
+    """Versioned host-owned identity shared by all tasks in one graph run."""
+
+    version: Literal["wellplot.document-inspection.v1"] = "wellplot.document-inspection.v1"
+    snapshot_id: str = Field(min_length=1)
+    document_revision: str = Field(min_length=1)
+    sources: tuple[SnapshotSource, ...] = ()
 
 
 class EnrichmentWarning(_EnrichmentModel):
@@ -140,6 +165,8 @@ class EnrichedSemanticContext(_EnrichmentModel):
     plan: SemanticPlan
     sections: tuple[ResolvedSectionContext, ...]
     report: ReportContext
+    snapshot: DocumentInspectionSnapshot | None = None
+    snapshot_bytes: int = Field(default=0, ge=0)
     warnings: tuple[EnrichmentWarning, ...] = ()
 
 
@@ -157,6 +184,8 @@ class EnrichmentErrorCode(StrEnum):
     SECTION_TARGET_DUPLICATE = "section_target_duplicate"
     SECTION_TARGET_CARDINALITY_AMBIGUOUS = "section_target_cardinality_ambiguous"
     SCOPE_BINDING_MISMATCH = "scope_binding_mismatch"
+    SNAPSHOT_STALE = "snapshot_stale"
+    INSPECTION_CONTEXT_LIMIT = "inspection_context_limit"
 
 
 class SemanticEnrichmentError(ValueError):
@@ -192,6 +221,12 @@ class SemanticEnricher:
 
     loader: SourceLoaderProtocol
     allowed_roots: Mapping[str, str | Path]
+    max_context_bytes: int = MAX_SERIALIZED_INSPECTION_CONTEXT_BYTES
+
+    def __post_init__(self) -> None:
+        """Reject a disabled or nonsensical serialized-context budget."""
+        if not 1 <= self.max_context_bytes <= MAX_SERIALIZED_INSPECTION_CONTEXT_BYTES:
+            raise ValueError("The inspection context byte limit is outside its allowed range.")
 
     def enrich(
         self,
@@ -201,8 +236,18 @@ class SemanticEnricher:
         document: AuthoringDocumentSpec,
         source_candidates: Sequence[SourceCandidate],
         mode: CompilationMode = "reconstruct",
+        expected_document_revision: str | None = None,
     ) -> EnrichedSemanticContext:
         """Enrich one plan without changing it or mutating the document."""
+        document_revision = AuthoringInspectionFacade(document).document_revision()
+        if (
+            expected_document_revision is not None
+            and expected_document_revision != document_revision
+        ):
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SNAPSHOT_STALE,
+                "The document changed between planning and source inspection.",
+            )
         target_obligations = tuple(
             item for item in plan.obligations if item.kind is ObligationKind.TARGET_REFERENCE
         )
@@ -283,6 +328,30 @@ class SemanticEnricher:
             document,
             available_channels=available_channels,
         )
+        sources_by_handle = {
+            source.handle: source for sources in resolved_sources.values() for source in sources
+        }
+        snapshot_sources = tuple(
+            SnapshotSource(
+                handle=source.handle,
+                inspection_state=source.inspection_state,
+                revision_token=source.revision_token,
+            )
+            for source in sorted(sources_by_handle.values(), key=lambda item: item.handle)
+        )
+        snapshot_payload = {
+            "version": "wellplot.document-inspection.v1",
+            "document_revision": document_revision,
+            "sources": [item.model_dump(mode="json") for item in snapshot_sources],
+        }
+        snapshot_id = hashlib.sha256(
+            json.dumps(snapshot_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        snapshot = DocumentInspectionSnapshot(
+            snapshot_id=snapshot_id,
+            document_revision=document_revision,
+            sources=snapshot_sources,
+        )
         sections = tuple(
             self._section_context(
                 task,
@@ -291,20 +360,100 @@ class SemanticEnricher:
                 inspection=inspection,
                 document=document,
                 sources=resolved_sources[task_index],
+                snapshot_id=snapshot_id,
             )
             for task_index, task in enumerate(plan.section_tasks)
         )
-        return EnrichedSemanticContext(
+        context = EnrichedSemanticContext(
             plan=plan,
             sections=sections,
             report=ReportContext(
+                snapshot_id=snapshot_id,
                 header_slots=_report_header_slots(document, inspection.header_slots()),
                 general_slot_ids=_general_slot_ids(document),
                 service_title_slot_ids=_service_title_slot_ids(document),
                 detail_slot_ids=_detail_slot_ids(document),
             ),
+            snapshot=snapshot,
             warnings=tuple(warnings),
         )
+        serialized_size = len(
+            json.dumps(
+                context.model_dump(mode="json", exclude={"snapshot_bytes"}),
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        )
+        if serialized_size > self.max_context_bytes:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.INSPECTION_CONTEXT_LIMIT,
+                "The inspected worker context exceeds its configured size limit.",
+            )
+        return context.model_copy(update={"snapshot_bytes": serialized_size})
+
+    def validate_snapshot(
+        self,
+        context: EnrichedSemanticContext,
+        document: AuthoringDocumentSpec,
+    ) -> None:
+        """Fail closed when captured document or source revisions have changed."""
+        snapshot = context.snapshot
+        if snapshot is None:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SNAPSHOT_STALE,
+                "Worker context is missing its required inspection snapshot.",
+            )
+        if any(section.snapshot_id != snapshot.snapshot_id for section in context.sections):
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SNAPSHOT_STALE,
+                "Section context is not bound to the captured document snapshot.",
+            )
+        if context.report.snapshot_id != snapshot.snapshot_id:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SNAPSHOT_STALE,
+                "Report context is not bound to the captured document snapshot.",
+            )
+        if AuthoringInspectionFacade(document).document_revision() != snapshot.document_revision:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SNAPSHOT_STALE,
+                "The document no longer matches the inspected snapshot.",
+            )
+        inspected_sources = {
+            source.handle: source for section in context.sections for source in section.sources
+        }
+        actual_source_identity = tuple(
+            SnapshotSource(
+                handle=source.handle,
+                inspection_state=source.inspection_state,
+                revision_token=source.revision_token,
+            )
+            for source in sorted(inspected_sources.values(), key=lambda item: item.handle)
+        )
+        if actual_source_identity != snapshot.sources:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SNAPSHOT_STALE,
+                "Source context no longer matches its captured snapshot identity.",
+            )
+        for source in inspected_sources.values():
+            if source.inspection_state != "inspected":
+                continue
+            if source.canonical_path is None or source.revision_token is None:
+                raise SemanticEnrichmentError(
+                    EnrichmentErrorCode.SNAPSHOT_STALE,
+                    "An inspected source is missing its private revision identity.",
+                )
+            try:
+                current_token = _source_revision_token(Path(source.canonical_path))
+            except OSError as exc:
+                raise SemanticEnrichmentError(
+                    EnrichmentErrorCode.SNAPSHOT_STALE,
+                    "An inspected source is no longer available at its snapshot revision.",
+                ) from exc
+            if current_token != source.revision_token:
+                raise SemanticEnrichmentError(
+                    EnrichmentErrorCode.SNAPSHOT_STALE,
+                    "An inspected source changed after the worker snapshot was created.",
+                )
 
     def _load_source(
         self,
@@ -314,6 +463,30 @@ class SemanticEnricher:
         task_index: int,
     ) -> SourceContext:
         """Load one canonical candidate at most once per enrichment call."""
+        if candidate.path is None:
+            return SourceContext(
+                candidate_id=candidate.candidate_id,
+                handle=candidate.handle,
+                labels=candidate.labels,
+                source_format=candidate.source_format,
+                inspection_state="unavailable",
+            )
+        if candidate.source_format is None:
+            return SourceContext(
+                candidate_id=candidate.candidate_id,
+                handle=candidate.handle,
+                labels=candidate.labels,
+                inspection_state="unavailable",
+            )
+        try:
+            revision_before = _source_revision_token(candidate.path)
+        except OSError as exc:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SOURCE_MISSING,
+                "The selected source changed before inspection.",
+                task_index=task_index,
+                candidate_id=candidate.candidate_id,
+            ) from exc
         cache_key = (candidate.path, candidate.source_format)
         if cache_key not in loaded_cache:
             try:
@@ -329,11 +502,30 @@ class SemanticEnricher:
                     candidate_id=candidate.candidate_id,
                 ) from exc
         loaded = loaded_cache[cache_key]
+        try:
+            revision_after = _source_revision_token(candidate.path)
+        except OSError as exc:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SNAPSHOT_STALE,
+                "The selected source became unavailable during inspection.",
+                task_index=task_index,
+                candidate_id=candidate.candidate_id,
+            ) from exc
+        if revision_before != revision_after:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SNAPSHOT_STALE,
+                "A source changed while it was being inspected.",
+                task_index=task_index,
+                candidate_id=candidate.candidate_id,
+            )
         return SourceContext(
             candidate_id=candidate.candidate_id,
+            handle=candidate.handle,
             labels=candidate.labels,
             canonical_path=str(candidate.path),
             source_format=candidate.source_format,
+            inspection_state="inspected",
+            revision_token=revision_after,
             dataset_name=loaded.dataset_name,
             well_metadata=loaded.well_metadata,
             channels=loaded.channels,
@@ -348,6 +540,7 @@ class SemanticEnricher:
         inspection: AuthoringInspectionFacade,
         document: AuthoringDocumentSpec,
         sources: tuple[SourceContext, ...],
+        snapshot_id: str,
     ) -> ResolvedSectionContext:
         """Project canonical section and channels through the inspection facade."""
         if section_id is None:
@@ -366,6 +559,8 @@ class SemanticEnricher:
         return ResolvedSectionContext(
             task_index=task_index,
             section_id=section_id,
+            section_handle=(None if section_id is None else inspection.section_handle(section_id)),
+            snapshot_id=snapshot_id,
             sources=sources,
             channels=channels,
             existing_curves=_existing_curves(document, section_id),
@@ -377,8 +572,10 @@ class _NormalizedCandidate:
     """Internal canonical candidate retained only during one enrichment call."""
 
     candidate_id: str
-    path: Path
-    source_format: SourceFormat
+    handle: str
+    path: Path | None
+    source_format: SourceFormat | None
+    inspection_state: Literal["inspected", "not_inspected", "unavailable"]
     labels: tuple[str, ...]
 
 
@@ -473,6 +670,18 @@ def _normalize_candidates(
 
         requested = Path(candidate.path).expanduser()
         path = requested if requested.is_absolute() else root / requested
+        if candidate.inspection_state == "unavailable":
+            normalized.append(
+                _NormalizedCandidate(
+                    candidate_id=candidate.candidate_id,
+                    handle="",
+                    path=None,
+                    source_format=_source_format_hint(candidate, path),
+                    inspection_state="unavailable",
+                    labels=tuple(dict.fromkeys((*candidate.labels, path.name, path.stem))),
+                )
+            )
+            continue
         try:
             canonical_path = path.resolve(strict=True)
         except (FileNotFoundError, OSError) as exc:
@@ -499,12 +708,42 @@ def _normalize_candidates(
         normalized.append(
             _NormalizedCandidate(
                 candidate_id=candidate.candidate_id,
+                handle="",
                 path=canonical_path,
                 source_format=source_format,
+                inspection_state=candidate.inspection_state,
                 labels=tuple(candidate.labels),
             )
         )
-    return tuple(sorted(normalized, key=lambda item: item.candidate_id.casefold()))
+    ordered = sorted(normalized, key=lambda item: (item.candidate_id.casefold(), item.candidate_id))
+    return tuple(
+        _NormalizedCandidate(
+            candidate_id=item.candidate_id,
+            handle=f"source-{index + 1}",
+            path=item.path,
+            source_format=item.source_format,
+            inspection_state=item.inspection_state,
+            labels=item.labels,
+        )
+        for index, item in enumerate(ordered)
+    )
+
+
+def _source_format_hint(candidate: SourceCandidate, path: Path) -> SourceFormat | None:
+    """Infer an unavailable candidate format without resolving its path."""
+    suffix_format: SourceFormat | None = {
+        ".las": "las",
+        ".dlis": "dlis",
+    }.get(path.suffix.casefold())
+    if candidate.trusted_format is not None:
+        if suffix_format is not None and candidate.trusted_format != suffix_format:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SOURCE_FORMAT_CONFLICT,
+                "The trusted source format conflicts with the file suffix.",
+                candidate_id=candidate.candidate_id,
+            )
+        return candidate.trusted_format
+    return suffix_format
 
 
 def _source_format(candidate: SourceCandidate, path: Path) -> SourceFormat:
@@ -530,6 +769,23 @@ def _source_format(candidate: SourceCandidate, path: Path) -> SourceFormat:
             candidate_id=candidate.candidate_id,
         )
     return suffix_format
+
+
+def _source_revision_token(path: Path) -> str:
+    """Hash stable filesystem revision metadata without reading large source bytes."""
+    resolved_path = path.resolve(strict=True)
+    stat = resolved_path.stat()
+    if not resolved_path.is_file():
+        raise OSError("Inspected source is no longer a regular file.")
+    payload = {
+        "path": resolved_path.as_posix(),
+        "device": stat.st_dev,
+        "inode": stat.st_ino,
+        "size": stat.st_size,
+        "mtime_ns": stat.st_mtime_ns,
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("ascii")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _select_sources(
@@ -580,7 +836,8 @@ def _select_sources(
 def _candidate_labels(candidate: _NormalizedCandidate) -> tuple[str, ...]:
     """Return only host-supplied labels and canonical filename labels."""
     labels: list[str] = []
-    for value in (candidate.candidate_id, candidate.path.name, candidate.path.stem):
+    path_labels = () if candidate.path is None else (candidate.path.name, candidate.path.stem)
+    for value in (candidate.candidate_id, *path_labels):
         normalized = _normalize_lexical(value)
         if normalized:
             labels.append(normalized)
@@ -749,6 +1006,7 @@ def _report_header_slots(
 
 __all__ = [
     "ChannelContext",
+    "DocumentInspectionSnapshot",
     "EnrichedSemanticContext",
     "EnrichmentWarning",
     "EnrichmentErrorCode",
@@ -764,4 +1022,5 @@ __all__ = [
     "SourceFormat",
     "SourceLoaderProtocol",
     "SourceMetadata",
+    "SnapshotSource",
 ]

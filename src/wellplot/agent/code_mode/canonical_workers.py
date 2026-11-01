@@ -36,7 +36,7 @@ from .obligations import (
 )
 from .planner import ReportTask
 from .semantic_actions import SectionSemanticAction
-from .worker_contracts import CanonicalWorkerResult
+from .worker_contracts import CanonicalWorkerResult, ReportOperationContract
 
 
 class _SemanticModel(BaseModel):
@@ -164,6 +164,7 @@ class CanonicalReportWorker:
         report_context: ReportContext,
         document: object,
         authoritative_request: str,
+        operation_contract: ReportOperationContract | None = None,
         timeout_seconds: float,
         temperature: float | None = None,
         max_output_tokens: int | None = None,
@@ -171,6 +172,11 @@ class CanonicalReportWorker:
         """Generate exactly one report semantic response."""
         payload = {
             "report_task": task.model_dump(mode="json"),
+            "operation_contract": (
+                operation_contract.model_dump(mode="json")
+                if operation_contract is not None
+                else None
+            ),
             "report_context": {
                 "header_slots": [
                     slot.model_dump(mode="json") for slot in report_context.header_slots
@@ -192,6 +198,10 @@ class CanonicalReportWorker:
             },
             "authoritative_request": authoritative_request,
             "rules": (
+                "The operation_contract, when present, is the host-owned mapping from each "
+                "request-local operation ref to its exact report field/slot and value. Satisfy "
+                "every mapped target; do not move values between slot groups. NO_OP entries "
+                "preserve existing state and require no response field. "
                 "Return only explicit report values. Put general values in general_fields, "
                 "service-title values in service_titles, and detail-table values in "
                 "detail_fields. Use only the slot IDs in the matching slot_groups list. "
@@ -252,6 +262,8 @@ class CanonicalReportWorker:
                         allowed_fields,
                     )
                 validate_report_obligations(response, task.obligations)
+                if operation_contract is not None:
+                    _validate_report_operation_contract(response, operation_contract)
                 intent = _lower_report(response, report_context)
                 return CanonicalWorkerResult(
                     True,
@@ -423,6 +435,69 @@ def _lower_report(
     if response.tail_enabled is not None:
         values["tail"] = AuthoringTailIntent(enabled=response.tail_enabled)
     return AuthoringDocumentIntent(**values)
+
+
+def _validate_report_operation_contract(
+    response: ReportSemanticResponse,
+    contract: ReportOperationContract,
+) -> None:
+    """Verify every contracted report target is represented by the sparse response."""
+    ranks: dict[str, int] = {}
+    for entry in contract.entries:
+        if entry.field == "NO_OP":
+            continue
+        target = entry.target
+        actual: object | None
+        if target.startswith("general."):
+            slot_id = target.removeprefix("general.")
+            actual = next(
+                (item.value for item in response.general_fields if item.slot_id == slot_id), None
+            )
+        elif target.startswith("detail."):
+            slot_id = target.removeprefix("detail.")
+            actual = next(
+                (item.value for item in response.detail_fields if item.slot_id == slot_id), None
+            )
+        elif target.startswith("service_title."):
+            slot_id = target.removeprefix("service_title.")
+            if entry.order_index is not None:
+                ranks[entry.operation_ref] = entry.order_index
+            actual = next(
+                (item.value for item in response.service_titles if item.slot_id == slot_id), None
+            )
+        elif target.startswith("remark."):
+            try:
+                index = int(target.rsplit(".", maxsplit=1)[-1]) - 1
+            except ValueError as error:
+                raise ValueError("Report operation has an invalid remark target.") from error
+            if entry.order_index is not None:
+                ranks[entry.operation_ref] = entry.order_index
+            actual = response.remarks[index] if 0 <= index < len(response.remarks) else None
+            if actual is not None:
+                expected = json.loads(str(entry.value))
+                if actual.title != expected.get("title") or actual.text != expected.get("text"):
+                    raise ValueError("Report operation remark differs from its request contract.")
+                continue
+        elif target.startswith("report."):
+            field_name = target.removeprefix("report.")
+            if field_name not in ReportSemanticResponse.model_fields:
+                raise ValueError("Report operation references an unsupported report field.")
+            actual = getattr(response, field_name)
+        else:
+            raise ValueError("Report operation target is not a supported report slot.")
+
+        if actual is None or str(actual) != str(entry.value):
+            raise ValueError("Report operation value is absent or differs from its contract.")
+
+    for item_ref, relation, anchor_ref in contract.ordering_constraints:
+        if item_ref not in ranks or anchor_ref not in ranks:
+            raise ValueError("Report operation order cannot be grounded to ordered targets.")
+        item_rank = ranks[item_ref]
+        anchor_rank = ranks[anchor_ref]
+        if (relation == "before" and item_rank >= anchor_rank) or (
+            relation == "after" and item_rank <= anchor_rank
+        ):
+            raise ValueError("Report operation order differs from its contract.")
 
 
 def _normalize_report_slot_groups(

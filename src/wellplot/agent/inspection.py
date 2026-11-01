@@ -27,6 +27,8 @@ the authoring-program layer.
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 
@@ -127,6 +129,44 @@ class AuthoringInspectionFacade:
             subtitle=self._document.subtitle,
             section_ids=tuple(section.id for section in self._document.sections),
         )
+
+    def document_revision(self) -> str:
+        """Return a deterministic digest of the captured canonical document."""
+        payload = self._document.model_dump(mode="json", exclude_unset=False)
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
+    def planner_summary(self) -> dict[str, object]:
+        """Return a bounded planner projection with snapshot-local opaque handles."""
+        sections = self.sections()
+        return {
+            "name": self._document.name,
+            "title": self._document.title,
+            "subtitle": self._document.subtitle,
+            "document_revision": self.document_revision(),
+            "sections": [
+                {
+                    "handle": f"section-{index + 1}",
+                    "title": section.title,
+                    "subtitle": section.subtitle,
+                    "depth_range": section.depth_range,
+                    "track_count": len(section.track_ids),
+                    "track_kinds": list(section.track_kinds),
+                }
+                for index, section in enumerate(sections)
+            ],
+            "existing_section_hints": [
+                {"title": section.title, "subtitle": section.subtitle} for section in sections
+            ],
+            "revision_inventory": [dict(item) for item in self.semantic_inventory()],
+        }
+
+    def section_handle(self, section_id: str) -> str:
+        """Map one canonical section ID to its opaque handle in this snapshot."""
+        for index, section in enumerate(self._document.sections):
+            if section.id == section_id:
+                return f"section-{index + 1}"
+        raise IdentityError(f"Section '{section_id}' is not available.")
 
     def sections(self) -> tuple[SectionInspectionSummary, ...]:
         """Return section summaries in canonical document order."""

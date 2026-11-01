@@ -36,6 +36,7 @@ from .obligations import (
 )
 from .planner import SectionTask
 from .section_semantics import (
+    SectionSemanticDraft,
     SemanticGrid,
     SemanticSampleAxis,
     SemanticScale,
@@ -44,6 +45,7 @@ from .section_semantics import (
 from .semantic_actions import (
     AddFillAction,
     AddTrackAction,
+    AddTracksAction,
     ReconstructSectionAction,
     SectionSemanticAction,
     SemanticActionError,
@@ -52,6 +54,7 @@ from .semantic_actions import (
 )
 from .worker_contracts import (
     CanonicalWorkerResult,
+    SectionOperationContract,
     SectionWorkContract,
     SectionWorkContractError,
     validate_section_action_contract,
@@ -60,6 +63,7 @@ from .worker_contracts import (
 _ACTION_RESPONSE_MODELS = {
     "reconstruct": ReconstructSectionAction,
     "add_track": AddTrackAction,
+    "add_tracks": AddTracksAction,
     "update_curve_scale": UpdateCurveScaleAction,
     "add_fill": AddFillAction,
 }
@@ -105,6 +109,33 @@ _SECTION_ACTION_EXAMPLES: dict[str, dict[str, object]] = {
             "title": "Example Track",
             "bindings": [{"semantic_id": "example_track.binding.1", "channel": "EXAMPLE_A"}],
         },
+    },
+    "add_tracks": {
+        "action": "add_tracks",
+        "operations": [
+            {
+                "operation_ref": "add_track_a",
+                "track": {
+                    "semantic_id": "example_track_a",
+                    "kind": "normal",
+                    "title": "Example Track A",
+                    "bindings": [
+                        {"semantic_id": "example_track_a.binding.1", "channel": "EXAMPLE_A"}
+                    ],
+                },
+            },
+            {
+                "operation_ref": "add_track_b",
+                "track": {
+                    "semantic_id": "example_track_b",
+                    "kind": "normal",
+                    "title": "Example Track B",
+                    "bindings": [
+                        {"semantic_id": "example_track_b.binding.1", "channel": "EXAMPLE_B"}
+                    ],
+                },
+            },
+        ],
     },
     "update_curve_scale": {
         "action": "update_curve_scale",
@@ -257,6 +288,7 @@ class CanonicalSectionWorker:
         self,
         action: SectionSemanticAction,
         contract: SectionWorkContract,
+        operation_contract: SectionOperationContract | None,
         *,
         task_index: int,
         attempt: int,
@@ -300,7 +332,7 @@ class CanonicalSectionWorker:
                 raise SectionActionEvidenceError() from None
         error: SectionWorkContractError | None = None
         try:
-            validate_section_action_contract(action, contract)
+            validate_section_action_contract(action, contract, operation_contract)
         except SectionWorkContractError as caught:
             error = caught
         if enabled:
@@ -334,6 +366,7 @@ class CanonicalSectionWorker:
         document: object,
         authoritative_request: str,
         work_contract: SectionWorkContract,
+        operation_contract: SectionOperationContract | None = None,
         timeout_seconds: float,
         temperature: float | None = None,
         max_output_tokens: int | None = None,
@@ -341,13 +374,26 @@ class CanonicalSectionWorker:
         """Generate exactly one action and lower it without document mutation."""
         section_context = ResolvedSectionContext.model_validate(context.sections[task_index])
         task = SectionTask.model_validate(context.plan.section_tasks[task_index])
+        if work_contract.required_action == "add_tracks" and operation_contract is None:
+            return _canonical_failure(
+                "worker_operation_contract_missing",
+                "Sparse track additions require a host-compiled operation contract.",
+                normalization="PASS",
+                worker_obligation="FAIL",
+            )
         payload = {
             "section_work_contract": work_contract.model_dump(mode="json"),
+            "operation_contract": (
+                operation_contract.model_dump(mode="json")
+                if operation_contract is not None
+                else None
+            ),
             "section_task": _provider_section_task(task),
             "section_context": _canonical_section_context(section_context, work_contract),
             "authoritative_request": authoritative_request,
             "authority_rules": {
                 "section_work_contract": "authoritative task-local requirements and action",
+                "operation_contract": "exact permitted operation refs, types, and request fields",
                 "section_context": "host-grounded source and existing-object facts",
                 "authoritative_request": "supporting context only",
                 "section_task": "supporting scoped decomposition only",
@@ -360,8 +406,10 @@ class CanonicalSectionWorker:
                 "already interpreted the request and resolved authoritative requirements. "
                 "The supplied SectionWorkContract is authoritative. Construct exactly one "
                 "JSON object satisfying the supplied action-specific response schema. "
-                "Represent every required object exactly once and copy request-local handles "
-                "exactly. Preserve required values and use only supplied source/channel facts. "
+                "When an operation contract is supplied, emit exactly its authorized operation "
+                "refs and bind each patch to that operation's target. Represent every required "
+                "object exactly once and copy request-local handles exactly. Preserve required "
+                "values and use only supplied source/channel facts. "
                 "Do not omit or invent objects. The example demonstrates structure only; its "
                 "values are not authoritative. Never emit canonical host IDs, filesystem paths, "
                 "programs, SDK calls, renderer state, or unrelated document state."
@@ -390,6 +438,7 @@ class CanonicalSectionWorker:
             error = self._validate_observed_action(
                 raw_action,
                 work_contract,
+                operation_contract,
                 task_index=task_index,
                 attempt=1,
                 logical_call_index=getattr(generated, "logical_call_index", None),
@@ -408,6 +457,7 @@ class CanonicalSectionWorker:
         object_bindings: SectionObjectBindings | None = None
         for attempt in range(2):
             try:
+                action = _action_for_obligation_pipeline(raw_action, work_contract)
                 if attempt:
                     if (
                         correction_baseline is None
@@ -421,12 +471,12 @@ class CanonicalSectionWorker:
                         )
                     _verify_repair_candidate(
                         correction_baseline,
-                        raw_action,
+                        action,
                         correction_contract,
                         object_bindings=object_bindings,
                     )
                 action = _bind_compiled_source(
-                    raw_action,
+                    action,
                     section_context,
                     work_contract=work_contract,
                 )
@@ -456,8 +506,9 @@ class CanonicalSectionWorker:
                     object_bindings=object_bindings,
                 )
                 try:
+                    lowering_action = _restore_add_tracks_operation_refs(raw_action, action)
                     intent = lower_section_action(
-                        action,
+                        lowering_action,
                         context=section_context,
                         document=document,
                     )
@@ -589,6 +640,7 @@ class CanonicalSectionWorker:
                     error = self._validate_observed_action(
                         raw_action,
                         work_contract,
+                        operation_contract,
                         task_index=task_index,
                         attempt=2,
                         logical_call_index=getattr(corrected, "logical_call_index", None),
@@ -649,6 +701,57 @@ def _canonical_section_context(
             for index, curve in enumerate(context.existing_curves, start=1)
         ],
     }
+
+
+def _action_for_obligation_pipeline(
+    action: SectionSemanticAction,
+    work_contract: SectionWorkContract,
+) -> SectionSemanticAction:
+    """Adapt a sparse additive batch to shared validators without reconstruction authority."""
+    if action.action != "add_tracks":
+        return action
+    tracks = tuple(item.track for item in action.operations)
+    source_handle = work_contract.source_handle
+    if source_handle is None or source_handle not in {
+        source.handle for source in work_contract.source_facts
+    }:
+        raise SemanticActionError(
+            "worker_grounding_ambiguous",
+            "Track additions lack one explicitly grounded source handle.",
+        )
+    return ReconstructSectionAction(
+        action="reconstruct",
+        section=SectionSemanticDraft(
+            title=work_contract.target.title or "Section",
+            source_candidate=source_handle,
+            tracks=tracks,
+        ),
+    )
+
+
+def _restore_add_tracks_operation_refs(
+    raw_action: SectionSemanticAction,
+    normalized_action: SectionSemanticAction,
+) -> SectionSemanticAction:
+    """Reattach authorized refs to normalized tracks without changing order."""
+    if raw_action.action != "add_tracks":
+        return normalized_action
+    if normalized_action.action != "reconstruct":
+        raise SemanticActionError(
+            "worker_operation_target_mismatch",
+            "Normalized track batch lost its section-shaped validator projection.",
+        )
+    return AddTracksAction(
+        action="add_tracks",
+        operations=tuple(
+            item.model_copy(update={"track": track})
+            for item, track in zip(
+                raw_action.operations,
+                normalized_action.section.tracks,
+                strict=True,
+            )
+        ),
+    )
 
 
 def _normalize_reconstruct_track_dimensions(
@@ -1197,17 +1300,16 @@ def _bind_compiled_source(
     if action.action != "reconstruct":
         return action
     source_handle = work_contract.source_handle or action.section.source_candidate
-    try:
-        source_index = int(source_handle.removeprefix("source-")) - 1
-    except ValueError as error:
-        raise SemanticActionError(
-            "source_candidate_missing", "The work contract source handle is invalid."
-        ) from error
-    if source_index < 0 or source_index >= len(context.sources):
+    matches = [source for source in context.sources if source.handle == source_handle]
+    if len(matches) != 1:
         raise SemanticActionError(
             "source_candidate_missing", "The work contract source handle is not grounded."
         )
-    selected = context.sources[source_index]
+    selected = matches[0]
+    if selected.inspection_state != "inspected":
+        raise SemanticActionError(
+            "source_candidate_unavailable", "The selected source has not been inspected."
+        )
     return action.model_copy(
         update={
             "section": action.section.model_copy(update={"source_candidate": selected.candidate_id})

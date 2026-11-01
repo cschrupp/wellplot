@@ -190,6 +190,8 @@ def test_explicit_sources_are_normalized_and_formats_are_inferred(
     source = result.sections[0].sources[0]
     assert source.canonical_path == str((tmp_path / filename).resolve())
     assert source.source_format == source_format
+    assert source.inspection_state == "inspected"
+    assert source.handle == "source-1"
     assert loader.calls == [(Path(source.canonical_path), source_format)]
 
 
@@ -625,6 +627,169 @@ def test_duplicate_existing_section_targets_fail_before_source_loading(tmp_path:
     assert duplicate.value.code is EnrichmentErrorCode.SECTION_TARGET_DUPLICATE
     assert duplicate.value.task_index == 1
     assert loader.calls == []
+
+
+def test_snapshot_identity_is_shared_and_stable_across_section_tasks(tmp_path: Path) -> None:
+    """Sibling tasks share one deterministic document/source revision identity."""
+    source_path = tmp_path / "main.las"
+    source_path.write_text("source", encoding="utf-8")
+    enricher, _ = _enricher(tmp_path)
+    task = _plan().section_tasks[0]
+    plan = SemanticPlan(
+        summary="Two independent sections.",
+        section_tasks=(
+            task.model_copy(update={"scope_id": "new:first", "source_hints": ("main",)}),
+            task.model_copy(update={"scope_id": "new:second", "source_hints": ("main",)}),
+        ),
+    )
+    document = _document()
+    original_document = document.model_dump(mode="json")
+
+    candidates = (_candidate(tmp_path),)
+    first = enricher.enrich(plan=plan, document=document, source_candidates=candidates)
+    second = enricher.enrich(plan=plan, document=document, source_candidates=candidates)
+
+    assert first.snapshot is not None
+    assert first.snapshot.snapshot_id == second.snapshot.snapshot_id
+    assert {section.snapshot_id for section in first.sections} == {first.snapshot.snapshot_id}
+    assert first.report.snapshot_id == first.snapshot.snapshot_id
+    assert [section.sources[0].handle for section in first.sections] == ["source-1", "source-1"]
+    assert first.snapshot_bytes > 0
+    assert source_path.read_text(encoding="utf-8") == "source"
+    assert document.model_dump(mode="json") == original_document
+
+
+def test_snapshot_rejects_changed_document_or_source(tmp_path: Path) -> None:
+    """Optimistic validation rejects document and source changes after inspection."""
+    source_path = tmp_path / "main.las"
+    source_path.write_text("source", encoding="utf-8")
+    enricher, _ = _enricher(tmp_path)
+    context = enricher.enrich(
+        plan=_plan(source_hints=("main",)),
+        document=_document(),
+        source_candidates=(_candidate(tmp_path),),
+    )
+    assert context.snapshot is not None
+
+    changed_document = _document().model_copy(update={"title": "Changed outside snapshot"})
+    with pytest.raises(SemanticEnrichmentError) as stale_document:
+        enricher.validate_snapshot(context, changed_document)
+    assert stale_document.value.code is EnrichmentErrorCode.SNAPSHOT_STALE
+
+    source_path.write_text("changed source bytes", encoding="utf-8")
+    with pytest.raises(SemanticEnrichmentError) as stale_source:
+        enricher.validate_snapshot(context, _document())
+    assert stale_source.value.code is EnrichmentErrorCode.SNAPSHOT_STALE
+
+
+def test_snapshot_rejects_missing_snapshot_and_inspected_source_identity(tmp_path: Path) -> None:
+    """An absent snapshot or incomplete private source identity is never a pass."""
+    source_path = tmp_path / "main.las"
+    source_path.write_text("source", encoding="utf-8")
+    enricher, _loader = _enricher(tmp_path)
+    context = enricher.enrich(
+        plan=_plan(source_hints=("main",)),
+        document=_document(),
+        source_candidates=(_candidate(tmp_path),),
+    )
+
+    with pytest.raises(SemanticEnrichmentError) as missing_snapshot:
+        enricher.validate_snapshot(context.model_copy(update={"snapshot": None}), _document())
+    assert missing_snapshot.value.code is EnrichmentErrorCode.SNAPSHOT_STALE
+
+    section = context.sections[0]
+    source = section.sources[0].model_copy(update={"canonical_path": None})
+    incomplete = context.model_copy(
+        update={"sections": (section.model_copy(update={"sources": (source,)}),)}
+    )
+    with pytest.raises(SemanticEnrichmentError) as missing_path:
+        enricher.validate_snapshot(incomplete, _document())
+    assert missing_path.value.code is EnrichmentErrorCode.SNAPSHOT_STALE
+
+    source = section.sources[0].model_copy(update={"revision_token": None})
+    incomplete = context.model_copy(
+        update={"sections": (section.model_copy(update={"sources": (source,)}),)}
+    )
+    with pytest.raises(SemanticEnrichmentError) as missing_token:
+        enricher.validate_snapshot(incomplete, _document())
+    assert missing_token.value.code is EnrichmentErrorCode.SNAPSHOT_STALE
+
+
+def test_document_revision_mismatch_fails_before_source_loading(tmp_path: Path) -> None:
+    """A stale planner snapshot is rejected before any source is opened."""
+    (tmp_path / "main.las").write_text("source", encoding="utf-8")
+    enricher, loader = _enricher(tmp_path)
+
+    with pytest.raises(SemanticEnrichmentError) as caught:
+        enricher.enrich(
+            plan=_plan(source_hints=("main",)),
+            document=_document(),
+            source_candidates=(_candidate(tmp_path),),
+            expected_document_revision="0" * 64,
+        )
+
+    assert caught.value.code is EnrichmentErrorCode.SNAPSHOT_STALE
+    assert loader.calls == []
+
+
+def test_unavailable_and_inspected_empty_sources_remain_distinct(tmp_path: Path) -> None:
+    """Unavailable is retained without loading; inspected-empty is authoritative."""
+    missing_loader = _Loader()
+    unavailable_enricher, _ = _enricher(tmp_path, missing_loader)
+    unavailable = SourceCandidate(
+        candidate_id="main-source",
+        root_id="input",
+        path="missing.las",
+        labels=("main",),
+        inspection_state="unavailable",
+    )
+    unavailable_context = unavailable_enricher.enrich(
+        plan=_plan(source_hints=("main",)),
+        document=_document(),
+        source_candidates=(unavailable,),
+    )
+    unavailable_source = unavailable_context.sections[0].sources[0]
+    assert unavailable_source.inspection_state == "unavailable"
+    assert unavailable_source.channels == ()
+    assert unavailable_context.snapshot is not None
+    assert unavailable_context.snapshot.sources[0].inspection_state == "unavailable"
+    assert missing_loader.calls == []
+
+    class EmptyLoader:
+        """Return a successfully inspected source with no channels."""
+
+        def load(self, path: Path, source_format: str) -> LoadedSource:
+            return LoadedSource(dataset_name=path.stem)
+
+    (tmp_path / "empty.las").write_text("empty", encoding="utf-8")
+    empty_enricher = SemanticEnricher(loader=EmptyLoader(), allowed_roots={"input": tmp_path})
+    empty_context = empty_enricher.enrich(
+        plan=_plan(source_hints=("empty",)),
+        document=_document(),
+        source_candidates=(_candidate(tmp_path, name="empty.las", labels=("empty",)),),
+    )
+    empty_source = empty_context.sections[0].sources[0]
+    assert empty_source.inspection_state == "inspected"
+    assert empty_source.channels == ()
+
+
+def test_context_size_budget_fails_with_stable_enrichment_code(tmp_path: Path) -> None:
+    """Oversized serialized inspection context fails before worker dispatch."""
+    (tmp_path / "main.las").write_text("source", encoding="utf-8")
+    enricher = SemanticEnricher(
+        loader=_Loader(),
+        allowed_roots={"input": tmp_path},
+        max_context_bytes=1,
+    )
+
+    with pytest.raises(SemanticEnrichmentError) as caught:
+        enricher.enrich(
+            plan=_plan(source_hints=("main",)),
+            document=_document(),
+            source_candidates=(_candidate(tmp_path),),
+        )
+
+    assert caught.value.code is EnrichmentErrorCode.INSPECTION_CONTEXT_LIMIT
 
 
 def test_enrichment_models_reject_extras_and_are_immutable() -> None:

@@ -40,10 +40,19 @@ from .planner import (
 )
 from .report_boundary_safety import ReportBoundarySafetyFailure, enforce_report_boundary_safety
 from .section_leaf_safety import SectionLeafSafetyFailure, enforce_section_leaf_safety
-from .state import CodeModeGraphState, CodeModeWorkerState, WorkerOutcome
+from .state import (
+    CodeModeGraphState,
+    CodeModeWorkerState,
+    ConditionalOmissionEvidence,
+    WorkerOutcome,
+)
 from .worker_contracts import (
+    ReportOperationContract,
+    SectionOperationContract,
     SectionWorkContract,
     SectionWorkContractError,
+    build_report_operation_contract,
+    build_section_operation_contract,
     build_section_work_contract,
 )
 
@@ -96,15 +105,8 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
         """Plan from a bounded document summary, never the full document."""
         document = _document(state)
         inspection = AuthoringInspectionFacade(document)
-        summary = inspection.document_summary().model_dump(mode="json")
-        summary["existing_section_hints"] = [
-            {
-                "title": section.title,
-                "subtitle": section.subtitle,
-            }
-            for section in inspection.sections()
-        ]
-        summary["revision_inventory"] = _revision_inventory(inspection)
+        document_revision = inspection.document_revision()
+        summary = inspection.planner_summary()
         plan = await dependencies.planner.plan(
             request=state["request"],
             mode=state.get("mode", "reconstruct"),
@@ -114,7 +116,10 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
             temperature=state.get("planner_temperature", 0.0),
             max_output_tokens=state.get("max_output_tokens"),
         )
-        return {"plan": plan.model_dump(mode="json")}
+        return {
+            "plan": plan.model_dump(mode="json"),
+            "planned_document_revision": document_revision,
+        }
 
     async def capability_safety_node(state: CodeModeGraphState) -> dict[str, object]:
         """Apply provider-free admissibility rules before enrichment."""
@@ -152,6 +157,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
                     SourceCandidate.model_validate(candidate)
                     for candidate in state.get("source_candidates", [])
                 ),
+                expected_document_revision=state.get("planned_document_revision"),
             )
         except SemanticEnrichmentError as error:
             _trace(dependencies, "ENRICHMENT_FAIL", **_trace_failure(error))
@@ -208,20 +214,55 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
         _trace(dependencies, "DISPATCH_ENTER")
         plan = SemanticPlan.model_validate(state["plan"])
         context = EnrichedSemanticContext.model_validate(state["enriched_context"])
+        _validate_snapshot_if_present(dependencies, context, _document(state))
         sends: list[Send] = []
         if plan.report_task is not None:
-            sends.append(
-                Send(
-                    "compile_worker",
-                    _worker_payload(
-                        state,
-                        kind="report",
-                        plan_order=0,
-                        report_task=plan.report_task.model_dump(mode="json"),
-                        report_context=context.report.model_dump(mode="json"),
-                    ),
+            try:
+                report_operation_contract = (
+                    build_report_operation_contract(plan.report_task, context.report)
+                    if plan.report_task.operations
+                    else None
                 )
-            )
+            except SectionWorkContractError as error:
+                _trace(
+                    dependencies,
+                    "REPORT_OPERATION_CONTRACT_FAIL",
+                    code=error.code,
+                    plan_order=0,
+                )
+                sends.append(
+                    Send(
+                        "compile_worker",
+                        _worker_payload(
+                            state,
+                            kind="report",
+                            plan_order=0,
+                            report_operation_contract_error=error.code,
+                        ),
+                    )
+                )
+            else:
+                sends.append(
+                    Send(
+                        "compile_worker",
+                        _worker_payload(
+                            state,
+                            kind="report",
+                            plan_order=0,
+                            report_task=plan.report_task.model_dump(mode="json"),
+                            report_context=context.report.model_dump(mode="json"),
+                            **(
+                                {
+                                    "report_operation_contract": (
+                                        report_operation_contract.model_dump(mode="json")
+                                    )
+                                }
+                                if report_operation_contract is not None
+                                else {}
+                            ),
+                        ),
+                    )
+                )
         for task_index, task in enumerate(plan.section_tasks):
             section_context = context.sections[task_index]
             if section_context.task_index != task_index:
@@ -236,7 +277,49 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
                 )
                 raise error
             try:
-                work_contract = build_section_work_contract(task, section_context)
+                operation_contract = (
+                    build_section_operation_contract(task, section_context)
+                    if task.operations
+                    else None
+                )
+                if operation_contract is None:
+                    active_task = task
+                else:
+                    omitted_requirement_ids = {
+                        requirement_id
+                        for entry in operation_contract.omitted_operations
+                        for requirement_id in entry.requirement_ids
+                    }
+                    active_refs = {entry.operation_ref for entry in operation_contract.operations}
+                    active_task = task.model_copy(
+                        update={
+                            "operations": tuple(
+                                operation
+                                for operation in task.operations
+                                if operation.local_ref in active_refs
+                            ),
+                            "obligations": tuple(
+                                item
+                                for item in task.obligations
+                                if item.requirement_id not in omitted_requirement_ids
+                            ),
+                        }
+                    )
+                if operation_contract is not None and not operation_contract.operations:
+                    sends.append(
+                        Send(
+                            "compile_worker",
+                            _worker_payload(
+                                state,
+                                kind="section",
+                                plan_order=task_index + 1,
+                                conditional_noop=True,
+                                conditional_omissions=_conditional_omissions(operation_contract),
+                            ),
+                        )
+                    )
+                    continue
+                work_contract = build_section_work_contract(active_task, section_context)
             except SectionWorkContractError as error:
                 _trace(
                     dependencies,
@@ -263,9 +346,21 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
                         state,
                         kind="section",
                         plan_order=task_index + 1,
-                        section_task=task.model_dump(mode="json"),
+                        section_task=active_task.model_dump(mode="json"),
                         section_context=section_context.model_dump(mode="json"),
                         section_work_contract=work_contract.model_dump(mode="json"),
+                        **(
+                            {
+                                "section_operation_contract": operation_contract.model_dump(
+                                    mode="json"
+                                ),
+                                "conditional_omissions": _conditional_omissions(operation_contract)
+                                if operation_contract is not None
+                                else [],
+                            }
+                            if operation_contract is not None
+                            else {}
+                        ),
                     ),
                 )
             )
@@ -288,6 +383,22 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
         worker_state = cast(CodeModeWorkerState, state)
         kind = worker_state["kind"]
         plan_order = worker_state["plan_order"]
+        report_contract_error = worker_state.get("report_operation_contract_error")
+        if report_contract_error is not None:
+            return _outcome_state(
+                WorkerOutcome(
+                    kind="report",
+                    plan_order=plan_order,
+                    success=False,
+                    diagnostics=(
+                        SemanticDiagnostic(
+                            stage="worker_obligation",
+                            code=report_contract_error,
+                            message="The report operation contract could not be established.",
+                        ),
+                    ),
+                )
+            )
         contract_error = worker_state.get("section_work_contract_error")
         if contract_error is not None:
             outcome = WorkerOutcome(
@@ -303,14 +414,54 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
                 ),
             )
             return _outcome_state(outcome)
+        if worker_state.get("conditional_noop") is True:
+            omissions = tuple(
+                ConditionalOmissionEvidence.model_validate(item)
+                for item in worker_state.get("conditional_omissions", [])
+            )
+            if not omissions:
+                return _outcome_state(
+                    WorkerOutcome(
+                        kind="section",
+                        plan_order=plan_order,
+                        success=False,
+                        diagnostics=(
+                            SemanticDiagnostic(
+                                stage="worker_obligation",
+                                code="conditional_noop_evidence_missing",
+                                message="A no-op requires verified conditional omission evidence.",
+                            ),
+                        ),
+                    )
+                )
+            return _outcome_state(
+                WorkerOutcome(
+                    kind="section",
+                    plan_order=plan_order,
+                    success=True,
+                    intent_fragment=AuthoringDocumentIntent(),
+                    conditional_omissions=omissions,
+                )
+            )
         document = AuthoringDocumentSpec.model_validate(worker_state["document"])
         try:
             if kind == "report":
+                operation_contract_data = worker_state.get("report_operation_contract")
+                report_operation_contract = (
+                    ReportOperationContract.model_validate(operation_contract_data)
+                    if operation_contract_data is not None
+                    else None
+                )
                 result = await dependencies.report_compiler.compile(
                     task=ReportTask.model_validate(worker_state["report_task"]),
                     report_context=ReportContext.model_validate(worker_state["report_context"]),
                     document=document,
                     authoritative_request=worker_state["authoritative_request"],
+                    **(
+                        {"operation_contract": report_operation_contract}
+                        if report_operation_contract is not None
+                        else {}
+                    ),
                     timeout_seconds=worker_state["timeout_seconds"],
                     temperature=worker_state.get("temperature"),
                     max_output_tokens=worker_state.get("max_output_tokens"),
@@ -323,6 +474,12 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
                 work_contract = SectionWorkContract.model_validate(
                     worker_state["section_work_contract"]
                 )
+                operation_contract_data = worker_state.get("section_operation_contract")
+                operation_contract = (
+                    SectionOperationContract.model_validate(operation_contract_data)
+                    if operation_contract_data is not None
+                    else None
+                )
                 isolated_context = _isolated_section_context(task, section_context)
                 result = await dependencies.section_compiler.compile(
                     task_index=0,
@@ -330,6 +487,11 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
                     document=document,
                     authoritative_request=worker_state["authoritative_request"],
                     work_contract=work_contract,
+                    **(
+                        {"operation_contract": operation_contract}
+                        if operation_contract is not None
+                        else {}
+                    ),
                     timeout_seconds=worker_state["timeout_seconds"],
                     temperature=worker_state.get("temperature"),
                     max_output_tokens=worker_state.get("max_output_tokens"),
@@ -381,12 +543,18 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
             diagnostics=_semantic_diagnostics(result.diagnostics),
             metrics=_semantic_metrics(result.metrics),
             stage_evidence=getattr(result, "stage_evidence", SemanticStageEvidence()),
+            conditional_omissions=tuple(
+                ConditionalOmissionEvidence.model_validate(item)
+                for item in worker_state.get("conditional_omissions", [])
+            ),
         )
         return _outcome_state(outcome)
 
     async def merge_node(state: CodeModeGraphState) -> dict[str, object]:
         """Reject incomplete/failed fan-out and merge successful intents in plan order."""
         plan = SemanticPlan.model_validate(state["plan"])
+        context = EnrichedSemanticContext.model_validate(state["enriched_context"])
+        _validate_snapshot_if_present(dependencies, context, _document(state))
         outcomes = tuple(
             WorkerOutcome.model_validate(json.loads(outcome))
             for outcome in state.get("worker_outcomes", [])
@@ -559,6 +727,7 @@ def _planner_source_summary(state: CodeModeGraphState) -> dict[str, object]:
                         "unit": channel.unit,
                     }
                     for channel in candidate.channels
+                    if candidate.inspection_state == "inspected"
                 ],
                 "inspection_state": candidate.inspection_state,
             }
@@ -567,9 +736,44 @@ def _planner_source_summary(state: CodeModeGraphState) -> dict[str, object]:
     }
 
 
-def _revision_inventory(inspection: AuthoringInspectionFacade) -> list[dict[str, object]]:
-    """Expose semantic revision facts without host IDs or mutation handles."""
-    return [dict(item) for item in inspection.semantic_inventory()]
+def _validate_snapshot_if_present(
+    dependencies: CodeModeGraphDependencies,
+    context: EnrichedSemanticContext,
+    document: AuthoringDocumentSpec,
+) -> None:
+    """Revalidate snapshots whenever the configured enricher exposes the contract."""
+    validator = getattr(dependencies.enricher, "validate_snapshot", None)
+    if callable(validator):
+        validator(context, document)
+
+
+def _conditional_omissions(
+    contract: SectionOperationContract,
+) -> list[dict[str, object]]:
+    """Project only verified conditional omissions into host-owned evidence."""
+    result: list[dict[str, object]] = []
+    for entry in contract.omitted_operations:
+        if (
+            entry.condition_result != "CONDITION_FALSE"
+            or entry.condition_predicate is None
+            or entry.condition_evidence is None
+            or entry.condition_channel_clue is None
+            or not entry.requirement_ids
+        ):
+            raise SectionWorkContractError(
+                "section_operation_omission_evidence_invalid",
+                "A conditional omission lacks inspected evidence or owned requirements.",
+            )
+        result.append(
+            {
+                "operation_ref": entry.operation_ref,
+                "predicate": entry.condition_predicate,
+                "evidence_source_handle": entry.condition_evidence,
+                "channel_clue": entry.condition_channel_clue,
+                "requirement_ids": list(entry.requirement_ids),
+            }
+        )
+    return result
 
 
 def _isolated_section_context(
@@ -646,6 +850,11 @@ def _validate_fragment_boundaries(outcomes: Iterable[WorkerOutcome]) -> None:
             ):
                 raise ValueError("Report worker emitted section or child intent.")
         else:
+            if (
+                outcome.conditional_omissions
+                and fragment.model_dump(mode="json", exclude_unset=True) == {}
+            ):
+                continue
             if (
                 any(
                     getattr(fragment, name) is not None

@@ -34,6 +34,7 @@ from .obligations import (
 )
 
 CompilationMode = Literal["reconstruct", "revise"]
+MAX_SEMANTIC_OPERATIONS = 20
 
 _SCHEMA_CORRECTION_INSTRUCTION = (
     "Retry the SemanticPlan because the previous response was valid JSON but did not "
@@ -166,7 +167,9 @@ class ReportTask(_SemanticModel):
     capability_ids: tuple[str, ...] = ()
     requirements: tuple[str, ...] = ()
     constraints: tuple[str, ...] = ()
-    operations: tuple[SemanticOperation, ...] = ()
+    operations: tuple[SemanticOperation, ...] = Field(
+        default=(), max_length=MAX_SEMANTIC_OPERATIONS
+    )
     presentation_constraints: tuple[PresentationConstraint, ...] = ()
     obligations: tuple[RequestObligation, ...] = ()
 
@@ -197,7 +200,9 @@ class SectionTask(_SemanticModel):
     requirements: tuple[str, ...] = ()
     constraints: tuple[str, ...] = ()
     scope_ref: str | None = Field(default=None, pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
-    operations: tuple[SemanticOperation, ...] = ()
+    operations: tuple[SemanticOperation, ...] = Field(
+        default=(), max_length=MAX_SEMANTIC_OPERATIONS
+    )
     presentation_constraints: tuple[PresentationConstraint, ...] = ()
     obligations: tuple[RequestObligation, ...] = ()
     requirement_refs: tuple[str, ...] = ()
@@ -232,7 +237,9 @@ class _PlannerWireReportTask(_SemanticModel):
     capability_ids: tuple[str, ...] = ()
     requirements: tuple[str, ...] = ()
     constraints: tuple[str, ...] = ()
-    operations: tuple[SemanticOperation, ...] = Field(min_length=1)
+    operations: tuple[SemanticOperation, ...] = Field(
+        min_length=1, max_length=MAX_SEMANTIC_OPERATIONS
+    )
     presentation_constraints: tuple[PresentationConstraint, ...] = ()
 
     @field_validator("capability_ids", "requirements", "constraints")
@@ -253,7 +260,9 @@ class _PlannerWireSectionTask(_SemanticModel):
     requirements: tuple[str, ...] = ()
     constraints: tuple[str, ...] = ()
     scope_ref: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
-    operations: tuple[SemanticOperation, ...] = Field(min_length=1)
+    operations: tuple[SemanticOperation, ...] = Field(
+        min_length=1, max_length=MAX_SEMANTIC_OPERATIONS
+    )
     presentation_constraints: tuple[PresentationConstraint, ...] = ()
 
     model_config = ConfigDict(

@@ -3,17 +3,25 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from ...model.intent import AuthoringDocumentIntent
 from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
-from .enrichment import ResolvedSectionContext
+from .enrichment import ReportContext, ResolvedSectionContext
 from .obligations import ObligationState, OwnerKind, RequestObligation
-from .planner import SectionTask
+from .planner import (
+    MAX_SEMANTIC_OPERATIONS,
+    OperationCondition,
+    ReportTask,
+    SectionTask,
+    SemanticOperation,
+)
 
 
 class SectionWorkContractError(ValueError):
@@ -72,6 +80,7 @@ class SectionWorkTarget(BaseModel):
 
     kind: Literal["existing_section", "new_section"]
     title: str | None = None
+    handle: str | None = None
 
 
 class SectionWorkScale(BaseModel):
@@ -145,7 +154,8 @@ class SectionWorkSource(BaseModel):
 
     handle: str = Field(min_length=1)
     name: str = Field(min_length=1)
-    format: str
+    format: str | None = None
+    inspection_state: Literal["inspected", "not_inspected", "unavailable"] = "inspected"
     channels: tuple[SectionWorkChannel, ...] = ()
 
 
@@ -155,8 +165,11 @@ class SectionWorkContract(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     version: Literal["wellplot.section-work.v1"] = "wellplot.section-work.v1"
+    snapshot_id: str | None = None
     target: SectionWorkTarget
-    required_action: Literal["reconstruct", "add_track", "update_curve_scale", "add_fill"]
+    required_action: Literal[
+        "reconstruct", "add_track", "add_tracks", "update_curve_scale", "add_fill"
+    ]
     required_tracks: tuple[SectionWorkTrack, ...] = ()
     required_bindings: tuple[SectionWorkBinding, ...] = ()
     source_handle: str | None = None
@@ -165,6 +178,81 @@ class SectionWorkContract(BaseModel):
     required_fill: dict[str, str | float | bool | None] | None = None
     source_facts: tuple[SectionWorkSource, ...] = ()
     preservation_rules: tuple[str, ...] = ()
+
+
+class WorkerOperationContractEntry(BaseModel):
+    """One planner operation grounded into its section-local host contract."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    operation_id: str = Field(min_length=1)
+    operation_ref: str = Field(min_length=1)
+    operation_type: Literal["ADD_TRACK"]
+    scope_ref: str = Field(min_length=1)
+    target_handle: str | None = None
+    parent_operation_id: str | None = None
+    condition_predicate: str | None = None
+    condition_result: Literal[
+        "UNCONDITIONAL",
+        "CONDITION_TRUE",
+        "CONDITION_FALSE",
+        "SOURCE_NOT_INSPECTED",
+        "SOURCE_UNAVAILABLE",
+    ] = "UNCONDITIONAL"
+    condition_evidence: str | None = None
+    condition_channel_clue: str | None = None
+    requirement_ids: tuple[str, ...] = ()
+
+
+class SectionOperationContract(BaseModel):
+    """Exact host-owned operation inventory for one immutable section snapshot."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    version: Literal["wellplot.section-operation-contract.v1"] = (
+        "wellplot.section-operation-contract.v1"
+    )
+    request_sha256: str
+    scope_ref: str = Field(min_length=1)
+    snapshot_id: str = Field(min_length=1)
+    operations: tuple[WorkerOperationContractEntry, ...]
+    omitted_operations: tuple[WorkerOperationContractEntry, ...] = ()
+    operation_schema_sha256: str
+    ordering_constraints: tuple[tuple[str, str, str], ...] = ()
+
+
+class ReportOperationContractEntry(BaseModel):
+    """One report operation mapped to an existing report-owned output target."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    operation_ref: str = Field(min_length=1)
+    field: str = Field(min_length=1)
+    target: str = Field(min_length=1)
+    value: str | float | int | bool | None = None
+    requirement_id: str | None = None
+    order_index: int | None = Field(default=None, ge=1)
+
+
+class ReportOperationContract(BaseModel):
+    """Host-owned binding from report planner refs to obligation-backed slots."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    version: Literal["wellplot.report-operation-contract.v1"] = (
+        "wellplot.report-operation-contract.v1"
+    )
+    request_sha256: str
+    scope_ref: Literal["report"] = "report"
+    snapshot_id: str = Field(min_length=1)
+    entries: tuple[ReportOperationContractEntry, ...]
+    ordering_constraints: tuple[tuple[str, str, str], ...] = ()
+
+
+# The planner and worker schema share this finite batch bound. It caps a
+# provider response to a size already representable by one bounded section
+# task; it is not a claim of compatibility for arbitrary providers.
+MAX_SECTION_SEMANTIC_OPERATIONS = MAX_SEMANTIC_OPERATIONS
 
 
 _BINDING_FIELDS = {
@@ -257,17 +345,27 @@ def _source_handle(
     if len(matches) != 1:
         code = "section_work_source_missing" if not matches else "section_work_source_ambiguous"
         raise SectionWorkContractError(code, "The requested source is not uniquely inspected.")
-    return f"source-{matches[0] + 1}"
+    source = section_context.sources[matches[0]]
+    if source.inspection_state != "inspected":
+        raise SectionWorkContractError(
+            "section_work_source_unavailable",
+            "The requested source does not have an inspected channel inventory.",
+        )
+    return source.handle
 
 
-def _source_index(source_handle: str) -> int:
+def _source_index(source_handle: str, section_context: ResolvedSectionContext) -> int:
     """Decode one already-resolved opaque source handle."""
-    match = re.fullmatch(r"source-([1-9][0-9]*)", source_handle)
-    if match is None:
+    matches = [
+        index
+        for index, source in enumerate(section_context.sources)
+        if source.handle == source_handle
+    ]
+    if len(matches) != 1:
         raise SectionWorkContractError(
             "section_work_source_missing", "The requested source handle is invalid."
         )
-    return int(match.group(1)) - 1
+    return matches[0]
 
 
 def _channel_kind(
@@ -314,7 +412,11 @@ def _channel_kind(
 def _source_name(source: object) -> str:
     """Project a basename only; never expose a canonical source path."""
     labels = tuple(getattr(source, "labels", ()))
-    raw = labels[0] if labels else str(getattr(source, "canonical_path", "source"))
+    canonical_path = getattr(source, "canonical_path", None)
+    fallback = (
+        Path(canonical_path).name if canonical_path else getattr(source, "candidate_id", "source")
+    )
+    raw = labels[0] if labels else str(fallback)
     name = re.split(r"[/\\]", raw)[-1].strip()
     return name or "source"
 
@@ -385,10 +487,12 @@ def build_section_work_contract(
     selected_source_handle = (
         _source_handle(source_obligation.value, section_context)
         if source_obligation is not None
+        else "source-1"
+        if len(section_context.sources) == 1
         else None
     )
     selected_source_index = (
-        _source_index(selected_source_handle)
+        _source_index(selected_source_handle, section_context)
         if selected_source_handle is not None
         else (0 if len(section_context.sources) == 1 else None)
     )
@@ -532,13 +636,15 @@ def build_section_work_contract(
         for item in obligations
     )
     if fill_facts:
-        required_action: Literal["reconstruct", "add_track", "update_curve_scale", "add_fill"] = (
-            "add_fill"
-        )
+        required_action: Literal[
+            "reconstruct", "add_track", "add_tracks", "update_curve_scale", "add_fill"
+        ] = "add_fill"
     elif scale_only and section_context.section_id is not None:
         required_action = "update_curve_scale"
-    elif len(work_tracks) == 1 and section_context.section_id is not None:
+    elif section_context.section_id is not None and len(work_tracks) == 1:
         required_action = "add_track"
+    elif section_context.section_id is not None and len(work_tracks) > 1:
+        required_action = "add_tracks"
     elif work_tracks:
         required_action = "reconstruct"
     else:
@@ -562,6 +668,7 @@ def build_section_work_contract(
     target = SectionWorkTarget(
         kind="existing_section" if section_context.section_id is not None else "new_section",
         title=target_title,
+        handle=section_context.section_handle,
     )
     target_handle = None
     required_scale = None
@@ -611,13 +718,18 @@ def build_section_work_contract(
             item.field: item.value for item in fill_facts if item.field in {"color", "alpha"}
         }
 
-    source_handle = selected_source_handle if required_action == "reconstruct" else None
+    source_handle = (
+        selected_source_handle
+        if required_action in {"reconstruct", "add_track", "add_tracks"}
+        else None
+    )
 
     sources = tuple(
         SectionWorkSource(
-            handle=f"source-{index + 1}",
+            handle=source.handle,
             name=_source_name(source),
             format=source.source_format,
+            inspection_state=source.inspection_state,
             channels=tuple(
                 SectionWorkChannel(mnemonic=channel.mnemonic, kind=channel.kind, unit=channel.unit)
                 for channel in source.channels
@@ -631,6 +743,7 @@ def build_section_work_contract(
         else ()
     )
     return SectionWorkContract(
+        snapshot_id=section_context.snapshot_id,
         target=target,
         required_action=required_action,
         required_tracks=tuple(work_tracks),
@@ -644,7 +757,476 @@ def build_section_work_contract(
     )
 
 
-def validate_section_action_contract(action: object, contract: SectionWorkContract) -> None:
+def build_section_operation_contract(
+    task: SectionTask,
+    section_context: ResolvedSectionContext,
+) -> SectionOperationContract:
+    """Ground the planner inventory against request facts and one snapshot."""
+    if not section_context.snapshot_id:
+        raise SectionWorkContractError(
+            "section_operation_snapshot_missing", "Operation contract requires a bound snapshot."
+        )
+    if not task.scope_ref:
+        raise SectionWorkContractError(
+            "section_operation_scope_missing", "Operation contract requires a declared scope."
+        )
+    if not task.operations:
+        raise SectionWorkContractError(
+            "section_operation_inventory_missing", "Section task has no semantic operations."
+        )
+    if len(task.operations) > MAX_SECTION_SEMANTIC_OPERATIONS:
+        raise SectionWorkContractError(
+            "section_operation_budget_exceeded",
+            "Section operation inventory exceeds the bounded contract limit.",
+        )
+    if len({item.local_ref for item in task.operations}) != len(task.operations):
+        raise SectionWorkContractError(
+            "section_operation_duplicate_ref",
+            "Section operation refs must be unique.",
+        )
+
+    obligations = tuple(task.obligations)
+    if any(item.state is not ObligationState.SET for item in obligations):
+        raise SectionWorkContractError(
+            "section_operation_requirements_unresolved",
+            "Operation contract requires resolved explicit request facts.",
+        )
+    request_hashes = {item.request_sha256 for item in obligations}
+    if len(request_hashes) != 1:
+        raise SectionWorkContractError(
+            "section_operation_request_identity_invalid",
+            "Section requirements do not share one authoritative request identity.",
+        )
+    request_sha256 = next(iter(request_hashes))
+    track_owners = tuple(
+        dict.fromkeys(
+            item.owner_ref
+            for item in obligations
+            if item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK}
+        )
+    )
+
+    def field_matches(left: object, right: object) -> bool:
+        if isinstance(left, str) and isinstance(right, str):
+            return left.casefold().strip() == right.casefold().strip()
+        return left == right
+
+    def track_owner(operation: SemanticOperation) -> str | None:
+        candidates = {
+            _work_handle(value)
+            for value in (operation.semantic_ref, operation.target_clue)
+            if value
+        }
+        exact = [owner for owner in track_owners if _work_handle(owner) in candidates]
+        if len(exact) == 1:
+            return exact[0]
+        title_values = [item.value for item in operation.field_values if item.field == "title"]
+        if len(title_values) == 1:
+            titled = [
+                owner
+                for owner in track_owners
+                if any(
+                    item.owner_ref == owner
+                    and item.field == "title"
+                    and field_matches(item.value, title_values[0])
+                    for item in obligations
+                )
+            ]
+            if len(titled) == 1:
+                return titled[0]
+        return None
+
+    operation_ids = {
+        item.local_ref: hashlib.sha256(f"{task.scope_ref}:{item.local_ref}".encode()).hexdigest()[
+            :24
+        ]
+        for item in task.operations
+    }
+    semantic_operation_ids = {
+        item.semantic_ref: operation_ids[item.local_ref]
+        for item in task.operations
+        if item.semantic_ref is not None
+    }
+    track_owner_by_semantic_ref = {
+        item.semantic_ref: track_owner(item)
+        for item in task.operations
+        if item.object_kind == "track" and item.semantic_ref is not None
+    }
+    entries: list[WorkerOperationContractEntry] = []
+    omitted_entries: list[WorkerOperationContractEntry] = []
+    assigned_track_owners: set[str] = set()
+    source_obligation = next(
+        (item for item in obligations if item.owner_kind is OwnerKind.SOURCE), None
+    )
+    selected_source = (
+        _source_handle(source_obligation.value, section_context)
+        if source_obligation is not None
+        else None
+    )
+    for operation in task.operations:
+        if operation.scope_ref != task.scope_ref:
+            raise SectionWorkContractError(
+                "section_operation_scope_mismatch",
+                "Operation inventory crosses its declared section scope.",
+            )
+
+        owner: str | None = None
+        if operation.object_kind in {"track", "binding"}:
+            owner = (
+                track_owner_by_semantic_ref.get(operation.parent_ref)
+                if operation.object_kind == "binding" and operation.parent_ref is not None
+                else track_owner(operation)
+            )
+            if operation.object_kind == "track":
+                if owner is None:
+                    raise SectionWorkContractError(
+                        "section_operation_target_unresolved",
+                        "Track operation does not resolve to one request-owned track.",
+                    )
+                if owner in assigned_track_owners:
+                    raise SectionWorkContractError(
+                        "section_operation_duplicate_target",
+                        "Multiple operations target the same request-owned track.",
+                    )
+                assigned_track_owners.add(owner)
+
+        operation_type = _section_operation_type(operation)
+        facts = [
+            item
+            for item in obligations
+            if owner is not None
+            and item.owner_ref == owner
+            and item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK, OwnerKind.BINDING}
+        ]
+        for proposal in operation.field_values:
+            matching_facts = [item for item in facts if item.field == proposal.field]
+            if (
+                not matching_facts
+                or proposal.state != "SET"
+                or not any(field_matches(item.value, proposal.value) for item in matching_facts)
+            ):
+                raise SectionWorkContractError(
+                    "section_operation_field_mismatch",
+                    "Planner operation fields conflict with request-authoritative facts.",
+                )
+
+        if (
+            operation.condition is not None
+            and selected_source is not None
+            and operation.condition.evidence_kind == "inspected_source"
+            and operation.condition.evidence_ref != selected_source
+        ):
+            raise SectionWorkContractError(
+                "section_operation_condition_source_mismatch",
+                "Conditional evidence does not belong to the selected request source.",
+            )
+        condition_result, condition_evidence = _evaluate_operation_condition(
+            operation.condition, section_context
+        )
+        entry = WorkerOperationContractEntry(
+            operation_id=operation_ids[operation.local_ref],
+            operation_ref=operation.local_ref,
+            operation_type=operation_type,
+            scope_ref=task.scope_ref,
+            target_handle=_work_handle(owner) if owner is not None else None,
+            parent_operation_id=(
+                semantic_operation_ids.get(operation.parent_ref)
+                if operation.parent_ref is not None
+                else None
+            ),
+            condition_predicate=(
+                operation.condition.predicate if operation.condition is not None else None
+            ),
+            condition_result=condition_result,
+            condition_evidence=condition_evidence,
+            condition_channel_clue=(
+                operation.condition.channel_clue if operation.condition is not None else None
+            ),
+            requirement_ids=tuple(
+                dict.fromkeys(item.requirement_id for item in facts if item.requirement_id)
+            ),
+        )
+        (omitted_entries if condition_result == "CONDITION_FALSE" else entries).append(entry)
+
+    required_track_owners = set(track_owners)
+    if assigned_track_owners != required_track_owners:
+        raise SectionWorkContractError(
+            "section_operation_coverage_incomplete",
+            "Operation inventory does not cover every request-owned track exactly once.",
+        )
+    ordering: list[tuple[str, str, str]] = []
+    for item in task.operations:
+        if item.anchor_ref is None:
+            continue
+        anchor_operation_id = semantic_operation_ids.get(item.anchor_ref)
+        if anchor_operation_id is None:
+            raise SectionWorkContractError(
+                "section_operation_order_unresolved",
+                "Ordering constraint references an unknown operation.",
+            )
+        ordering.append((operation_ids[item.local_ref], item.relation or "", anchor_operation_id))
+    schema_bytes = json.dumps(
+        WorkerOperationContractEntry.model_json_schema(),
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return SectionOperationContract(
+        request_sha256=request_sha256,
+        scope_ref=task.scope_ref,
+        snapshot_id=section_context.snapshot_id,
+        operations=tuple(entries),
+        omitted_operations=tuple(omitted_entries),
+        operation_schema_sha256=hashlib.sha256(schema_bytes).hexdigest(),
+        ordering_constraints=tuple(ordering),
+    )
+
+
+def build_report_operation_contract(
+    task: ReportTask,
+    report_context: ReportContext,
+) -> ReportOperationContract:
+    """Bind report operation refs to obligation-backed report slots or fields."""
+    if not report_context.snapshot_id:
+        raise SectionWorkContractError(
+            "report_operation_snapshot_missing", "Report contract requires a bound snapshot."
+        )
+    if not task.operations:
+        raise SectionWorkContractError(
+            "report_operation_inventory_missing", "Report task has no semantic operations."
+        )
+
+    obligations = tuple(
+        item
+        for item in task.obligations
+        if item.owner_kind is OwnerKind.REPORT and item.state is ObligationState.SET
+    )
+    request_hashes = {item.request_sha256 for item in obligations}
+    if len(request_hashes) != 1:
+        raise SectionWorkContractError(
+            "report_operation_request_identity_invalid",
+            "Report obligations do not share one authoritative request identity.",
+        )
+    request_sha256 = next(iter(request_hashes))
+
+    def normalized(value: object) -> str:
+        return re.sub(r"[^a-z0-9]+", "", str(value).casefold())
+
+    def target_for(item: RequestObligation) -> str:
+        if item.field == "metadata":
+            key = normalized(item.owner_ref)
+            matches = [
+                slot
+                for slot in report_context.header_slots
+                if key
+                in {
+                    normalized(slot.key),
+                    normalized(slot.label),
+                }
+            ]
+            if len(matches) != 1:
+                raise SectionWorkContractError(
+                    "report_operation_slot_ambiguous",
+                    "Report metadata does not resolve to exactly one inspected slot.",
+                )
+            slot = matches[0]
+            if slot.slot_id in report_context.general_slot_ids:
+                return f"general.{slot.slot_id}"
+            if slot.slot_id in report_context.detail_slot_ids:
+                return f"detail.{slot.slot_id}"
+            raise SectionWorkContractError(
+                "report_operation_slot_unsupported",
+                "Report metadata resolved outside an authorized slot group.",
+            )
+        if item.field == "service_title":
+            if not item.slot_key or item.slot_key not in {
+                f"service_title.{index}"
+                for index in range(1, len(report_context.service_title_slot_ids) + 1)
+            }:
+                raise SectionWorkContractError(
+                    "report_operation_slot_missing",
+                    "Service-title requirement lacks an inspected output slot.",
+                )
+            index = int(item.slot_key.rsplit(".", maxsplit=1)[-1]) - 1
+            return f"service_title.{report_context.service_title_slot_ids[index]}"
+        if item.field == "remark":
+            if not item.slot_key or not item.slot_key.startswith("remark."):
+                raise SectionWorkContractError(
+                    "report_operation_slot_missing",
+                    "Remark requirement lacks a request-local ordered slot.",
+                )
+            return item.slot_key
+        return f"report.{item.field}"
+
+    entries: list[ReportOperationContractEntry] = []
+    used_requirements: set[str] = set()
+    seen_refs: set[str] = set()
+    for operation in task.operations:
+        if operation.local_ref in seen_refs:
+            raise SectionWorkContractError(
+                "report_operation_duplicate_ref", "Report operation refs must be unique."
+            )
+        seen_refs.add(operation.local_ref)
+        if operation.object_kind not in {"report_field", "service_title", "remark"}:
+            raise SectionWorkContractError(
+                "report_operation_unsupported",
+                "Report task contains an operation outside report-owned object kinds.",
+            )
+        if not operation.field_values:
+            raise SectionWorkContractError(
+                "report_operation_fields_missing",
+                "Report operation has no inspected postcondition to verify.",
+            )
+        for proposed in operation.field_values:
+            candidates = [
+                item
+                for item in obligations
+                if item.requirement_id not in used_requirements
+                and item.field == proposed.field
+                and item.value == proposed.value
+            ]
+            clues = {
+                normalized(value)
+                for value in (operation.semantic_ref, operation.target_clue)
+                if value
+            }
+            if len(candidates) > 1 and clues:
+                candidates = [
+                    item
+                    for item in candidates
+                    if normalized(item.owner_ref) in clues or normalized(item.slot_key) in clues
+                ]
+            if len(candidates) != 1:
+                raise SectionWorkContractError(
+                    "report_operation_fact_unresolved",
+                    "Report operation does not resolve to exactly one request obligation.",
+                )
+            fact = candidates[0]
+            allowed_fields = {
+                "report_field": {
+                    "title",
+                    "subtitle",
+                    "metadata",
+                    "tail_enabled",
+                    "depth_presentation_allowed",
+                    "page_presentation_allowed",
+                    "remark",
+                    "service_title",
+                },
+                "service_title": {"service_title"},
+                "remark": {"remark"},
+            }[operation.object_kind]
+            if fact.field not in allowed_fields:
+                raise SectionWorkContractError(
+                    "report_operation_field_kind_mismatch",
+                    "Report operation kind does not own the requested field.",
+                )
+            used_requirements.add(fact.requirement_id)
+            entries.append(
+                ReportOperationContractEntry(
+                    operation_ref=operation.local_ref,
+                    field=fact.field,
+                    target=target_for(fact),
+                    value=fact.value,
+                    requirement_id=fact.requirement_id,
+                    order_index=(
+                        int(fact.slot_key.rsplit(".", maxsplit=1)[-1])
+                        if fact.field in {"service_title", "remark"} and fact.slot_key
+                        else None
+                    ),
+                )
+            )
+
+    expected_requirements = {item.requirement_id for item in obligations}
+    if used_requirements != expected_requirements:
+        raise SectionWorkContractError(
+            "report_operation_coverage_incomplete",
+            "Report operations do not cover every request-owned report obligation exactly.",
+        )
+
+    known_refs = {item.local_ref for item in task.operations}
+    ordering: list[tuple[str, str, str]] = []
+    for constraint in task.presentation_constraints:
+        if (
+            constraint.scope_ref != "report"
+            or constraint.item_ref not in known_refs
+            or constraint.anchor_ref not in known_refs
+        ):
+            raise SectionWorkContractError(
+                "report_operation_order_unresolved",
+                "Report presentation order references an unknown operation or scope.",
+            )
+        ordering.append((constraint.item_ref, constraint.relation, constraint.anchor_ref))
+    return ReportOperationContract(
+        request_sha256=request_sha256,
+        snapshot_id=report_context.snapshot_id,
+        entries=tuple(entries),
+        ordering_constraints=tuple(ordering),
+    )
+
+
+def _section_operation_type(operation: SemanticOperation) -> Literal["ADD_TRACK"]:
+    """Accept only the additive operation currently consumed by this worker."""
+    if operation.verb != "CREATE" or operation.object_kind != "track":
+        raise SectionWorkContractError(
+            "section_operation_unsupported",
+            "The current section operation contract supports only track additions.",
+        )
+    return "ADD_TRACK"
+
+
+def _evaluate_operation_condition(
+    condition: OperationCondition | None,
+    context: ResolvedSectionContext,
+) -> tuple[str, str | None]:
+    """Evaluate only conditions supported by the immutable inspected snapshot."""
+    if condition is None:
+        return "UNCONDITIONAL", None
+    if condition.predicate in {"source_channel_available", "source_channel_absent"}:
+        source = next(
+            (item for item in context.sources if item.handle == condition.evidence_ref),
+            None,
+        )
+        if source is None:
+            raise SectionWorkContractError(
+                "section_operation_condition_unresolved",
+                "Conditional source handle is not present in the inspected snapshot.",
+            )
+        if source.inspection_state == "unavailable":
+            raise SectionWorkContractError(
+                "section_operation_condition_unresolved",
+                "Conditional source inventory is unavailable.",
+            )
+        if source.inspection_state != "inspected":
+            raise SectionWorkContractError(
+                "section_operation_condition_unresolved",
+                "Conditional source inventory has not been inspected.",
+            )
+        matches = [
+            channel
+            for channel in source.channels
+            if channel.mnemonic.casefold() == (condition.channel_clue or "").casefold()
+        ]
+        if len(matches) > 1:
+            raise SectionWorkContractError(
+                "section_operation_condition_ambiguous",
+                "The inspected source has ambiguous channel identity for the condition.",
+            )
+        found = bool(matches)
+        expected_found = condition.predicate == "source_channel_available"
+        if found == expected_found:
+            return "CONDITION_TRUE", source.handle
+        return "CONDITION_FALSE", source.handle
+    raise SectionWorkContractError(
+        "section_operation_condition_unresolved",
+        "The operation condition cannot be resolved from the inspected snapshot.",
+    )
+
+
+def validate_section_action_contract(
+    action: object,
+    contract: SectionWorkContract,
+    operation_contract: SectionOperationContract | None = None,
+) -> None:
     """Reject provider output that violates the deterministic work contract."""
     if getattr(action, "action", None) != contract.required_action:
         raise SectionWorkContractError(
@@ -668,6 +1250,62 @@ def validate_section_action_contract(action: object, contract: SectionWorkContra
         tracks = tuple(section.tracks)
     elif contract.required_action == "add_track":
         tracks = (action.track,)
+    elif contract.required_action == "add_tracks":
+        patches = tuple(action.operations)
+        tracks = tuple(item.track for item in patches)
+        if operation_contract is None:
+            raise SectionWorkContractError(
+                "worker_operation_contract_missing",
+                "Sparse track batches require an authoritative operation contract.",
+            )
+        if (
+            not operation_contract.operations
+            or operation_contract.snapshot_id != contract.snapshot_id
+            or any(
+                item.scope_ref != operation_contract.scope_ref
+                for item in operation_contract.operations
+            )
+        ):
+            raise SectionWorkContractError(
+                "worker_operation_contract_identity_mismatch",
+                "Operation contract is empty or not bound to the work snapshot.",
+            )
+        if any(
+            item.operation_type != "ADD_TRACK"
+            for item in (*operation_contract.operations, *operation_contract.omitted_operations)
+        ):
+            raise SectionWorkContractError(
+                "worker_operation_combination_unsupported",
+                "The response shape cannot cover every operation in this section task.",
+            )
+        if {item.operation_ref for item in operation_contract.operations}.intersection(
+            item.operation_ref for item in operation_contract.omitted_operations
+        ):
+            raise SectionWorkContractError(
+                "worker_operation_set_mismatch",
+                "An operation cannot be both admitted and conditionally omitted.",
+            )
+        expected_by_ref = {item.operation_ref: item for item in operation_contract.operations}
+        actual_refs = tuple(item.operation_ref for item in patches)
+        expected_refs = tuple(item.operation_ref for item in operation_contract.operations)
+        if len(actual_refs) != len(set(actual_refs)) or set(actual_refs) != set(expected_refs):
+            raise SectionWorkContractError(
+                "worker_operation_set_mismatch",
+                "Track patch operation refs differ from the authorized operation set.",
+            )
+        if any(
+            patch.track.semantic_id != expected_by_ref[patch.operation_ref].target_handle
+            for patch in patches
+        ):
+            raise SectionWorkContractError(
+                "worker_operation_target_mismatch",
+                "A track patch is assigned to the wrong authorized operation.",
+            )
+        if actual_refs != expected_refs:
+            raise SectionWorkContractError(
+                "worker_operation_order_mismatch",
+                "Track patches do not preserve the authorized operation order.",
+            )
     elif contract.required_action == "update_curve_scale":
         if action.target.handle != contract.target_handle or not _scale_matches(
             action.scale, contract.required_scale
@@ -846,6 +1484,10 @@ class CanonicalWorkerResult:
 
 __all__ = [
     "CanonicalWorkerResult",
+    "MAX_SECTION_SEMANTIC_OPERATIONS",
+    "ReportOperationContract",
+    "ReportOperationContractEntry",
+    "SectionOperationContract",
     "SectionWorkBinding",
     "SectionWorkChannel",
     "SectionWorkContract",
@@ -854,6 +1496,9 @@ __all__ = [
     "SectionWorkSource",
     "SectionWorkTarget",
     "SectionWorkTrack",
+    "WorkerOperationContractEntry",
+    "build_section_operation_contract",
+    "build_report_operation_contract",
     "build_section_work_contract",
     "validate_section_action_contract",
 ]

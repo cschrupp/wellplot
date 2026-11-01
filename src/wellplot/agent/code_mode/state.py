@@ -20,6 +20,18 @@ def replace_merged_intent(
     return update
 
 
+class ConditionalOmissionEvidence(BaseModel):
+    """One verified request-local operation omitted by an evaluated condition."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    operation_ref: str = Field(min_length=1)
+    predicate: Literal["source_channel_available", "source_channel_absent"]
+    evidence_source_handle: str = Field(min_length=1)
+    channel_clue: str = Field(min_length=1)
+    requirement_ids: tuple[str, ...] = Field(min_length=1)
+
+
 class WorkerOutcome(BaseModel):
     """Compact result from one isolated report or section worker."""
 
@@ -32,6 +44,7 @@ class WorkerOutcome(BaseModel):
     diagnostics: tuple[SemanticDiagnostic, ...] = ()
     metrics: SemanticMetrics = Field(default_factory=SemanticMetrics)
     stage_evidence: SemanticStageEvidence = Field(default_factory=SemanticStageEvidence)
+    conditional_omissions: tuple[ConditionalOmissionEvidence, ...] = ()
 
     @model_validator(mode="after")
     def validate_evidence(self) -> WorkerOutcome:
@@ -58,6 +71,7 @@ class CodeModeGraphState(TypedDict, total=False):
     temperature: float | None
     max_output_tokens: int | None
     plan: dict[str, Any]
+    planned_document_revision: str
     capability_safety: dict[str, Any]
     report_boundary_safety: dict[str, Any]
     section_leaf_safety: dict[str, Any]
@@ -75,9 +89,14 @@ class CodeModeWorkerState(TypedDict, total=False):
     authoritative_request: str
     report_task: NotRequired[dict[str, Any]]
     report_context: NotRequired[dict[str, Any]]
+    report_operation_contract: NotRequired[dict[str, Any]]
+    report_operation_contract_error: NotRequired[str]
     section_task: NotRequired[dict[str, Any]]
     section_context: NotRequired[dict[str, Any]]
     section_work_contract: NotRequired[dict[str, Any]]
+    section_operation_contract: NotRequired[dict[str, Any]]
+    conditional_omissions: NotRequired[list[dict[str, Any]]]
+    conditional_noop: NotRequired[bool]
     section_work_contract_error: NotRequired[str]
     document: dict[str, Any]
     timeout_seconds: float

@@ -16,6 +16,7 @@ from ...model.intent import (
 )
 from ..identity import IdAllocator
 from .enrichment import ExistingCurveContext, ResolvedSectionContext
+from .planner import MAX_SEMANTIC_OPERATIONS
 from .section_semantics import SectionSemanticDraft, SemanticScale, TrackSemanticDraft
 from .semantic_section_compiler import compile_section_semantics
 
@@ -107,6 +108,20 @@ class AddTrackAction(_SemanticActionModel):
     track: TrackSemanticDraft
 
 
+class AddTrackPatch(_SemanticActionModel):
+    """One sparse track patch bound to a host-authorized planner operation."""
+
+    operation_ref: str = Field(min_length=1)
+    track: TrackSemanticDraft
+
+
+class AddTracksAction(_SemanticActionModel):
+    """Add a bounded batch of tracks to one grounded existing section."""
+
+    action: Literal["add_tracks"]
+    operations: tuple[AddTrackPatch, ...] = Field(min_length=2, max_length=MAX_SEMANTIC_OPERATIONS)
+
+
 class AddFillAction(_SemanticActionModel):
     """Add one bounded fill relation to a grounded existing track."""
 
@@ -116,7 +131,11 @@ class AddFillAction(_SemanticActionModel):
 
 
 SectionSemanticAction: TypeAlias = Annotated[
-    ReconstructSectionAction | UpdateCurveScaleAction | AddTrackAction | AddFillAction,
+    ReconstructSectionAction
+    | UpdateCurveScaleAction
+    | AddTrackAction
+    | AddTracksAction
+    | AddFillAction,
     Field(discriminator="action"),
 ]
 
@@ -169,6 +188,21 @@ def lower_section_action(
 
     if action.action == "add_track":
         return _lower_added_track(action.track, context=context, document=document)
+
+    if action.action == "add_tracks":
+        lowered = [
+            _lower_added_track(item.track, context=context, document=document)
+            for item in action.operations
+        ]
+        sections = [section for intent in lowered for section in intent.sections]
+        if len(sections) != len(lowered) or not sections:
+            raise SemanticActionError(
+                "track_batch_lowering_invalid", "Track batch did not lower one-to-one."
+            )
+        combined_section = sections[0].model_copy(
+            update={"tracks": [track for section in sections for track in section.tracks]}
+        )
+        return lowered[0].model_copy(update={"sections": [combined_section]})
 
     target = resolve_existing_curve(action.target, context)
     fill = action.fill

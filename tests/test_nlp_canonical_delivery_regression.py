@@ -44,6 +44,8 @@ from wellplot.agent.code_mode.obligations import (
 from wellplot.agent.code_mode.planner import (
     ReportTask,
     SectionTask,
+    SemanticFieldValue,
+    SemanticOperation,
     SemanticPlan,
     _attach_compiled_requirements,
     _PlannerWireSectionTask,
@@ -59,7 +61,10 @@ from wellplot.agent.code_mode.typed_section_worker import (
     _normalize_reconstruct_track_dimensions,
     apply_compiled_requirements,
 )
-from wellplot.agent.code_mode.worker_contracts import build_section_work_contract
+from wellplot.agent.code_mode.worker_contracts import (
+    build_section_operation_contract,
+    build_section_work_contract,
+)
 from wellplot.agent.providers.base import (
     ProviderMetrics,
     StructuredGenerationRequest,
@@ -902,6 +907,75 @@ def _authority_g_worker_context(plan: SemanticPlan) -> EnrichedSemanticContext:
     )
 
 
+def _authority_g_operation_context(
+    plan: SemanticPlan,
+) -> tuple[SemanticPlan, EnrichedSemanticContext]:
+    """Bind captured Authority-G tasks to the current additive operation contract."""
+    section_tasks: list[SectionTask] = []
+    for index, task in enumerate(plan.section_tasks):
+        scope_ref = "main_pass" if index == 0 else "repeat_pass"
+        owners = tuple(
+            dict.fromkeys(
+                item.owner_ref
+                for item in task.obligations
+                if item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK}
+            )
+        )
+        operations = []
+        for owner in owners:
+            facts = [
+                item
+                for item in task.obligations
+                if item.owner_ref == owner
+                and item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK}
+                and item.field in {"title", "kind", "width_mm"}
+            ]
+            operations.append(
+                SemanticOperation(
+                    local_ref=f"{scope_ref}_add_{owner}",
+                    scope_ref=scope_ref,
+                    verb="CREATE",
+                    object_kind="track",
+                    semantic_ref=f"{scope_ref}_{owner}",
+                    target_clue=owner,
+                    field_values=tuple(
+                        SemanticFieldValue(field=fact.field, state="SET", value=fact.value)
+                        for fact in facts
+                    ),
+                )
+            )
+        section_tasks.append(
+            task.model_copy(update={"scope_ref": scope_ref, "operations": tuple(operations)})
+        )
+    bound_plan = plan.model_copy(update={"section_tasks": tuple(section_tasks)})
+    context = _authority_g_worker_context(bound_plan)
+    sections = tuple(
+        section.model_copy(update={"snapshot_id": f"authority-g-{index}"})
+        for index, section in enumerate(context.sections)
+    )
+    return bound_plan, context.model_copy(update={"sections": sections})
+
+
+def _authority_g_add_tracks_response(
+    response: dict[str, object],
+) -> dict[str, object]:
+    """Adapt the sealed section semantics to the current operation-ref DTO."""
+    section = response["section"]
+    tracks = section["tracks"]
+    patches = []
+    owners = ("combo", "depth", "cbl", "vdl")
+    for owner, track in zip(owners, tracks, strict=True):
+        semantic_id = str(track["semantic_id"])
+        request_local_id = owner if semantic_id.startswith("main_pass.") else semantic_id
+        patches.append(
+            {
+                "operation_ref": f"main_pass_add_{owner}",
+                "track": {**track, "semantic_id": request_local_id},
+            }
+        )
+    return {"action": "add_tracks", "operations": patches}
+
+
 def _authority_g_response() -> dict[str, object]:
     """Load the sanitized exact Main Pass response captured in Authority G."""
     captured = json.loads(
@@ -917,7 +991,7 @@ def _authority_g_response() -> dict[str, object]:
 
 
 def test_authority_g_captured_response_uses_one_shared_track_binding() -> None:
-    """Exact G response grounds combo once and completes canonical validation."""
+    """Exact G response grounds combo once; current worker rejects its wrong track title."""
     _compilation, plan, _actions = _compiled_cbl_capture()
     task = next(task for task in plan.section_tasks if task.existing_section_hint == "Main Pass")
     response = _authority_g_response()
@@ -927,7 +1001,8 @@ def test_authority_g_captured_response_uses_one_shared_track_binding() -> None:
     assert bindings.track_index("combo") == 0
     applied = apply_compiled_requirements(action, task.obligations, object_bindings=bindings)
     assert applied.section.tracks[0].width_mm == 50
-    context = _authority_g_worker_context(plan)
+    plan, context = _authority_g_operation_context(plan)
+    task = context.plan.section_tasks[0]
     section_context = context.sections[0]
     issues = section_worker._collect_validation_issues(
         applied,
@@ -945,7 +1020,7 @@ def test_authority_g_captured_response_uses_one_shared_track_binding() -> None:
         object_bindings=bindings,
     )
 
-    worker_backend = _StructuredFixtureBackend([response])
+    worker_backend = _StructuredFixtureBackend([_authority_g_add_tracks_response(response)])
     document = load_authoring_document(
         REPO_ROOT / "tests/fixtures/agentic_cbl/cased_hole_starter.log.yaml"
     )
@@ -959,12 +1034,13 @@ def test_authority_g_captured_response_uses_one_shared_track_binding() -> None:
                 for case in d4.load_cases(REPO_ROOT)
                 if case["turn_id"] == "D4-C01:C01"
             ),
-            work_contract=_work_contract(context),
+            work_contract=build_section_work_contract(task, context.sections[0]),
+            operation_contract=build_section_operation_contract(task, context.sections[0]),
             timeout_seconds=10,
         )
     )
     assert result.success is False
-    assert result.diagnostics[0].code == "worker_contract_target_mismatch"
+    assert result.diagnostics[0].code == "worker_contract_track_mismatch"
     assert len(worker_backend.requests) == 1
 
 
@@ -1276,9 +1352,10 @@ def test_unresolved_authority_g_response_is_bounded_before_correction() -> None:
     combo["semantic_id"] = "unrelated-track"
     combo["title"] = "Unrelated"
     combo["bindings"] = [{"semantic_id": "only", "channel": "GR"}]
-    backend = _StructuredFixtureBackend([response])
+    backend = _StructuredFixtureBackend([_authority_g_add_tracks_response(response)])
     observed_actions: list[dict[str, object]] = []
-    context = _authority_g_worker_context(plan)
+    plan, context = _authority_g_operation_context(plan)
+    task = context.plan.section_tasks[0]
     document = load_authoring_document(
         REPO_ROOT / "tests/fixtures/agentic_cbl/cased_hole_starter.log.yaml"
     )
@@ -1293,12 +1370,13 @@ def test_unresolved_authority_g_response_is_bounded_before_correction() -> None:
                 for case in d4.load_cases(REPO_ROOT)
                 if case["turn_id"] == "D4-C01:C01"
             ),
-            work_contract=_work_contract(context),
+            work_contract=build_section_work_contract(task, context.sections[0]),
+            operation_contract=build_section_operation_contract(task, context.sections[0]),
             timeout_seconds=10,
         )
     )
     assert result.success is False
-    assert result.diagnostics[0].code == "worker_contract_target_mismatch"
+    assert result.diagnostics[0].code == "worker_operation_target_mismatch"
     assert result.stage_evidence.normalization == "PASS"
     assert len(backend.requests) == 1
     assert observed_actions == []
@@ -1326,7 +1404,8 @@ def test_incomplete_multitrack_add_track_fails_closed_without_second_call() -> N
     first_track = full_response["section"]["tracks"][0]
     initial_response = {"action": "add_track", "track": first_track}
     backend = _StructuredFixtureBackend([initial_response])
-    context = _authority_g_worker_context(plan)
+    plan, context = _authority_g_operation_context(plan)
+    main_task = context.plan.section_tasks[main_index]
     document = load_authoring_document(
         REPO_ROOT / "tests/fixtures/agentic_cbl/cased_hole_starter.log.yaml"
     )
@@ -1342,7 +1421,10 @@ def test_incomplete_multitrack_add_track_fails_closed_without_second_call() -> N
                 for case in d4.load_cases(REPO_ROOT)
                 if case["turn_id"] == "D4-C01:C01"
             ),
-            work_contract=_work_contract(context),
+            work_contract=build_section_work_contract(main_task, context.sections[main_index]),
+            operation_contract=build_section_operation_contract(
+                main_task, context.sections[main_index]
+            ),
             timeout_seconds=10,
         )
     )

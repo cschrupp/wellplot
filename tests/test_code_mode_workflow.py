@@ -22,7 +22,14 @@ from wellplot.agent.code_mode.enrichment import (
 )
 from wellplot.agent.code_mode.facade import CodeModeCompileFacade
 from wellplot.agent.code_mode.obligations import ObligationState, compile_request_contract
-from wellplot.agent.code_mode.planner import ReportTask, SectionTask, SemanticPlan
+from wellplot.agent.code_mode.planner import (
+    OperationCondition,
+    ReportTask,
+    SectionTask,
+    SemanticFieldValue,
+    SemanticOperation,
+    SemanticPlan,
+)
 from wellplot.agent.code_mode.state import WorkerOutcome
 from wellplot.agent.code_mode.workflow import (
     CodeModeGraphDependencies,
@@ -300,6 +307,109 @@ def test_graph_merges_report_and_sections_in_plan_order() -> None:
     ]
     assert result["merged_intent"]["title"] == "Report title"
     assert "report = wp.report" not in str(result["worker_outcomes"])
+
+
+def test_false_conditional_operations_produce_verified_graph_noop() -> None:
+    """Inspected absence yields explicit no-op evidence without worker generation."""
+    request = (
+        "In Main Log add Bond Index and Gamma Ray normal tracks. "
+        "Track Bond Index: normal, width 34 mm. "
+        "Track Gamma Ray: normal, width 26 mm."
+    )
+    condition = OperationCondition(
+        predicate="source_channel_available",
+        evidence_kind="inspected_source",
+        evidence_ref="source-1",
+        channel_clue="SP",
+    )
+    operations = tuple(
+        SemanticOperation(
+            local_ref=f"add_{handle}",
+            scope_ref="main_log",
+            verb="CREATE",
+            object_kind="track",
+            semantic_ref=f"{handle}_track",
+            field_values=(
+                SemanticFieldValue(field="title", state="SET", value=title),
+                SemanticFieldValue(field="kind", state="SET", value="normal"),
+                SemanticFieldValue(field="width_mm", state="SET", value=width),
+            ),
+            condition=condition,
+        )
+        for handle, title, width in (
+            ("bond_index", "Bond Index", 34),
+            ("gamma_ray", "Gamma Ray", 26),
+        )
+    )
+    plan = SemanticPlan(
+        summary="Main Log",
+        obligations=compile_request_contract(request).requirements.requirements,
+        section_tasks=(
+            SectionTask(
+                goal="Add conditional tracks.",
+                capability_ids=("section.log_plot", "track.normal", "binding.curve"),
+                existing_section_hint="Main Log",
+                scope_ref="main_log",
+                operations=operations,
+            ),
+        ),
+    )
+    source = SourceContext(
+        candidate_id="source-candidate",
+        handle="source-1",
+        labels=("fixture.las",),
+        canonical_path="/fixture.las",
+        source_format="las",
+        inspection_state="inspected",
+        channels=(ChannelContext(mnemonic="BI", kind="scalar"),),
+    )
+
+    class _SnapshotEnricher:
+        def enrich(self, *, plan: SemanticPlan, **_kwargs: object) -> EnrichedSemanticContext:
+            return EnrichedSemanticContext(
+                plan=plan,
+                sections=(
+                    ResolvedSectionContext(
+                        task_index=0,
+                        section_id="existing",
+                        section_handle="section-1",
+                        snapshot_id="snapshot-conditional",
+                        sources=(source,),
+                    ),
+                ),
+                report=ReportContext(snapshot_id="snapshot-conditional"),
+            )
+
+    class _NoGeneration:
+        async def compile(self, **_kwargs: object) -> ProgramExecutionResult:
+            raise AssertionError("A verified all-false condition must not generate a response.")
+
+    state = _state(plan)
+    state["request"] = request
+    original_document = state["document"]
+    graph = _graph(
+        plan,
+        _Workers(),
+        enricher=_SnapshotEnricher(),
+        section_compiler=_NoGeneration(),
+    )
+    graph_result = asyncio.run(graph.ainvoke(state))
+    from wellplot.agent.code_mode.facade import _project_graph_result
+
+    result = _project_graph_result(graph_result)
+
+    assert result.success is True
+    assert result.merged_intent is not None
+    assert result.merged_intent.model_dump(mode="json", exclude_unset=True) == {}
+    assert result.obligations == ()
+    assert graph_result["document"] == original_document
+    outcome = WorkerOutcome.model_validate(json.loads(graph_result["worker_outcomes"][0]))
+    assert outcome.success is True
+    assert {item.operation_ref for item in outcome.conditional_omissions} == {
+        "add_bond_index",
+        "add_gamma_ray",
+    }
+    assert all(item.evidence_source_handle == "source-1" for item in outcome.conditional_omissions)
 
 
 @pytest.mark.parametrize(
@@ -590,6 +700,31 @@ def test_graph_plans_at_zero_and_keeps_source_summary_path_free() -> None:
     ]
 
 
+def test_uninspected_source_inventory_does_not_claim_channels_are_absent() -> None:
+    """Uninspected candidate metadata is not projected as an authoritative inventory."""
+    plan = SemanticPlan(
+        summary="section only",
+        section_tasks=(SectionTask(goal="inspect", capability_ids=("section.log_plot",)),),
+    )
+    planner = _Planner(plan)
+    state = _state(plan)
+    state["source_candidates"] = [
+        {
+            "candidate_id": "source-uninspected",
+            "root_id": "input",
+            "path": "source.las",
+            "labels": ["main pass"],
+            "inspection_state": "not_inspected",
+            "channels": [{"mnemonic": "GR", "kind": "scalar", "unit": "gAPI"}],
+        }
+    ]
+
+    asyncio.run(_graph(plan, _Workers(), planner).ainvoke(state))
+
+    assert planner.source_summaries[0]["sources"][0]["inspection_state"] == "not_inspected"
+    assert planner.source_summaries[0]["sources"][0]["channels"] == []
+
+
 def test_graph_planner_context_exposes_safe_existing_section_hints() -> None:
     """Planner context includes titles without exposing nested canonical state."""
     plan = SemanticPlan(
@@ -607,6 +742,9 @@ def test_graph_planner_context_exposes_safe_existing_section_hints() -> None:
     assert planner.summaries[0]["existing_section_hints"] == [
         {"title": "Existing section", "subtitle": None}
     ]
+    assert planner.summaries[0]["sections"][0]["handle"] == "section-1"
+    assert "section_ids" not in planner.summaries[0]
+    assert '"id": "existing"' not in json.dumps(planner.summaries[0], sort_keys=True)
     assert planner.summaries[0]["revision_inventory"] == [
         {
             "title": "Existing section",
