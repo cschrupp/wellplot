@@ -17,7 +17,6 @@ from .enrichment import ReportContext, ResolvedSectionContext
 from .obligations import ObligationState, OwnerKind, RequestObligation
 from .planner import (
     MAX_SEMANTIC_OPERATIONS,
-    OperationCondition,
     ReportTask,
     SectionTask,
     SemanticOperation,
@@ -853,16 +852,7 @@ def build_section_operation_contract(
         if item.object_kind == "track" and item.semantic_ref is not None
     }
     entries: list[WorkerOperationContractEntry] = []
-    omitted_entries: list[WorkerOperationContractEntry] = []
     assigned_track_owners: set[str] = set()
-    source_obligation = next(
-        (item for item in obligations if item.owner_kind is OwnerKind.SOURCE), None
-    )
-    selected_source = (
-        _source_handle(source_obligation.value, section_context)
-        if source_obligation is not None
-        else None
-    )
     for operation in task.operations:
         if operation.scope_ref != task.scope_ref:
             raise SectionWorkContractError(
@@ -910,19 +900,11 @@ def build_section_operation_contract(
                     "Planner operation fields conflict with request-authoritative facts.",
                 )
 
-        if (
-            operation.condition is not None
-            and selected_source is not None
-            and operation.condition.evidence_kind == "inspected_source"
-            and operation.condition.evidence_ref != selected_source
-        ):
+        if operation.condition is not None:
             raise SectionWorkContractError(
-                "section_operation_condition_source_mismatch",
-                "Conditional evidence does not belong to the selected request source.",
+                "section_operation_condition_unauthorized",
+                "The request contract does not authorize conditional operation omission.",
             )
-        condition_result, condition_evidence = _evaluate_operation_condition(
-            operation.condition, section_context
-        )
         entry = WorkerOperationContractEntry(
             operation_id=operation_ids[operation.local_ref],
             operation_ref=operation.local_ref,
@@ -937,16 +919,12 @@ def build_section_operation_contract(
             condition_predicate=(
                 operation.condition.predicate if operation.condition is not None else None
             ),
-            condition_result=condition_result,
-            condition_evidence=condition_evidence,
-            condition_channel_clue=(
-                operation.condition.channel_clue if operation.condition is not None else None
-            ),
+            condition_result="UNCONDITIONAL",
             requirement_ids=tuple(
                 dict.fromkeys(item.requirement_id for item in facts if item.requirement_id)
             ),
         )
-        (omitted_entries if condition_result == "CONDITION_FALSE" else entries).append(entry)
+        entries.append(entry)
 
     required_track_owners = set(track_owners)
     if assigned_track_owners != required_track_owners:
@@ -975,7 +953,6 @@ def build_section_operation_contract(
         scope_ref=task.scope_ref,
         snapshot_id=section_context.snapshot_id,
         operations=tuple(entries),
-        omitted_operations=tuple(omitted_entries),
         operation_schema_sha256=hashlib.sha256(schema_bytes).hexdigest(),
         ordering_constraints=tuple(ordering),
     )
@@ -1172,54 +1149,6 @@ def _section_operation_type(operation: SemanticOperation) -> Literal["ADD_TRACK"
             "The current section operation contract supports only track additions.",
         )
     return "ADD_TRACK"
-
-
-def _evaluate_operation_condition(
-    condition: OperationCondition | None,
-    context: ResolvedSectionContext,
-) -> tuple[str, str | None]:
-    """Evaluate only conditions supported by the immutable inspected snapshot."""
-    if condition is None:
-        return "UNCONDITIONAL", None
-    if condition.predicate in {"source_channel_available", "source_channel_absent"}:
-        source = next(
-            (item for item in context.sources if item.handle == condition.evidence_ref),
-            None,
-        )
-        if source is None:
-            raise SectionWorkContractError(
-                "section_operation_condition_unresolved",
-                "Conditional source handle is not present in the inspected snapshot.",
-            )
-        if source.inspection_state == "unavailable":
-            raise SectionWorkContractError(
-                "section_operation_condition_unresolved",
-                "Conditional source inventory is unavailable.",
-            )
-        if source.inspection_state != "inspected":
-            raise SectionWorkContractError(
-                "section_operation_condition_unresolved",
-                "Conditional source inventory has not been inspected.",
-            )
-        matches = [
-            channel
-            for channel in source.channels
-            if channel.mnemonic.casefold() == (condition.channel_clue or "").casefold()
-        ]
-        if len(matches) > 1:
-            raise SectionWorkContractError(
-                "section_operation_condition_ambiguous",
-                "The inspected source has ambiguous channel identity for the condition.",
-            )
-        found = bool(matches)
-        expected_found = condition.predicate == "source_channel_available"
-        if found == expected_found:
-            return "CONDITION_TRUE", source.handle
-        return "CONDITION_FALSE", source.handle
-    raise SectionWorkContractError(
-        "section_operation_condition_unresolved",
-        "The operation condition cannot be resolved from the inspected snapshot.",
-    )
 
 
 def validate_section_action_contract(

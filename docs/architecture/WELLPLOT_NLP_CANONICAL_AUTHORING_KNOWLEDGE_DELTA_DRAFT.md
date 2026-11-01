@@ -109,8 +109,8 @@ scientific_population_access: 0
 - `build_section_operation_contract()` compiles the planner inventory into
   `wellplot.section-operation-contract.v1`: bounded at 20 operations (the
   shared planner-wire/worker-schema maximum), with deterministic operation
-  IDs, request hash, scope/snapshot binding, target-local handles, conditional
-  evidence, requirement IDs, ordering relations, and a schema digest. The
+  IDs, request hash, scope/snapshot binding, target-local handles, requirement
+  IDs, ordering relations, and a schema digest. The
   count is a finite response-size guard, not a provider compatibility claim.
   Track facts must be covered once; planner-proposed explicit values must
   agree with compiled obligations. Existing `SectionWorkContract` remains the
@@ -131,12 +131,11 @@ scientific_population_access: 0
   fill, binding-update, move, remove, and section-field inventories fail closed
   before worker dispatch. The corresponding `add_tracks` DTO shares the
   planner's 20-operation schema bound.
-- Source-channel conditions are evaluated against the named inspected source.
-  True operations are admitted; false operations are recorded as explicit
-  no-ops with their source/channel evidence and owned requirement IDs, which
-  are excluded from final compile obligations. Not-inspected, unavailable,
-  ambiguous, and generic target conditions fail closed. Conditions never
-  imply absence without inspected evidence.
+- Planner-supplied operation conditions are currently rejected. The canonical
+  request contract has no typed representation authorizing conditional
+  omission, so valid source evidence alone cannot waive a mandatory request.
+  Conditional omission remains unsupported until request-authored conditions
+  can be compiled and bound independently of the planner proposal.
 - Report-operation projection now requires exact request-obligation coverage
   and rejects fieldless `ENSURE` as an unverifiable no-op. Single-track
   operation-ref binding, report worker mapping, full canonical
@@ -145,8 +144,7 @@ scientific_population_access: 0
   assigned to A06–A08 and require explicit regressions before acceptance.
 
 Provider-free evidence currently covers operation ownership/value conflicts,
- missing track coverage, true/false/unknown conditional admission, explicit
-no-op output and obligation filtering, source-specific evidence, exact
+missing track coverage, rejection of planner-created conditions, exact
 multi-add operation references, worker-level two-track validation and
 lowering, preservation/reconciliation with pre-existing unrelated tracks,
 schema strictness, and the existing planner/enrichment/work-contract suites.
@@ -169,9 +167,10 @@ scientific_population_access: 0
 - `CanonicalReportWorker` remains the only report worker. It receives the
   host-owned projection, preserves `ReportSemanticResponse`, applies the
   existing compiled report requirements and slot-group checks, validates
-  obligations, then checks the final sparse target/value projection before
-  existing intent lowering. No report-specific wire DTO, executor, or CRUD
-  route was introduced.
+  obligations, then requires the exact set of response effect paths to equal
+  the authorized contract paths before existing intent lowering. Unrequested
+  title, page, depth, tail, slot, remark, and unit effects fail closed. No
+  report-specific wire DTO, executor, or CRUD route was introduced.
 - Explicit metadata slot resolution currently uses exact normalized equality
   against inspected slot keys/labels. It does not invent aliases. Service
   titles and remarks bind to request-local ordered slots. Existing typed

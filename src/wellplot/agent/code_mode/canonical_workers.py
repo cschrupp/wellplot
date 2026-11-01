@@ -441,7 +441,51 @@ def _validate_report_operation_contract(
     response: ReportSemanticResponse,
     contract: ReportOperationContract,
 ) -> None:
-    """Verify every contracted report target is represented by the sparse response."""
+    """Require an exact effect set and verify every contracted target/value."""
+
+    def effect_for_target(target: str) -> tuple[str, str]:
+        if target.startswith("general."):
+            return "general_fields", target.removeprefix("general.")
+        if target.startswith("detail."):
+            return "detail_fields", target.removeprefix("detail.")
+        if target.startswith("service_title."):
+            return "service_titles", target.removeprefix("service_title.")
+        if target.startswith("remark."):
+            index_text = target.rsplit(".", maxsplit=1)[-1]
+            try:
+                index = int(index_text)
+            except ValueError as error:
+                raise ValueError("Report operation has an invalid remark target.") from error
+            if index < 1:
+                raise ValueError("Report operation has an invalid remark target.")
+            return "remarks", str(index - 1)
+        if target.startswith("report."):
+            return "report", target.removeprefix("report.")
+        raise ValueError("Report operation target is not a supported report slot.")
+
+    authorized_effects = {
+        effect_for_target(entry.target) for entry in contract.entries if entry.field != "NO_OP"
+    }
+    actual_effects = {
+        ("report", name)
+        for name in (
+            "title",
+            "subtitle",
+            "page_size",
+            "page_orientation",
+            "depth_unit",
+            "depth_scale",
+            "tail_enabled",
+        )
+        if getattr(response, name) is not None
+    }
+    actual_effects.update(("general_fields", item.slot_id) for item in response.general_fields)
+    actual_effects.update(("service_titles", item.slot_id) for item in response.service_titles)
+    actual_effects.update(("detail_fields", item.slot_id) for item in response.detail_fields)
+    actual_effects.update(("remarks", str(index)) for index, _item in enumerate(response.remarks))
+    if actual_effects - authorized_effects:
+        raise ValueError("Report response contains an unauthorized effect.")
+
     ranks: dict[str, int] = {}
     for entry in contract.entries:
         if entry.field == "NO_OP":
@@ -475,7 +519,12 @@ def _validate_report_operation_contract(
             actual = response.remarks[index] if 0 <= index < len(response.remarks) else None
             if actual is not None:
                 expected = json.loads(str(entry.value))
-                if actual.title != expected.get("title") or actual.text != expected.get("text"):
+                if (
+                    actual.title != expected.get("title")
+                    or actual.text != expected.get("text")
+                    or actual.lines
+                    or actual.alignment != "left"
+                ):
                     raise ValueError("Report operation remark differs from its request contract.")
                 continue
         elif target.startswith("report."):
@@ -488,6 +537,14 @@ def _validate_report_operation_contract(
 
         if actual is None or str(actual) != str(entry.value):
             raise ValueError("Report operation value is absent or differs from its contract.")
+
+    response_slots = (
+        *response.general_fields,
+        *response.service_titles,
+        *response.detail_fields,
+    )
+    if any(item.unit is not None for item in response_slots):
+        raise ValueError("Report response contains an unauthorized unit mutation.")
 
     for item_ref, relation, anchor_ref in contract.ordering_constraints:
         if item_ref not in ranks or anchor_ref not in ranks:

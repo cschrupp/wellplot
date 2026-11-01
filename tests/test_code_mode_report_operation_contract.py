@@ -119,6 +119,40 @@ def test_report_operation_contract_rejects_output_value_drift() -> None:
         _validate_report_operation_contract(response, contract)
 
 
+@pytest.mark.parametrize(
+    "response",
+    (
+        ReportSemanticResponse(
+            title="Unrequested title",
+            general_fields=(
+                ReportSlotValue(slot_id="general.company", value="University of Utah"),
+            ),
+        ),
+        ReportSemanticResponse(
+            page_size="A4",
+            general_fields=(
+                ReportSlotValue(slot_id="general.company", value="University of Utah"),
+            ),
+        ),
+        ReportSemanticResponse(
+            general_fields=(
+                ReportSlotValue(slot_id="general.company", value="University of Utah"),
+                ReportSlotValue(slot_id="general.well", value="Test Well"),
+            ),
+        ),
+    ),
+)
+def test_report_operation_contract_rejects_unrequested_effects(
+    response: ReportSemanticResponse,
+) -> None:
+    """A valid requested value cannot authorize unrelated report mutations."""
+    task, context = _report_contract_fixture()
+    contract = build_report_operation_contract(task, context)
+
+    with pytest.raises(ValueError, match="unauthorized effect"):
+        _validate_report_operation_contract(response, contract)
+
+
 def test_report_operation_contract_rejects_order_constraint_on_reversed_slots() -> None:
     """Reject request order constraints contradicted by resolved report positions."""
     contract = ReportOperationContract(

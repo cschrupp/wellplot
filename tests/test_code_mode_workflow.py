@@ -309,8 +309,8 @@ def test_graph_merges_report_and_sections_in_plan_order() -> None:
     assert "report = wp.report" not in str(result["worker_outcomes"])
 
 
-def test_false_conditional_operations_produce_verified_graph_noop() -> None:
-    """Inspected absence yields explicit no-op evidence without worker generation."""
+def test_planner_condition_cannot_cancel_mandatory_graph_work() -> None:
+    """An unconditional user request remains outstanding despite planner conditions."""
     request = (
         "In Main Log add Bond Index and Gamma Ray normal tracks. "
         "Track Bond Index: normal, width 34 mm. "
@@ -382,11 +382,10 @@ def test_false_conditional_operations_produce_verified_graph_noop() -> None:
 
     class _NoGeneration:
         async def compile(self, **_kwargs: object) -> ProgramExecutionResult:
-            raise AssertionError("A verified all-false condition must not generate a response.")
+            raise AssertionError("Unauthorized conditions must fail before worker execution.")
 
     state = _state(plan)
     state["request"] = request
-    original_document = state["document"]
     graph = _graph(
         plan,
         _Workers(),
@@ -398,18 +397,12 @@ def test_false_conditional_operations_produce_verified_graph_noop() -> None:
 
     result = _project_graph_result(graph_result)
 
-    assert result.success is True
-    assert result.merged_intent is not None
-    assert result.merged_intent.model_dump(mode="json", exclude_unset=True) == {}
-    assert result.obligations == ()
-    assert graph_result["document"] == original_document
+    assert result.success is False
+    assert len(result.obligations) == len(plan.obligations)
     outcome = WorkerOutcome.model_validate(json.loads(graph_result["worker_outcomes"][0]))
-    assert outcome.success is True
-    assert {item.operation_ref for item in outcome.conditional_omissions} == {
-        "add_bond_index",
-        "add_gamma_ray",
-    }
-    assert all(item.evidence_source_handle == "source-1" for item in outcome.conditional_omissions)
+    assert outcome.success is False
+    assert outcome.conditional_omissions == ()
+    assert outcome.diagnostics[0].code == "section_operation_condition_unauthorized"
 
 
 @pytest.mark.parametrize(

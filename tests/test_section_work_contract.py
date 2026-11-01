@@ -524,8 +524,8 @@ def test_canonical_worker_accepts_two_operation_bound_sparse_additions() -> None
     ]
 
 
-def test_false_channel_condition_is_omitted_with_owned_requirement_evidence() -> None:
-    """A verified absent channel is omitted, while unrelated work stays admitted."""
+def test_planner_condition_cannot_omit_an_unconditional_request() -> None:
+    """Valid source evidence cannot grant authority absent from the request contract."""
     compilation = compile_request_contract(_smoke_request())
     task = SectionTask(
         goal="Add both requested tracks.",
@@ -563,43 +563,28 @@ def test_false_channel_condition_is_omitted_with_owned_requirement_evidence() ->
         obligations=compilation.requirements.requirements,
     )
     context = _context().model_copy(update={"snapshot_id": "snapshot-test"})
+    with pytest.raises(SectionWorkContractError) as error:
+        build_section_operation_contract(task, context)
+
+    assert error.value.code == "section_operation_condition_unauthorized"
+    assert len(task.obligations) == len(compilation.requirements.requirements)
+
+
+def test_unconditional_request_operations_remain_admitted() -> None:
+    """The supported positive path preserves every unconditional requested track."""
+    task, context, _work, _operations = _multi_track_contracts(_smoke_request())
+
     contract = build_section_operation_contract(task, context)
 
-    assert [item.operation_ref for item in contract.operations] == ["add_gamma_ray"]
-    assert len(contract.omitted_operations) == 1
-    omitted = contract.omitted_operations[0]
-    assert omitted.operation_ref == "add_bond_index"
-    assert omitted.condition_result == "CONDITION_FALSE"
-    assert omitted.condition_evidence == "source-1"
-    assert omitted.condition_channel_clue == "SP"
-    assert omitted.requirement_ids
-
-
-def test_true_channel_condition_is_admitted() -> None:
-    """A positive availability predicate admits only after inspected evidence."""
-    compilation = compile_request_contract(_smoke_request())
-    task, context, _work, _operations = _multi_track_contracts(_smoke_request())
-    first = task.operations[0].model_copy(
-        update={
-            "condition": OperationCondition(
-                predicate="source_channel_available",
-                evidence_kind="inspected_source",
-                evidence_ref="source-1",
-                channel_clue="BI",
-            )
-        }
-    )
-    conditioned = task.model_copy(update={"operations": (first, *task.operations[1:])})
-
-    contract = build_section_operation_contract(conditioned, context)
-
-    assert contract.operations[0].condition_result == "CONDITION_TRUE"
+    assert [item.operation_ref for item in contract.operations] == [
+        item.local_ref for item in task.operations
+    ]
+    assert all(item.condition_result == "UNCONDITIONAL" for item in contract.operations)
     assert not contract.omitted_operations
-    assert len(compilation.requirements.requirements) == len(task.obligations)
 
 
-def test_condition_reads_only_the_named_source_inventory() -> None:
-    """A channel in a sibling source cannot satisfy another source's predicate."""
+def test_inspected_inventory_does_not_authorize_planner_condition() -> None:
+    """Even matching source evidence cannot authorize a planner-created condition."""
     task, context, _work, _operations = _multi_track_contracts(_smoke_request())
     first = task.operations[0].model_copy(
         update={
@@ -624,10 +609,9 @@ def test_condition_reads_only_the_named_source_inventory() -> None:
     )
     context = context.model_copy(update={"sources": (context.sources[0], source_with_sp)})
 
-    contract = build_section_operation_contract(conditioned, context)
-
-    assert contract.omitted_operations[0].operation_ref == first.local_ref
-    assert contract.omitted_operations[0].condition_evidence == "source-1"
+    with pytest.raises(SectionWorkContractError) as error:
+        build_section_operation_contract(conditioned, context)
+    assert error.value.code == "section_operation_condition_unauthorized"
 
 
 def test_unknown_target_condition_fails_closed() -> None:
@@ -647,7 +631,7 @@ def test_unknown_target_condition_fails_closed() -> None:
         build_section_operation_contract(
             task.model_copy(update={"operations": (first, *task.operations[1:])}), context
         )
-    assert error.value.code == "section_operation_condition_unresolved"
+    assert error.value.code == "section_operation_condition_unauthorized"
 
 
 @pytest.mark.parametrize("inspection_state", ["not_inspected", "unavailable"])
@@ -672,7 +656,7 @@ def test_unknown_channel_condition_fails_before_operation_admission(
 
     with pytest.raises(SectionWorkContractError) as error:
         build_section_operation_contract(conditioned, context)
-    assert error.value.code == "section_operation_condition_unresolved"
+    assert error.value.code == "section_operation_condition_unauthorized"
 
 
 @pytest.mark.parametrize("extra_kind", ["fill", "binding"])
