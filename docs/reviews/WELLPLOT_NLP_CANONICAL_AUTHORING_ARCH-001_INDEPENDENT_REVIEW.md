@@ -89,6 +89,10 @@ remain unchanged.
   and have finite limits before implementation.
 - Correction remains one bounded existing protocol.
 - No frozen D5/C02 evidence is altered or reinterpreted.
-- Active baseline is not changed until accepted implementation evidence is
-  available.
+- After independent and Human architecture acceptance, the active baseline
+  records the accepted architecture as `ACCEPTED / NOT YET IMPLEMENTED` before
+  A01; this entry makes no implementation-capability claim.
+- After independent implementation acceptance, the active baseline is updated
+  with only verified contracts, regressions, exact checkpoints, and residual
+  limitations.
 - A12 live smoke and any scientific campaign retain separate authority gates.

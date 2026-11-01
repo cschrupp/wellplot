@@ -50,7 +50,9 @@ is closed and is not a scientific campaign. The current design candidate is:
 ```text
 binding smoke 002: SMOKE_CONTRACT_FAIL [CLOSED]
     -> A00 architecture integration [PENDING INDEPENDENT REVIEW]
-    -> Human architecture acceptance + implementation authorization
+    -> independent + Human architecture acceptance
+    -> architecture Knowledge Delta promoted as ACCEPTED / NOT YET IMPLEMENTED
+    -> separate Human implementation authorization
     -> A01-A11 bounded implementation/qualification slices
     -> A12 fresh authorized engineering smoke
     -> separate decision on any scientific qualification
@@ -59,7 +61,9 @@ binding smoke 002: SMOKE_CONTRACT_FAIL [CLOSED]
 The older repaired-baseline confirmation and CM-54 through CM-58 wording
 below is preserved as historical roadmap context, not as the current execution
 sequence. A00's proposed sequence is not active authority until independent
-review and Human acceptance; A01 implementation is not yet authorized.
+review and Human acceptance. Following acceptance, the architecture-level
+Knowledge Delta is promoted as `ACCEPTED / NOT YET IMPLEMENTED` before A01;
+A01 still requires separate Human implementation authorization.
 
 ## Proposed Canonical NLP-Authoring Remediation (A00 Pending Review)
 
@@ -71,10 +75,13 @@ This is a bounded worker-contract mismatch, not a scientific result.
 `WELLPLOT-NLP-CANONICAL-AUTHORING-ARCH-001` is a documentation-only
 architecture candidate. A00 integrates that proposal with the accepted
 single-engine and host-ownership invariants and is awaiting independent review.
-It does not supersede the current active baseline, authorize A01 implementation,
-or authorize another smoke/scientific campaign. If accepted and Human-approved,
-the proposed A01-A11 provider-free implementation slices precede a separately
-authorized A12 live engineering qualification.
+The current candidate does not edit the active baseline. If independently and
+Human-accepted, a stage-one baseline entry will record the architecture as
+`ACCEPTED / NOT YET IMPLEMENTED` before A01, explicitly superseding only the
+planner restriction identified in the ADR while preserving other active
+invariants. A01-A11 additionally require separate Human implementation
+authorization; they precede separately authorized A12 live engineering
+qualification.
 
 ## Current Agent Architecture Status
 

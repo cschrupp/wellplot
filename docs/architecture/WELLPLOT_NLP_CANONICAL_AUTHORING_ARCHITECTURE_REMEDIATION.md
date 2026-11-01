@@ -422,7 +422,8 @@ Task atoms:
 5.	Produce a decision record: planner operation inventory, bounded read-only inspection, worker patch vocabulary, unchanged canonical CRUD, single-engine promise.
 6.	State every genuinely open semantic question (section create-vs-revise, GR/SP grouping, conditional absence, duplicate policy, style policy, staged-state dependency).
 7.	Independently review the ADR and decide KEEP/ADAPT/REPLACE/REOPEN for restrictions it changes.
-8.	Record accepted Knowledge Delta and update active baseline only after architecture acceptance.
+8.	After independent and Human architecture acceptance, promote the accepted architecture delta into the active baseline, clearly marked `ACCEPTED / NOT YET IMPLEMENTED`, before A01 begins. State the exact superseded planner restriction and all preserved K/R invariants.
+9.	After independent implementation acceptance, make a second Knowledge Delta promotion containing only verified implementation contracts, regression evidence, exact accepted implementation/test identities, and residual limitations.
 Acceptance: one accepted architecture direction; no competing engine; unchanged live authority; exact affected baseline clauses identified. Do not implement before this gate.
 Slice A01 — Golden behavior and test fixtures (P0, provider-free)
 1.	Build synthetic existing six-track Main Log with an unrelated section and populated report fields.
@@ -531,7 +532,7 @@ Slice A10 — Full provider-free integration and compatibility matrix (P0)
 Acceptance: all mandatory suites pass with accounted deselections; one production path; no live calls; independent implementation acceptance.
 Slice A11 — Documentation, migration, and deployment readiness (P1)
 1.	Update AGENTS.md if governance rules need genuine changes; otherwise preserve it unchanged.
-2.	Update docs/agent-code-mode-current-baseline.md only with accepted Knowledge Delta and new regression references.
+2.	Complete the implementation-stage Knowledge Delta in docs/agent-code-mode-current-baseline.md only after independent implementation acceptance; the architecture-stage entry is promoted after A00 acceptance and before A01.
 3.	Write one development-memory page per slice: intention, files, frozen contract, evidence, limitations, lessons.
 4.	Update architecture ADR, schema examples, operator doc, roadmap, task/backlog visibility, and stale references.
 5.	Document a versioned schema migration strategy; define compatibility handling for callers using historical planner or action models.
@@ -587,24 +588,28 @@ ________________________________________
 6.	Rollback: preserve exact prior accepted executable SHA and artifacts; if new semantic contracts regress, revert routing as one reviewed change. Never rewrite sealed evidence or reuse a consumed namespace.
 7.	Evidence discipline: historical D5 acceptance is evidence for old behavior, not proof of new schema/model capability.
 ________________________________________
-14. Open decisions to resolve during A00, not by hidden implementation defaults
-ID	Decision	Preferred starting position	Why open
-OD-01	Planner emits semantic operation inventory?	Yes, versioned and independently validated	Changes historical accepted planner prohibition; needs ADR
-OD-02	Worker batch size	One bounded batch per section/report scope by default	Schema/provider size limits need measurements
-OD-03	Worker read-only tool interface	Prefetch-first, bounded on-demand host queries	Tool budget, provider/tool compatibility still need design
-OD-04	Existing SectionSemanticDraft vs new sparse patch DTO	Reuse maximum stable typed models; introduce smallest versioned wrapper	Avoid redundant IR
-OD-05	New-section CREATE_SECTION and child DAG	Host-owned staged identities	Need explicit schema-valid empty/shell section behavior
-OD-06	CREATE vs ENSURE vs duplicate	Honor literal intent; ambiguity fails closed	Avoid surprising overwrites or duplicate tracks
-OD-07	GR/SP one visual track vs two	Do not assume; domain default only if explicitly documented	Prompt is ambiguous
-OD-08	Resistivity role and emphasis defaults	Registry-grounded domain policy where available; otherwise bounded resolution	Not universal across logs
-OD-09	Snapshot change during worker calls	Optimistic version/hash guard and explicit recompile	Avoid stale modification
-OD-10	Report/section dependencies	Parallel only if independent; staged snapshot otherwise	Mixed transactions can have cross-scope dependencies
-OD-11	Correction budget	Preserve accepted single correction protocol	No hidden new retries
-OD-12	Schema limits	Derive from provider constraints and bounded tests	Avoid arbitrary unsupported caps
-OD-13	Persist/reload failure recovery	Guarantee no success or silent partial state	Exact durable-write semantics require audit
+14. Open decisions: classification and first consuming slice
+
+An A00 architecture decision is promoted to the active baseline after independent and Human acceptance, explicitly as not yet implemented. Deferred interface decisions block only their first consuming slice. Scientific/domain ambiguities remain fail-closed until grounded; no implementation default may silently resolve them.
+
+| ID | Classification | A00 direction or unresolved question | First consuming slice / gate |
+| --- | --- | --- | --- |
+| OD-01 | Architectural decision requiring A00 acceptance | Accept a bounded request-local semantic operation inventory, verified against host-compiled request obligations. This supersedes only the planner ban on operation intent, not host CRUD or dependency authority. | A01 fixtures depend on the accepted vocabulary; exact planner schema is frozen in A02. |
+| OD-02 | Implementation-interface decision | Batch-per-scope shape is proposed; numerical operation/context/response cap remains unset. Do not invent a value. | A04 freezes contract cap before implementation; A05 consumes it in schema/output limits. |
+| OD-03 | Architectural decision requiring A00 acceptance | Accept prefetch-first, host-mediated, read-only inspection; optional query only for typed missing-fact conditions. Exact protocol/limits remain open. | A03 freezes snapshot binding, scope and any resource limits before implementation. |
+| OD-04 | Implementation-interface decision | Prefer the existing canonical action family; exact sparse action discriminator/schema is unresolved; no durable second IR. | A05 freezes schema before changing provider contract or worker behavior. |
+| OD-05 | Implementation-interface decision | Staged IDs are host-owned; exact schema-valid new-section shell and child references are unresolved. | A07 freezes the minimal intent mapping before lowerer changes; A08 consumes it in scheduling. |
+| OD-06 | Implementation-interface decision | Define literal CREATE/UPDATE/ENSURE and duplicate/no-op behavior; unsupported or conflicting intent fails closed. | A04 defines supported semantics before contract implementation. |
+| OD-07 | Scientific/domain ambiguity | GR/SP grouping cannot be inferred; require authoritative domain evidence or user clarification, else unresolved/fail-closed. | A04 requires grounded resolution or preserves failure; A01 includes ambiguity fixtures. |
+| OD-08 | Scientific/domain ambiguity | Resistivity roles, units, channel mapping, and emphasis need inspected source facts and authoritative policy; no arbitrary choice/conversion. | A03 establishes available source evidence; A04 blocks unresolved roles/units. |
+| OD-09 | Implementation-interface decision | Optimistic snapshot validation is a candidate; exact document/source revision identity and conflict result remain unresolved. | A03 freezes snapshot contract before exposing context; A08 revalidates before apply/publish. |
+| OD-10 | Implementation-interface decision | Independent scopes may fan out on one snapshot; dependent work needs explicit staged state. Scheduler/detection details remain unresolved. | A08 freezes dependency contract before workflow execution changes. |
+| OD-11 | Architectural decision requiring A00 acceptance | Preserve current bounded correction authority; no second correction protocol or retry class for the same violation. Per-stage interplay is verified, not expanded. | A02/A05 consume at planner/worker correction boundaries; A05 proves unchanged limits. |
+| OD-12 | Implementation-interface decision | Numeric plan/read/context/schema/time budgets remain unset; do not invent values during A00. | A03 sets inspection/context budgets; A04/A05 set operation/response limits before contract/schema use. |
+| OD-13 | Implementation-interface decision | Do not claim request-level atomic persistence from per-operation CRUD atomicity; audit publication, rollback and reload failure. | A08 completes audit before implementation/documentation claims whole-request atomicity. |
 ________________________________________
 15. Suggested Codex implementation handoff (after design acceptance only)
-Task: Implement the accepted WELLPLOT-NLP-CANONICAL-AUTHORING-ARCH-001 architecture through the existing canonical Code Mode graph, in bounded slices A01–A11, after A00 ADR acceptance. Preserve the current authoring YAML, AuthoringService, AuthoringDocumentIntent, reconcile_authoring(), AuthoringExecutor, provider composition and existing single-engine attestation. Do not introduce parallel compilers, planners, engines, direct LLM CRUD or agent loops. Maintain strict semantic operation inventories and read-only source/document inspection. For every slice, provide design delta, exact code changes, provider-free tests, baseline/regression impact, development memory, and remaining gaps. Stop at the agreed implementation-review gate. Do not run endpoint/model calls, reuse D5 sealed namespaces, or start scientific qualification without separate exact-checkpoint authorization.
+Task: Implement the accepted WELLPLOT-NLP-CANONICAL-AUTHORING-ARCH-001 architecture through the existing canonical Code Mode graph, in bounded slices A01–A11, only after A00 independent/Human acceptance, architecture Knowledge Delta promotion into the active baseline as not yet implemented, and explicit Human implementation authorization. Preserve the current authoring YAML, AuthoringService, AuthoringDocumentIntent, reconcile_authoring(), AuthoringExecutor, provider composition and existing single-engine attestation. Do not introduce parallel compilers, planners, engines, direct LLM CRUD or agent loops. Maintain strict semantic operation inventories and read-only source/document inspection. For every slice, provide design delta, exact code changes, provider-free tests, baseline/regression impact, development memory, and remaining gaps. Stop at the agreed implementation-review gate. Do not run endpoint/model calls, reuse D5 sealed namespaces, or start scientific qualification without separate exact-checkpoint authorization.
 Operational rule: Human acceptance is meaningful at architecture/design and completed implementation review boundaries. Routine within-slice steps can proceed under the approved design/implementation authority; live smoke and scientific campaigns retain their distinct accepted gates.
 ________________________________________
 16. Source-of-truth reference list

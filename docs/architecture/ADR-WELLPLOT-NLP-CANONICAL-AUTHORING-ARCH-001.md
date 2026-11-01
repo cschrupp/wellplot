@@ -185,43 +185,48 @@ deterministic contract defects are closed.
 | Slice | Scope and primary code surfaces | Dependency / gate | A00 acceptance evidence |
 | --- | --- | --- | --- |
 | A00 | This specification, ADR, baseline matrix, roadmap and review packet. | Current design gate. | Independent architecture review; no source delta. |
-| A01 | Synthetic fixtures/gold in tests; existing planner/work-contract/action/reconciler tests. | A00 accepted. | Sparse two-addition positive; full eight-track response negative; preservation and duplicate negatives. |
+| A01 | Synthetic fixtures/gold in tests; existing planner/work-contract/action/reconciler tests. | A00 accepted; architecture delta promoted to active baseline as implementation-pending; Human implementation authorization. | Sparse two-addition positive; full eight-track response negative; preservation and duplicate negatives. |
 | A02 | `planner.py`, `obligations.py`, planner schemas/prompts/tests. | A01 fixtures and accepted OD-01. | One canonical conversion; operation coverage and request-span provenance. |
-| A03 | `enrichment.py`, `inspection.py`, `source_loader.py`, snapshot models/tests. | A00 accepted; can progress alongside A02 after interface review. | Bounded source/document state; inspected/uninspected/unavailable distinctions; no mutation. |
-| A04 | `worker_contracts.py`, existing report contract, scope/source binding tests. | A02 + A03. | Exact authorized operation multiset and scope, no cardinality-based `RECONSTRUCT`. |
-| A05 | `typed_section_worker.py`, existing action schemas and worker tests. | A04. | Sparse multi-operation output; 8-track proposal rejected before lowering; existing correction only. |
+| A03 | `enrichment.py`, `inspection.py`, `source_loader.py`, snapshot models/tests. | A00 accepted; OD-03 policy accepted, exact snapshot/read protocol frozen before this slice; can progress alongside A02 after interface review. | Bounded source/document state; inspected/uninspected/unavailable distinctions; no mutation. |
+| A04 | `worker_contracts.py`, existing report contract, scope/source binding tests. | A02 + A03; OD-02/OD-06/OD-07 implementation treatment frozen before contract behavior is coded. | Exact authorized operation multiset and scope, no cardinality-based `RECONSTRUCT`; domain ambiguity fails closed. |
+| A05 | `typed_section_worker.py`, existing action schemas and worker tests. | A04; OD-04 schema choice and OD-11 correction compatibility frozen before schema changes. | Sparse multi-operation output; 8-track proposal rejected before lowering; existing correction only. |
 | A06 | `canonical_workers.py`, report action schema/tests. | A04; preserve report boundary. | Sparse ordered report operations, exact slot ownership, no bleed. |
-| A07 | `semantic_actions.py`, `semantic_section_compiler.py`, `AuthoringDocumentIntent`. | A05/A06. | One mapping into canonical intent; no duplicate IR/lowerer. |
-| A08 | `workflow.py`, `merge_v2_intents`, `direct_notebook.py`, reconciler/executor/service integration tests. | A07. | Host CRUD DAG, private candidate, stale-state and failure atomicity, preservation. |
+| A07 | `semantic_actions.py`, `semantic_section_compiler.py`, `AuthoringDocumentIntent`. | A05/A06; OD-05 shell/identity mechanics resolved before implementation. | One mapping into canonical intent; no duplicate IR/lowerer. |
+| A08 | `workflow.py`, `merge_v2_intents`, `direct_notebook.py`, reconciler/executor/service integration tests. | A07; OD-09/OD-10 contracts frozen; OD-13 audit completed before atomic-publication claims. | Host CRUD DAG, private candidate, stale-state and failure atomicity, preservation. |
 | A09 | Existing inspection/capture/error paths and security tests. | Interfaces from A03-A08. | Bounded reads, injection/path-denial, size/time limits, safe causal diagnostics. |
 | A10 | Provider-free cross-product suites and attestation. | A01-A09. | AC-01..AC-24, regression matrix, no provider access. |
-| A11 | Operator docs, schema examples, migration memory, pending Knowledge Delta promotion. | A10 and implementation review. | Code/docs/tests agree; old contracts marked historical rather than silently aliased. |
+| A11 | Operator docs, schema examples, migration memory, implementation-stage Knowledge Delta. | A10 and independent implementation acceptance; stage-one architecture delta was already promoted after A00 acceptance. | Code/docs/tests agree; old contracts marked historical rather than silently aliased; residual limits are explicit. |
 | A12 | Existing canonical live harness only. | A00 accepted, implementation accepted, separate live authority. | Fresh exact-head engineering smoke, independently reviewed; no authority for science in this ADR. |
 
-**Implementation authorization:** not granted by this candidate. Independent
-architecture acceptance plus one explicit Human authorization is required
-before A01 or any production-source change. A12 remains a separate live gate.
+**Implementation authorization:** not granted by this candidate. Following
+independent and Human architecture acceptance, first promote the architecture
+delta into the active baseline and label it `ACCEPTED / NOT YET IMPLEMENTED`.
+Then require the explicit Human implementation authorization before A01 or any
+production-source change. A12 remains a separate live gate.
 
 ## Open Decisions Requiring Review
 
-The following questions must remain open until the architecture reviewer
-accepts a specific answer. They must not be filled by implementation defaults.
+The classification below distinguishes architectural policy to be accepted at
+A00 from interface questions deferred to their first consuming slice and
+scientific/domain ambiguities that must remain fail-closed. A deferred detail
+blocks its consuming slice until resolved; it does not block unrelated prior
+slices. No implementation default may silently settle one of these items.
 
-| ID | Question | Candidate recommendation | Acceptance needed |
+| ID | Classification | Decision / unresolved detail | First consuming slice and gate |
 | --- | --- | --- | --- |
-| OD-01 | Should planner emit a typed operation inventory? | Yes, as a constrained proposal verified against host-compiled request obligations; this amends only the current planner ban on operation intent, not host CRUD authority. | Confirm exact allowed planner semantics and provenance ownership. |
-| OD-02 | How many operations per worker call? | One bounded batch per report/section scope by default, but numeric cap is unset. | Derive response/context ceilings from provider schema and bounded tests. |
-| OD-03 | Should workers have read-only query tools? | Prefetch-first; on-demand only when a typed sufficiency check identifies missing facts. | Decide whether any tool is needed; define fixed count/bytes/time budgets and snapshot token. |
-| OD-04 | Reuse current action DTOs or add sparse patch model? | Extend existing action family minimally; no durable second IR. | Choose exact discriminator/shape after compatibility/schema audit. |
-| OD-05 | How are new section shells and child operations staged? | Host-generated staged identities and existing CRUD DAG. | Verify schema-valid shell defaults and rollback behavior in source/tests. |
-| OD-06 | CREATE versus ENSURE and duplicate policy? | Literal intent; ambiguity/conflicts fail closed. | Define idempotence/no-op rules per supported operation. |
-| OD-07 | Does ambiguous “GR and SP track” mean one or two tracks? | Do not infer. Use a documented domain rule only if authoritative, otherwise targeted clarification. | Resolve with domain evidence or preserve explicit ambiguity response. |
-| OD-08 | Resistivity roles, units and visual emphasis? | Exact inspected mnemonic/unit; no arbitrary candidate choice or conversion. | Identify registry-backed role and style policy or leave unsupported/ambiguous. |
-| OD-09 | Snapshot change during model work? | Optimistic version/hash check before lowering and publication. | Confirm existing document revision/hash mechanism and replan semantics. |
-| OD-10 | How do report/section dependencies affect fan-out? | Parallel only for independent work on one immutable snapshot; dependent stages require explicit staged snapshot. | Define detection and deterministic scheduler ownership. |
-| OD-11 | Correction count and preservation? | Retain one existing correction path and current ceiling. | Confirm no planner correction plus worker correction can exceed global per-turn limits. |
-| OD-12 | Operation/schema/read budgets? | No arbitrary numeric defaults. | Set and test limits before implementation completion/qualification. |
-| OD-13 | What does request-level atomic persistence guarantee? | Do not claim whole-request atomicity until private candidate and persistence path are audited. | Prove candidate swap/rollback and reload failure behavior. |
+| OD-01 | Architectural decision requiring A00 acceptance | Accept the direction: planner proposes a bounded request-local operation inventory; host obligation compilation verifies it. This supersedes only the ban on planner semantic operation intent, not CRUD/dependency authority. Exact fields remain for A02. | A01 fixtures depend on the accepted operation vocabulary; schema is frozen in A02. |
+| OD-02 | Implementation-interface decision | Batch-per-scope is the shape, but maximum operation count/context/response size is unset; do not invent a number. | A04 must freeze the contract cap before worker-contract implementation; A05 consumes it in schema/output limits. |
+| OD-03 | Architectural decision requiring A00 acceptance | Accept prefetch-first, host-mediated, read-only access. On-demand query is optional and only for a typed missing-fact condition. Exact protocol and limits remain open. | A03 must decide whether queries are needed and freeze snapshot binding, scope, and resource bounds before implementation. |
+| OD-04 | Implementation-interface decision | Prefer the existing canonical action family; a sparse shape may be added only within that family and must not become a second durable IR. Exact schema is not selected here. | A05 freezes the action discriminator/shape before changing provider schema or worker behavior. |
+| OD-05 | Implementation-interface decision | Host-only staged identities and existing CRUD dependencies remain policy; the schema-valid section shell and child-reference mechanics are unresolved. | A07 resolves the smallest intent mapping before lowerer changes; A08 consumes it in dependency execution. |
+| OD-06 | Implementation-interface decision | Literal CREATE/UPDATE/ENSURE meanings and duplicate/no-op behavior must be explicit. Conflicts or unsupported intent fail closed; no implicit conversion. | A04 defines supported operation semantics before compiling work contracts. |
+| OD-07 | Scientific/domain ambiguity | GR/SP grouping cannot be inferred. Resolve only from authoritative domain evidence or a targeted user clarification; otherwise keep the request unresolved and fail closed. | A04 must consume a resolved fact or preserve a bounded unresolved/failure state; A01 includes ambiguity fixtures. |
+| OD-08 | Scientific/domain ambiguity | Resistivity role, units, channel selection, and emphasis require inspected source facts and an authoritative role/style rule. No arbitrary selection or unit conversion. | A03 establishes available evidence; A04 blocks unresolved role/units before authorizing work. |
+| OD-09 | Implementation-interface decision | Candidate policy is optimistic snapshot validation, but exact revision token/hash and conflict response are not established. | A03 freezes snapshot identity before exposing context; A08 requires revalidation before execute/publish. |
+| OD-10 | Implementation-interface decision | Independent scopes may fan out on one immutable snapshot; dependent work requires explicit staged state. Exact dependency detection/scheduling remains open. | A08 defines the scheduler contract before changing workflow execution. |
+| OD-11 | Architectural decision requiring A00 acceptance | Accept preservation of the existing bounded correction policy: no new correction protocol or retry class for the same violation. Per-stage ceilings and interplay are verified, not expanded, in implementation. | A02/A05 first consume this at planner and worker correction boundaries; A05 must show no expanded retry. |
+| OD-12 | Implementation-interface decision | Numeric plan, inspection, context, response, and time budgets remain unset; no values may be invented in A00. | A03 freezes read/context budgets before inspection implementation; A04/A05 freeze operation/response limits before their contracts/schemas. |
+| OD-13 | Implementation-interface decision | Do not claim whole-request atomicity from per-operation CRUD atomicity. Actual candidate publication, rollback, and reload-failure behavior require source audit. | A08 audits this before any request-level atomic-publication guarantee is implemented or documented. |
 
 ## Independent Review Instructions
 
@@ -255,14 +260,20 @@ The review must explicitly evaluate:
    evidence, not as a scientific result or proof that the design will work.
 
 No independent review should require or perform a provider/model call, smoke,
-or scientific campaign. A00 must remain documentation-only. After ACCEPT,
-Human architecture acceptance and implementation authorization are still
-required before A01.
+or scientific campaign. A00 must remain documentation-only. After independent
+and Human architecture acceptance, promote the architecture decision into the
+active baseline as `ACCEPTED / NOT YET IMPLEMENTED` before A01. A separate
+explicit Human implementation authorization is required before A01 begins.
 
 ## Pending Knowledge Delta (Not Active Baseline)
 
-If this architecture is accepted and later implemented, prepare a baseline
-delta proposing that:
+This draft defines two separate promotions. Stage one follows independent and
+Human architecture acceptance; stage two follows independent implementation
+acceptance.
+
+### Stage One: Accepted Architecture, Not Yet Implemented
+
+Before A01, the active baseline entry should state that:
 
 - planner semantic operation intent is permitted only as a typed, request-local
   proposal validated against host request obligations;
@@ -276,9 +287,21 @@ delta proposing that:
 - the existing single-engine, provider-schema parity, capability closure,
   bounded correction, causal failure and live-gate invariants remain binding.
 
-This section is preparatory only. Do not edit or promote
-`docs/agent-code-mode-current-baseline.md` until the ADR is independently
-accepted and implementation evidence is available.
+The stage-one entry must identify the exact planner restriction superseded,
+mark the capability `NOT YET IMPLEMENTED`, cite the accepted ADR, and list the
+implementation/regression obligations. This promotion establishes
+architectural authority only.
+
+### Stage Two: Accepted Implementation
+
+After independent implementation acceptance, update the baseline with only
+the verified contracts, regression evidence and exact implementation/test
+identities. Record residual limitations and do not promote unverified
+capabilities.
+
+This section is preparatory only. The current corrective does not edit
+`docs/agent-code-mode-current-baseline.md`; that edit follows architecture
+acceptance, and it must precede A01.
 
 ## Stop Condition
 

@@ -118,5 +118,9 @@ candidate pending independent review. It audits the accepted planner/worker
 contracts and proposes a bounded semantic-operation inventory and sparse worker
 patches through the existing canonical graph and CRUD engine. No source changes,
 provider calls, new smoke, scientific execution, or C02 access are authorized by
-A00. Do not update the active baseline or start A01 until independent review,
-Human architecture acceptance, and implementation authorization are complete.
+A00. The current candidate does not edit the active baseline. After independent
+and Human architecture acceptance, promote a stage-one Knowledge Delta marking
+the architecture `ACCEPTED / NOT YET IMPLEMENTED` before A01. A01 still
+requires separate Human implementation authorization. Following independent
+implementation acceptance, stage two records only verified implementation
+contracts, regression evidence, exact checkpoints, and residual limitations.
