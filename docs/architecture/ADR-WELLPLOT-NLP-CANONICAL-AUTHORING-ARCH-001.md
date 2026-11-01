@@ -1,11 +1,12 @@
-# ADR Candidate: NLP-to-Canonical Authoring Architecture
+# ADR: NLP-to-Canonical Authoring Architecture
 
 ```yaml
 decision_id: WELLPLOT-NLP-CANONICAL-AUTHORING-ARCH-001
-status: DESIGN CANDIDATE / PENDING INDEPENDENT REVIEW
+status: ACCEPTED / IMPLEMENTATION AUTHORIZED
 design_spec: docs/architecture/WELLPLOT_NLP_CANONICAL_AUTHORING_ARCHITECTURE_REMEDIATION.md
 reference_checkpoint: 6f0ef73d2a73b1a01d40767264e8dea0bbad3b45
-implementation_authorized: false
+accepted_review_checkpoint: c6ec436619418b3831a1c9decd7d3c15efebb74c
+implementation_authorized: true
 provider_calls: 0
 endpoint_calls: 0
 model_calls: 0
@@ -13,11 +14,12 @@ scientific_execution: false
 C02_exposure: 0
 ```
 
-## Decision Requested
+## Accepted Decision
 
-Accept, adapt, replace, or reopen the proposed architecture for a single
-canonical NLP-to-authoring path. This record is a review candidate, not an
-accepted architecture decision and not an implementation authorization.
+The architecture is accepted for implementation through slices A01-A11 under
+the bounded migration plan below. This decision preserves one canonical
+NLP-to-authoring path and does not authorize live smoke or scientific
+execution.
 
 The proposed direction is:
 
@@ -198,11 +200,11 @@ deterministic contract defects are closed.
 | A11 | Operator docs, schema examples, migration memory, implementation-stage Knowledge Delta. | A10 and independent implementation acceptance; stage-one architecture delta was already promoted after A00 acceptance. | Code/docs/tests agree; old contracts marked historical rather than silently aliased; residual limits are explicit. |
 | A12 | Existing canonical live harness only. | A00 accepted, implementation accepted, separate live authority. | Fresh exact-head engineering smoke, independently reviewed; no authority for science in this ADR. |
 
-**Implementation authorization:** not granted by this candidate. Following
-independent and Human architecture acceptance, first promote the architecture
-delta into the active baseline and label it `ACCEPTED / NOT YET IMPLEMENTED`.
-Then require the explicit Human implementation authorization before A01 or any
-production-source change. A12 remains a separate live gate.
+**Implementation authorization:** Human authorization is granted for the
+bounded provider-free A01-A11 implementation slices after the stage-one
+architecture delta was promoted into the active baseline as
+`ACCEPTED / NOT YET IMPLEMENTED`. Each slice remains subject to its stated
+interfaces, tests, and fail-closed gates. A12 remains a separate live gate.
 
 ## Open Decisions Requiring Review
 

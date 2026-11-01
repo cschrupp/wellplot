@@ -1,6 +1,6 @@
 # wellplot Decision Log
 
-Last updated: 2026-10-26
+Last updated: 2026-11-01
 
 ## Purpose
 
@@ -90,6 +90,30 @@ Before another live authority is consumed, the exact executing shell must pass
 the non-generative canonical-runtime environment check with zero model calls
 and no secret disclosure. A failure remains operational evidence and does not
 consume C02 or create a scientific observation.
+
+### Canonical NLP Authoring Architecture Acceptance (2026-11-01)
+
+The A00 architecture for `WELLPLOT-NLP-CANONICAL-AUTHORING-ARCH-001` was
+independently accepted at exact documentation checkpoint
+`c6ec436619418b3831a1c9decd7d3c15efebb74c` and Human-authorized for bounded
+provider-free implementation. The stage-one Knowledge Delta is promoted in
+`docs/agent-code-mode-current-baseline.md` as `ACCEPTED / NOT YET IMPLEMENTED`.
+
+For the existing Code-Mode `SemanticPlanner`, the accepted direction
+supersedes only the prior prohibition on proposing typed semantic operations
+and user-requested ordering constraints. The proposal remains request-local
+and is checked against host-compiled obligations. It does not grant model
+authority over canonical CRUD, identity, paths, dependencies, mutation,
+validation, or persistence. Prefetch-first host-mediated read-only context is
+accepted as architecture; exact schemas, query protocols, budgets, and domain
+rules remain gated at their first consuming implementation slices.
+
+This decision does not supersede the separate 2026-08-14 MCP/tool-loop
+decision: that MCP provider-facing contract remains a small stable set of
+deterministic tools, and its recovery path remains distinct. K-01 and all other
+unchanged K/R invariants remain binding. The A01-A11 implementation is
+provider-free; A12 live smoke and any scientific campaign require separate
+authorization and acceptance.
 
 ## Product and Scope Decisions
 

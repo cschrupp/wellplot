@@ -573,6 +573,24 @@ of current authority.
 
 ### Promoted
 
+- **WELLPLOT-NLP-CANONICAL-AUTHORING-ARCH-001 architecture accepted, not yet
+  implemented.** The architecture decision was independently accepted at
+  `c6ec436619418b3831a1c9decd7d3c15efebb74c` and Human-authorized for
+  implementation progression. The specific superseded planner restriction is
+  the prior prohibition on proposing typed semantic operations and
+  user-requested ordering constraints. The planner may propose only a bounded,
+  request-local semantic operation inventory; host-compiled obligations must
+  independently validate it. This does not authorize model-generated CRUD,
+  canonical IDs, paths, or execution dependencies. The accepted direction also
+  requires prefetch-first, host-mediated, read-only context access. The exact
+  operation schema, query protocol, budgets, and unresolved domain semantics
+  remain deferred to their first consuming slices as recorded in the ADR.
+  Status: `ACCEPTED / NOT YET IMPLEMENTED`; this entry is architectural
+  authority, not evidence of runtime capability. K-01 and all other unchanged
+  K/R invariants remain binding. A01-A11 implementation requires the separate
+  Human authorization now recorded in the accepted ADR; live qualification and
+  scientific execution remain separately gated.
+
 - Live scientific campaigns now require an execution-environment gate and a separately authorized, independently accepted live smoke before scientific `STARTED`.
 - Live/evidence-bearing execution on the current host is bound to `/home/user/projects/well_log_os`; disposable worktrees are implementation/review-only.
 - The CM/TW/D5 findings listed in sections 3-5 are now active project

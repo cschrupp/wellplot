@@ -1,7 +1,7 @@
 WellPlot — NLP-to-Canonical Authoring Architecture
 Detailed Remediation Specification, Migration Plan, and Acceptance Matrix
 Document ID: WELLPLOT-NLP-CANONICAL-AUTHORING-ARCH-001
-Version: 0.1 — DESIGN CANDIDATE FOR REVIEW
+Version: 0.1 — A00 ACCEPTED / IMPLEMENTATION AUTHORIZED
 Prepared: 2026-10-31
 Repository: cschrupp/wellplot
 Inspected development branch: engineering-d5-binding-path-repair

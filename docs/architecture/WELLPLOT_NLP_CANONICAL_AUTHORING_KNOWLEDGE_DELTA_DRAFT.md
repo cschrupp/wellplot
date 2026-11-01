@@ -1,15 +1,19 @@
 # Knowledge Delta Draft: Canonical NLP Authoring
 
 ```yaml
-status: PREPARED / NOT AUTHORITATIVE
+status: STAGE 1 PROMOTED / STAGE 2 PENDING
 depends_on: WELLPLOT-NLP-CANONICAL-AUTHORING-ARCH-001
-architecture_status: PENDING INDEPENDENT REVIEW
-baseline_updated: false
+architecture_status: ACCEPTED / NOT YET IMPLEMENTED
+accepted_architecture_checkpoint: c6ec436619418b3831a1c9decd7d3c15efebb74c
+baseline_updated: stage_1
+implementation_authorized: true
 ```
 
-This draft defines two distinct baseline-promotion milestones. The current
-corrective only prepares the draft: it does not edit the active baseline,
-supersede an active item, or authorize implementation.
+Stage one has been incorporated into `docs/agent-code-mode-current-baseline.md`
+after independent architecture acceptance and Human authorization. It records
+the accepted architecture as not yet implemented. Stage two remains pending
+independent implementation acceptance and will contain only verified
+implementation evidence.
 
 ## Proposed Previous / New Knowledge
 
@@ -42,7 +46,7 @@ superseded planner restriction, retain all unchanged K/R invariants, and list
 the implementation/regression obligations. This architecture-level promotion
 does not claim runtime capability and does not authorize A01 by itself.
 
-The present corrective does not perform this edit.
+Stage one is promoted; no implementation capability is claimed.
 
 ## Stage 2: Implementation Promotion
 

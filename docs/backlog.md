@@ -113,14 +113,12 @@ policy and 30-day authorized-deletion procedure are recorded in
 
 ## Canonical NLP Authoring Architecture Remediation
 
-`WELLPLOT-NLP-CANONICAL-AUTHORING-ARCH-001` A00 is a documentation-only
-candidate pending independent review. It audits the accepted planner/worker
-contracts and proposes a bounded semantic-operation inventory and sparse worker
-patches through the existing canonical graph and CRUD engine. No source changes,
-provider calls, new smoke, scientific execution, or C02 access are authorized by
-A00. The current candidate does not edit the active baseline. After independent
-and Human architecture acceptance, promote a stage-one Knowledge Delta marking
-the architecture `ACCEPTED / NOT YET IMPLEMENTED` before A01. A01 still
-requires separate Human implementation authorization. Following independent
-implementation acceptance, stage two records only verified implementation
-contracts, regression evidence, exact checkpoints, and residual limitations.
+`WELLPLOT-NLP-CANONICAL-AUTHORING-ARCH-001` A00 was accepted at
+`c6ec436619418b3831a1c9decd7d3c15efebb74c`; its stage-one Knowledge Delta is
+active and marks the architecture `ACCEPTED / NOT YET IMPLEMENTED`. A01-A11
+are authorized as bounded provider-free implementation slices through the
+existing canonical graph and CRUD engine. Do not alter frozen D5/C02 evidence,
+run live smoke, or execute scientific campaigns under this authorization.
+Stage-two baseline promotion follows independent implementation acceptance and
+may record only verified contracts, regression evidence, exact checkpoints,
+and residual limitations.

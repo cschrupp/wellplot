@@ -1,6 +1,6 @@
 # wellplot Roadmap
 
-Last updated: 2026-10-21
+Last updated: 2026-11-01
 
 ## Scope Summary
 
@@ -49,10 +49,8 @@ is closed and is not a scientific campaign. The current design candidate is:
 
 ```text
 binding smoke 002: SMOKE_CONTRACT_FAIL [CLOSED]
-    -> A00 architecture integration [PENDING INDEPENDENT REVIEW]
-    -> independent + Human architecture acceptance
-    -> architecture Knowledge Delta promoted as ACCEPTED / NOT YET IMPLEMENTED
-    -> separate Human implementation authorization
+    -> A00 architecture [ACCEPTED / CLOSED at c6ec436619418b3831a1c9decd7d3c15efebb74c]
+    -> stage-one Knowledge Delta promoted [ACCEPTED / NOT YET IMPLEMENTED]
     -> A01-A11 bounded implementation/qualification slices
     -> A12 fresh authorized engineering smoke
     -> separate decision on any scientific qualification
@@ -60,10 +58,10 @@ binding smoke 002: SMOKE_CONTRACT_FAIL [CLOSED]
 
 The older repaired-baseline confirmation and CM-54 through CM-58 wording
 below is preserved as historical roadmap context, not as the current execution
-sequence. A00's proposed sequence is not active authority until independent
-review and Human acceptance. Following acceptance, the architecture-level
-Knowledge Delta is promoted as `ACCEPTED / NOT YET IMPLEMENTED` before A01;
-A01 still requires separate Human implementation authorization.
+sequence. A00 is independently accepted and Human-authorized; its architecture
+delta is now active as `ACCEPTED / NOT YET IMPLEMENTED`. A01-A11 may proceed
+under the bounded implementation authorization. A12 and scientific execution
+remain separately gated.
 
 ## Proposed Canonical NLP-Authoring Remediation (A00 Pending Review)
 
@@ -72,16 +70,12 @@ The D5 binding smoke at `6f0ef73d2a73b1a01d40767264e8dea0bbad3b45` ended
 contained eight track handles against a work contract requiring exactly two.
 This is a bounded worker-contract mismatch, not a scientific result.
 
-`WELLPLOT-NLP-CANONICAL-AUTHORING-ARCH-001` is a documentation-only
-architecture candidate. A00 integrates that proposal with the accepted
-single-engine and host-ownership invariants and is awaiting independent review.
-The current candidate does not edit the active baseline. If independently and
-Human-accepted, a stage-one baseline entry will record the architecture as
-`ACCEPTED / NOT YET IMPLEMENTED` before A01, explicitly superseding only the
-planner restriction identified in the ADR while preserving other active
-invariants. A01-A11 additionally require separate Human implementation
-authorization; they precede separately authorized A12 live engineering
-qualification.
+`WELLPLOT-NLP-CANONICAL-AUTHORING-ARCH-001` A00 is accepted at
+`c6ec436619418b3831a1c9decd7d3c15efebb74c`. The stage-one baseline entry
+explicitly supersedes only the prior planner prohibition on proposing typed
+semantic operations and user-requested ordering constraints; all other active
+invariants remain binding. A01-A11 are authorized provider-free engineering
+slices. They precede separately authorized A12 live engineering qualification.
 
 ## Current Agent Architecture Status
 
