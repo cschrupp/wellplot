@@ -17,15 +17,12 @@ from wellplot.agent.code_mode.enrichment import (
 )
 from wellplot.agent.code_mode.obligations import (
     compile_request_contract,
-    validate_section_obligations,
 )
 from wellplot.agent.code_mode.planner import OperationCondition, SectionTask
 from wellplot.agent.code_mode.semantic_actions import (
     AddFillAction,
-    AddTracksAction,
     BaselineSplitFill,
     ExistingCurveSelector,
-    ReconstructSectionAction,
     SectionSemanticAction,
     lower_section_action,
 )
@@ -53,6 +50,7 @@ from wellplot.authoring_executor import AuthoringExecutor
 from wellplot.authoring_reconciler import reconcile_authoring
 from wellplot.authoring_service import AuthoringService
 from wellplot.model.authoring import AuthoringDocumentSpec
+from wellplot.model.intent import AuthoringDocumentIntent
 
 
 def _context(*, section_id: str | None = "main") -> ResolvedSectionContext:
@@ -1095,35 +1093,11 @@ def test_action_schema_is_the_schema_sent_by_existing_openai_compat_adapter(
 
 
 def test_sparse_track_batch_preserves_all_unrequested_existing_tracks() -> None:
-    """Two sparse additions execute while existing tracks and report fields survive."""
+    """Validated add_tracks lowers once and preserves unrelated canonical state."""
     request = _smoke_request()
     task, context, contract, operation_contract = _multi_track_contracts(request)
     action = TypeAdapter(SectionSemanticAction).validate_python(_valid_add_tracks_payload())
     validate_section_action_contract(action, contract, operation_contract)
-    action = ReconstructSectionAction(
-        action="reconstruct",
-        section={
-            "title": "Main Log",
-            "source_candidate": "source-1",
-            "tracks": tuple(item.track for item in action.operations),
-        },
-    )
-    grounded = _bind_compiled_source(
-        action,
-        context,
-        work_contract=contract,
-    )
-    object_bindings = resolve_section_object_bindings(grounded, task.obligations)
-    grounded = apply_compiled_requirements(
-        grounded, task.obligations, object_bindings=object_bindings
-    )
-    validate_section_obligations(
-        grounded,
-        task.obligations,
-        section_context=context,
-        section_title="Main Log",
-        object_bindings=object_bindings,
-    )
     document = AuthoringDocumentSpec.model_validate(
         {
             "name": "binding-smoke-preservation",
@@ -1173,23 +1147,17 @@ def test_sparse_track_batch_preserves_all_unrequested_existing_tracks() -> None:
             ],
         }
     )
-    intent = lower_section_action(
-        AddTracksAction(
-            action="add_tracks",
-            operations=tuple(
-                item.model_copy(update={"track": track})
-                for item, track in zip(
-                    TypeAdapter(SectionSemanticAction)
-                    .validate_python(_valid_add_tracks_payload())
-                    .operations,
-                    grounded.section.tracks,
-                    strict=True,
-                )
-            ),
-        ),
-        context=context,
-        document=document,
-    )
+    intent = lower_section_action(action, context=context, document=document)
+    serialized_intent = intent.model_dump_json(exclude_none=True)
+    assert "add_bond_index" not in serialized_intent
+    assert "add_gamma_ray" not in serialized_intent
+    intent = AuthoringDocumentIntent.model_validate_json(serialized_intent)
+    lowered_tracks = intent.sections[0].tracks
+    assert len({track.track_id for track in lowered_tracks}) == 2
+    lowered_binding_ids = [
+        binding.binding_id for track in lowered_tracks for binding in track.bindings
+    ]
+    assert len(lowered_binding_ids) == len(set(lowered_binding_ids)) == 2
     plan = reconcile_authoring(
         intent,
         existing=document,
@@ -1237,6 +1205,41 @@ def test_sparse_track_batch_preserves_all_unrequested_existing_tracks() -> None:
         assert binding["scale"]["maximum"] == maximum
         assert binding["style"]["color"] == color
         assert binding["style"]["line_width"] == 0.8
+
+
+def test_add_tracks_batch_shares_host_identity_reservations() -> None:
+    """Colliding advisory hints receive distinct host-owned track and binding IDs."""
+    payload = _valid_add_tracks_payload()
+    for operation in payload["operations"]:
+        operation["track"]["semantic_id"] = "shared-hint"
+    action = TypeAdapter(SectionSemanticAction).validate_python(payload)
+    document = AuthoringDocumentSpec.model_validate(
+        {
+            "name": "identity-collision",
+            "sections": [
+                {
+                    "id": "main",
+                    "title": "Main Log",
+                    "tracks": [
+                        {
+                            "id": "existing",
+                            "kind": "normal",
+                            "title": "Existing",
+                            "width_mm": 20,
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+
+    intent = lower_section_action(action, context=_context(), document=document)
+    tracks = intent.sections[0].tracks
+    track_ids = [track.track_id for track in tracks]
+    binding_ids = [binding.binding_id for track in tracks for binding in track.bindings]
+
+    assert track_ids == ["track-shared-hint", "track-shared-hint.2"]
+    assert len(set(binding_ids)) == len(binding_ids) == 2
 
 
 def test_add_fill_lowering_remains_reachable_after_sparse_batch_branch() -> None:

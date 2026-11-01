@@ -23,7 +23,7 @@
     "src/wellplot/agent/code_mode/report_boundary_safety.py": "cc94431bdc9c0d8b7e582de4f931aabf3bd4bea61bbd847051658abf86135c46",
     "src/wellplot/agent/code_mode/section_leaf_safety.py": "008cf45794cfb1372f77b7e300db311d8dc58123de0c429146057f6fc51331b4",
     "src/wellplot/agent/code_mode/section_semantics.py": "35c572193110cae72f91f3cb8bb0fb3a537ff8c459984e732559fec0a6a8567e",
-    "src/wellplot/agent/code_mode/semantic_actions.py": "10cc6035d3439dc0a4c4fc5a6412667f8d2d3732debbe457bcbc4e09c13e5ceb",
+    "src/wellplot/agent/code_mode/semantic_actions.py": "01b16d24944bfcf8df46c40509eb5ef335ed740b614f439a297a9a126e849162",
     "src/wellplot/agent/code_mode/semantic_section_compiler.py": "cdc0ac065f16f56a662d37a6cbec7113e91feb30630fb4561bdcec8bf3629914",
     "src/wellplot/agent/code_mode/source_loader.py": "2035c31f4f1efb459683f47c9d8b7565a74d8eeddceda6e8bca6e0591bc05a3d",
     "src/wellplot/agent/code_mode/state.py": "8cfc14e0ec247d3b0951cde50d747d36d3beeb97b40c99fd235434ae9ec2b179",

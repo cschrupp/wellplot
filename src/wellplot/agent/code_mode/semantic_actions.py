@@ -190,8 +190,14 @@ def lower_section_action(
         return _lower_added_track(action.track, context=context, document=document)
 
     if action.action == "add_tracks":
+        allocator = _allocator(document)
         lowered = [
-            _lower_added_track(item.track, context=context, document=document)
+            _lower_added_track(
+                item.track,
+                context=context,
+                document=document,
+                allocator=allocator,
+            )
             for item in action.operations
         ]
         sections = [section for intent in lowered for section in intent.sections]
@@ -259,12 +265,13 @@ def _lower_added_track(
     *,
     context: ResolvedSectionContext,
     document: object,
+    allocator: IdAllocator | None = None,
 ) -> AuthoringDocumentIntent:
     """Lower one new track while retaining host-owned identities."""
     section_id = context.section_id
     if section_id is None:
         raise SemanticActionError("section_missing", "Adding a track requires a grounded section.")
-    allocator = _allocator(document)
+    allocator = allocator if allocator is not None else _allocator(document)
     track_id = allocator.allocate_track(section_id, f"track-{track.semantic_id}")
     bindings: list[object] = []
     for binding in track.bindings:
