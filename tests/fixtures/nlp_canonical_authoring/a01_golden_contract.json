@@ -1,0 +1,336 @@
+{
+  "fixture_version": "a01-v1",
+  "provenance": {
+    "classification": "synthetic_provider_free",
+    "private_las_bytes_included": false,
+    "visual_render_evidence": "not_generated"
+  },
+  "source_inventories": [
+    {
+      "id": "forge-full",
+      "inspection_state": "inspected",
+      "source_label": "synthetic-forge-full.las",
+      "channels": [
+        {"mnemonic": "DEPT", "kind": "depth", "unit": "ft"},
+        {"mnemonic": "GR", "kind": "scalar", "unit": "API"},
+        {"mnemonic": "BI", "kind": "scalar", "unit": "index"},
+        {"mnemonic": "SP", "kind": "scalar", "unit": "mV"},
+        {"mnemonic": "RDEP", "kind": "scalar", "unit": "ohm.m"},
+        {"mnemonic": "RMED", "kind": "scalar", "unit": "ohm.m"},
+        {"mnemonic": "RSHA", "kind": "scalar", "unit": "ohm.m"}
+      ]
+    },
+    {
+      "id": "forge-no-sp",
+      "inspection_state": "inspected",
+      "source_label": "synthetic-forge-no-sp.las",
+      "channels": [
+        {"mnemonic": "DEPT", "kind": "depth", "unit": "ft"},
+        {"mnemonic": "GR", "kind": "scalar", "unit": "API"}
+      ]
+    },
+    {
+      "id": "forge-uninspected",
+      "inspection_state": "not_inspected",
+      "source_label": "synthetic-forge-uninspected.las",
+      "channels": []
+    },
+    {
+      "id": "forge-unavailable",
+      "inspection_state": "unavailable",
+      "source_label": "synthetic-forge-unavailable.las",
+      "channels": []
+    },
+    {
+      "id": "forge-ambiguous-resistivity",
+      "inspection_state": "inspected",
+      "source_label": "synthetic-forge-ambiguous.las",
+      "channels": [
+        {"mnemonic": "DEPT", "kind": "depth", "unit": "ft"},
+        {"mnemonic": "RDEP", "kind": "scalar", "unit": "ohm.m"},
+        {"mnemonic": "RMED", "kind": "scalar", "unit": "ohm.m"},
+        {"mnemonic": "RSHA", "kind": "scalar", "unit": "ohm.m"}
+      ]
+    },
+    {
+      "id": "forge-source-b",
+      "inspection_state": "inspected",
+      "source_label": "synthetic-forge-source-b.las",
+      "channels": [
+        {"mnemonic": "DEPT", "kind": "depth", "unit": "ft"},
+        {"mnemonic": "GR", "kind": "scalar", "unit": "API"}
+      ]
+    }
+  ],
+  "canonical_document_fixtures": {
+    "existing_forge_main": {
+      "name": "FORGE Main Log Fixture",
+      "title": "FORGE 16B",
+      "subtitle": "North Field Evaluation",
+      "header": {
+        "enabled": true,
+        "provider_name": "FORGE Energy",
+        "title": "FORGE 16B",
+        "subtitle": "North Field Evaluation",
+        "general_fields": [
+          {"slot_id": "general.well", "key": "well", "label": "Well", "value": {"value": "FORGE 16B", "provenance": "user", "availability": "available"}},
+          {"slot_id": "general.field", "key": "field", "label": "Field", "value": {"value": "North Field", "provenance": "user", "availability": "available"}}
+        ],
+        "service_titles": [{"slot_id": "service_title.1", "value": {"value": "Open Hole Evaluation", "provenance": "user", "availability": "available"}}],
+        "tail_enabled": true
+      },
+      "tail": {"enabled": true},
+      "remarks": [{"remark_id": "remark-existing", "title": "Existing note", "text": "Preserve this unrelated note."}],
+      "sections": [
+        {
+          "id": "main_log",
+          "title": "Main Log",
+          "subtitle": "Existing six-track section",
+          "data_source": {"source_path": "synthetic-forge-full.las", "source_format": "las"},
+          "tracks": [
+            {"id": "depth", "title": "Depth", "kind": "reference", "width_mm": 16, "unit": "ft", "scale_ratio": 240, "major_step": 100},
+            {"id": "gr", "title": "Gamma Ray", "kind": "normal", "width_mm": 24, "bindings": [{"binding_id": "gr-main", "kind": "curve", "channel": "GR", "label": "GR"}]},
+            {"id": "sp", "title": "SP", "kind": "normal", "width_mm": 22, "bindings": [{"binding_id": "sp-main", "kind": "curve", "channel": "SP", "label": "SP"}]},
+            {"id": "rdep", "title": "Deep Resistivity", "kind": "normal", "width_mm": 28, "bindings": [{"binding_id": "rdep-main", "kind": "curve", "channel": "RDEP", "label": "RDEP"}]},
+            {"id": "rmed", "title": "Medium Resistivity", "kind": "normal", "width_mm": 26, "bindings": [{"binding_id": "rmed-main", "kind": "curve", "channel": "RMED", "label": "RMED"}]},
+            {"id": "rsha", "title": "Shallow Resistivity", "kind": "normal", "width_mm": 24, "bindings": [{"binding_id": "rsha-main", "kind": "curve", "channel": "RSHA", "label": "RSHA"}]}
+          ]
+        },
+        {
+          "id": "mud_log",
+          "title": "Mud Log",
+          "data_source": {"source_path": "synthetic-forge-source-b.las", "source_format": "las"},
+          "tracks": [{"id": "mud_gas", "title": "Gas Units", "kind": "normal", "width_mm": 25, "bindings": [{"binding_id": "mud-gas", "kind": "curve", "channel": "GR", "label": "Gas"}]}]
+        }
+      ]
+    },
+    "new_forge_document": {
+      "name": "FORGE New Log Fixture",
+      "title": "FORGE 16B New Report",
+      "header": {"enabled": true, "general_fields": [], "service_titles": []},
+      "sections": [
+        {
+          "id": "new_main_log",
+          "title": "Main Log",
+          "data_source": {"source_path": "synthetic-forge-full.las", "source_format": "las"},
+          "tracks": [
+            {"id": "depth", "title": "Depth", "kind": "reference", "width_mm": 16, "unit": "ft", "scale_ratio": 240, "major_step": 100},
+            {"id": "gr", "title": "Gamma Ray", "kind": "normal", "width_mm": 24, "bindings": [{"binding_id": "gr-new", "kind": "curve", "channel": "GR", "label": "GR"}]}
+          ]
+        }
+      ]
+    }
+  },
+  "document_overlays": {
+    "duplicate_main_log_target": {
+      "section": {
+        "id": "main_log_copy",
+        "title": "Main Log",
+        "data_source": {"source_path": "synthetic-forge-full.las", "source_format": "las"},
+        "tracks": [{"id": "duplicate_depth", "title": "Depth", "kind": "reference", "width_mm": 16, "unit": "ft", "scale_ratio": 240, "major_step": 100}]
+      }
+    },
+    "duplicate_gr_track": {
+      "track": {
+        "id": "gr_duplicate",
+        "title": "Gamma Ray",
+        "kind": "normal",
+        "width_mm": 24,
+        "bindings": [{"binding_id": "gr-duplicate", "kind": "curve", "channel": "GR", "label": "GR"}]
+      }
+    }
+  },
+  "case_gold": [
+    {
+      "id": "existing-two-track-sparse-add",
+      "source_inventory": "forge-full",
+      "document_fixture": "existing_forge_main",
+      "request": "In Main Log, add a Bond Index track using BI with a 0..1 scale and a Gamma Ray track using GR with a 0..150 scale. Preserve all existing tracks.",
+      "model_contract_gold": {
+        "outcome": "accept",
+        "operations": [
+          {"ref": "op_bi", "verb": "create", "scope": "Main Log", "track": {"ref": "bond_index", "title": "Bond Index", "kind": "normal", "width_mm": 34}, "binding": {"ref": "bond_index.curve", "channel": "BI", "label": "Bond Index", "scale": {"kind": "linear", "minimum": 0, "maximum": 1}}},
+          {"ref": "op_gr", "verb": "create", "scope": "Main Log", "track": {"ref": "gamma_ray_new", "title": "Gamma Ray (New)", "kind": "normal", "width_mm": 26}, "binding": {"ref": "gamma_ray_new.curve", "channel": "GR", "label": "Gamma Ray", "scale": {"kind": "linear", "minimum": 0, "maximum": 150}}}
+        ]
+      },
+      "host_crud_gold": {
+        "outcome": "two_create_operations_only",
+        "section_target": "existing:main_log",
+        "preserve_existing_track_refs": ["depth", "gr", "sp", "rdep", "rmed", "rsha"],
+        "new_track_refs_in_order": ["bond_index", "gamma_ray_new"]
+      },
+      "expected_model_state": {
+        "main_log_track_ids_in_order": ["depth", "gr", "sp", "rdep", "rmed", "rsha", "bond_index", "gamma_ray_new"],
+        "mud_log_track_ids_unchanged": ["mud_gas"],
+        "report_title_unchanged": "FORGE 16B",
+        "existing_remark_unchanged": "Preserve this unrelated note."
+      },
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    },
+    {
+      "id": "eight-track-full-reemission",
+      "source_inventory": "forge-full",
+      "document_fixture": "existing_forge_main",
+      "request": "In Main Log, add two requested tracks while preserving existing tracks.",
+      "model_contract_gold": {"outcome": "reject", "diagnostic": "unauthorized_existing_object_reemission"},
+      "host_crud_gold": {"outcome": "no_operations", "document_mutation": false},
+      "invalid_candidate": {"emitted_existing_track_count": 6, "emitted_requested_track_count": 2},
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    },
+    {
+      "id": "duplicate-local-handle",
+      "source_inventory": "forge-full",
+      "document_fixture": "existing_forge_main",
+      "request": "Add two distinct tracks to Main Log.",
+      "model_contract_gold": {"outcome": "reject", "diagnostic": "duplicate_operation_ref"},
+      "host_crud_gold": {"outcome": "no_operations", "document_mutation": false},
+      "invalid_candidate": {"operation_refs": ["op_curve", "op_curve"]},
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    },
+    {
+      "id": "invalid-channel-for-source",
+      "source_inventory": "forge-no-sp",
+      "document_fixture": "new_forge_document",
+      "request": "Plot SP from the selected source in Main Log.",
+      "model_contract_gold": {"outcome": "reject", "diagnostic": "channel_not_in_selected_source"},
+      "host_crud_gold": {"outcome": "no_operations", "document_mutation": false},
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    },
+    {
+      "id": "existing-track-must-not-be-mutated",
+      "source_inventory": "forge-full",
+      "document_fixture": "existing_forge_main",
+      "request": "Add Bond Index and Gamma Ray tracks; leave all existing tracks unchanged.",
+      "model_contract_gold": {"outcome": "reject", "diagnostic": "unauthorized_existing_object_change"},
+      "host_crud_gold": {"outcome": "no_operations", "document_mutation": false},
+      "invalid_candidate": {"changed_existing_ref": "gr", "changed_field": "width_mm"},
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    },
+    {
+      "id": "mixed-report-and-section-operations",
+      "source_inventory": "forge-full",
+      "document_fixture": "existing_forge_main",
+      "request": "Set the report well to FORGE 16B, add a first-page remark, and add Bond Index to Main Log.",
+      "model_contract_gold": {
+        "outcome": "accept",
+        "operations": [
+          {"ref": "op_well", "verb": "update", "scope": "report", "field": "general.well", "value": "FORGE 16B"},
+          {"ref": "op_remark", "verb": "create", "scope": "report", "field": "remarks", "value": {"title": "Operations note", "text": "Confirm intervals before issue.", "placement": "first_page"}},
+          {"ref": "op_bi", "verb": "create", "scope": "Main Log", "track": {"ref": "bond_index", "title": "Bond Index", "kind": "normal", "width_mm": 34}, "binding": {"ref": "bond_index.curve", "channel": "BI", "label": "Bond Index", "scale": {"kind": "linear", "minimum": 0, "maximum": 1}}}
+        ]
+      },
+      "host_crud_gold": {"outcome": "report_and_section_operations", "report_slot": "general.well", "remark_order": "first_page", "section_target": "existing:main_log"},
+      "expected_model_state": {
+        "header_general_well": "FORGE 16B",
+        "first_remark": {"title": "Operations note", "text": "Confirm intervals before issue."},
+        "main_log_new_track_ids_in_order": ["bond_index"],
+        "unrelated_section_unchanged": true
+      },
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    },
+    {
+      "id": "missing-header-slot",
+      "source_inventory": "forge-full",
+      "document_fixture": "new_forge_document",
+      "request": "Set the report header field named rig supervisor to Alex.",
+      "model_contract_gold": {"outcome": "unresolved", "diagnostic": "header_slot_unavailable"},
+      "host_crud_gold": {"outcome": "no_operations", "document_mutation": false},
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    },
+    {
+      "id": "optional-sp-omitted-when-absent",
+      "source_inventory": "forge-no-sp",
+      "document_fixture": "new_forge_document",
+      "request": "Add GR, and include SP only if the selected source contains it.",
+      "model_contract_gold": {"outcome": "accept_with_conditional_omission", "operations": [{"ref": "op_gr", "channel": "GR", "scope": "Main Log"}], "omitted_conditional": {"channel": "SP", "reason": "not_present_in_inspected_source"}},
+      "host_crud_gold": {"outcome": "one_create_operation", "channels": ["GR"]},
+      "expected_model_state": {"new_main_log_binding_channels": ["GR"]},
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    },
+    {
+      "id": "source-not-inspected",
+      "source_inventory": "forge-uninspected",
+      "document_fixture": "new_forge_document",
+      "request": "Plot GR from the selected source.",
+      "model_contract_gold": {"outcome": "unresolved", "diagnostic": "source_inventory_not_inspected"},
+      "host_crud_gold": {"outcome": "no_operations", "document_mutation": false},
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    },
+    {
+      "id": "source-unavailable",
+      "source_inventory": "forge-unavailable",
+      "document_fixture": "new_forge_document",
+      "request": "Plot GR from the selected source.",
+      "model_contract_gold": {"outcome": "unresolved", "diagnostic": "source_unavailable"},
+      "host_crud_gold": {"outcome": "no_operations", "document_mutation": false},
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    },
+    {
+      "id": "ambiguous-resistivity-role",
+      "source_inventory": "forge-ambiguous-resistivity",
+      "document_fixture": "new_forge_document",
+      "request": "Add the resistivity curve to Main Log.",
+      "model_contract_gold": {"outcome": "unresolved", "diagnostic": "channel_role_ambiguous", "candidates": ["RDEP", "RMED", "RSHA"]},
+      "host_crud_gold": {"outcome": "no_operations", "document_mutation": false},
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    },
+    {
+      "id": "existing-target-resolution",
+      "source_inventory": "forge-full",
+      "document_fixture": "existing_forge_main",
+      "request": "Add a Bond Index track to the existing Main Log section.",
+      "model_contract_gold": {"outcome": "accept", "section_target": "Main Log"},
+      "host_crud_gold": {"outcome": "existing_section_target", "section_ref": "main_log"},
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    },
+    {
+      "id": "absent-target-resolution",
+      "source_inventory": "forge-full",
+      "document_fixture": "existing_forge_main",
+      "request": "Create a new section named Repeat Log.",
+      "model_contract_gold": {"outcome": "accept", "section_target": "Repeat Log", "target_state": "absent"},
+      "host_crud_gold": {"outcome": "host_staged_section_create", "section_identity": "host_assigned"},
+      "expected_model_state": {"created_section_title": "Repeat Log", "identity_authority": "host"},
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    },
+    {
+      "id": "duplicate-targets-fail-closed",
+      "source_inventory": "forge-full",
+      "document_fixture": "existing_forge_main",
+      "request": "Add Bond Index to the Main Log section.",
+      "model_contract_gold": {"outcome": "unresolved", "diagnostic": "section_target_ambiguous", "matching_sections": ["main_log", "main_log_copy"]},
+      "host_crud_gold": {"outcome": "no_operations", "document_mutation": false},
+      "fixture_overlay": "duplicate_main_log_target",
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    },
+    {
+      "id": "reordered-existing-tracks",
+      "source_inventory": "forge-full",
+      "document_fixture": "existing_forge_main",
+      "request": "Move SP before Gamma Ray in Main Log.",
+      "model_contract_gold": {"outcome": "accept", "ordering_constraint": {"object": "sp", "relation": "before", "relative_to": "gr"}},
+      "host_crud_gold": {"outcome": "one_order_operation", "unrelated_track_properties_preserved": true},
+      "expected_model_state": {"main_log_track_ids_in_order": ["depth", "sp", "gr", "rdep", "rmed", "rsha"], "track_properties_unchanged": true},
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    },
+    {
+      "id": "duplicate-existing-gr-track",
+      "source_inventory": "forge-full",
+      "document_fixture": "existing_forge_main",
+      "request": "Update the Gamma Ray track in Main Log.",
+      "model_contract_gold": {"outcome": "unresolved", "diagnostic": "existing_target_ambiguous", "matching_track_refs": ["gr", "gr_duplicate"]},
+      "host_crud_gold": {"outcome": "no_operations", "document_mutation": false},
+      "fixture_overlay": "duplicate_gr_track",
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    },
+    {
+      "id": "same-mnemonic-distinct-sources",
+      "source_inventory": ["forge-full", "forge-source-b"],
+      "document_fixture": "existing_forge_main",
+      "request": "Use GR from the Main Log source for Main Log and GR from the mud source for Mud Log.",
+      "model_contract_gold": {"outcome": "accept_only_with_explicit_source_ownership", "source_ownership": {"Main Log": "forge-full", "Mud Log": "forge-source-b"}},
+      "host_crud_gold": {"outcome": "two_scoped_operations", "same_mnemonic_is_not_identity": true},
+      "visual_evidence": {"status": "not_generated", "grading_authority": false}
+    }
+  ]
+}
