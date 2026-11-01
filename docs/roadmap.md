@@ -43,18 +43,38 @@ measured complexity.
 
 ## Current Agent Work Road
 
-The active sequence is:
+The prior baseline-confirmation sequence is paused at the worker-contract
+failure exposed by the accepted binding-smoke implementation. Its live result
+is closed and is not a scientific campaign. The current design candidate is:
 
 ```text
-Accepted Current Active Baseline
-    -> D5-5H baseline-compliance closure [COMPLETE]
-    -> baseline Knowledge Delta promotion [COMPLETE]
-    -> one bounded repaired-baseline live confirmation
-    -> investigate only genuinely residual semantic failures
+binding smoke 002: SMOKE_CONTRACT_FAIL [CLOSED]
+    -> A00 architecture integration [PENDING INDEPENDENT REVIEW]
+    -> Human architecture acceptance + implementation authorization
+    -> A01-A11 bounded implementation/qualification slices
+    -> A12 fresh authorized engineering smoke
+    -> separate decision on any scientific qualification
 ```
 
-The older CM-54 through CM-58 wording below is preserved as historical
-roadmap context, not as the current execution sequence.
+The older repaired-baseline confirmation and CM-54 through CM-58 wording
+below is preserved as historical roadmap context, not as the current execution
+sequence. A00's proposed sequence is not active authority until independent
+review and Human acceptance; A01 implementation is not yet authorized.
+
+## Proposed Canonical NLP-Authoring Remediation (A00 Pending Review)
+
+The D5 binding smoke at `6f0ef73d2a73b1a01d40767264e8dea0bbad3b45` ended
+`SMOKE_CONTRACT_FAIL` before semantic lowering: a schema-valid section response
+contained eight track handles against a work contract requiring exactly two.
+This is a bounded worker-contract mismatch, not a scientific result.
+
+`WELLPLOT-NLP-CANONICAL-AUTHORING-ARCH-001` is a documentation-only
+architecture candidate. A00 integrates that proposal with the accepted
+single-engine and host-ownership invariants and is awaiting independent review.
+It does not supersede the current active baseline, authorize A01 implementation,
+or authorize another smoke/scientific campaign. If accepted and Human-approved,
+the proposed A01-A11 provider-free implementation slices precede a separately
+authorized A12 live engineering qualification.
 
 ## Current Agent Architecture Status
 

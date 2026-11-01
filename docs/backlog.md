@@ -102,8 +102,21 @@ until a bounded provider-free implementation and regression are accepted.
 
 ## Section Action Observability
 
-D5-WORKER-OBS-01 is an implementation candidate pending independent review.
-The previous binding-smoke response remains unavailable; do not reinterpret
-its sealed terminal or treat the candidate as a live qualification. The
-controlled-capture policy and 30-day authorized-deletion procedure are recorded
-in `docs/architecture/D5_WORKER_ACTION_OBSERVABILITY.md`.
+D5-WORKER-OBS-01 was accepted at
+`6f0ef73d2a73b1a01d40767264e8dea0bbad3b45`. The fresh binding smoke
+`d5-binding-smoke-6f0ef73d-002` is sealed as `SMOKE_CONTRACT_FAIL`: the
+schema-valid response had eight track handles where the deterministic contract
+required exactly two; semantic lowering was not reached. This is engineering
+contract evidence, not scientific evidence. The opt-in controlled-capture
+policy and 30-day authorized-deletion procedure are recorded in
+`docs/architecture/D5_WORKER_ACTION_OBSERVABILITY.md`.
+
+## Canonical NLP Authoring Architecture Remediation
+
+`WELLPLOT-NLP-CANONICAL-AUTHORING-ARCH-001` A00 is a documentation-only
+candidate pending independent review. It audits the accepted planner/worker
+contracts and proposes a bounded semantic-operation inventory and sparse worker
+patches through the existing canonical graph and CRUD engine. No source changes,
+provider calls, new smoke, scientific execution, or C02 access are authorized by
+A00. Do not update the active baseline or start A01 until independent review,
+Human architecture acceptance, and implementation authorization are complete.
