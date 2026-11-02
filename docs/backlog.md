@@ -123,6 +123,20 @@ Stage-two baseline promotion follows independent implementation acceptance and
 may record only verified contracts, regression evidence, exact checkpoints,
 and residual limitations.
 
+A09 is in provider-free implementation review. The current candidate adds
+failure ownership, safe exception/cancellation stage traces, request/result and
+worker-contract digest linkage, and prompt-injection projection coverage. The
+fixed source-file byte ceiling is explicitly deferred: multi-gigabyte LAS/DLIS
+files must not be rejected solely by total file size. This does not close
+parser resource-safety requirements. Metadata-first inspection, deterministic
+`UNIQUE`/`AMBIGUOUS`/`ABSENT`/`UNKNOWN` channel resolution, and token-aware
+complete-request budgeting require a separate design review before
+implementation. Proposed replacement controls include bounded parser memory
+and time, metadata-volume and read-query budgets, and model-aware token budgets
+with a secondary serialized-byte safety cap. A09 remains incomplete until
+those safeguards are accepted or the residual limitation is explicitly
+accepted.
+
 The bounded A07 shared-identity allocator corrective was independently
 accepted at `c0ea8b9a7ebc0d9590fdf13286adfbd367c7e8ed`. The broader A07
 operation-mapping and compatibility matrix remains open for A10 qualification;
@@ -158,8 +172,10 @@ local evidence rather than A08 regressions:
   planner wire/scope or capability-safety expectations.
 
 The unfiltered repository suite remains unqualified; the candidate must not
-claim a full-suite PASS from these filtered provider-free results. A09 remains
-on hold, and no live or scientific execution is authorized.
+claim a full-suite PASS from these filtered provider-free results. A09 has
+focused provider-free candidate evidence but remains subject to independent
+review and the explicitly deferred resource-safety design. No live or
+scientific execution is authorized by that candidate evidence.
 
 A08 publication semantics are intentionally bounded: same-directory
 `os.replace()` provides atomic file visibility on POSIX, but rollback after a

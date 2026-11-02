@@ -518,6 +518,50 @@ def test_worker_rejected_dto_is_observed_before_contract_failure() -> None:
     assert events[0]["logical_call_index"] == events[1]["logical_call_index"] == 11
 
 
+def test_custody_preserves_contract_and_result_digest_bindings(tmp_path: Path) -> None:
+    """Opt-in custody retains only digests linking the DTO to its contracts."""
+    custody = _custody(tmp_path, "diagnostics")
+    common = {
+        "event_version": "wellplot.section-action-observation.v1",
+        "worker_role": "section_worker",
+        "task_index": 0,
+        "attempt": 1,
+        "logical_call_index": 1,
+        "response_schema": "AddTrackAction",
+        "dto_sha256": "1" * 64,
+        "dto_size_bytes": 12,
+        "snapshot_id": "snapshot-test",
+        "request_sha256": "2" * 64,
+        "work_contract_sha256": "3" * 64,
+        "operation_contract_sha256": "4" * 64,
+    }
+    custody.record_section_action(
+        {
+            **common,
+            "event": "SECTION_ACTION_SCHEMA_VALIDATED",
+            "capture_state": "metadata_only",
+            "contract_outcome": "NOT_EVALUATED",
+        }
+    )
+    custody.record_section_action(
+        {
+            **common,
+            "event": "SECTION_ACTION_CONTRACT_RESULT",
+            "contract_outcome": "PASS",
+            "diagnostic_code": None,
+            "mismatch": None,
+            "validation_result_sha256": "5" * 64,
+        }
+    )
+
+    rows = _rows(custody)
+    assert rows[0]["request_sha256"] == common["request_sha256"]
+    assert rows[0]["work_contract_sha256"] == common["work_contract_sha256"]
+    assert rows[0]["operation_contract_sha256"] == common["operation_contract_sha256"]
+    assert rows[0]["snapshot_id"] == common["snapshot_id"]
+    assert rows[1]["validation_result_sha256"] == "5" * 64
+
+
 def test_worker_capture_write_failure_stops_before_lowering() -> None:
     """A mandatory observation failure prevents lowering and further calls."""
 

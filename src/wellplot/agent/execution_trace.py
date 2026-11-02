@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import re
@@ -213,15 +214,32 @@ class AgentRunTrace:
         self.record("stage_started", status="started", stage=stage, target_id=target_id)
         try:
             yield
-        except Exception as exc:
-            status = str(getattr(exc, "status", "failed"))
+        except asyncio.CancelledError:
             self.record(
                 "stage_finished",
-                status=status,
+                status="cancelled",
                 stage=stage,
                 target_id=target_id,
                 duration_ms=round((perf_counter() - started) * 1000),
-                details={"error": str(exc)},
+                details={"termination_kind": "cancelled"},
+            )
+            raise
+        except Exception as exc:
+            safe_details: dict[str, object] = {
+                "exception_type": type(exc).__name__,
+                "exception_module": type(exc).__module__,
+            }
+            for attribute in ("code", "safe_message"):
+                value = getattr(exc, attribute, None)
+                if isinstance(value, str):
+                    safe_details[attribute] = value
+            self.record(
+                "stage_finished",
+                status="failed",
+                stage=stage,
+                target_id=target_id,
+                duration_ms=round((perf_counter() - started) * 1000),
+                details=safe_details,
             )
             raise
         else:

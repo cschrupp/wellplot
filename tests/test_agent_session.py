@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import json
 import math
 from dataclasses import dataclass, field
 from typing import NoReturn
@@ -21,8 +23,10 @@ from wellplot.agent.code_mode.facade import (
     CompileDiagnostic,
     CompileMetrics,
     CompileWorkerEvidence,
+    _semantic_diagnostic,
 )
 from wellplot.agent.mcp import LocalStdioMcpRuntime
+from wellplot.agent.semantic_runtime import SemanticDiagnostic, SemanticStageEvidence
 from wellplot.authoring_program.models import ProgramMetrics
 from wellplot.model.authoring import AuthoringDocumentSpec
 from wellplot.model.intent import AuthoringDocumentIntent
@@ -202,6 +206,16 @@ def test_revise_uses_revise_mode_and_projects_bounded_inspection(
     assert compiler.calls[0]["mode"] == "revise"
     inspection = result.inspection()
     assert inspection["intent_present"] is True
+    assert inspection["request_sha256"] == hashlib.sha256(b"Change the title.").hexdigest()
+    result_digest = inspection.pop("result_sha256")
+    assert (
+        result_digest
+        == hashlib.sha256(
+            json.dumps(
+                inspection, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+            ).encode()
+        ).hexdigest()
+    )
     assert inspection["workers"][0]["stage_evidence"]["provider_wire"] == "NOT_REACHED"
     serialized = repr(inspection)
     assert "raw provider response" not in serialized
@@ -276,3 +290,27 @@ def test_public_diagnostic_model_accepts_only_safe_fields() -> None:
                 "provider_object": object(),
             }
         )
+
+
+@pytest.mark.parametrize(
+    ("stage", "evidence", "expected_owner"),
+    [
+        ("provider", SemanticStageEvidence(), "provider"),
+        ("semantic_worker", SemanticStageEvidence(worker_obligation="FAIL"), "worker_schema"),
+        ("semantic_worker", SemanticStageEvidence(semantic_lowering="FAIL"), "lowering"),
+        ("semantic_worker", SemanticStageEvidence(), "worker_semantics"),
+    ],
+)
+def test_failure_owner_comes_from_reached_worker_stage(
+    stage: str,
+    evidence: SemanticStageEvidence,
+    expected_owner: str,
+) -> None:
+    """Worker attribution distinguishes schema, semantics, and lowering boundaries."""
+    diagnostic = _semantic_diagnostic(
+        SemanticDiagnostic(stage=stage, code="bounded_failure", message="safe"),
+        worker_kind="section",
+        plan_order=0,
+        stage_evidence=evidence,
+    )
+    assert diagnostic.failure_owner == expected_owner

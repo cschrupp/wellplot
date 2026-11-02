@@ -1151,6 +1151,11 @@ class D5SmokeCustody:
                 "response_schema",
                 "dto_sha256",
                 "dto_size_bytes",
+                "snapshot_id",
+                "request_sha256",
+                "work_contract_sha256",
+                "operation_contract_sha256",
+                "validation_result_sha256",
                 "capture_state",
                 "contract_outcome",
                 "diagnostic_code",
@@ -1177,6 +1182,7 @@ class D5SmokeCustody:
             if row.get("response_schema") not in {
                 "ReconstructSectionAction",
                 "AddTrackAction",
+                "AddTracksAction",
                 "UpdateCurveScaleAction",
                 "AddFillAction",
             }:
@@ -1187,6 +1193,19 @@ class D5SmokeCustody:
                 r"[0-9a-f]{64}", row["dto_sha256"]
             ):
                 raise D5HarnessError("section observation digest is invalid")
+            for field_name in (
+                "request_sha256",
+                "work_contract_sha256",
+                "operation_contract_sha256",
+                "validation_result_sha256",
+            ):
+                digest = row.get(field_name)
+                if digest is not None and (
+                    not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest)
+                ):
+                    raise D5HarnessError("section evidence digest is invalid")
+            if row.get("snapshot_id") is not None and not isinstance(row["snapshot_id"], str):
+                raise D5HarnessError("section snapshot identity is invalid")
             if name == "SECTION_ACTION_SCHEMA_VALIDATED":
                 expected_state = "complete" if mode == "validated_dto" else "metadata_only"
                 if (
@@ -1874,6 +1893,7 @@ def verify_smoke_observability(paths: EvidencePaths) -> dict[str, object]:
             if row.get("event") == "logical_call_started"
         }
         observed: dict[tuple[object, ...], str | None] = {}
+        observation_bindings: dict[tuple[object, ...], dict[str, object]] = {}
         metadata_dtos: set[str] = set()
         if paths.section_actions.exists():
             for line in paths.section_actions.read_text(encoding="utf-8").splitlines():
@@ -1893,6 +1913,15 @@ def verify_smoke_observability(paths: EvidencePaths) -> dict[str, object]:
                     if key in observed:
                         raise D5HarnessError("duplicate section observation")
                     observed[key] = None
+                    observation_bindings[key] = {
+                        name: row.get(name)
+                        for name in (
+                            "snapshot_id",
+                            "request_sha256",
+                            "work_contract_sha256",
+                            "operation_contract_sha256",
+                        )
+                    }
                     if row.get("capture_state") == "complete" and artifacts.get(
                         row.get("dto_path")
                     ) != row.get("dto_sha256"):
@@ -1924,9 +1953,18 @@ def verify_smoke_observability(paths: EvidencePaths) -> dict[str, object]:
                 elif row.get("event") == "SECTION_ACTION_CONTRACT_RESULT":
                     if key not in observed or observed[key] is not None:
                         raise D5HarnessError("section contract result is uncorrelated")
+                    if any(
+                        row.get(field) != value
+                        for field, value in observation_bindings[key].items()
+                    ):
+                        raise D5HarnessError("section contract evidence binding changed")
                     outcome = row.get("contract_outcome")
                     if outcome not in {"PASS", "FAIL"}:
                         raise D5HarnessError("section contract outcome is invalid")
+                    if not isinstance(row.get("validation_result_sha256"), str) or not re.fullmatch(
+                        r"[0-9a-f]{64}", row["validation_result_sha256"]
+                    ):
+                        raise D5HarnessError("section validation result digest is invalid")
                     observed[key] = outcome
                 elif row.get("event") == "SECTION_ACTION_VALIDATED":
                     if observed.get(key) != "PASS":

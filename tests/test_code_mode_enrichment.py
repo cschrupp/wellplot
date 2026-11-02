@@ -429,7 +429,7 @@ def test_equivalent_paths_are_loaded_once_and_channels_are_semantic_only(tmp_pat
 def test_section_hint_resolution_is_exact_then_lexical_and_preserves_plan(tmp_path: Path) -> None:
     """Only deterministic title/subtitle matching resolves existing sections."""
     (tmp_path / "main.las").write_text("source", encoding="utf-8")
-    enricher, _ = _enricher(tmp_path)
+    enricher, loader = _enricher(tmp_path)
     plan = _plan(hint="  MAIN   PASS  ", source_hints=("main",))
 
     result = enricher.enrich(
@@ -459,7 +459,7 @@ def test_section_hint_resolution_is_exact_then_lexical_and_preserves_plan(tmp_pa
 
 def test_detail_column_slots_retain_row_ownership_for_report_workers(tmp_path: Path) -> None:
     """Expose row keys on value cells without assigning ownership to unit cells."""
-    enricher, _ = _enricher(tmp_path)
+    enricher, loader = _enricher(tmp_path)
     (tmp_path / "main.las").write_text("source", encoding="utf-8")
     document = AuthoringDocumentSpec(
         name="cm-41",
@@ -633,7 +633,7 @@ def test_snapshot_identity_is_shared_and_stable_across_section_tasks(tmp_path: P
     """Sibling tasks share one deterministic document/source revision identity."""
     source_path = tmp_path / "main.las"
     source_path.write_text("source", encoding="utf-8")
-    enricher, _ = _enricher(tmp_path)
+    enricher, loader = _enricher(tmp_path)
     task = _plan().section_tasks[0]
     plan = SemanticPlan(
         summary="Two independent sections.",
@@ -655,6 +655,7 @@ def test_snapshot_identity_is_shared_and_stable_across_section_tasks(tmp_path: P
     assert first.report.snapshot_id == first.snapshot.snapshot_id
     assert [section.sources[0].handle for section in first.sections] == ["source-1", "source-1"]
     assert first.snapshot_bytes > 0
+    assert loader.calls == [(source_path.resolve(), "las"), (source_path.resolve(), "las")]
     assert source_path.read_text(encoding="utf-8") == "source"
     assert document.model_dump(mode="json") == original_document
 

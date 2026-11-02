@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -103,6 +105,21 @@ class AgentDiagnostic(_SessionModel):
     code: str = Field(min_length=1)
     message: str = Field(min_length=1)
     severity: AgentDiagnosticSeverity = AgentDiagnosticSeverity.ERROR
+    failure_owner: (
+        Literal[
+            "planner",
+            "inspection",
+            "worker_schema",
+            "worker_semantics",
+            "lowering",
+            "reconciliation",
+            "executor",
+            "persistence",
+            "provider",
+            "host_safety",
+        ]
+        | None
+    ) = None
     retryable: bool | None = None
     worker_kind: Literal["report", "section"] | None = None
     plan_order: int | None = Field(default=None, ge=0)
@@ -165,6 +182,12 @@ class AgentSessionResult(_SessionModel):
     workers: tuple[AgentWorkerEvidence, ...] = ()
     metrics: AgentMetrics
     obligations: tuple[RequestObligation, ...] = ()
+    request_sha256: str | None = Field(
+        default=None,
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9a-f]{64}$",
+    )
 
     @model_validator(mode="after")
     def validate_result_evidence(self) -> AgentSessionResult:
@@ -180,14 +203,23 @@ class AgentSessionResult(_SessionModel):
 
     def inspection(self) -> dict[str, object]:
         """Return bounded JSON-safe evidence without intent or provider material."""
-        return {
+        projection: dict[str, object] = {
             "mode": self.mode,
             "success": self.success,
             "diagnostics": [item.model_dump(mode="json") for item in self.diagnostics],
             "workers": [item.model_dump(mode="json") for item in self.workers],
             "metrics": self.metrics.model_dump(mode="json"),
             "intent_present": self.intent is not None,
+            "request_sha256": self.request_sha256,
         }
+        encoded = json.dumps(
+            projection,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ).encode("utf-8")
+        projection["result_sha256"] = hashlib.sha256(encoded).hexdigest()
+        return projection
 
 
 class _DiagnosticLike(Protocol):
@@ -197,6 +229,7 @@ class _DiagnosticLike(Protocol):
     code: str
     message: str
     severity: object
+    failure_owner: str | None
     retryable: bool | None
     worker_kind: Literal["report", "section"] | None
     plan_order: int | None
@@ -331,7 +364,9 @@ class AgentSession:
             temperature=self.config.temperature,
             max_output_tokens=self.config.max_output_tokens,
         )
-        return _project_result(result, mode=mode)
+        projected = _project_result(result, mode=mode)
+        request_sha256 = hashlib.sha256(normalized_request.encode("utf-8")).hexdigest()
+        return projected.model_copy(update={"request_sha256": request_sha256})
 
 
 def _project_result(result: _CompileResultLike, *, mode: CompilationMode) -> AgentSessionResult:
@@ -356,6 +391,7 @@ def _project_diagnostic(diagnostic: _DiagnosticLike) -> AgentDiagnostic:
         code=diagnostic.code,
         message=diagnostic.message,
         severity=severity,
+        failure_owner=getattr(diagnostic, "failure_owner", None),
         retryable=diagnostic.retryable,
         worker_kind=diagnostic.worker_kind,
         plan_order=diagnostic.plan_order,

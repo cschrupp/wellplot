@@ -5,6 +5,7 @@ from __future__ import annotations
 import shutil
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import yaml
@@ -12,8 +13,24 @@ from tests._mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 
 from wellplot.agent.session import AgentMetrics, AgentSessionResult, AgentWorkerEvidence
 from wellplot.errors import AuthoringPublicationRecoveryError
-from wellplot.mcp.agentic import _apply_session_result, _request_context
+from wellplot.mcp.agentic import _apply_failure_owner, _apply_session_result, _request_context
 from wellplot.model import AuthoringDocumentIntent
+
+
+def test_apply_failure_owner_keeps_deterministic_boundaries_distinct() -> None:
+    """Trace ownership distinguishes compile, reconcile, executor, and persistence."""
+    assert _apply_failure_owner(["reconciliation_blocked"], object()) == "reconciliation"
+    assert _apply_failure_owner(["execution_failed"], object()) == "executor"
+    assert _apply_failure_owner(["validation_failed"], object()) == "executor"
+    assert _apply_failure_owner(["stale_snapshot_conflict"], object()) == "persistence"
+    assert _apply_failure_owner(["publication_recovery_failed"], object()) == "persistence"
+    assert (
+        _apply_failure_owner(
+            ["compile_failed"],
+            SimpleNamespace(diagnostics=(SimpleNamespace(failure_owner="inspection"),)),
+        )
+        == "inspection"
+    )
 
 
 def _successful_result() -> AgentSessionResult:

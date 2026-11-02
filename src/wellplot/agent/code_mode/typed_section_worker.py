@@ -306,6 +306,10 @@ class CanonicalSectionWorker:
             encoded = json.dumps(
                 dto, sort_keys=True, separators=(",", ":"), ensure_ascii=True
             ).encode()
+            work_contract_payload = contract.model_dump(mode="json")
+            operation_contract_payload = (
+                None if operation_contract is None else operation_contract.model_dump(mode="json")
+            )
             common = {
                 "event_version": "wellplot.section-action-observation.v1",
                 "worker_role": "section_worker",
@@ -315,7 +319,16 @@ class CanonicalSectionWorker:
                 "response_schema": type(action).__name__,
                 "dto_sha256": hashlib.sha256(encoded).hexdigest(),
                 "dto_size_bytes": len(encoded),
+                "snapshot_id": contract.snapshot_id,
+                "work_contract_sha256": _canonical_sha256(work_contract_payload),
             }
+            if operation_contract_payload is not None:
+                common.update(
+                    {
+                        "request_sha256": operation_contract.request_sha256,
+                        "operation_contract_sha256": _canonical_sha256(operation_contract_payload),
+                    }
+                )
             event = {
                 **common,
                 "event": "SECTION_ACTION_SCHEMA_VALIDATED",
@@ -337,14 +350,18 @@ class CanonicalSectionWorker:
             error = caught
         if enabled:
             assert self.action_observer is not None
+            result_evidence = {
+                "contract_outcome": "FAIL" if error is not None else "PASS",
+                "diagnostic_code": error.code if error is not None else None,
+                "mismatch": error.details if error is not None else None,
+            }
             try:
                 self.action_observer(
                     {
                         **common,
                         "event": "SECTION_ACTION_CONTRACT_RESULT",
-                        "contract_outcome": "FAIL" if error is not None else "PASS",
-                        "diagnostic_code": error.code if error is not None else None,
-                        "mismatch": error.details if error is not None else None,
+                        **result_evidence,
+                        "validation_result_sha256": _canonical_sha256(result_evidence),
                     }
                 )
             except Exception:
@@ -2261,6 +2278,17 @@ def _added_bindings(
 def _json_payload(value: object) -> str:
     """Serialize canonical worker input deterministically."""
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def _canonical_sha256(value: object) -> str:
+    """Hash one JSON-compatible evidence projection without retaining its bytes."""
+    encoded = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 __all__ = ["CanonicalSectionWorker"]

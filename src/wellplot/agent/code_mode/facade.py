@@ -64,6 +64,21 @@ class CompileDiagnostic(_CompileModel):
     code: str = Field(min_length=1)
     message: str = Field(min_length=1)
     severity: CompileDiagnosticSeverity = CompileDiagnosticSeverity.ERROR
+    failure_owner: (
+        Literal[
+            "planner",
+            "inspection",
+            "worker_schema",
+            "worker_semantics",
+            "lowering",
+            "reconciliation",
+            "executor",
+            "persistence",
+            "provider",
+            "host_safety",
+        ]
+        | None
+    ) = None
     retryable: bool | None = None
     worker_kind: Literal["report", "section"] | None = None
     plan_order: int | None = Field(default=None, ge=0)
@@ -277,6 +292,7 @@ def _worker_evidence(outcome: WorkerOutcome) -> CompileWorkerEvidence:
                 diagnostic,
                 worker_kind=outcome.kind,
                 plan_order=outcome.plan_order,
+                stage_evidence=outcome.stage_evidence,
             )
             for diagnostic in outcome.diagnostics
         ),
@@ -291,6 +307,7 @@ def _semantic_diagnostic(
     *,
     worker_kind: Literal["report", "section"],
     plan_order: int,
+    stage_evidence: SemanticStageEvidence,
 ) -> CompileDiagnostic:
     """Project a worker program diagnostic into the generic host contract."""
     retryable = None
@@ -305,10 +322,25 @@ def _semantic_diagnostic(
         code=diagnostic.code or "program.unknown",
         message=diagnostic.message,
         severity=CompileDiagnosticSeverity(diagnostic.severity.value),
+        failure_owner=_semantic_failure_owner(diagnostic.stage, stage_evidence),
         retryable=retryable,
         worker_kind=worker_kind,
         plan_order=plan_order,
     )
+
+
+def _semantic_failure_owner(
+    stage: str,
+    evidence: SemanticStageEvidence,
+) -> Literal["worker_schema", "worker_semantics", "lowering", "provider"]:
+    """Classify worker failures using the stage evidence already recorded."""
+    if stage == "provider":
+        return "provider"
+    if evidence.semantic_lowering == "FAIL":
+        return "lowering"
+    if evidence.worker_obligation == "FAIL":
+        return "worker_schema"
+    return "worker_semantics"
 
 
 def _provider_diagnostic(error: ProviderRequestError) -> CompileDiagnostic:
@@ -326,6 +358,7 @@ def _provider_diagnostic(error: ProviderRequestError) -> CompileDiagnostic:
         stage="planner",
         code=code,
         message=error.safe_message,
+        failure_owner="provider",
         retryable=error.retryable,
     )
 
@@ -336,6 +369,7 @@ def _enrichment_diagnostic(error: SemanticEnrichmentError) -> CompileDiagnostic:
         stage="enrichment",
         code=f"enrichment.{error.code.value}",
         message=str(error),
+        failure_owner="inspection",
     )
 
 
@@ -356,6 +390,7 @@ def _planner_diagnostic(error: PlannerSemanticFailure) -> CompileDiagnostic:
         stage="planner",
         code=f"planner.{error.code}",
         message=error.safe_message,
+        failure_owner="planner",
         retryable=False,
     )
 
@@ -366,6 +401,7 @@ def _capability_safety_failure_diagnostic(error: CapabilitySafetyFailure) -> Com
         stage="capability_safety",
         code=f"capability_safety.{error.code}",
         message=error.safe_message,
+        failure_owner="host_safety",
         retryable=False,
     )
 
@@ -413,6 +449,7 @@ def _report_boundary_safety_failure_diagnostic(
         stage="report_boundary_safety",
         code=f"report_boundary_safety.{error.code}",
         message=error.safe_message,
+        failure_owner="host_safety",
         retryable=False,
     )
 
@@ -458,6 +495,7 @@ def _section_leaf_safety_failure_diagnostic(
         stage="section_leaf_safety",
         code=f"section_leaf_safety.{error.code}",
         message=error.safe_message,
+        failure_owner="host_safety",
         retryable=False,
     )
 

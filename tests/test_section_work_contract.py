@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from types import SimpleNamespace
 
@@ -500,9 +501,14 @@ def test_canonical_worker_accepts_two_operation_bound_sparse_additions() -> None
     context = SimpleNamespace(
         plan=SimpleNamespace(section_tasks=(task,)), sections=(section_context,)
     )
+    observed: list[dict[str, object]] = []
 
     result = asyncio.run(
-        CanonicalSectionWorker(_Backend()).compile(
+        CanonicalSectionWorker(
+            _Backend(),
+            action_observer=observed.append,
+            action_capture_mode="diagnostics",
+        ).compile(
             task_index=0,
             context=context,
             document=document,
@@ -520,6 +526,33 @@ def test_canonical_worker_accepts_two_operation_bound_sparse_additions() -> None
         "Bond Index",
         "Gamma Ray",
     ]
+    schema_event, contract_event, _accepted_event = observed
+    assert schema_event["request_sha256"] == operation_contract.request_sha256
+    assert schema_event["snapshot_id"] == operation_contract.snapshot_id
+    operation_payload = operation_contract.model_dump(mode="json")
+    operation_bytes = json.dumps(
+        operation_payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    ).encode("utf-8")
+    assert schema_event["operation_contract_sha256"] == hashlib.sha256(operation_bytes).hexdigest()
+    assert schema_event["work_contract_sha256"]
+    assert (
+        contract_event["validation_result_sha256"]
+        == hashlib.sha256(
+            json.dumps(
+                {
+                    "contract_outcome": "PASS",
+                    "diagnostic_code": None,
+                    "mismatch": None,
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=True,
+            ).encode("utf-8")
+        ).hexdigest()
+    )
 
 
 def test_planner_condition_cannot_omit_an_unconditional_request() -> None:

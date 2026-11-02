@@ -385,6 +385,7 @@ class GraphAuthoringMcpOperations:
                 status="succeeded" if success else "failed",
                 details={
                     "apply_status": apply_status,
+                    "failure_owner": _apply_failure_owner(apply_status, result),
                     "changed": changed,
                     "rolled_back": rolled_back,
                 },
@@ -415,6 +416,29 @@ class GraphAuthoringMcpOperations:
                     "trace_event_count": trace.event_count,
                 }
             )
+
+
+def _apply_failure_owner(apply_status: list[str], session_result: object) -> str | None:
+    """Attribute post-compile failures to the deterministic owning boundary."""
+    status = apply_status[0] if apply_status else ""
+    owners = {
+        "reconciliation_blocked": "reconciliation",
+        "execution_failed": "executor",
+        "validation_failed": "executor",
+        "stale_snapshot_conflict": "persistence",
+        "publication_recovery_failed": "persistence",
+    }
+    if status in owners:
+        return owners[status]
+    if status == "compile_failed":
+        diagnostic_owners = {
+            getattr(item, "failure_owner", None)
+            for item in getattr(session_result, "diagnostics", ())
+        }
+        diagnostic_owners.discard(None)
+        if len(diagnostic_owners) == 1:
+            return next(iter(diagnostic_owners))
+    return None
 
 
 def register_agentic_tools(
