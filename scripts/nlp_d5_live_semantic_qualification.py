@@ -1965,6 +1965,12 @@ def verify_smoke_observability(paths: EvidencePaths) -> dict[str, object]:
                         r"[0-9a-f]{64}", row["validation_result_sha256"]
                     ):
                         raise D5HarnessError("section validation result digest is invalid")
+                    validation_result = {
+                        name: row.get(name)
+                        for name in ("contract_outcome", "diagnostic_code", "mismatch")
+                    }
+                    if row["validation_result_sha256"] != _sha256_json(validation_result):
+                        raise D5HarnessError("section validation result digest mismatch")
                     observed[key] = outcome
                 elif row.get("event") == "SECTION_ACTION_VALIDATED":
                     if observed.get(key) != "PASS":

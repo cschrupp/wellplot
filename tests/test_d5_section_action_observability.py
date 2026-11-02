@@ -31,7 +31,9 @@ from tests.test_nlp_d5_live_semantic_qualification import (
 from tests.test_section_work_contract import (
     _context,
     _contract,
+    _multi_track_contracts,
     _smoke_request,
+    _valid_add_tracks_payload,
     _valid_reconstruct_payload,
 )
 
@@ -560,6 +562,41 @@ def test_custody_preserves_contract_and_result_digest_bindings(tmp_path: Path) -
     assert rows[0]["operation_contract_sha256"] == common["operation_contract_sha256"]
     assert rows[0]["snapshot_id"] == common["snapshot_id"]
     assert rows[1]["validation_result_sha256"] == "5" * 64
+
+
+def test_verifier_rejects_forged_validation_result_digest(tmp_path: Path) -> None:
+    """A valid outer seal cannot legitimize an incorrect result fingerprint."""
+    custody = _custody(tmp_path, "diagnostics")
+    action = TypeAdapter(SectionSemanticAction).validate_python(_valid_add_tracks_payload())
+    _task, _context, work_contract, operation_contract = _multi_track_contracts(_smoke_request())
+    worker = CanonicalSectionWorker(
+        backend=object(),
+        action_observer=custody.record_section_action,
+        action_capture_mode="diagnostics",
+    )
+    assert (
+        worker._validate_observed_action(
+            action,
+            work_contract,
+            operation_contract,
+            task_index=0,
+            attempt=1,
+            logical_call_index=1,
+        )
+        is None
+    )
+
+    rows = _rows(custody)
+    result_row = next(row for row in rows if row["event"] == "SECTION_ACTION_CONTRACT_RESULT")
+    result_row["validation_result_sha256"] = "a" * 64
+    custody.paths.section_actions.write_text(
+        "".join(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+    custody.finish("SMOKE_PASS")
+
+    with pytest.raises(d5.D5HarnessError, match="section validation result digest mismatch"):
+        d5.verify_smoke_observability(custody.paths)
 
 
 def test_worker_capture_write_failure_stops_before_lowering() -> None:
