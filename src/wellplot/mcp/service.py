@@ -22,8 +22,11 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import os
+import stat
+import tempfile
 from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import dataclass
@@ -86,11 +89,13 @@ from ..authoring_service import (
     authoring_operation_json_schema,
 )
 from ..errors import (
+    AuthoringSnapshotConflictError,
     DependencyUnavailableError,
     PathAccessError,
     TemplateValidationError,
     UnitConversionError,
 )
+from ..file_revision import file_revision_token
 from ..io import load_dlis, load_las
 from ..logfile import (
     LogFileSpec,
@@ -1508,6 +1513,8 @@ def _persist_validated_logfile_mapping(
     logfile_path: Path,
     root: Path,
     validation_level: str = "structural",
+    expected_file_sha256: str | None = None,
+    expected_dependency_revisions: tuple[tuple[str, str], ...] = (),
 ) -> LogFileSpec:
     """Persist one logfile through the canonical authoring projection."""
     canonical_mapping = deepcopy(mapping)
@@ -1533,23 +1540,146 @@ def _persist_validated_logfile_mapping(
     if not isinstance(normalized_yaml, str):
         raise RuntimeError("Expected canonical YAML text from report_to_yaml().")
     logfile_path.parent.mkdir(parents=True, exist_ok=True)
-    logfile_path.write_text(normalized_yaml, encoding="utf-8")
+    original_bytes = logfile_path.read_bytes() if logfile_path.exists() else None
+    original_mode = stat.S_IMODE(logfile_path.stat().st_mode) if logfile_path.exists() else None
+    if expected_file_sha256 is not None:
+        _require_expected_file_revision(logfile_path, expected_file_sha256)
 
-    persisted_spec = load_logfile(logfile_path, allowed_root=root)
-    persisted_canonical = AuthoringService.from_mapping(report_to_dict(persisted_spec))
-    persisted_validation = persisted_canonical.validate()
-    if not persisted_validation.valid:
+    staged_path: Path | None = None
+    published = False
+    try:
+        descriptor, staged_name = tempfile.mkstemp(
+            prefix=f".{logfile_path.name}.",
+            suffix=".tmp",
+            dir=logfile_path.parent,
+        )
+        staged_path = Path(staged_name)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as staged_file:
+            staged_file.write(normalized_yaml)
+            staged_file.flush()
+            os.fsync(staged_file.fileno())
+        if original_mode is not None:
+            staged_path.chmod(original_mode)
+
+        staged_spec = load_logfile(staged_path, allowed_root=root)
+        _validate_persisted_logfile(
+            staged_spec,
+            validation_level=validation_level,
+            logfile_path=logfile_path,
+            root=root,
+            message_prefix="Staged logfile",
+        )
+
+        if expected_file_sha256 is not None:
+            _require_expected_file_revision(logfile_path, expected_file_sha256)
+        _require_expected_dependency_revisions(expected_dependency_revisions)
+        os.replace(staged_path, logfile_path)
+        staged_path = None
+        published = True
+
+        persisted_spec = load_logfile(logfile_path, allowed_root=root)
+        _validate_persisted_logfile(
+            persisted_spec,
+            validation_level=validation_level,
+            logfile_path=logfile_path,
+            root=root,
+            message_prefix="Persisted logfile",
+        )
+        return persisted_spec
+    except Exception:
+        if published:
+            _restore_logfile_bytes(
+                logfile_path,
+                original_bytes=original_bytes,
+                original_mode=original_mode,
+            )
+        raise
+    finally:
+        if staged_path is not None:
+            staged_path.unlink(missing_ok=True)
+
+
+def _require_expected_file_revision(logfile_path: Path, expected_sha256: str) -> None:
+    """Reject publication when the source YAML no longer matches its snapshot."""
+    try:
+        current_digest = hashlib.sha256(logfile_path.read_bytes()).hexdigest()
+    except OSError as error:
+        raise AuthoringSnapshotConflictError(
+            "The source logfile is unavailable at publication time."
+        ) from error
+    if current_digest != expected_sha256:
+        raise AuthoringSnapshotConflictError(
+            "The source logfile changed after the authoring snapshot was created."
+        )
+
+
+def _validate_persisted_logfile(
+    spec: LogFileSpec,
+    *,
+    validation_level: str,
+    logfile_path: Path,
+    root: Path,
+    message_prefix: str,
+) -> None:
+    """Validate one staged or reloaded logfile through canonical validators."""
+    canonical = AuthoringService.from_mapping(report_to_dict(spec))
+    validation = canonical.validate()
+    if not validation.valid:
         raise TemplateValidationError(
-            "Persisted logfile failed canonical authoring validation: "
-            + "; ".join(persisted_validation.errors)
+            f"{message_prefix} failed canonical authoring validation: "
+            + "; ".join(validation.errors)
         )
     _validate_logfile_spec(
-        persisted_spec,
+        spec,
         validation_level=validation_level,
         base_dir=logfile_path.parent,
         allowed_root=root,
     )
-    return persisted_spec
+
+
+def _require_expected_dependency_revisions(
+    expected_revisions: tuple[tuple[str, str], ...],
+) -> None:
+    """Reject publication if an inspected source changed after snapshot creation."""
+    for source_path, expected_revision in expected_revisions:
+        try:
+            current_revision = file_revision_token(Path(source_path))
+        except OSError as error:
+            raise AuthoringSnapshotConflictError(
+                "An inspected document dependency is unavailable at publication time."
+            ) from error
+        if current_revision != expected_revision:
+            raise AuthoringSnapshotConflictError(
+                "An inspected document dependency changed after the authoring snapshot was created."
+            )
+
+
+def _restore_logfile_bytes(
+    logfile_path: Path,
+    *,
+    original_bytes: bytes | None,
+    original_mode: int | None,
+) -> None:
+    """Restore the previously published bytes after a failed reload check."""
+    if original_bytes is None:
+        logfile_path.unlink(missing_ok=True)
+        return
+    descriptor, restore_name = tempfile.mkstemp(
+        prefix=f".{logfile_path.name}.restore.",
+        suffix=".tmp",
+        dir=logfile_path.parent,
+    )
+    restore_path = Path(restore_name)
+    try:
+        with os.fdopen(descriptor, "wb") as restore_file:
+            restore_file.write(original_bytes)
+            restore_file.flush()
+            os.fsync(restore_file.fileno())
+        if original_mode is not None:
+            restore_path.chmod(original_mode)
+        os.replace(restore_path, logfile_path)
+    finally:
+        restore_path.unlink(missing_ok=True)
 
 
 def persist_authoring_document(
@@ -1558,6 +1688,8 @@ def persist_authoring_document(
     logfile_path: str | Path,
     root: str | Path | None = None,
     validation_level: str = "structural",
+    expected_file_sha256: str | None = None,
+    expected_dependency_revisions: tuple[tuple[str, str], ...] = (),
 ) -> LogFileSpec:
     """Persist one canonical authoring document through the logfile projection."""
     server_root = resolve_server_root(root)
@@ -1571,6 +1703,8 @@ def persist_authoring_document(
         logfile_path=resolved_logfile,
         root=server_root,
         validation_level=validation_level,
+        expected_file_sha256=expected_file_sha256,
+        expected_dependency_revisions=expected_dependency_revisions,
     )
 
 

@@ -14,6 +14,7 @@ from typing import Literal, Protocol
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ...authoring_context import AuthoringChannelCandidate
+from ...file_revision import file_revision_token
 from ...model.authoring import AuthoringDocumentSpec
 from ..inspection import (
     AuthoringInspectionFacade,
@@ -443,7 +444,7 @@ class SemanticEnricher:
                     "An inspected source is missing its private revision identity.",
                 )
             try:
-                current_token = _source_revision_token(Path(source.canonical_path))
+                current_token = file_revision_token(Path(source.canonical_path))
             except OSError as exc:
                 raise SemanticEnrichmentError(
                     EnrichmentErrorCode.SNAPSHOT_STALE,
@@ -479,7 +480,7 @@ class SemanticEnricher:
                 inspection_state="unavailable",
             )
         try:
-            revision_before = _source_revision_token(candidate.path)
+            revision_before = file_revision_token(candidate.path)
         except OSError as exc:
             raise SemanticEnrichmentError(
                 EnrichmentErrorCode.SOURCE_MISSING,
@@ -503,7 +504,7 @@ class SemanticEnricher:
                 ) from exc
         loaded = loaded_cache[cache_key]
         try:
-            revision_after = _source_revision_token(candidate.path)
+            revision_after = file_revision_token(candidate.path)
         except OSError as exc:
             raise SemanticEnrichmentError(
                 EnrichmentErrorCode.SNAPSHOT_STALE,
@@ -769,23 +770,6 @@ def _source_format(candidate: SourceCandidate, path: Path) -> SourceFormat:
             candidate_id=candidate.candidate_id,
         )
     return suffix_format
-
-
-def _source_revision_token(path: Path) -> str:
-    """Hash stable filesystem revision metadata without reading large source bytes."""
-    resolved_path = path.resolve(strict=True)
-    stat = resolved_path.stat()
-    if not resolved_path.is_file():
-        raise OSError("Inspected source is no longer a regular file.")
-    payload = {
-        "path": resolved_path.as_posix(),
-        "device": stat.st_dev,
-        "inode": stat.st_ino,
-        "size": stat.st_size,
-        "mtime_ns": stat.st_mtime_ns,
-    }
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("ascii")
-    return hashlib.sha256(encoded).hexdigest()
 
 
 def _select_sources(

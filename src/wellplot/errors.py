@@ -36,6 +36,10 @@ class TemplateValidationError(WellLogOSError):
     """Raised when a template cannot be converted into a document."""
 
 
+class AuthoringSnapshotConflictError(WellLogOSError):
+    """Raised when an authoring snapshot is stale at publication time."""
+
+
 class LayoutError(WellLogOSError):
     """Raised when a document cannot be placed on the requested page."""
 

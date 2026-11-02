@@ -329,27 +329,56 @@ def _subset(actual: object, expected: object) -> bool:
     return _same(actual, expected)
 
 
-def _validate_plan(plan: AuthoringReconciliationPlan) -> list[str]:
-    """Validate operation IDs, dependency references, and dependency order."""
+def _order_plan_operations(
+    plan: AuthoringReconciliationPlan,
+) -> tuple[dict[AuthoringOperationPhase, list[AuthoringOperation]], list[str]]:
+    """Order operations by canonical phase and explicit same-phase dependencies."""
     errors: list[str] = []
-    positions: dict[str, int] = {}
-    for index, operation in enumerate(plan.operations):
-        if operation.operation_id in positions:
+    operations_by_id: dict[str, AuthoringOperation] = {}
+    phase_positions = {phase: index for index, phase in enumerate(AuthoringOperationPhase)}
+    for operation in plan.operations:
+        if operation.operation_id in operations_by_id:
             errors.append(f"Duplicate operation id {operation.operation_id!r}.")
-        positions[operation.operation_id] = index
-    for index, operation in enumerate(plan.operations):
+        operations_by_id[operation.operation_id] = operation
+    for operation in plan.operations:
         for dependency in operation.depends_on:
-            if dependency not in positions:
+            dependency_operation = operations_by_id.get(dependency)
+            if dependency_operation is None:
                 errors.append(
                     f"Operation {operation.operation_id!r} depends on unknown operation "
                     f"{dependency!r}."
                 )
-            elif positions[dependency] >= index:
+            elif phase_positions[dependency_operation.phase] > phase_positions[operation.phase]:
                 errors.append(
-                    f"Operation {operation.operation_id!r} depends on a later operation "
+                    f"Operation {operation.operation_id!r} depends on later phase operation "
                     f"{dependency!r}."
                 )
-    return errors
+    if errors:
+        return {}, errors
+
+    ordered: dict[AuthoringOperationPhase, list[AuthoringOperation]] = {}
+    completed: set[str] = set()
+    for phase in AuthoringOperationPhase:
+        pending = [item for item in plan.operations if item.phase == phase]
+        phase_operations: list[AuthoringOperation] = []
+        while pending:
+            ready_index = next(
+                (
+                    index
+                    for index, operation in enumerate(pending)
+                    if all(dependency in completed for dependency in operation.depends_on)
+                ),
+                None,
+            )
+            if ready_index is None:
+                cycle_ids = ", ".join(item.operation_id for item in pending)
+                errors.append(f"Operation dependencies contain a cycle: {cycle_ids}.")
+                return {}, errors
+            operation = pending.pop(ready_index)
+            phase_operations.append(operation)
+            completed.add(operation.operation_id)
+        ordered[phase] = phase_operations
+    return ordered, []
 
 
 class AuthoringExecutor:
@@ -375,7 +404,7 @@ class AuthoringExecutor:
                 document=document,
                 errors=errors,
             )
-        plan_errors = _validate_plan(plan)
+        ordered_operations, plan_errors = _order_plan_operations(plan)
         if plan_errors:
             return AuthoringExecutionResult(
                 success=False,
@@ -389,15 +418,13 @@ class AuthoringExecutor:
         errors: list[str] = []
         warnings: list[str] = []
         applied_ids: set[str] = set()
-        operation_index = 0
         for phase in AuthoringOperationPhase:
-            phase_operations = [item for item in plan.operations if item.phase == phase]
+            phase_operations = ordered_operations[phase]
             if not phase_operations:
                 continue
             phase_status = AuthoringExecutionStatus.COMPLETED
             phase_applied = 0
             for operation in phase_operations:
-                operation_index += 1
                 missing_dependencies = [
                     dependency
                     for dependency in operation.depends_on

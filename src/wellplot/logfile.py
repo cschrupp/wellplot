@@ -113,6 +113,7 @@ def _resolve_template_inheritance(
     base_dir: Path,
     allowed_root: Path | None = None,
     visited_templates: set[Path] | None = None,
+    resolved_template_paths: list[Path] | None = None,
 ) -> dict[str, Any]:
     template_ref = payload.get("template")
     if template_ref is None:
@@ -134,6 +135,8 @@ def _resolve_template_inheritance(
             allowed_root=allowed_root,
             context="template.path",
         )
+    if resolved_template_paths is not None:
+        resolved_template_paths.append(template_path)
 
     visited = set() if visited_templates is None else set(visited_templates)
     if template_path in visited:
@@ -146,6 +149,7 @@ def _resolve_template_inheritance(
         base_dir=template_path.parent,
         allowed_root=allowed_root,
         visited_templates=visited,
+        resolved_template_paths=resolved_template_paths,
     )
 
     override = deepcopy(payload)
@@ -1125,7 +1129,12 @@ def logfile_from_mapping(data: dict[str, Any]) -> LogFileSpec:
     )
 
 
-def load_logfile(path: str | Path, *, allowed_root: Path | None = None) -> LogFileSpec:
+def load_logfile(
+    path: str | Path,
+    *,
+    allowed_root: Path | None = None,
+    resolved_template_paths: list[Path] | None = None,
+) -> LogFileSpec:
     """Load a logfile YAML file, resolve templates, and return a typed spec."""
     file_path = Path(path).resolve()
     if allowed_root is not None:
@@ -1135,6 +1144,7 @@ def load_logfile(path: str | Path, *, allowed_root: Path | None = None) -> LogFi
         payload,
         base_dir=file_path.parent,
         allowed_root=allowed_root,
+        resolved_template_paths=resolved_template_paths,
     )
     return logfile_from_mapping(resolved_payload)
 
@@ -1144,6 +1154,7 @@ def load_logfile_text(
     *,
     base_dir: str | Path | None = None,
     allowed_root: Path | None = None,
+    resolved_template_paths: list[Path] | None = None,
 ) -> LogFileSpec:
     """Load logfile YAML text, resolve templates, and return a typed spec."""
     resolved_base_dir = Path.cwd().resolve()
@@ -1158,6 +1169,7 @@ def load_logfile_text(
         dict(payload),
         base_dir=resolved_base_dir,
         allowed_root=allowed_root,
+        resolved_template_paths=resolved_template_paths,
     )
     return logfile_from_mapping(resolved_payload)
 

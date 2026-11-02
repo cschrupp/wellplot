@@ -122,3 +122,24 @@ run live smoke, or execute scientific campaigns under this authorization.
 Stage-two baseline promotion follows independent implementation acceptance and
 may record only verified contracts, regression evidence, exact checkpoints,
 and residual limitations.
+
+The bounded A07 shared-identity allocator corrective was independently
+accepted at `c0ea8b9a7ebc0d9590fdf13286adfbd367c7e8ed`. The broader A07
+operation-mapping and compatibility matrix remains open for A10 qualification;
+the accepted corrective is not evidence that every A07 requirement is complete.
+A08 is currently an uncommitted provider-free implementation candidate based on
+that checkpoint and is awaiting independent review. Its candidate tests cover
+phase/dependency ordering, cycles, stale YAML/template/source snapshots,
+private-candidate CRUD failure, staged replacement failure, and reload
+rollback. The candidate has not begun A09 and does not authorize live or
+scientific execution.
+
+A08 publication semantics are intentionally bounded: same-directory
+`os.replace()` provides atomic file visibility on POSIX, but rollback after a
+post-replacement reload error may expose the candidate briefly to concurrent
+readers. Revision checks are optimistic, not a cross-process compare-and-swap;
+writers bypassing the canonical persistence path can race between the final
+check and replacement. File revision tokens use resolved path and filesystem
+metadata, not full source-content hashing. Directory-entry crash durability is
+not claimed because the parent directory is not fsynced. These limitations
+must remain explicit in independent review and A10 acceptance.

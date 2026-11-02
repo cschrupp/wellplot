@@ -29,6 +29,7 @@ import tempfile
 import unittest
 from hashlib import sha256
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
@@ -49,7 +50,11 @@ from wellplot.authoring_service import (
     SectionPatch,
     TrackPatch,
 )
-from wellplot.errors import PathAccessError, TemplateValidationError
+from wellplot.errors import (
+    AuthoringSnapshotConflictError,
+    PathAccessError,
+    TemplateValidationError,
+)
 from wellplot.mcp import service
 
 HAS_LAS = importlib.util.find_spec("lasio") is not None
@@ -159,6 +164,113 @@ class McpServiceTests(unittest.TestCase):
         validation = canonical.validate()
         self.assertTrue(validation.valid, validation.errors)
         return self._canonical_logfile_hash(logfile_path)
+
+    def _create_transaction_draft(self) -> tuple[tempfile.TemporaryDirectory[str], Path]:
+        """Create an isolated logfile for transaction-boundary regressions."""
+        temporary = tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="authoring-transaction-")
+        logfile_path = Path(temporary.name) / "draft.log.yaml"
+        service.create_logfile_draft(
+            str(logfile_path),
+            source_logfile_path=self._fixture_paths.single_logfile_relative,
+            root=REPO_ROOT,
+        )
+        return temporary, logfile_path
+
+    def test_authoring_persistence_rejects_stale_file_revision(self) -> None:
+        """Do not overwrite file edits made after the authoring snapshot was loaded."""
+        temporary, logfile_path = self._create_transaction_draft()
+        with temporary:
+            original_bytes = logfile_path.read_bytes()
+            expected_revision = sha256(original_bytes).hexdigest()
+            spec = service.load_logfile(logfile_path, allowed_root=REPO_ROOT)
+            document = AuthoringService.from_mapping(service.report_to_dict(spec)).document
+            concurrent_bytes = b"# concurrent edit\n" + original_bytes
+            logfile_path.write_bytes(concurrent_bytes)
+
+            with self.assertRaises(AuthoringSnapshotConflictError):
+                service.persist_authoring_document(
+                    document.model_copy(update={"title": "Should Not Publish"}),
+                    logfile_path=logfile_path,
+                    root=REPO_ROOT,
+                    expected_file_sha256=expected_revision,
+                )
+
+            self.assertEqual(logfile_path.read_bytes(), concurrent_bytes)
+
+    def test_authoring_persistence_round_trips_before_atomic_publish(self) -> None:
+        """Publish only a validated, reloadable canonical YAML candidate."""
+        temporary, logfile_path = self._create_transaction_draft()
+        with temporary:
+            expected_revision = sha256(logfile_path.read_bytes()).hexdigest()
+            spec = service.load_logfile(logfile_path, allowed_root=REPO_ROOT)
+            document = AuthoringService.from_mapping(service.report_to_dict(spec)).document
+            updated = document.model_copy(update={"title": "Transactionally Updated"})
+
+            service.persist_authoring_document(
+                updated,
+                logfile_path=logfile_path,
+                root=REPO_ROOT,
+                expected_file_sha256=expected_revision,
+            )
+
+            persisted = service.load_logfile(logfile_path, allowed_root=REPO_ROOT)
+            persisted_document = AuthoringService.from_mapping(
+                service.report_to_dict(persisted)
+            ).document
+            self.assertEqual(persisted_document.title, "Transactionally Updated")
+            self.assertTrue(
+                all(path.name == "draft.log.yaml" for path in Path(temporary.name).iterdir())
+            )
+
+    def test_authoring_persistence_replace_failure_preserves_public_file(self) -> None:
+        """A failed atomic replace leaves the prior public YAML untouched."""
+        temporary, logfile_path = self._create_transaction_draft()
+        with temporary:
+            original_bytes = logfile_path.read_bytes()
+            spec = service.load_logfile(logfile_path, allowed_root=REPO_ROOT)
+            mapping = service.report_to_dict(spec)
+            with (
+                patch.object(service.os, "replace", side_effect=OSError("injected replace")),
+                self.assertRaisesRegex(OSError, "injected replace"),
+            ):
+                service._persist_validated_logfile_mapping(
+                    mapping,
+                    logfile_path=logfile_path,
+                    root=REPO_ROOT,
+                )
+
+            self.assertEqual(logfile_path.read_bytes(), original_bytes)
+            self.assertEqual(list(Path(temporary.name).iterdir()), [logfile_path])
+
+    def test_authoring_persistence_reload_failure_rolls_back_publication(self) -> None:
+        """Restore the exact prior file if post-publication reload fails."""
+        temporary, logfile_path = self._create_transaction_draft()
+        with temporary:
+            original_bytes = logfile_path.read_bytes()
+            spec = service.load_logfile(logfile_path, allowed_root=REPO_ROOT)
+            mapping = service.report_to_dict(spec)
+            real_load = service.load_logfile
+            call_count = 0
+
+            def fail_published_reload(path: object, *, allowed_root: object = None) -> object:
+                nonlocal call_count
+                call_count += 1
+                if call_count == 2:
+                    raise TemplateValidationError("injected reload failure")
+                return real_load(path, allowed_root=allowed_root)
+
+            with (
+                patch.object(service, "load_logfile", side_effect=fail_published_reload),
+                self.assertRaisesRegex(TemplateValidationError, "injected reload failure"),
+            ):
+                service._persist_validated_logfile_mapping(
+                    mapping,
+                    logfile_path=logfile_path,
+                    root=REPO_ROOT,
+                )
+
+            self.assertEqual(logfile_path.read_bytes(), original_bytes)
+            self.assertEqual(list(Path(temporary.name).iterdir()), [logfile_path])
 
     def _seed_structural_raster_binding(self, draft_path: Path, *, track_id: str) -> None:
         """Seed a raster binding without claiming the scalar LAS proxy is renderable."""

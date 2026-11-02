@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from enum import Enum
@@ -13,7 +14,9 @@ from ..authoring_context import AuthoringChannelCandidate
 from ..authoring_executor import execute_authoring_plan
 from ..authoring_reconciler import reconcile_authoring
 from ..authoring_service import AuthoringService
-from ..logfile import load_logfile, resolve_section_data_sources_for_logfile
+from ..errors import AuthoringSnapshotConflictError
+from ..file_revision import file_revision_token
+from ..logfile import load_logfile_text, resolve_section_data_sources_for_logfile
 from ..mcp import service as mcp_service
 from ..model.authoring import AuthoringDocumentSpec
 from .code_mode.enrichment import LoadedSource
@@ -37,6 +40,9 @@ class _NotebookDocumentContext:
     """Canonical document and declared source candidates for one notebook run."""
 
     logfile_path: Path
+    baseline_text: str
+    source_file_sha256: str
+    dependency_revisions: tuple[tuple[str, str], ...]
     document: AuthoringDocumentSpec
     source_candidates: tuple[AgentSourceConfig, ...]
     available_channels: Mapping[str, tuple[AuthoringChannelCandidate, ...]]
@@ -131,14 +137,37 @@ def _declared_source_inventory(
 
 def _load_document_context(logfile_path: Path, *, root: Path) -> _NotebookDocumentContext:
     """Load one canonical logfile and its explicitly declared sources."""
-    spec = load_logfile(logfile_path, allowed_root=root)
+    raw_bytes = logfile_path.read_bytes()
+    baseline_text = raw_bytes.decode("utf-8")
+    template_paths: list[Path] = []
+    spec = load_logfile_text(
+        baseline_text,
+        base_dir=logfile_path.parent,
+        allowed_root=root,
+        resolved_template_paths=template_paths,
+    )
     source_candidates, available_channels = _declared_source_inventory(
         spec,
         logfile_path=logfile_path,
         root=root,
     )
+    dependency_paths = {
+        candidate.path
+        for candidate in source_candidates
+        if candidate.inspection_state == "inspected"
+    }
+    dependency_paths.update(str(path) for path in template_paths)
+    dependency_revisions = tuple(
+        sorted(
+            ((path, file_revision_token(Path(path))) for path in dependency_paths),
+            key=lambda item: item[0],
+        )
+    )
     return _NotebookDocumentContext(
         logfile_path=logfile_path,
+        baseline_text=baseline_text,
+        source_file_sha256=hashlib.sha256(raw_bytes).hexdigest(),
+        dependency_revisions=dependency_revisions,
         document=AuthoringService.from_mapping(report_to_dict(spec)).document,
         source_candidates=source_candidates,
         available_channels=available_channels,
@@ -272,11 +301,24 @@ def _apply_result(
         return False, False, True, [str(error)], "post_lowering_obligation_failed", stages
     changed = context.document.model_dump(mode="json") != accepted.model_dump(mode="json")
     if changed:
-        mcp_service.persist_authoring_document(
-            accepted,
-            logfile_path=context.logfile_path,
-            root=root,
-        )
+        try:
+            mcp_service.persist_authoring_document(
+                accepted,
+                logfile_path=context.logfile_path,
+                root=root,
+                expected_file_sha256=context.source_file_sha256,
+                expected_dependency_revisions=context.dependency_revisions,
+            )
+        except AuthoringSnapshotConflictError as error:
+            stages["persistence"] = "FAIL"
+            return (
+                False,
+                False,
+                True,
+                [str(error)],
+                "stale_snapshot_conflict",
+                stages,
+            )
     stages["persistence"] = "PASS"
     return True, changed, False, [], "persisted" if changed else "no_op", stages
 
@@ -366,8 +408,8 @@ class DirectNotebookSession:
     ) -> AuthoringResult:
         """Compile, apply, inspect, and project one direct v2 operation."""
         del max_rounds
-        baseline_text = logfile_path.read_text(encoding="utf-8")
         context = _load_document_context(logfile_path, root=self.server_root)
+        baseline_text = context.baseline_text
         result = (
             await self.session.build(
                 request=request,

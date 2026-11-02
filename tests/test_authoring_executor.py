@@ -320,3 +320,99 @@ def test_executor_rejects_invalid_dependency_plan_before_mutation() -> None:
     assert result.stopped is True
     assert "unknown operation" in result.errors[0]
     assert service.document.title == "Original"
+
+
+def test_executor_orders_same_phase_dependencies_not_input_order() -> None:
+    """Honor explicit CRUD dependencies even when the plan lists them backwards."""
+    service = AuthoringService(_document())
+    plan = AuthoringReconciliationPlan(
+        ready=True,
+        operations=[
+            AuthoringOperation(
+                operation_id="second-track",
+                phase=AuthoringOperationPhase.TRACKS,
+                action=AuthoringOperationAction.CREATE,
+                object_kind=AuthoringOperationObjectKind.TRACK,
+                object_id="second",
+                section_id="main",
+                payload={
+                    "object": {
+                        "id": "second",
+                        "title": "Second",
+                        "kind": "normal",
+                        "width_mm": 20,
+                    }
+                },
+                depends_on=["first-track"],
+                reason="Depends on the first track operation.",
+            ),
+            AuthoringOperation(
+                operation_id="first-track",
+                phase=AuthoringOperationPhase.TRACKS,
+                action=AuthoringOperationAction.CREATE,
+                object_kind=AuthoringOperationObjectKind.TRACK,
+                object_id="first",
+                section_id="main",
+                payload={
+                    "object": {
+                        "id": "first",
+                        "title": "First",
+                        "kind": "normal",
+                        "width_mm": 20,
+                    }
+                },
+                reason="Dependency target.",
+            ),
+        ],
+    )
+
+    result = execute_authoring_plan(service, plan)
+
+    assert result.success is True
+    assert [outcome.operation_id for outcome in result.outcomes] == [
+        "first-track",
+        "second-track",
+    ]
+    assert {track.id for track in service.document.sections[0].tracks} >= {
+        "curves",
+        "first",
+        "second",
+    }
+
+
+def test_executor_rejects_dependency_cycle_before_mutation() -> None:
+    """A cyclic same-phase dependency graph cannot mutate the private candidate."""
+    service = AuthoringService(_document())
+    operations = [
+        AuthoringOperation(
+            operation_id="first",
+            phase=AuthoringOperationPhase.TRACKS,
+            action=AuthoringOperationAction.CREATE,
+            object_kind=AuthoringOperationObjectKind.TRACK,
+            object_id="first",
+            section_id="main",
+            payload={"object": {"id": "first", "title": "First", "kind": "normal"}},
+            depends_on=["second"],
+            reason="Cycle test.",
+        ),
+        AuthoringOperation(
+            operation_id="second",
+            phase=AuthoringOperationPhase.TRACKS,
+            action=AuthoringOperationAction.CREATE,
+            object_kind=AuthoringOperationObjectKind.TRACK,
+            object_id="second",
+            section_id="main",
+            payload={"object": {"id": "second", "title": "Second", "kind": "normal"}},
+            depends_on=["first"],
+            reason="Cycle test.",
+        ),
+    ]
+
+    result = execute_authoring_plan(
+        service,
+        AuthoringReconciliationPlan(ready=True, operations=operations),
+    )
+
+    assert result.success is False
+    assert "contain a cycle" in result.errors[0]
+    assert [track.id for track in service.document.sections[0].tracks] == ["curves"]
