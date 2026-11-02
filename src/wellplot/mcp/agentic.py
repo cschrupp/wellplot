@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,7 +26,9 @@ from ..authoring_context import AuthoringChannelCandidate
 from ..authoring_executor import execute_authoring_plan
 from ..authoring_reconciler import reconcile_authoring
 from ..authoring_service import AuthoringService
-from ..logfile import load_logfile, resolve_section_data_sources_for_logfile
+from ..errors import AuthoringPublicationRecoveryError, AuthoringSnapshotConflictError
+from ..file_revision import file_revision_token
+from ..logfile import load_logfile_text, resolve_section_data_sources_for_logfile
 from ..model.authoring import AuthoringDocumentSpec
 from . import service
 
@@ -52,6 +55,8 @@ class _McpDocumentContext:
     """Host-owned canonical document and explicitly declared source candidates."""
 
     logfile_path: Path
+    source_file_sha256: str
+    dependency_revisions: tuple[tuple[str, str], ...]
     document: AuthoringDocumentSpec
     source_candidates: tuple[AgentSourceConfig, ...]
     available_channels: Mapping[str, tuple[AuthoringChannelCandidate, ...]]
@@ -63,7 +68,14 @@ def _request_context(logfile_path: str, *, root: Path) -> _McpDocumentContext:
     resolved_logfile = (
         requested_logfile if requested_logfile.is_absolute() else root / requested_logfile
     ).resolve()
-    spec = load_logfile(resolved_logfile, allowed_root=root)
+    raw_bytes = resolved_logfile.read_bytes()
+    template_paths: list[Path] = []
+    spec = load_logfile_text(
+        raw_bytes.decode("utf-8"),
+        base_dir=resolved_logfile.parent,
+        allowed_root=root,
+        resolved_template_paths=template_paths,
+    )
     document = AuthoringService.from_mapping(report_to_dict(spec)).document
     declared = resolve_section_data_sources_for_logfile(
         spec,
@@ -114,8 +126,20 @@ def _request_context(logfile_path: str, *, root: Path) -> _McpDocumentContext:
             )
             for channel in source.channels
         )
+    dependency_paths = {
+        candidate.path for candidate in candidates_list if candidate.inspection_state == "inspected"
+    }
+    dependency_paths.update(str(path) for path in template_paths)
+    dependency_revisions = tuple(
+        sorted(
+            ((path, file_revision_token(Path(path))) for path in dependency_paths),
+            key=lambda item: item[0],
+        )
+    )
     return _McpDocumentContext(
         logfile_path=resolved_logfile,
+        source_file_sha256=hashlib.sha256(raw_bytes).hexdigest(),
+        dependency_revisions=dependency_revisions,
         document=document,
         source_candidates=tuple(candidates_list),
         available_channels=available_channels,
@@ -206,11 +230,32 @@ def _apply_session_result(
     accepted = private_service.document
     changed = context.document.model_dump(mode="json") != accepted.model_dump(mode="json")
     if changed:
-        service.persist_authoring_document(
-            accepted,
-            logfile_path=context.logfile_path,
-            root=root,
-        )
+        try:
+            service.persist_authoring_document(
+                accepted,
+                logfile_path=context.logfile_path,
+                root=root,
+                expected_file_sha256=context.source_file_sha256,
+                expected_dependency_revisions=context.dependency_revisions,
+            )
+        except AuthoringSnapshotConflictError as error:
+            return (
+                False,
+                False,
+                True,
+                [f"stale_snapshot_conflict: {error}"],
+                ["stale_snapshot_conflict"],
+                [section.id for section in context.document.sections],
+            )
+        except AuthoringPublicationRecoveryError as error:
+            return (
+                False,
+                True,
+                False,
+                [f"publication_recovery_failed: {error}"],
+                ["publication_recovery_failed"],
+                [section.id for section in accepted.sections],
+            )
     return (
         True,
         changed,

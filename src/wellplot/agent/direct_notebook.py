@@ -14,7 +14,7 @@ from ..authoring_context import AuthoringChannelCandidate
 from ..authoring_executor import execute_authoring_plan
 from ..authoring_reconciler import reconcile_authoring
 from ..authoring_service import AuthoringService
-from ..errors import AuthoringSnapshotConflictError
+from ..errors import AuthoringPublicationRecoveryError, AuthoringSnapshotConflictError
 from ..file_revision import file_revision_token
 from ..logfile import load_logfile_text, resolve_section_data_sources_for_logfile
 from ..mcp import service as mcp_service
@@ -319,6 +319,16 @@ def _apply_result(
                 "stale_snapshot_conflict",
                 stages,
             )
+        except AuthoringPublicationRecoveryError as error:
+            stages["persistence"] = "RECOVERY_FAIL"
+            return (
+                False,
+                True,
+                False,
+                [str(error)],
+                "publication_recovery_failed",
+                stages,
+            )
     stages["persistence"] = "PASS"
     return True, changed, False, [], "persisted" if changed else "no_op", stages
 
@@ -472,38 +482,70 @@ class DirectNotebookSession:
         change_summary = mcp_service.summarize_logfile_changes(
             str(logfile_path), previous_text=baseline_text, root=self.server_root
         )
-        report_preview = mcp_service.preview_logfile_png(
-            str(logfile_path), root=self.server_root, include_report_pages=True, dpi=72
-        )
         section_ids = list(getattr(inspect_summary, "section_ids", []))
-        section_preview = (
-            mcp_service.preview_section_png(
-                str(logfile_path), section_id=section_ids[0], root=self.server_root, dpi=72
+        report_preview = b""
+        section_preview = b""
+        render_error: str | None = None
+        if success:
+            validation_valid = (
+                validation.get("valid")
+                if isinstance(validation, Mapping)
+                else getattr(validation, "valid", None)
             )
-            if section_ids
-            else report_preview
-        )
+            if validation_valid is not True:
+                render_error = "Persisted artifact failed render-level validation."
+            else:
+                try:
+                    report_preview = mcp_service.preview_logfile_png(
+                        str(logfile_path),
+                        root=self.server_root,
+                        include_report_pages=True,
+                        dpi=72,
+                    )
+                    section_preview = (
+                        mcp_service.preview_section_png(
+                            str(logfile_path),
+                            section_id=section_ids[0],
+                            root=self.server_root,
+                            dpi=72,
+                        )
+                        if section_ids
+                        else report_preview
+                    )
+                    if not report_preview or not section_preview:
+                        render_error = "Preview generation returned no image data."
+                except Exception as error:
+                    render_error = f"Preview generation failed ({type(error).__name__})."
+        final_success = success and render_error is None
+        final_apply_status = apply_status
+        final_errors = list(errors)
+        if render_error is not None:
+            final_apply_status = "persisted_render_failed" if changed else "render_failed_noop"
+            final_errors.append(render_error)
+
         inspection = result.inspection()
         host_stage_evidence = dict(host_stage_evidence)
         host_stage_evidence["reload"] = "PASS" if success else "NOT_REACHED"
-        host_stage_evidence["render"] = "PASS" if success else "NOT_REACHED"
+        host_stage_evidence["render"] = (
+            "PASS" if success and render_error is None else "FAIL" if success else "NOT_REACHED"
+        )
         report_facts = {
             "engine": "v2",
             "compilation": inspection,
-            "apply_status": apply_status,
-            "success": success,
+            "apply_status": final_apply_status,
+            "success": final_success,
             "changed": changed,
             "rolled_back": rolled_back,
             "host_stage_evidence": host_stage_evidence,
         }
-        if success:
+        if final_success:
             user_report = AuthoringUserReport(
                 done=("Compiled and applied the request through the direct Code Mode v2 path.",),
             )
         else:
             user_report = AuthoringUserReport(
                 could_not_do=("Apply the requested v2 authoring change.",),
-                why_not=tuple(errors) or ("The v2 authoring request failed.",),
+                why_not=tuple(final_errors) or ("The v2 authoring request failed.",),
                 next_help=("Inspect the deterministic validation and compilation evidence.",),
             )
         return AuthoringResult(
@@ -519,7 +561,7 @@ class DirectNotebookSession:
             tool_trace=(),
             final_text=(
                 "Direct Code Mode v2 authoring completed."
-                if success
+                if final_success
                 else "Direct Code Mode v2 authoring did not produce an accepted change."
             ),
             validation=_json_value(validation),

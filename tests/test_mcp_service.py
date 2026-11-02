@@ -51,6 +51,7 @@ from wellplot.authoring_service import (
     TrackPatch,
 )
 from wellplot.errors import (
+    AuthoringPublicationRecoveryError,
     AuthoringSnapshotConflictError,
     PathAccessError,
     TemplateValidationError,
@@ -271,6 +272,49 @@ class McpServiceTests(unittest.TestCase):
 
             self.assertEqual(logfile_path.read_bytes(), original_bytes)
             self.assertEqual(list(Path(temporary.name).iterdir()), [logfile_path])
+
+    def test_authoring_persistence_classifies_restore_failure(self) -> None:
+        """Expose a distinct recovery error when the old bytes cannot be restored."""
+        temporary, logfile_path = self._create_transaction_draft()
+        with temporary:
+            original_bytes = logfile_path.read_bytes()
+            spec = service.load_logfile(logfile_path, allowed_root=REPO_ROOT)
+            mapping = service.report_to_dict(spec)
+            mapping["name"] = "Changed before injected recovery failure"
+            real_load = service.load_logfile
+            real_replace = service.os.replace
+            load_count = 0
+            replace_count = 0
+
+            def fail_published_reload(path: object, *, allowed_root: object = None) -> object:
+                nonlocal load_count
+                load_count += 1
+                if load_count == 2:
+                    raise TemplateValidationError("injected reload failure")
+                return real_load(path, allowed_root=allowed_root)
+
+            def fail_restore_replace(source: object, destination: object) -> None:
+                nonlocal replace_count
+                replace_count += 1
+                if replace_count == 2:
+                    raise OSError("injected restoration failure")
+                real_replace(source, destination)
+
+            with (
+                patch.object(service, "load_logfile", side_effect=fail_published_reload),
+                patch.object(service.os, "replace", side_effect=fail_restore_replace),
+                self.assertRaises(AuthoringPublicationRecoveryError) as raised,
+            ):
+                service._persist_validated_logfile_mapping(
+                    mapping,
+                    logfile_path=logfile_path,
+                    root=REPO_ROOT,
+                )
+
+            self.assertEqual(raised.exception.publication_error_type, "TemplateValidationError")
+            self.assertEqual(raised.exception.recovery_error_type, "OSError")
+            self.assertIn("recovery could not restore", str(raised.exception))
+            self.assertNotEqual(logfile_path.read_bytes(), original_bytes)
 
     def _seed_structural_raster_binding(self, draft_path: Path, *, track_id: str) -> None:
         """Seed a raster binding without claiming the scalar LAS proxy is renderable."""

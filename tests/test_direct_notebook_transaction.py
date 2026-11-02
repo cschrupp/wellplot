@@ -5,14 +5,20 @@ from __future__ import annotations
 import shutil
 import tempfile
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import yaml
 from tests._mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 
-from wellplot.agent.direct_notebook import _apply_result, _load_document_context
+from wellplot.agent.direct_notebook import (
+    DirectNotebookSession,
+    _apply_result,
+    _load_document_context,
+)
 from wellplot.agent.session import AgentMetrics, AgentSessionResult, AgentWorkerEvidence
 from wellplot.authoring_service import AuthoringService, CreateTrackRequest
+from wellplot.errors import AuthoringPublicationRecoveryError
 from wellplot.model import AuthoringDocumentIntent
 
 
@@ -177,3 +183,152 @@ def test_notebook_apply_does_not_publish_partial_private_execution() -> None:
         assert "injected second-track failure" in errors[0]
         assert create_count == 2
         assert fixture_paths.single_logfile.read_bytes() == original_logfile_bytes
+
+
+def test_notebook_reports_preview_failure_after_persistence() -> None:
+    """A preview failure is visible without claiming the persisted edit rolled back."""
+    adapter = DirectNotebookSession(
+        session=None,  # type: ignore[arg-type]
+        provider="test",
+        model="test-model",
+        credential_source=None,
+        server_root=REPO_ROOT,
+    )
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="notebook-render-") as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        with (
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.validate_logfile",
+                return_value=SimpleNamespace(valid=True),
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.summarize_logfile_draft",
+                return_value={},
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.inspect_logfile",
+                return_value=SimpleNamespace(section_ids=["main"]),
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.summarize_logfile_changes",
+                return_value={},
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.preview_logfile_png",
+                return_value=b"report-preview",
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.preview_section_png",
+                side_effect=RuntimeError("renderer details are not exposed"),
+            ),
+        ):
+            result = adapter._project_result(
+                request="update the report",
+                mode="revise",
+                logfile_path=fixture_paths.single_logfile,
+                baseline_text="before",
+                result=_successful_result(),
+                success=True,
+                changed=True,
+                rolled_back=False,
+                errors=[],
+                apply_status="persisted",
+                example_id=None,
+                source_logfile_path=None,
+                host_stage_evidence={"persistence": "PASS"},
+            )
+
+    assert result.report_facts["success"] is False
+    assert result.report_facts["changed"] is True
+    assert result.report_facts["rolled_back"] is False
+    assert result.report_facts["apply_status"] == "persisted_render_failed"
+    evidence = result.report_facts["host_stage_evidence"]
+    assert evidence["persistence"] == "PASS"
+    assert evidence["reload"] == "PASS"
+    assert evidence["render"] == "FAIL"
+    assert result.report_preview_png == b"report-preview"
+    assert result.section_preview_png == b""
+
+
+def test_notebook_marks_render_pass_only_after_nonempty_previews() -> None:
+    """A successful render stage requires observed preview output."""
+    adapter = DirectNotebookSession(
+        session=None,  # type: ignore[arg-type]
+        provider="test",
+        model="test-model",
+        credential_source=None,
+        server_root=REPO_ROOT,
+    )
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="notebook-render-") as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        with (
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.validate_logfile",
+                return_value=SimpleNamespace(valid=True),
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.summarize_logfile_draft",
+                return_value={},
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.inspect_logfile",
+                return_value=SimpleNamespace(section_ids=["main"]),
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.summarize_logfile_changes",
+                return_value={},
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.preview_logfile_png",
+                return_value=b"report-preview",
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.preview_section_png",
+                return_value=b"section-preview",
+            ),
+        ):
+            result = adapter._project_result(
+                request="update the report",
+                mode="revise",
+                logfile_path=fixture_paths.single_logfile,
+                baseline_text="before",
+                result=_successful_result(),
+                success=True,
+                changed=True,
+                rolled_back=False,
+                errors=[],
+                apply_status="persisted",
+                example_id=None,
+                source_logfile_path=None,
+                host_stage_evidence={"persistence": "PASS"},
+            )
+
+    assert result.report_facts["success"] is True
+    assert result.report_facts["host_stage_evidence"]["render"] == "PASS"
+    assert result.report_preview_png == b"report-preview"
+    assert result.section_preview_png == b"section-preview"
+
+
+def test_notebook_classifies_publication_recovery_failure() -> None:
+    """A failed restore is not reported as a successful rollback."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="notebook-transaction-") as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        context = _load_document_context(fixture_paths.single_logfile, root=REPO_ROOT)
+        error = AuthoringPublicationRecoveryError("TemplateValidationError", "OSError")
+
+        with patch(
+            "wellplot.agent.direct_notebook.mcp_service.persist_authoring_document",
+            side_effect=error,
+        ):
+            success, changed, rolled_back, errors, status, stages = _apply_result(
+                context=context,
+                result=_successful_result(),
+                root=REPO_ROOT,
+            )
+
+        assert success is False
+        assert changed is True
+        assert rolled_back is False
+        assert status == "publication_recovery_failed"
+        assert stages["persistence"] == "RECOVERY_FAIL"
+        assert "recovery could not restore" in errors[0]

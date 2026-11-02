@@ -127,12 +127,14 @@ The bounded A07 shared-identity allocator corrective was independently
 accepted at `c0ea8b9a7ebc0d9590fdf13286adfbd367c7e8ed`. The broader A07
 operation-mapping and compatibility matrix remains open for A10 qualification;
 the accepted corrective is not evidence that every A07 requirement is complete.
-A08 is currently an uncommitted provider-free implementation candidate based on
-that checkpoint and is awaiting independent review. Its candidate tests cover
-phase/dependency ordering, cycles, stale YAML/template/source snapshots,
-private-candidate CRUD failure, staged replacement failure, and reload
-rollback. The candidate has not begun A09 and does not authorize live or
-scientific execution.
+A08 is a provider-free implementation candidate based on that checkpoint and
+is awaiting independent review. The narrow corrective for review findings
+F09-F11 binds MCP publication to YAML/template/source snapshot revisions,
+reports post-publication preview failures without claiming rollback, and
+classifies failed restoration distinctly. Candidate tests cover these cases in
+addition to phase/dependency ordering, cycles, private-candidate CRUD failure,
+staged replacement failure, and reload rollback. A09 remains on hold; no live
+or scientific execution is authorized.
 
 A08 publication semantics are intentionally bounded: same-directory
 `os.replace()` provides atomic file visibility on POSIX, but rollback after a

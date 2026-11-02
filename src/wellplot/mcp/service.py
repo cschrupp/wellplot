@@ -89,6 +89,7 @@ from ..authoring_service import (
     authoring_operation_json_schema,
 )
 from ..errors import (
+    AuthoringPublicationRecoveryError,
     AuthoringSnapshotConflictError,
     DependencyUnavailableError,
     PathAccessError,
@@ -1586,13 +1587,19 @@ def _persist_validated_logfile_mapping(
             message_prefix="Persisted logfile",
         )
         return persisted_spec
-    except Exception:
+    except Exception as publication_error:
         if published:
-            _restore_logfile_bytes(
-                logfile_path,
-                original_bytes=original_bytes,
-                original_mode=original_mode,
-            )
+            try:
+                _restore_logfile_bytes(
+                    logfile_path,
+                    original_bytes=original_bytes,
+                    original_mode=original_mode,
+                )
+            except Exception as recovery_error:
+                raise AuthoringPublicationRecoveryError(
+                    type(publication_error).__name__,
+                    type(recovery_error).__name__,
+                ) from recovery_error
         raise
     finally:
         if staged_path is not None:

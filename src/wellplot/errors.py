@@ -40,6 +40,19 @@ class AuthoringSnapshotConflictError(WellLogOSError):
     """Raised when an authoring snapshot is stale at publication time."""
 
 
+class AuthoringPublicationRecoveryError(WellLogOSError):
+    """Raised when publication fails and restoring the prior file also fails."""
+
+    def __init__(self, publication_error_type: str, recovery_error_type: str) -> None:
+        """Store bounded exception types without retaining raw error messages."""
+        self.publication_error_type = publication_error_type
+        self.recovery_error_type = recovery_error_type
+        super().__init__(
+            "Authoring publication failed and recovery could not restore the prior file "
+            f"(publication={publication_error_type}, recovery={recovery_error_type})."
+        )
+
+
 class LayoutError(WellLogOSError):
     """Raised when a document cannot be placed on the requested page."""
 
