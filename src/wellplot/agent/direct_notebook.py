@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypeVar
 
 from ..api.serialize import report_to_dict
 from ..authoring_context import AuthoringChannelCandidate
@@ -46,6 +46,28 @@ class _NotebookDocumentContext:
     document: AuthoringDocumentSpec
     source_candidates: tuple[AgentSourceConfig, ...]
     available_channels: Mapping[str, tuple[AuthoringChannelCandidate, ...]]
+
+
+_ProjectionValue = TypeVar("_ProjectionValue")
+
+
+def _capture_projection(
+    name: str,
+    operation: Callable[[], _ProjectionValue],
+    *,
+    statuses: dict[str, str],
+    errors: list[str],
+    fallback: _ProjectionValue,
+) -> _ProjectionValue:
+    """Capture one bounded result-projection failure without obscuring apply state."""
+    try:
+        value = operation()
+    except Exception as error:
+        statuses[name] = "FAIL"
+        errors.append(f"post_publication_{name}_failed ({type(error).__name__})")
+        return fallback
+    statuses[name] = "PASS"
+    return value
 
 
 def _json_value(value: object) -> object:
@@ -472,20 +494,52 @@ class DirectNotebookSession:
         host_stage_evidence: dict[str, str],
     ) -> AuthoringResult:
         """Build the existing notebook result envelope from bounded v2 evidence."""
-        validation = mcp_service.validate_logfile(
-            str(logfile_path), root=self.server_root, level="render"
+        projection_status: dict[str, str] = {}
+        projection_errors: list[str] = []
+        validation = _capture_projection(
+            "validation",
+            lambda: mcp_service.validate_logfile(
+                str(logfile_path), root=self.server_root, level="render"
+            ),
+            statuses=projection_status,
+            errors=projection_errors,
+            fallback={"valid": False, "message": "Render validation failed."},
         )
-        draft_summary = mcp_service.summarize_logfile_draft(
-            str(logfile_path), root=self.server_root
+        draft_summary = _capture_projection(
+            "draft_summary",
+            lambda: mcp_service.summarize_logfile_draft(str(logfile_path), root=self.server_root),
+            statuses=projection_status,
+            errors=projection_errors,
+            fallback={},
         )
-        inspect_summary = mcp_service.inspect_logfile(str(logfile_path), root=self.server_root)
-        change_summary = mcp_service.summarize_logfile_changes(
-            str(logfile_path), previous_text=baseline_text, root=self.server_root
+        inspect_summary = _capture_projection(
+            "inspection",
+            lambda: mcp_service.inspect_logfile(str(logfile_path), root=self.server_root),
+            statuses=projection_status,
+            errors=projection_errors,
+            fallback={"section_ids": []},
+        )
+        change_summary = _capture_projection(
+            "change_summary",
+            lambda: mcp_service.summarize_logfile_changes(
+                str(logfile_path), previous_text=baseline_text, root=self.server_root
+            ),
+            statuses=projection_status,
+            errors=projection_errors,
+            fallback={},
+        )
+        draft_text = _capture_projection(
+            "draft_text",
+            lambda: logfile_path.read_text(encoding="utf-8"),
+            statuses=projection_status,
+            errors=projection_errors,
+            fallback="",
         )
         section_ids = list(getattr(inspect_summary, "section_ids", []))
+        if isinstance(inspect_summary, Mapping):
+            section_ids = list(inspect_summary.get("section_ids", []))
         report_preview = b""
         section_preview = b""
-        render_error: str | None = None
         if success:
             validation_valid = (
                 validation.get("valid")
@@ -493,42 +547,85 @@ class DirectNotebookSession:
                 else getattr(validation, "valid", None)
             )
             if validation_valid is not True:
-                render_error = "Persisted artifact failed render-level validation."
+                projection_status["render"] = "FAIL"
+                projection_status["report_preview"] = "NOT_REACHED"
+                projection_status["section_preview"] = "NOT_REACHED"
+                projection_errors.append("persisted_artifact_failed_render_validation")
             else:
-                try:
-                    report_preview = mcp_service.preview_logfile_png(
+                report_preview = _capture_projection(
+                    "report_preview",
+                    lambda: mcp_service.preview_logfile_png(
                         str(logfile_path),
                         root=self.server_root,
                         include_report_pages=True,
                         dpi=72,
-                    )
-                    section_preview = (
-                        mcp_service.preview_section_png(
+                    ),
+                    statuses=projection_status,
+                    errors=projection_errors,
+                    fallback=b"",
+                )
+                if projection_status.get("inspection") != "PASS":
+                    projection_status["section_preview"] = "NOT_REACHED"
+                elif section_ids:
+                    section_preview = _capture_projection(
+                        "section_preview",
+                        lambda: mcp_service.preview_section_png(
                             str(logfile_path),
                             section_id=section_ids[0],
                             root=self.server_root,
                             dpi=72,
-                        )
-                        if section_ids
-                        else report_preview
+                        ),
+                        statuses=projection_status,
+                        errors=projection_errors,
+                        fallback=b"",
                     )
-                    if not report_preview or not section_preview:
-                        render_error = "Preview generation returned no image data."
-                except Exception as error:
-                    render_error = f"Preview generation failed ({type(error).__name__})."
-        final_success = success and render_error is None
+                else:
+                    section_preview = report_preview
+                    projection_status["section_preview"] = projection_status.get(
+                        "report_preview", "NOT_REACHED"
+                    )
+                report_has_no_data = (
+                    projection_status.get("report_preview") == "PASS" and not report_preview
+                )
+                section_has_no_data = (
+                    bool(section_ids)
+                    and projection_status.get("section_preview") == "PASS"
+                    and not section_preview
+                )
+                if (
+                    projection_status.get("report_preview") != "PASS"
+                    or (section_ids and projection_status.get("section_preview") != "PASS")
+                    or report_has_no_data
+                    or section_has_no_data
+                ):
+                    projection_status["render"] = "FAIL"
+                    if report_has_no_data or section_has_no_data:
+                        projection_errors.append("preview_generation_returned_no_image_data")
+                elif projection_status.get("section_preview") == "NOT_REACHED":
+                    projection_status["render"] = "FAIL"
+                else:
+                    projection_status["render"] = "PASS"
+
+        if "render" not in projection_status:
+            projection_status["render"] = "NOT_REACHED"
+
+        projection_failed = bool(projection_errors)
+        final_success = success and not projection_failed
         final_apply_status = apply_status
-        final_errors = list(errors)
-        if render_error is not None:
-            final_apply_status = "persisted_render_failed" if changed else "render_failed_noop"
-            final_errors.append(render_error)
+        final_errors = [*errors, *projection_errors]
+        if success and projection_failed:
+            if projection_status.get("render") == "FAIL":
+                final_apply_status = "persisted_render_failed" if changed else "render_failed_noop"
+            else:
+                final_apply_status = (
+                    "persisted_projection_failed" if changed else "projection_failed_noop"
+                )
 
         inspection = result.inspection()
         host_stage_evidence = dict(host_stage_evidence)
         host_stage_evidence["reload"] = "PASS" if success else "NOT_REACHED"
-        host_stage_evidence["render"] = (
-            "PASS" if success and render_error is None else "FAIL" if success else "NOT_REACHED"
-        )
+        host_stage_evidence.update(projection_status)
+        host_stage_evidence["result_projection"] = "FAIL" if projection_failed else "PASS"
         report_facts = {
             "engine": "v2",
             "compilation": inspection,
@@ -542,12 +639,29 @@ class DirectNotebookSession:
             user_report = AuthoringUserReport(
                 done=("Compiled and applied the request through the direct Code Mode v2 path.",),
             )
+        elif success and changed and projection_failed:
+            user_report = AuthoringUserReport(
+                could_not_do=("Complete the post-publication result projection.",),
+                why_not=tuple(final_errors),
+                next_help=("The requested change persisted; review it before retrying.",),
+            )
         else:
             user_report = AuthoringUserReport(
                 could_not_do=("Apply the requested v2 authoring change.",),
                 why_not=tuple(final_errors) or ("The v2 authoring request failed.",),
                 next_help=("Inspect the deterministic validation and compilation evidence.",),
             )
+        if final_success:
+            final_text = "Direct Code Mode v2 authoring completed."
+        elif success and changed and projection_failed:
+            final_text = (
+                "The requested change was persisted, but post-publication inspection or preview "
+                "failed; no rollback was performed."
+            )
+        elif success and projection_failed:
+            final_text = "No file change was made, but post-operation inspection or preview failed."
+        else:
+            final_text = "Direct Code Mode v2 authoring did not produce an accepted change."
         return AuthoringResult(
             provider=self.provider,
             model=self.model,
@@ -559,16 +673,12 @@ class DirectNotebookSession:
             draft_logfile=_relative_path(logfile_path, root=self.server_root),
             server_root=self.server_root,
             tool_trace=(),
-            final_text=(
-                "Direct Code Mode v2 authoring completed."
-                if final_success
-                else "Direct Code Mode v2 authoring did not produce an accepted change."
-            ),
+            final_text=final_text,
             validation=_json_value(validation),
             draft_summary=_json_value(draft_summary),
             inspect_summary=_json_value(inspect_summary),
             change_summary=_json_value(change_summary),
-            draft_text=logfile_path.read_text(encoding="utf-8"),
+            draft_text=draft_text,
             report_preview_png=report_preview,
             section_preview_png=section_preview,
             run_state=AuthoringRunState(),

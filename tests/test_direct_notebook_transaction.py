@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
 import yaml
 from tests._mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 
@@ -307,6 +308,104 @@ def test_notebook_marks_render_pass_only_after_nonempty_previews() -> None:
     assert result.report_facts["host_stage_evidence"]["render"] == "PASS"
     assert result.report_preview_png == b"report-preview"
     assert result.section_preview_png == b"section-preview"
+
+
+@pytest.mark.parametrize(
+    ("failing_stage", "expected_render_status"),
+    [
+        ("validation", "FAIL"),
+        ("draft_summary", "PASS"),
+        ("inspection", "FAIL"),
+        ("change_summary", "PASS"),
+        ("report_preview", "FAIL"),
+        ("draft_text", "PASS"),
+    ],
+)
+def test_notebook_projection_failure_preserves_published_state(
+    failing_stage: str,
+    expected_render_status: str,
+) -> None:
+    """Post-publication projection errors do not hide or reverse a persisted edit."""
+    adapter = DirectNotebookSession(
+        session=None,  # type: ignore[arg-type]
+        provider="test",
+        model="test-model",
+        credential_source=None,
+        server_root=REPO_ROOT,
+    )
+    target_by_stage = {
+        "validation": "wellplot.agent.direct_notebook.mcp_service.validate_logfile",
+        "draft_summary": ("wellplot.agent.direct_notebook.mcp_service.summarize_logfile_draft"),
+        "inspection": "wellplot.agent.direct_notebook.mcp_service.inspect_logfile",
+        "change_summary": ("wellplot.agent.direct_notebook.mcp_service.summarize_logfile_changes"),
+        "report_preview": "wellplot.agent.direct_notebook.mcp_service.preview_logfile_png",
+        "draft_text": "pathlib.Path.read_text",
+    }
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="notebook-projection-") as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        failing_projection = patch(
+            target_by_stage[failing_stage],
+            side_effect=RuntimeError("projection detail must not escape"),
+        )
+        with (
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.validate_logfile",
+                return_value=SimpleNamespace(valid=True),
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.summarize_logfile_draft",
+                return_value={},
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.inspect_logfile",
+                return_value=SimpleNamespace(section_ids=["main"]),
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.summarize_logfile_changes",
+                return_value={},
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.preview_logfile_png",
+                return_value=b"report-preview",
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.preview_section_png",
+                return_value=b"section-preview",
+            ),
+            failing_projection,
+        ):
+            result = adapter._project_result(
+                request="update the report",
+                mode="revise",
+                logfile_path=fixture_paths.single_logfile,
+                baseline_text="before",
+                result=_successful_result(),
+                success=True,
+                changed=True,
+                rolled_back=False,
+                errors=[],
+                apply_status="persisted",
+                example_id=None,
+                source_logfile_path=None,
+                host_stage_evidence={"persistence": "PASS"},
+            )
+
+    evidence = result.report_facts["host_stage_evidence"]
+    assert result.report_facts["success"] is False
+    assert result.report_facts["changed"] is True
+    assert result.report_facts["rolled_back"] is False
+    assert result.report_facts["apply_status"] in {
+        "persisted_projection_failed",
+        "persisted_render_failed",
+    }
+    assert evidence["persistence"] == "PASS"
+    assert evidence["reload"] == "PASS"
+    assert evidence["result_projection"] == "FAIL"
+    assert evidence["render"] == expected_render_status
+    assert evidence[failing_stage] == "FAIL"
+    assert "persisted" in result.final_text.lower()
+    assert "no rollback was performed" in result.final_text.lower()
+    assert "retrying" in result.user_report_text.lower()
 
 
 def test_notebook_classifies_publication_recovery_failure() -> None:

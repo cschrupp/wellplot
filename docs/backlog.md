@@ -128,13 +128,38 @@ accepted at `c0ea8b9a7ebc0d9590fdf13286adfbd367c7e8ed`. The broader A07
 operation-mapping and compatibility matrix remains open for A10 qualification;
 the accepted corrective is not evidence that every A07 requirement is complete.
 A08 is a provider-free implementation candidate based on that checkpoint and
-is awaiting independent review. The narrow corrective for review findings
-F09-F11 binds MCP publication to YAML/template/source snapshot revisions,
-reports post-publication preview failures without claiming rollback, and
-classifies failed restoration distinctly. Candidate tests cover these cases in
-addition to phase/dependency ordering, cycles, private-candidate CRUD failure,
-staged replacement failure, and reload rollback. A09 remains on hold; no live
-or scientific execution is authorized.
+is awaiting independent review. Its F09-F11 corrective binds MCP publication
+to YAML/template/source snapshot revisions, reports post-publication projection
+failures without implying rollback, and classifies failed restoration
+distinctly. The follow-up F10-R1 correction contains failures in validation,
+summary, inspection, preview, and draft-text projection while preserving the
+published/rollback state and warning users not to retry a persisted change.
+Provider-free transaction and adjacent canonical-path regressions pass.
+
+QUAL-01 full-suite triage is not a PASS. The following failures were
+reproduced at A07 parent `c0ea8b9a7ebc0d9590fdf13286adfbd367c7e8ed` and are
+classified as pre-existing baseline, stale historical contract, or missing
+local evidence rather than A08 regressions:
+
+- `test_inventory_output_is_deterministic_and_rewrites_identically` and
+  `test_required_migration_modules_are_classified_in_current_inventory`:
+  reachability inventory still requires absent `wellplot.agent.core`.
+- `test_profile_budget_is_bounded_and_smaller_than_diagnostic_contract`:
+  measured schema is 45,297 characters versus the stale 40,000 limit.
+- `test_protected_runtime_modules_do_not_depend_on_the_fixture`: expected
+  `src/wellplot/agent/graph/workflow.py` is absent.
+- CM56R7 evidence-analysis tests: required local
+  `/tmp/cm56r6-authoritative-qwen-rerun.jsonl` is absent.
+- CM57P10/P8 source-fingerprint tests: frozen provider-base hash differs;
+  CM57P2/P4 prompt-hash tests and CM57P6/P7 schema-hash tests also have stale
+  pins.
+- CM57P3/P5 planner self-tests and
+  `test_graph_safety_runs_before_enrichment_and_workers` fail on pre-existing
+  planner wire/scope or capability-safety expectations.
+
+The unfiltered repository suite remains unqualified; the candidate must not
+claim a full-suite PASS from these filtered provider-free results. A09 remains
+on hold, and no live or scientific execution is authorized.
 
 A08 publication semantics are intentionally bounded: same-directory
 `os.replace()` provides atomic file visibility on POSIX, but rollback after a
