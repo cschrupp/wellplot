@@ -137,6 +137,17 @@ with a secondary serialized-byte safety cap. A09 remains incomplete until
 those safeguards are accepted or the residual limitation is explicitly
 accepted.
 
+The metadata-first inspection / channel-resolution design is now captured in
+`docs/architecture/A09_METADATA_FIRST_INSPECTION_AND_CONTEXT_BUDGET_DESIGN.md`
+as a review candidate. It proposes LAS/DLIS metadata-only extraction through
+the existing source-loader boundary, four-state host resolution, full-request
+model-aware token budgeting, and explicit `UNKNOWN` on incomplete or
+resource-limited inspection. It selects no numeric budgets and no DLIS hard-
+containment mechanism; both remain review decisions. No implementation,
+baseline promotion, provider call, or live/scientific qualification is
+authorized by the design document. A09 remains open pending independent
+design acceptance and subsequent bounded implementation/qualification.
+
 The bounded A07 shared-identity allocator corrective was independently
 accepted at `c0ea8b9a7ebc0d9590fdf13286adfbd367c7e8ed`. The broader A07
 operation-mapping and compatibility matrix remains open for A10 qualification;
