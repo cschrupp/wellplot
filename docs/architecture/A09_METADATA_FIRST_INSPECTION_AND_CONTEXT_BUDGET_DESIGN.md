@@ -1,6 +1,6 @@
 # A09 Metadata-First Inspection and Context-Budget Design
 
-**Status:** DESIGN CANDIDATE — awaiting independent review
+**Status:** DESIGN CANDIDATE — F13/F14 corrective for independent review
 **Scope:** A09 source inspection, channel resolution, and model-context/resource
 budgets only
 **Implementation:** Not authorized by this design document
@@ -136,10 +136,37 @@ behavior.
    future contract requires them, they require separate sanitization,
    provenance, and injection review.
 4. Report separately: `inventory_complete`, `inspection_status`,
-   `declared_channel_metadata`, and `sample_availability`. Metadata inspection
-   establishes declaration, not numerical sample existence, readability,
-   quality, or usable sample count. Unless verified through an explicitly
-   authorized non-model mechanism, sample availability is `NOT_CHECKED`.
+   `declared_channel_metadata`, `binding_addressability`, and
+   `sample_availability`. Metadata inspection establishes declaration, not
+   numerical sample existence, readability, quality, or usable sample count.
+   Unless verified through an explicitly authorized non-model mechanism,
+   sample availability is `NOT_CHECKED`.
+
+5. **Binding addressability is a separate gate.** A metadata result of
+   `UNIQUE` identifies exactly one declared metadata object; it does not prove
+   that the existing scientific loader and mnemonic-keyed dataset/binding
+   schema can address that exact object. Before automatic binding, the host
+   must prove the selected metadata identity maps one-to-one to the exact
+   channel the existing loader will expose to rendering. Model this separately
+   as `ADDRESSABLE`, `UNADDRESSABLE`, or `UNKNOWN`, without changing the
+   existing authoring binding schema or numerical loader in A09. Permit
+   automatic binding only for metadata `UNIQUE` plus addressability
+   `ADDRESSABLE`. `UNADDRESSABLE` includes a channel in an unconsumed logical
+   file, a same-mnemonic collision the loader resolves to a different object,
+   or any compound identity the current binding API cannot select. Unknown
+   mapping is `UNKNOWN`, never an implicit best-effort match. Return a typed
+   unsupported/unresolved outcome and require clarification or a later
+   separately reviewed architecture change; do not silently substitute.
+   Numerical sample availability remains independent and may still be
+   `NOT_CHECKED`.
+
+   The current implementation audit makes this distinction material:
+   `load_dlis()` selects the first logical file, materializes frame curves,
+   and resolves same-name channels into a dataset dictionary keyed by
+   mnemonic. The metadata inspector may discover objects outside that
+   addressable subset or distinguish objects that the renderer collapses.
+   This design records those as unaddressable; it does not change those
+   loader semantics.
 
 ### Channel resolution states
 
@@ -147,24 +174,65 @@ Resolution is a deterministic host result, not a model-selected index:
 
 | State | Required evidence | Meaning |
 | --- | --- | --- |
-| `UNIQUE` | Inspection complete for the selected source/scope; exactly one candidate satisfies the request and trusted constraints | Host can bind the one candidate. |
+| `UNIQUE` | Inspection complete for the selected source/scope; exactly one candidate satisfies the request and trusted constraints | Exactly one metadata candidate is identified; binding still requires the separate addressability gate. |
 | `AMBIGUOUS` | Inspection complete; at least two plausible candidates remain | No candidate is selected by ordering or vendor convention; request clarification or return a typed ambiguity. |
 | `ABSENT` | Inspection complete, relevant source/frame inventory fully enumerated, supported format, no resource limit or parse uncertainty, and zero matching candidates | The requested channel is not declared in that completed scope. |
 | `UNKNOWN` | Any incomplete scan, unsupported/uncertain format, parser error, budget exhaustion, stale snapshot, unresolved source/frame scope, or untrusted/inconsistent identity | The system cannot establish presence or absence. Do not treat as absent. |
 
-Candidate matching must honor request constraints such as explicit source,
-frame, unit, dimensionality, and channel identity. No name-order heuristic is
-permitted. If two candidates share a mnemonic, retain distinct source/frame
-identity. For DLIS, preserve the library's compound channel identity (name,
-origin, copy number) and frame/logical-file identity. For LAS, retain the
-source identity and curve ordinal as well as mnemonic, because duplicate
-mnemonics may occur.
+Candidate matching follows this ordered, host-owned policy:
+
+1. **Explicit physical channel identity:** If the request carries a
+   source/frame-qualified identity or explicitly names a canonical mnemonic
+   as a physical channel, exact normalized identity is evaluated first. It
+   must resolve to exactly one metadata candidate. A collision is
+   `AMBIGUOUS`; alias matching must not override or break the tie.
+2. **Trusted semantic role/alias:** Otherwise, resolve the requested role
+   only through an authoritative, versioned alias catalog. The catalog entry
+   must record its stable ID/version (or content digest), canonical role,
+   accepted request terms, and explicitly reviewed physical mnemonics, with
+   provenance for the mapping. Aliases are equality-based after the catalog's
+   defined normalization; no substring, edit-distance, vendor-convention, or
+   naming-similarity expansion is allowed. If exactly one candidate matches
+   the trusted role and request constraints, continue to addressability
+   checking. If multiple candidates match, return `AMBIGUOUS`; do not rank or
+   select one by order.
+3. **No trusted mapping:** A source-qualified/explicit physical identity is
+   treated literally: if complete scoped inventory contains no exact match,
+   it is `ABSENT`. A natural-language role/alias that is not recognized by
+   the pinned catalog cannot be declared absent from the source; its
+   resolution is `UNKNOWN` and the user must clarify or select a catalogued
+   role. For a recognized role, zero candidates among that version's
+   explicitly listed mnemonics is `ABSENT` only after complete inventory. A
+   missing or inconclusive metadata field never creates a positive alias
+   match or proves absence.
+
+For example, a request for `GR` first matches a physical `GR` channel if one
+is uniquely present. If no exact `GR` candidate exists, the pinned catalog
+determines whether `GR` is a recognized semantic-role term and which physical
+mnemonics that role authorizes. If reviewed evidence in that entry makes both
+`GR_STGC` and `GR_CORR` plausible, the result is `AMBIGUOUS` and the scientist
+must choose. The names alone do not establish equivalence. If the pinned
+entry does not list those mnemonics, do not infer that either is GR; a
+recognized role with no listed candidate can be `ABSENT` only after complete
+inventory. If `GR` is not recognized by the catalog and is not present as an
+exact mnemonic, return `UNKNOWN` for clarification rather than guessing.
+
+Candidate matching also honors explicit source, frame, unit, dimensionality,
+and channel constraints. If two candidates share a mnemonic, retain distinct
+source/frame identity. For DLIS, preserve the library's compound channel
+identity (object type, name, origin, copy number) and frame/logical-file
+identity. For LAS, retain source identity and curve ordinal as well as
+mnemonic, because duplicate mnemonics may occur. A unique metadata identity
+must still pass the separate renderer-addressability gate above.
 
 The resolution record should bind the selected source candidate and revision,
-inspection/parser identity, relevant inventory projection, constraints,
-candidate identities, final state, and completeness evidence into the
-existing snapshot/provenance mechanism. A stale revision invalidates the
-resolution and yields `UNKNOWN` until reinspected.
+inspection/parser identity, relevant inventory projection, pinned alias
+catalog identity/version, request interpretation, constraints, candidate
+identities, metadata resolution state, separate binding-addressability state,
+and completeness evidence into the existing snapshot/provenance mechanism. A
+stale revision invalidates the resolution and yields `UNKNOWN` until
+reinspected. `sample_availability` is recorded independently and is not
+implied by either metadata uniqueness or renderer addressability.
 
 ## Resource-Safety Policy
 
@@ -269,9 +337,12 @@ bounded custody, without storing raw source bodies.
    or must the existing adapter own a local tokenizer capability?
 5. Which source/frame constraints are explicit user-authorized filters, and
    which require clarification rather than narrowing candidates?
-6. Which metadata fields may be exposed to planner/worker context? Default:
+6. What governed source/version and review process will maintain the trusted
+   semantic alias catalog, including role mappings such as Gamma Ray? Until a
+   mapping is approved, mnemonic resemblance does not establish equivalence.
+7. Which metadata fields may be exposed to planner/worker context? Default:
    stable technical metadata only; free-form descriptions remain excluded.
-7. What bounded outcome/custody fields represent budget exhaustion, unknown
+8. What bounded outcome/custody fields represent budget exhaustion, unknown
    inventory, and unavailable token counting without misclassifying them as
    provider or semantic failures?
 
@@ -299,10 +370,12 @@ introduce chosen numeric defaults during implementation by convenience.
 | Invariant | Design preservation | Required regression |
 | --- | --- | --- |
 | K-01 one canonical engine | Inspection enriches existing host context; no second agent/parser service | Reachability/attestation finds one planner-worker-execution path |
-| K-02 host owns source identity and availability | Resolution and candidate selection are host-owned | Model cannot choose by order or introduce a handle |
+| K-02 host owns source identity and availability | Metadata resolution, alias policy, and renderer addressability are host-owned | Model cannot choose by order, alias inference, or introduce a handle |
 | K-03 valid structure is not semantic correctness | Resolution status is distinct from worker/schema validity | Valid but ambiguous request fails/clarifies before generation |
 | K-04 safety does not repair semantics | No guessed candidate or silent truncation | Ambiguous/unknown inputs fail closed; requirements remain outstanding |
 | Snapshot integrity | Inspection result binds to source revision and identity | Change/reorder source metadata; stale resolution is rejected |
+| Metadata/render identity | Metadata `UNIQUE` is insufficient without exact addressability through the existing renderer path | First-logical-file limitation and same-mnemonic collision return typed unaddressable/unknown; no substitution |
+| Trusted semantic matching | Versioned alias entry is the only role-equivalence authority | `GR` exact, trusted `GR_STGC`/`GR_CORR` ambiguous, missing alias not guessed |
 | No sample exposure | Metadata route never calls curve sample APIs | Monkeypatch sample APIs to fail; metadata inspection still succeeds |
 | No false absence | `ABSENT` requires complete relevant inventory | Inject timeout/parse/count limit; result is `UNKNOWN`, not `ABSENT` |
 | Complete-request budget | Token counter sees schema/template/messages and reserved output | Exact request boundary cases; missing counter fails before provider call |
@@ -316,6 +389,13 @@ introduce chosen numeric defaults during implementation by convenience.
 - Four states have non-overlapping, testable predicates; incomplete means
   `UNKNOWN`.
 - Duplicate channel identities preserve frame/source/ordinal identity.
+- Metadata uniqueness and renderer addressability are separate; automatic
+  binding requires both a unique metadata match and proven exact
+  addressability through the current scientific loader/binding schema.
+- Alias/role matches use an authoritative versioned catalog with explicit
+  provenance; exact mnemonic, trusted alias, absent alias, and ambiguous role
+  behavior are tested separately. Mnemonic resemblance alone never implies
+  scientific equivalence.
 - No-match is `ABSENT` only after complete scoped inspection.
 - Context limits include the complete provider request and a model-specific
   token count plus serialized-byte cap.
