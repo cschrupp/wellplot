@@ -159,9 +159,14 @@ candidate is recorded in
 `docs/architecture/A09_JOINT_SEMANTIC_CATALOG_AND_SOURCE_INSPECTION_DESIGN.md`.
 It integrates the accepted metadata-first design with a governed normalized
 catalog and read-only inspection contract through the existing authoring
-context. D1 is pending independent review; it does not alter the accepted
-F13/F14 record, authorize implementation, select production aliases/defaults
-or resource budgets, or promote the active baseline. Four supplied family
+context. D1 is pending independent review; it preserves the historical
+F13/F14 document and proposes a narrow F14 amendment for ambiguous bare-token
+interpretation and family-level absence. The amendment is not accepted yet.
+D1 also addresses review finding F15 by separating request-term recognition
+from physical-channel classification, and binds semantic resolutions to the
+catalog content digest plus immutable release reference.
+D1 does not authorize implementation, select production aliases/defaults or
+resource budgets, or promote the active baseline. Four supplied family
 JSON files were audited as untrusted reference/collision data; exact findings
 and digests are in the D1 design and feasibility record. Licensing/provenance,
 valid synthetic DLIS fixtures, resource-budget evidence, exact model token

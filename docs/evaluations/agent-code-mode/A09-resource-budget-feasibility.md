@@ -355,11 +355,16 @@ alias used for semantic resolution is trusted.
 
 - A catalog release has a stable semantic version and canonical content
   digest; both are included in source-resolution snapshots and custody.
-- Each alias entry declares its canonical role, request terms, exact physical
-  mnemonics, applicable source/context constraints, whether its mnemonic list
-  is exhaustive for absence decisions, and provenance supporting every
-  equivalence. A domain-qualified reviewer approves scientific equivalence;
-  name similarity is insufficient.
+- Keep request-language interpretation rules separate from
+  concept-to-physical-channel classification rules. The former maps exact
+  normalized scientist terms to a stable concept; the latter independently
+  maps inspected physical mnemonics/patterns to that concept under source,
+  unit, and identity constraints. Each assertion has its own provenance and
+  review, even if they share a family registry and resolver.
+- A physical-channel rule may declare an exhaustive source/frame scope only
+  with explicit evidence and domain review. Only that scoped exhaustiveness,
+  together with a complete inventory, can support family-level `ABSENT`.
+  Domain-qualified review is required; name similarity is insufficient.
 - If a catalog is unavailable, digest-invalid, or lacks a mapping, exact
   physical mnemonic matching may proceed where the user supplied that exact
   identity. Role-based inference returns `UNKNOWN`/clarification. No catalog
@@ -382,11 +387,14 @@ untrusted-source-alias, incomplete-inventory, and GR ambiguity regressions.
 
 The integrated D1 proposal is in
 `docs/architecture/A09_JOINT_SEMANTIC_CATALOG_AND_SOURCE_INSPECTION_DESIGN.md`.
-It separates semantic classification from four-state physical resolution,
-renderer addressability, and sample availability; proposes normalized catalog
-and source-metadata shapes; defines deterministic request interpretation and
-matching; and lists a provider-free acceptance matrix. D1 is pending independent
-review and does not close any D2 feasibility item or authorize implementation.
+It separates request-term aliases from physical-channel rules, and semantic
+classification from four-state physical resolution, renderer addressability,
+and sample availability. It proposes normalized catalog and source-metadata
+shapes, a two-stage deterministic resolver, direct catalog-digest custody, and
+a provider-free acceptance matrix. It also proposes a narrow amendment to
+accepted F14 bare-token and family-absence semantics; that amendment is pending
+independent D1 acceptance and does not close any D2 feasibility item or
+authorize implementation.
 
 ### Supplied family JSON audit disposition
 

@@ -183,14 +183,22 @@ authorizes a scientific equivalence.
       "presentation_preset_id": null
     }
   ],
-  "recognition_rules": [
+  "request_term_rules": [
     {
-      "id": "example.rule-id",
+      "id": "example.request-term-rule-id",
       "family_id": "example.stable-family-id",
-      "matcher": {
-        "kind": "exact_mnemonic",
-        "value": "EXAMPLE"
-      },
+      "terms": ["example scientist term"],
+      "normalization_profile_id": "versioned-exact-text-normalization",
+      "status": "candidate",
+      "provenance_ids": [],
+      "review": null
+    }
+  ],
+  "physical_channel_rules": [
+    {
+      "id": "example.physical-channel-rule-id",
+      "family_id": "example.stable-family-id",
+      "matcher": {"kind": "exact_mnemonic", "value": "EXAMPLE"},
       "source_scope": [],
       "unit_constraints": [],
       "status": "candidate",
@@ -215,11 +223,19 @@ authorizes a scientific equivalence.
 - `absence_scope` defaults to `OPEN_WORLD`. Only an explicitly reviewed,
   scoped, exhaustive mapping can support family-level `ABSENT`; a catalog
   miss normally means `UNCLASSIFIED` or `UNKNOWN`.
-- Matcher kinds are finite: exact physical mnemonic, exact reviewed request
-  alias, or a restricted glob. Glob syntax, normalization, and scope must be
-  versioned. Regex, substring, edit-distance, vendor-guessing, and implicit
-  case/punctuation expansion are not authorized. Wildcard rules are
-  `candidate` until each is individually reviewed and collision-tested.
+- Request-term recognition and physical-channel recognition are distinct
+  typed contracts. A request-term rule maps exact, normalized scientist
+  language to a stable family ID; it contains no physical mnemonic matcher.
+  A physical-channel rule maps an exact mnemonic or restricted glob from an
+  inspected inventory to that family ID; it contains no scientist-language
+  alias. Both may reference the same family and provenance registry, but one
+  cannot establish the other assertion.
+- Request terms use exact equality under a versioned normalization profile.
+  Physical matcher kinds are exact mnemonic or restricted glob. Glob syntax,
+  normalization, and scope must be versioned. Regex, substring,
+  edit-distance, vendor-guessing, and implicit case/punctuation expansion are
+  not authorized. Wildcard rules are `candidate` until individually reviewed
+  and collision-tested.
 - `status` is `candidate`, `reviewed`, or `deprecated`. Only `reviewed` rules
   with valid provenance may authorize automatic semantic matches. Candidate
   rules may be shown as explicitly untrusted suggestions and must never
@@ -233,6 +249,12 @@ authorizes a scientific equivalence.
   order, rule order, mnemonic sorting, or specificity must not silently
   select a winner. A narrower rule can exclude candidates only when its
   scoped semantics are explicit and reviewed, not as a hidden priority.
+- Resolve a family-language request in two stages, inside the same
+  deterministic host resolver: (1) map the user term to one reviewed family
+  concept using `request_term_rules`; (2) independently match that concept's
+  reviewed `physical_channel_rules` against the complete inspected inventory.
+  Then separately establish physical presence/identity and renderer
+  addressability. A stage result is not evidence for a later stage.
 - Presentation presets are separate from recognition. They may describe only
   fields supported by the existing renderer and only after review. Effective
   precedence is: explicit scientist value, preserved existing value, approved
@@ -266,6 +288,34 @@ authorizes a scientific equivalence.
 Null means unspecified, not a default value. This example is not an instruction
 to create or select values.
 
+### Two-stage Gamma Ray example (synthetic policy fixture only)
+
+This example illustrates contract separation only. It does **not** approve
+`GR_STGC` (or any other mnemonic) as Gamma Ray in production.
+
+1. Scientist request: “Plot Gamma Ray.” A reviewed
+   `request_term_rule` maps the exact normalized term “gamma ray” to stable
+   concept `family.gamma_ray`; its provenance establishes language-to-concept
+   interpretation only.
+2. A distinct reviewed `physical_channel_rule` maps exact mnemonic `GR_STGC`
+   to `family.gamma_ray` only for an explicitly reviewed synthetic source
+   scope; its independent provenance establishes concept-to-mnemonic
+   classification only.
+3. The metadata inspector reports exactly one channel object in synthetic
+   `abc.dlis`, including logical-file, frame, and compound channel identity.
+   Matching that inventory against the physical rule yields physical
+   resolution `UNIQUE`. This source fact does not come from either catalog
+   rule.
+4. The existing renderer/binding addressability check must independently
+   prove that exact object is selectable. If so, addressability is
+   `ADDRESSABLE`; otherwise it is `UNADDRESSABLE` or `UNKNOWN` and no binding
+   occurs. Sample availability remains `NOT_CHECKED`.
+
+If any step has multiple eligible results, stale or missing provenance,
+incomplete inventory, or unresolved identity, the host returns ambiguity or
+unknown and asks for clarification/reinspection. This is one resolver with
+staged evidence checks, not a second resolution service.
+
 ### Structural JSON Schema sketch
 
 This draft-2020-12 fragment makes the catalog envelope and rule vocabulary
@@ -281,7 +331,8 @@ before implementation.
   "additionalProperties": false,
   "required": [
     "schema_version", "catalog_id", "catalog_version", "content_sha256",
-    "source_provenance", "families", "recognition_rules",
+    "source_provenance", "families", "request_term_rules",
+    "physical_channel_rules",
     "presentation_presets"
   ],
   "properties": {
@@ -291,7 +342,8 @@ before implementation.
     "content_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "source_provenance": {"type": "array", "items": {"type": "object"}},
     "families": {"type": "array", "items": {"$ref": "#/$defs/family"}},
-    "recognition_rules": {"type": "array", "items": {"$ref": "#/$defs/rule"}},
+    "request_term_rules": {"type": "array", "items": {"$ref": "#/$defs/requestTermRule"}},
+    "physical_channel_rules": {"type": "array", "items": {"$ref": "#/$defs/physicalChannelRule"}},
     "presentation_presets": {"type": "array", "items": {"type": "object"}}
   },
   "$defs": {
@@ -314,7 +366,21 @@ before implementation.
         "presentation_preset_id": {"type": ["string", "null"]}
       }
     },
-    "rule": {
+    "requestTermRule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "family_id", "terms", "normalization_profile_id", "status", "provenance_ids"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "family_id": {"type": "string", "minLength": 1},
+        "terms": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "normalization_profile_id": {"type": "string", "minLength": 1},
+        "status": {"enum": ["candidate", "reviewed", "deprecated"]},
+        "provenance_ids": {"type": "array", "items": {"type": "string"}},
+        "review": {"type": ["object", "null"]}
+      }
+    },
+    "physicalChannelRule": {
       "type": "object",
       "additionalProperties": false,
       "required": ["id", "family_id", "matcher", "status", "provenance_ids"],
@@ -326,7 +392,7 @@ before implementation.
           "additionalProperties": false,
           "required": ["kind", "value"],
           "properties": {
-            "kind": {"enum": ["exact_mnemonic", "exact_alias", "restricted_glob"]},
+            "kind": {"enum": ["exact_mnemonic", "restricted_glob"]},
             "value": {"type": "string", "minLength": 1}
           }
         },
@@ -472,6 +538,8 @@ The host resolution result carries at least:
   "sample_availability": "NOT_CHECKED | VERIFIED_AVAILABLE | VERIFIED_UNAVAILABLE | UNKNOWN",
   "source_revision": "pinned-revision",
   "catalog_version": "pinned-version-or-null-for-literal-only",
+  "catalog_content_sha256": "exact-pinned-digest-or-null-for-literal-only",
+  "catalog_release_ref": "immutable-content-addressed-release-ref-or-null",
   "candidate_physical_ids": [],
   "selected_physical_id": null,
   "evidence_refs": []
@@ -484,6 +552,23 @@ These fields are orthogonal. A selected literal vendor mnemonic may be
 still be plotted by explicit user choice. Conversely, a reviewed semantic
 match is not bindable if physical resolution is ambiguous or addressability
 is unknown.
+
+For any resolution that uses semantic catalog rules, `catalog_content_sha256`
+is the authoritative identity and is carried directly in the immutable
+resolution/snapshot record. `catalog_release_ref` points to the retained
+immutable catalog artifact but is not a substitute for the digest. The host
+verifies that artifact against the recorded digest both when resolving and
+immediately before publication; the selected family and physical candidate
+must be linked to that same digest. Missing, malformed, or changed catalog
+content invalidates the resolution. Literal-only physical selection that
+does not consult the catalog records both catalog fields as null. Version
+labels are descriptive; they never replace content identity. The proposed
+digest is SHA-256 over the canonical UTF-8 JSON serialization of the catalog
+payload with the root `content_sha256` field omitted; canonicalization must
+define key order, separators, Unicode handling, and disallowed numeric values
+before release. The digest cannot hash itself. The authoritative record
+contains both this digest and the immutable release reference; resolving and
+pre-publication checks recompute the digest from the retained artifact.
 
 ### Interpretation and resolution table
 
@@ -505,6 +590,34 @@ closed-world family mapping, never a failure to recognize a term in an open
 catalog. The existing accepted four-state contract is retained; the
 classification field prevents taxonomy status from being conflated with
 physical presence.
+
+### Proposed narrow amendment to accepted F14 semantics
+
+The accepted historical design at
+`daef5d171828495b2f0dfcea25ae372f0bc39af4` is immutable. D1 proposes this
+narrow amendment for independent review; until accepted, the original wording
+and this proposed change must both remain visible.
+
+1. **Bare-token interpretation:** Accepted F14 gives an exact physical `GR`
+   match precedence over semantic alias matching. D1 changes only the
+   ambiguous bare-token case: when the user says only `GR` and available
+   context supports both a literal physical mnemonic interpretation and a
+   Gamma Ray family interpretation, ask for clarification instead of applying
+   either precedence. Preserve exact-match precedence when the user
+   unambiguously selects a physical channel (for example, with a
+   source/frame-qualified selection or an explicit “channel mnemonic GR”).
+2. **Family-level absence:** Accepted F14 permits a recognized role with no
+   listed candidates to be `ABSENT` after complete inventory. D1 narrows this:
+   family-level `ABSENT` requires a separately reviewed, explicitly
+   exhaustive mapping for the relevant source/frame scope plus complete
+   inventory. A complete inventory alone cannot make a nonexhaustive family
+   catalog closed-world; without that exhaustive declaration the result is
+   `UNKNOWN`/`UNCLASSIFIED`.
+
+No other accepted F14 precedence, physical-identity, ambiguity,
+addressability, or source-scope rule is amended. These two changes are
+intentional, conservative improvements proposed for acceptance, not claims
+that the historical document already says the same thing.
 
 ### Bare-token interpretation
 
@@ -663,20 +776,25 @@ character/token heuristic, or invoke a model to discover fit.
 | --- | --- |
 | Unique explicit mnemonic | Exact physical identity selected; classification may remain `UNCLASSIFIED`; require `ADDRESSABLE` to bind. |
 | One unique reviewed family candidate | `UNIQUE` + `REVIEWED_MATCH` + `ADDRESSABLE`; snapshot pins both revisions. |
+| Reviewed request term followed by a distinct reviewed physical-channel rule | First stage resolves one family concept; second stage matches inspected channel identity; neither stage alone proves physical presence or addressability. |
 | GR-family request with `GR_STGC` and `GR_CORR` both reviewed/in scope | `AMBIGUOUS`; no sorting/first-match selection. |
 | Unknown vendor mnemonic explicitly selected | Literal `UNIQUE` if present/addressable; never rejected solely for missing family classification. |
-| Bare `GR` could be physical or family term | Interpretation ambiguity; ask user. |
+| Bare `GR` with both literal-channel and family interpretations possible | Interpretation ambiguity; ask user even if a literal `GR` channel exists. |
+| Explicitly qualified physical selector `GR` while a Gamma Ray family rule also exists | Exact physical selection retains precedence; the semantic family path is not used. |
 | Broad wildcard collision, including sonic-family patterns | Candidate-only or rejected rule; if reviewed matches collide, `AMBIGUOUS`; never prioritize by order. |
 | Unit conflict or missing unit for semantic request | Exclude only by reviewed dimension rules; otherwise `UNKNOWN`/clarification; no assumed conversion. |
 | Physical channel present but renderer-unaddressable | Metadata `UNIQUE`, addressability `UNADDRESSABLE`; block automatic binding. |
 | Incomplete LAS/DLIS inventory | `UNKNOWN`; never `ABSENT`; no publication. |
 | Recognized family has no hit in nonexhaustive catalog | `UNKNOWN`/`UNCLASSIFIED`; do not claim family absent. |
+| Recognized family has no hit in complete inventory and a reviewed exhaustive scope | Family-level `ABSENT` only for that exact scope. |
 | Explicit scale/color overrides preset | Preserve explicit values; preset does not overwrite. |
 | Large channel inventory | Host filters to request-specific bounded projection; token admission uses complete exact request accounting. |
 | Four-track conversational sequence | Each completed message persists one canonical revision and refreshed state. |
 | Existing six-track section receives two additions | Preserve all six and append exactly two resolved additions, no sample loading. |
 | Source revision changes after inspection | Revalidation invalidates resolution; no publication until reinspection. |
 | Catalog digest invalid/unavailable | Literal exact selection may continue if source evidence is complete; family inference fails closed. |
+| Catalog artifact changes between resolution and publication | Digest revalidation fails; invalidate resolution and block the whole message. |
+| Request-term rule contains physical matcher, or physical rule contains request terms | Structural schema validation rejects cross-domain fields. |
 | Catalog candidate alias or malicious source description | Cannot alter host authority; free text excluded from model projection. |
 
 All cases are provider-free; this matrix is a design acceptance target, not a
@@ -727,6 +845,7 @@ accepted.
 | K-03 structure is not semantic correctness | Keep provider validity, semantic resolution, and host application as separate outcomes. |
 | F13 metadata/addressability distinction | Metadata uniqueness cannot imply renderer addressability. |
 | F14 trusted aliases | Only versioned, provenance-reviewed rules authorize semantic equivalence. |
+| Proposed F14 amendment | Bare-token ambiguity and exhaustive-scope requirements are explicitly proposed; historical text remains unchanged pending acceptance. |
 | Four-state source resolution | Preserve `UNIQUE`/`AMBIGUOUS`/`ABSENT`/`UNKNOWN`; classification/addressability/samples remain separate dimensions. |
 | Snapshot integrity | Source and catalog revisions are pinned and revalidated before publication. |
 | Open-world physical support | Unknown taxonomy does not block explicit physical channel selection. |
@@ -737,10 +856,12 @@ accepted.
 ## Scope, Status, and References
 
 This D1 document is a review candidate layered on the accepted metadata-first
-design; it does not amend that historical record. If independently accepted,
-record the relationship in A09 development memory/backlog. Do not promote new
-invariants to `docs/agent-code-mode-current-baseline.md` before acceptance
-and the required Knowledge Delta process.
+design. It preserves that historical record and explicitly proposes the
+narrow F14 amendment described above; neither the amendment nor the integrated
+design is accepted yet. If independently accepted, record the relationship in
+A09 development memory/backlog. Do not promote new invariants to
+`docs/agent-code-mode-current-baseline.md` before acceptance and the required
+Knowledge Delta process.
 
 The audit input identities and limitations are recorded above and in
 `docs/evaluations/agent-code-mode/A09-resource-budget-feasibility.md`.

@@ -98,7 +98,10 @@ The documentation-only D1 integrated design candidate is
 It coordinates the semantic-family catalog and metadata-only LAS/DLIS source
 inspection through the existing authoring-context boundary. D1 acceptance is
 pending independent review; this candidate is not implementation authority
-and does not revise the accepted F13/F14 design checkpoint.
+and does not rewrite the accepted F13/F14 design checkpoint. It proposes a
+narrow F14 amendment for ambiguous bare `GR` interpretation and for requiring
+an explicitly reviewed exhaustive scope before family-level `ABSENT`; the
+original accepted rule remains historical and immutable pending review.
 
 The four local `examples/families/*.json` inputs were audited read-only. Their
 schema/count/collision findings and exact SHA-256 identities are recorded in
@@ -117,6 +120,19 @@ The integrated proposal explicitly keeps separate:
    unclassified, or unknown.
 3. Existing-renderer addressability: addressable, unaddressable, or unknown.
 4. Numeric sample availability: normally `NOT_CHECKED`.
+
+It also separates exact scientist request-term-to-family rules from
+independently reviewed family-to-physical-channel rules. A single deterministic
+host resolver executes those two stages; neither rule type establishes
+physical inventory presence or renderer addressability. Semantic resolutions
+carry `catalog_content_sha256` directly plus an immutable release reference,
+and verify the digest again before publication.
+
+The current D1 corrective addresses review findings F15/F16: distinct typed
+rule domains and an explicit, proposed F14 amendment for ambiguous bare-token
+interpretation and exhaustive-scope family absence. The accepted historical
+F14 document remains unchanged. The amendment remains pending independent
+review and must not be treated as accepted policy yet.
 
 It preserves exact literal channel selection for unclassified vendor channels,
 does not infer family absence from a nonexhaustive catalog, and blocks binding
