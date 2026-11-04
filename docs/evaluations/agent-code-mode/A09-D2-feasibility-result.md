@@ -371,12 +371,13 @@ Human implementation authorization before code is written.
 | LAS maximum line | 2 MiB | Chunked scanner refuses an over-limit line and returns incomplete/`UNKNOWN`; aligns with the largest synthetic single header record exercised, but the scanner limit itself still needs regression coverage. |
 | LAS cumulative header prefix | 16 MiB | Scanner stops before reading beyond the bounded prefix; over-limit/missing marker is incomplete/`UNKNOWN`. Provisional safety cap only, not a total-file limit. |
 | LAS channel records | 5,001 | Stop inventory construction and return incomplete/`UNKNOWN` above cap; the largest synthetic channel inventory exercised was 5,001. |
+| LAS parser address space / CPU / wall | 1 GiB / 10 seconds / 15 seconds | Run LASIO prefix parsing in the supervised parser child; set limits before parsing and terminate/reap its process group on wall expiry. All breaches return incomplete/`UNKNOWN`; this path is not yet implemented. |
 | DLIS child address space | 1 GiB per child | Set `RLIMIT_AS` before importing/using DLISIO. This bounds virtual address space, not RSS; unsupported or unavailable enforcement fails closed. |
 | DLIS child CPU time | 90 seconds | Set `RLIMIT_CPU`; signal/exit caused by the limit is incomplete/`UNKNOWN`. Mechanism exists, but this proposed value has not been tested on scaled inputs. |
 | DLIS wall time | 120 seconds | Parent monotonic deadline; start a killable process group and terminate/reap the entire group on expiry. Timeout is incomplete/`UNKNOWN`. |
 | DLIS projected metadata objects | 5,001 channel entries | Child counts projected channel entries and stops before emitting excess; output never certifies inventory completeness after truncation. |
-| Child metadata output and serialized inspection context | 1 MiB each | Parent reads output with a hard byte cap; existing `MAX_SERIALIZED_INSPECTION_CONTEXT_BYTES` is 1 MiB. Excess output is rejected as incomplete/`UNKNOWN`. |
-| Per-request parser concurrency | 1 child at a time | Serialize source inspections within one request; unrelated sources are not opened unless selected by source-dependent obligations. |
+| Child metadata output and serialized inspection context | 1 MiB each | Parent enforces a 1 MiB aggregate stdout/stderr cap incrementally while reading, requesting at most remaining-cap-plus-one bytes before terminating/rejecting excess; existing `MAX_SERIALIZED_INSPECTION_CONTEXT_BYTES` is 1 MiB. Never accumulate an unbounded pipe result. |
+| Host-wide parser concurrency | 1 active child across WellPlot processes on this host | Acquire one nonblocking process-shared OS lock before launch, held through child termination/reap; fail closed as incomplete/`UNKNOWN` if busy. Every inspection entry point must use the same gate. |
 
 No total source-file-byte ceiling is proposed. The proposed 120-second wall
 guard is greater than the 90-second provisional p95 objective, so missing a
@@ -392,10 +393,20 @@ authorization.
 The containment mechanisms follow the platform semantics documented by
 [Python 3.12 `resource`](https://docs.python.org/3.12/library/resource.html),
 [Python 3.12 `subprocess`](https://docs.python.org/3.12/library/subprocess.html),
-and the Linux [`getrlimit(2)` manual](https://man7.org/linux/man-pages/man2/getrlimit.2.html).
-In particular, `RLIMIT_AS` constrains virtual address space, `RLIMIT_CPU`
-constrains CPU seconds, and parent process-group termination is needed to
-contain descendants; none is equivalent to a measured RSS cgroup limit.
+and the Linux [`getrlimit(2)`](https://man7.org/linux/man-pages/man2/getrlimit.2.html)
+and [`flock(2)`](https://man7.org/linux/man-pages/man2/flock.2.html) manuals.
+The proposed host-wide gate is a nonblocking exclusive advisory lock on a
+canonical host-local runtime-state file shared by every WellPlot process. Hold
+it until the child is terminated and reaped; do not unlink the lock file while
+in use. The lock descriptor must remain held if the supervisor exits before
+the child, so pass it to the direct child or prove equivalent lifetime
+ownership. All loaders must honor the same gate because `flock` is advisory.
+Cross-process lock/lifetime behavior still requires provider-free regression
+tests. If the shared local lock path or semantics cannot be verified, do not
+launch a parser child. `RLIMIT_AS`
+constrains virtual address space, `RLIMIT_CPU` constrains CPU seconds, and
+process-group termination is needed to contain descendants; none is
+equivalent to a measured RSS cgroup limit.
 
 ### Bounded provider-free functional implementation candidate
 
@@ -459,6 +470,37 @@ declared but unselected DLIS source is not indexed; (5) a richer logical-file,
 frame, or repeated-mnemonic identity unsupported by the renderer returns
 `UNADDRESSABLE`; and (6) successful persistence remains reachable only through
 the existing canonical publication route.
+
+### F18/F19 — Parser-time and aggregate-concurrency safeguards
+
+The accepted F17 plan is conditionally complete on two narrow safety
+corrections. F18 requires the LASIO parse itself, not only prefix scanning, to
+run under finite CPU and wall-time containment. The proposed LAS limits are
+10 CPU seconds and 15 wall seconds in the same supervised parser-child
+mechanism used for DLIS; timeout, abnormal exit, or limit exhaustion returns
+incomplete evidence/`UNKNOWN`.
+
+F19 replaces per-request-only concurrency with one host-wide active parser
+child. The proposed Linux/WSL2 mechanism is a nonblocking process-shared
+exclusive `flock` at the existing `LogfileSourceLoader` boundary. Hold it
+until the child is terminated and reaped. A busy lock fails closed with a
+bounded `inspection_busy`/`UNKNOWN` result rather than launching another child.
+The lock descriptor must survive supervisor cancellation while the child
+remains alive, for example by passing it to the direct child; no parser
+descendant may outlive group cleanup. Combined stdout/stderr must be read
+incrementally with a strict 1 MiB cap before accumulation. Valid process exit
+alone is insufficient without a complete projection and terminal inventory
+evidence.
+
+Required negative regressions: pathological bounded-prefix LAS parser reaches
+CPU and wall limits and is killed/reaped; two independent requests/processes
+race and prove at most one child is active; lock contention returns the
+bounded incomplete result; cancellation and supervisor failure do not release
+capacity while a child remains alive; the lock becomes available after child
+termination; output flood is stopped at the byte cap without unbounded
+allocation; and successful exit with truncated/missing terminal inventory
+evidence remains `UNKNOWN`. Preserve F17 lazy-inspection, single-load,
+revision-revalidation, and renderer-`UNADDRESSABLE` tests.
 
 Implementation qualification must include source-level reachability/ownership
 tests proving the metadata adapter is reachable only through the existing

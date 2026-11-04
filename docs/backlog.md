@@ -190,6 +190,18 @@ entry points, provisional safety-control proposal and source-ownership tests
 are recorded in the D2 feasibility result. F17 does not reopen D1 or authorize
 source implementation.
 
+The follow-up independent safety review accepts F17 and adds F18/F19 before
+functional implementation authorization. F18 requires finite CPU and wall
+containment around LASIO parsing itself (proposed development values: 10 CPU
+seconds and 15 wall seconds, using the supervised parser child). F19 requires
+one host-wide active parser child across concurrent processes, a shared
+nonblocking lock at the existing loader boundary, safe lock lifetime through
+child cleanup, and an incrementally enforced aggregate 1 MiB stdout/stderr
+cap. Limit, timeout, lock-busy, cancellation, abnormal-exit, output-flood and
+incomplete-inventory cases must fail closed to `UNKNOWN`. These are safety
+requirements, not performance blockers. Cross-process lock semantics remain
+to be regression-qualified. No implementation is authorized.
+
 The accepted documentation-only D1 joint semantic-catalog/source-inspection
 design is recorded in
 `docs/architecture/A09_JOINT_SEMANTIC_CATALOG_AND_SOURCE_INSPECTION_DESIGN.md`.

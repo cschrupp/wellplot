@@ -238,7 +238,7 @@ Relevant locations:
   `logical_files[0]` and calls `frame.curves()`.
 - `src/wellplot/model/dataset.py:234-250` — channels are keyed by mnemonic.
 
-### Candidate containment for the canonical WSL2 runtime
+### Candidate containment for the canonical WSL2 runtime (LAS and DLIS)
 
 The feasible A09 candidate is a supervised, read-only parser subprocess
 behind the existing canonical inspection facade, not a new service or
@@ -248,22 +248,37 @@ ingestion engine:
    performs deterministic parser inspection and returns a bounded
    serializable projection. No samples, unrestricted parser objects, or
    arbitrary source bytes cross the boundary.
-2. Child applies finite `RLIMIT_CPU` and `RLIMIT_AS` before importing/using
-   DLISIO. `RLIMIT_AS` constrains virtual address space, including native
-   allocations, and therefore caps the addressable process footprint; it is
-   not a direct RSS/cgroup measurement. A limit-triggered allocation/parser
-   failure is a bounded inspection failure, not `ABSENT`.
-3. Parent enforces a monotonic wall-clock deadline and kills the isolated
-   process group on expiry. Require a clean successful exit, bounded output,
-   and complete inventory marker before returning metadata. Never promote
-   partial child output to a complete inventory.
+2. Child applies finite `RLIMIT_CPU` and `RLIMIT_AS` before parsing. Proposed
+   LAS development bounds are 1 GiB address space, 10 CPU seconds, and 15 wall
+   seconds; proposed DLIS bounds are 1 GiB address space, 90 CPU seconds, and
+   120 wall seconds. These are provisional safety values, not production
+   budgets. `RLIMIT_AS` constrains virtual address space, including native
+   allocations, and is not a direct RSS/cgroup measurement. A limit-triggered
+   allocation/parser failure is incomplete/`UNKNOWN`, never `ABSENT`.
+3. Parent enforces the format-specific monotonic wall-clock deadline and kills
+   and reaps the isolated process group on expiry. It reads combined
+   stdout/stderr incrementally, never retaining more than the 1 MiB aggregate
+   output allowance plus a single detection byte. Require a clean successful
+   exit, bounded output, and complete inventory marker before returning
+   metadata. Never promote partial child output to a complete inventory.
 4. Keep the child from spawning unrestricted descendants; if the parser or
    runtime later requires them, ensure limits are inherited and the process
    group remains killable.
+5. Before any child launch, acquire a single host-wide nonblocking exclusive
+   `flock` on a canonical host-local runtime-state file shared by all WellPlot
+   processes. Hold the lock through child termination/reap; on contention,
+   fail closed as incomplete/`UNKNOWN` rather than launching another parser.
+   Every source-inspection path must pass through the existing
+   `LogfileSourceLoader` gate. Pass the lock descriptor to the direct child
+   (or otherwise prove equivalent lifetime ownership) so supervisor
+   cancellation/crash cannot release the gate while a parser remains alive;
+   do not permit parser descendants to escape process-group cleanup.
 
 The OS probes demonstrate `RLIMIT_AS`, `RLIMIT_CPU`, and parent wall-time
-termination in this WSL2 environment. They do not establish suitable numeric
-limits or test DLISIO under them. cgroup v2 exposes memory controllers in the
+termination in this WSL2 environment. Platform documentation describes
+`flock`, but cross-process locking/lifetime behavior has not yet been tested.
+The probes do not establish suitable production limits or prove the proposed
+limits on scaled inputs. cgroup v2 exposes memory controllers in the
 mount, but the mount is read-only here and the current scope has
 `memory.max=max`; per-job cgroup RSS enforcement is unavailable in this
 execution context. Before adoption, review whether `RLIMIT_AS` plus a child
@@ -388,8 +403,9 @@ safety margin and failure semantics.
   DLIS under production-appropriate process limits.
 - Representative performance distributions and feasibility of the provisional
   latency targets; no production-selected numeric resource budget.
-- Queue/concurrency interaction under more than the current one concurrent
-  agent call; no concurrency experiment was run.
+- Host-wide lock contention and cross-process child-count regressions; these
+  are required implementation tests, while production queue/concurrency
+  performance remains deferred.
 
 ## Complete Qwen/llama.cpp Request-Token Accounting
 
@@ -557,6 +573,8 @@ array/waveform rules individually, with domain evidence and collision tests.
 | LAS parser | LASIO 0.32 scans EOF; synthetic 1.2/2.0 bounded-prefix cases parse headers with empty arrays; marker semantics anchored to CWLS | Keep bounded prefix adapter as candidate, LASIO as header parser; return `UNKNOWN` on limits | Functional implementation: basic supported syntax and finite provisional safety controls. Production readiness: adversarial/representative matrix and evidenced operational budgets |
 | DLIS parser | Preserved 2,364-byte synthetic multi-logical/multi-frame fixture; strict-error truncated cases fail, SUL-only succeeds empty | Keep metadata-only traversal in supervised child; require non-empty complete inventory; no sample APIs or project writer dependency | Basic isolation and finite provisional limits before implementation; expanded scale/memory qualification for production readiness |
 | Resource budgets | Synthetic probes; provisional p95 targets proposed, not measured/accepted | Separate provisional safety controls from optimized production limits | Functional implementation: review finite provisional safety controls. Production readiness: measure each stratum on canonical WSL2/local storage and approve operational limits |
+| Parser-time containment (F18) | Prefix scanning and DLIS child limits were explored; LASIO itself did not have a containment proposal | Run LASIO and DLIS parsing only inside the supervised parser child with format-specific finite CPU/wall limits | Negative timeout/termination/reap tests for both formats |
+| Aggregate parser concurrency/output (F19) | One child per request does not cap concurrent requests; post-hoc output-size checks can allocate too much | Host-wide nonblocking inter-process lock; one active child; incremental aggregate stdout/stderr cap | Cross-process contention, cancellation/lock-lifetime and output-flood tests |
 | Token budget | Existing request shape understood, exact tokenizer/template unavailable | Exact same-build/model tokenization; separate grammar cap and byte cap | Local tokenizer/build availability or separate non-generative authorization |
 | Aliases | Static catalog is unversioned; candidate aliases lack explicit trust marking | Content-addressed, provenance-bearing, scope-aware closed-world registry | Review governance and compatibility correction before enabling role resolution |
 | MCP source-inspection integration (F17) | `_request_context()` eagerly loads every declared source; enrichment may load selected sources again | One request-scoped, source-revision-bound projection; inspect lazily only when semantic obligations require source evidence | Include both MCP and enrichment call sites in implementation; preserve snapshot checks and canonical publication |
@@ -572,16 +590,18 @@ and evidence classification are recorded in
 `docs/evaluations/agent-code-mode/A09-D2-feasibility-result.md`.
 
 The D2 planning candidate was subsequently accepted at
-`8dec3f37adcb8a90948cb7312ee3ec4a6fbde685`. F17 adds the MCP eager-versus-lazy
-inspection integration requirement; it does not reopen D1. The D2 result
-contains the provisional finite safety profile, lifecycle gate split, exact
-existing-component map, and F17 resolution plan. The safety profile remains a
-proposal awaiting implementation authorization, not production policy.
+`8dec3f37adcb8a90948cb7312ee3ec4a6fbde685`. F17's MCP eager-versus-lazy
+inspection requirement is accepted. F18/F19 add bounded LAS parser-time and
+host-wide child/output containment corrections; they do not reopen D1. The D2
+result contains the provisional finite safety profile, lifecycle gate split,
+exact existing-component map, and F17-F19 regressions. The safety profile
+remains a proposal awaiting implementation authorization, not production
+policy.
 
 | Area | D2 status | Remaining gate |
 | --- | --- | --- |
-| LAS metadata-first feasibility | Established on synthetic 1.2/2.0 cases; scanner remains a prototype | Before implementation: bounded correctness behavior and finite provisional safety limits. Production readiness: expanded/adversarial and representative qualification |
-| DLIS fixture/containment feasibility | Expanded synthetic multi-file/multi-frame fixture and strict corruption probes pass; no scale or production-limit evidence | Before implementation: supervised parser isolation, complete-inventory contract, finite provisional safety limits. Production readiness: 250 MiB/1 GiB scaling and hardened containment |
+| LAS metadata-first feasibility | Established on synthetic 1.2/2.0 cases; scanner remains a prototype | Before implementation: bounded correctness, supervised LASIO CPU/wall containment, finite provisional safety limits. Production readiness: expanded/adversarial and representative qualification |
+| DLIS fixture/containment feasibility | Expanded synthetic multi-file/multi-frame fixture and strict corruption probes pass; no scale or production-limit evidence | Before implementation: supervised parser isolation, complete-inventory contract, finite provisional safety limits, host-wide concurrency and incremental output controls. Production readiness: 250 MiB/1 GiB scaling and hardened containment |
 | Numeric resource budgets | Open; provisional latency targets are qualification-only; prior probes do not establish representative distributions | Not a functional-implementation gate. Measure against targets and approve enforceable production limits before production readiness |
 | Exact Qwen/llama.cpp token accounting | Blocked: exact local tokenizer/build/template absent; endpoint prohibited | Not required for provider-free implementation; required before affected provider-backed qualification |
 | Catalog governance | Policy proposed; no scientific mappings approved; project owner nominated as initial domain reviewer, acceptance pending | Synthetic mappings may support isolated tests. Accept reviewer role and approve evidence-backed production rules before activation, with independent schema review |

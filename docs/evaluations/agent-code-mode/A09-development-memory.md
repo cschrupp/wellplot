@@ -193,6 +193,20 @@ work must not inspect unrelated DLIS. Rich DLIS identities not supported by
 the existing renderer remain `UNADDRESSABLE`. This is an implementation
 integration clarification, not a D1 reopening or a new workflow.
 
+The subsequent safety review accepted F17 and requires two documentation
+corrections before functional implementation authorization. F18 applies the
+proposed finite CPU/wall limits to LASIO parsing itself, not only prefix
+scanning (1 GiB address space, 10 CPU seconds, 15 wall seconds; timeout or
+limit returns incomplete/`UNKNOWN`). F19 requires one host-wide active parser
+child across concurrent WellPlot processes, enforced at the existing loader
+boundary with a process-shared nonblocking lock; busy means incomplete/
+`UNKNOWN`. The supervising parent must enforce the aggregate 1 MiB stdout/stderr
+limit incrementally, and lock lifetime must cover cancellation until the child
+is gone. Add cross-process contention, cancellation, output-flood, abnormal
+exit and terminal-inventory regressions. These are safety corrections, not
+performance gates. Cross-process `flock` semantics are documented but not yet
+qualified in this environment. See the updated D2 result and resource record.
+
 ## D1 Joint Catalog/Source Design Acceptance
 
 The integrated A09-CAT/A09-SRC D1 design was accepted at exact checkpoint
