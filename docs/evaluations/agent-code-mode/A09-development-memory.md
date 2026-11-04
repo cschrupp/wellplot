@@ -170,6 +170,29 @@ the existing canonical `AuthoringService` path. Functional implementation
 remains pending separate Human authorization; A09 promotion and production
 qualification are not authorized.
 
+### D2 planning review and F17 (2026-11-04)
+
+D2 planning candidate `8dec3f37adcb8a90948cb7312ee3ec4a6fbde685` was accepted
+for bounded functional implementation planning. Performance p95 targets,
+representative scaling, optimized production budgets and exact provider token
+accounting are deferred beyond provider-free functional development. Basic
+parser isolation, finite provisional safety limits, deterministic source and
+channel identity, four-state resolution, fail-closed ambiguity, and canonical
+publication ownership remain implementation prerequisites. The proposed
+finite profile and existing-component migration map are recorded in
+`A09-D2-feasibility-result.md`; the values await separate review/authorization.
+
+F17 records a duplicate-inspection path: MCP
+`src/wellplot/mcp/agentic.py::_request_context()` eagerly loads all declared
+sources, then Code Mode enrichment may load selected sources again through
+`SemanticEnricher._load_source()`. The bounded implementation must unify these
+through one request-scoped, source-revision-bound inspection result, defer
+parsing until source-dependent obligations select a source, and reuse that
+result for MCP reconciliation and publication revalidation. Structural-only
+work must not inspect unrelated DLIS. Rich DLIS identities not supported by
+the existing renderer remain `UNADDRESSABLE`. This is an implementation
+integration clarification, not a D1 reopening or a new workflow.
+
 ## D1 Joint Catalog/Source Design Acceptance
 
 The integrated A09-CAT/A09-SRC D1 design was accepted at exact checkpoint

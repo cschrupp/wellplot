@@ -555,10 +555,11 @@ array/waveform rules individually, with domain evidence and collision tests.
 | Decision | Current evidence | Proposed disposition | Remaining gate |
 | --- | --- | --- | --- |
 | LAS parser | LASIO 0.32 scans EOF; synthetic 1.2/2.0 bounded-prefix cases parse headers with empty arrays; marker semantics anchored to CWLS | Keep bounded prefix adapter as candidate, LASIO as header parser; return `UNKNOWN` on limits | Functional implementation: basic supported syntax and finite provisional safety controls. Production readiness: adversarial/representative matrix and evidenced operational budgets |
-| DLIS parser | Preserved 2,364-byte synthetic multi-logical/multi-frame fixture; strict-error truncated cases fail, SUL-only succeeds empty | Keep metadata-only traversal in supervised child; require non-empty complete inventory; no sample APIs or project writer dependency | Scale matrix, verify completeness contract, decide acceptable memory enforcement |
+| DLIS parser | Preserved 2,364-byte synthetic multi-logical/multi-frame fixture; strict-error truncated cases fail, SUL-only succeeds empty | Keep metadata-only traversal in supervised child; require non-empty complete inventory; no sample APIs or project writer dependency | Basic isolation and finite provisional limits before implementation; expanded scale/memory qualification for production readiness |
 | Resource budgets | Synthetic probes; provisional p95 targets proposed, not measured/accepted | Separate provisional safety controls from optimized production limits | Functional implementation: review finite provisional safety controls. Production readiness: measure each stratum on canonical WSL2/local storage and approve operational limits |
 | Token budget | Existing request shape understood, exact tokenizer/template unavailable | Exact same-build/model tokenization; separate grammar cap and byte cap | Local tokenizer/build availability or separate non-generative authorization |
 | Aliases | Static catalog is unversioned; candidate aliases lack explicit trust marking | Content-addressed, provenance-bearing, scope-aware closed-world registry | Review governance and compatibility correction before enabling role resolution |
+| MCP source-inspection integration (F17) | `_request_context()` eagerly loads every declared source; enrichment may load selected sources again | One request-scoped, source-revision-bound projection; inspect lazily only when semantic obligations require source evidence | Include both MCP and enrichment call sites in implementation; preserve snapshot checks and canonical publication |
 
 ### D2 feasibility disposition (2026-11-03)
 
@@ -569,6 +570,13 @@ produced a fail-closed catalog-governance recommendation. It did **not** close
 resource-budget selection or exact model-token accounting. The full D2 result
 and evidence classification are recorded in
 `docs/evaluations/agent-code-mode/A09-D2-feasibility-result.md`.
+
+The D2 planning candidate was subsequently accepted at
+`8dec3f37adcb8a90948cb7312ee3ec4a6fbde685`. F17 adds the MCP eager-versus-lazy
+inspection integration requirement; it does not reopen D1. The D2 result
+contains the provisional finite safety profile, lifecycle gate split, exact
+existing-component map, and F17 resolution plan. The safety profile remains a
+proposal awaiting implementation authorization, not production policy.
 
 | Area | D2 status | Remaining gate |
 | --- | --- | --- |

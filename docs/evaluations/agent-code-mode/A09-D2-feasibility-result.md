@@ -358,6 +358,45 @@ source byte counts into rejection thresholds. A safety-limit breach must
 produce incomplete evidence and `UNKNOWN`, never `ABSENT` or successful
 publication.
 
+### Provisional parser-safety profile for review (not authorized)
+
+To make the implementation boundary reviewable, the following finite initial
+development profile is proposed. These values bound parser work and emitted
+metadata; they are not claims of broad format support, performance, or
+production memory guarantees. They require independent review and explicit
+Human implementation authorization before code is written.
+
+| Control | Proposed initial value | Enforcement and rationale |
+| --- | ---: | --- |
+| LAS maximum line | 2 MiB | Chunked scanner refuses an over-limit line and returns incomplete/`UNKNOWN`; aligns with the largest synthetic single header record exercised, but the scanner limit itself still needs regression coverage. |
+| LAS cumulative header prefix | 16 MiB | Scanner stops before reading beyond the bounded prefix; over-limit/missing marker is incomplete/`UNKNOWN`. Provisional safety cap only, not a total-file limit. |
+| LAS channel records | 5,001 | Stop inventory construction and return incomplete/`UNKNOWN` above cap; the largest synthetic channel inventory exercised was 5,001. |
+| DLIS child address space | 1 GiB per child | Set `RLIMIT_AS` before importing/using DLISIO. This bounds virtual address space, not RSS; unsupported or unavailable enforcement fails closed. |
+| DLIS child CPU time | 90 seconds | Set `RLIMIT_CPU`; signal/exit caused by the limit is incomplete/`UNKNOWN`. Mechanism exists, but this proposed value has not been tested on scaled inputs. |
+| DLIS wall time | 120 seconds | Parent monotonic deadline; start a killable process group and terminate/reap the entire group on expiry. Timeout is incomplete/`UNKNOWN`. |
+| DLIS projected metadata objects | 5,001 channel entries | Child counts projected channel entries and stops before emitting excess; output never certifies inventory completeness after truncation. |
+| Child metadata output and serialized inspection context | 1 MiB each | Parent reads output with a hard byte cap; existing `MAX_SERIALIZED_INSPECTION_CONTEXT_BYTES` is 1 MiB. Excess output is rejected as incomplete/`UNKNOWN`. |
+| Per-request parser concurrency | 1 child at a time | Serialize source inspections within one request; unrelated sources are not opened unless selected by source-dependent obligations. |
+
+No total source-file-byte ceiling is proposed. The proposed 120-second wall
+guard is greater than the 90-second provisional p95 objective, so missing a
+latency target remains observable as a performance result before the
+independent safety deadline. These caps may cause a valid but unusually large
+metadata inventory to resolve `UNKNOWN`; do not claim `ABSENT`. `RLIMIT_AS`
+does not provide a direct RSS guarantee. Production readiness still requires
+measured scaling, memory characterization and review of whether a writable
+cgroup/job limit is required. A rejected proposed value must be replaced by
+another finite, enforceable, fail-closed value before implementation
+authorization.
+
+The containment mechanisms follow the platform semantics documented by
+[Python 3.12 `resource`](https://docs.python.org/3.12/library/resource.html),
+[Python 3.12 `subprocess`](https://docs.python.org/3.12/library/subprocess.html),
+and the Linux [`getrlimit(2)` manual](https://man7.org/linux/man-pages/man2/getrlimit.2.html).
+In particular, `RLIMIT_AS` constrains virtual address space, `RLIMIT_CPU`
+constrains CPU seconds, and parent process-group termination is needed to
+contain descendants; none is equivalent to a measured RSS cgroup limit.
+
 ### Bounded provider-free functional implementation candidate
 
 Subject to separate implementation authorization, the candidate is limited to
@@ -369,12 +408,57 @@ extend or preserve are:
 | --- | --- |
 | `src/wellplot/agent/composition.py::create_canonical_dependencies` | Keep the single composition root and inject the existing `LogfileSourceLoader`/`SemanticEnricher`; no new graph, planner, or worker. |
 | `src/wellplot/agent/code_mode/source_loader.py::LogfileSourceLoader.load` and `SourceLoaderProtocol` | Add metadata-only LAS/DLIS extraction behind the existing loader contract. A supervised DLIS child is only a parser/metadata mechanism and returns bounded evidence; it cannot resolve intent or create/persist documents. |
-| `src/wellplot/agent/code_mode/enrichment.py::SemanticEnricher.enrich` and `._load_source` | Preserve allowed-root checks, source revision tokens, cache/snapshot validation, bounded projections, and incomplete/unknown outcomes. Extend existing source metadata contracts only as required for identity/completeness evidence. |
+| `src/wellplot/agent/code_mode/enrichment.py::SemanticEnricher.enrich`, `._select_sources`, and `._load_source` | Inspect only sources required by source-dependent obligations; preserve allowed-root checks, source revision tokens, cache/snapshot validation, bounded projections, and incomplete/unknown outcomes. Structural-only work must not open unrelated DLIS files. |
 | `src/wellplot/agent/inspection.py::AuthoringInspectionFacade` | Extend fixed read-only projections only for required, sanitized metadata evidence; do not expose raw source paths, samples, or free-form untrusted descriptions to the model. |
 | `src/wellplot/authoring_context.py::AuthoringContextResolver.resolve` and existing channel-resolution helpers | Add deterministic catalog-backed request-term interpretation and physical-channel resolution to the existing resolver. Preserve exact physical selectors, four-state resolution, ambiguity, provenance/version checks, and fail-closed behavior. |
 | `src/wellplot/model/intent.py::AuthoringDocumentIntent` | Preserve as the provider-neutral desired-state boundary. Do not create a second canonical intent or persist parser/catalog-specific identities as model authority. |
 | `src/wellplot/authoring_reconciler.py::reconcile_authoring`, `src/wellplot/authoring_executor.py::AuthoringExecutor.execute`, and `src/wellplot/authoring_service.py::AuthoringService` | Reuse unchanged as the canonical plan, CRUD execution, and validated document mutation route except for narrowly required integration fixes reviewed separately. |
 | Existing YAML and renderer paths | Preserve unchanged. Metadata inspection must not become an alternate loader for scientific rendering or an alternate persistence route. |
+
+### F17 — MCP eager inspection / duplicate source loading
+
+The source audit for accepted D2 planning candidate `8dec3f37adcb8a90948cb7312ee3ec4a6fbde685`
+found an existing integration defect, not an architecture change:
+
+- `src/wellplot/mcp/agentic.py::_request_context()` currently invokes
+  `LogfileSourceLoader.load()` for every declared source before planning and
+  builds `available_channels` from that eager projection.
+- The same request can subsequently reach
+  `SemanticEnricher._load_source()` in
+  `src/wellplot/agent/code_mode/enrichment.py`, which loads selected sources
+  again. The MCP reconciliation step then consumes the earlier channel
+  projection.
+
+The bounded implementation plan must route both call sites through one
+request-scoped canonical inspection result and one consistent source revision
+identity. `_request_context()` should resolve declared source paths/formats
+and capture source revision evidence without parsing every source. After the
+planner, enrichment should inspect only source candidates selected by
+source-dependent obligations; structural-only work must not needlessly index
+DLIS. The bounded inspected projection and its revision must then be carried
+through the existing `CodeModeCompileResult`/`AgentSessionResult` boundary (or
+an equivalently narrow extension of those existing contracts) for MCP
+reconciliation and final pre-publication revalidation. Do not load the source
+again to reconstruct `available_channels`.
+
+The implementation must also preserve the existing distinction between
+metadata identity and renderer addressability. The current DLIS rendering
+loader in `src/wellplot/io/dlis.py` selects the first logical file and stores
+channels by mnemonic; richer metadata identities it cannot address must be
+`UNADDRESSABLE`, never silently substituted or used to justify a second
+scientific loader/binding schema. D2 remains sufficient for planning this
+functional implementation; F17 is a required integration item, not a reason
+for another broad feasibility cycle.
+
+F17 acceptance regressions must prove: (1) a structural-only request performs
+zero source parser loads; (2) one source selected by source-dependent
+obligations is inspected once and the same bounded projection feeds worker
+context and reconciliation; (3) a source revision change between candidate
+resolution, inspection, compilation, and publication fails closed; (4) a
+declared but unselected DLIS source is not indexed; (5) a richer logical-file,
+frame, or repeated-mnemonic identity unsupported by the renderer returns
+`UNADDRESSABLE`; and (6) successful persistence remains reachable only through
+the existing canonical publication route.
 
 Implementation qualification must include source-level reachability/ownership
 tests proving the metadata adapter is reachable only through the existing
@@ -393,11 +477,20 @@ acceptance, active catalog release, and baseline promotion are separate later
 gates. Current disposition: `D2_FEASIBILITY_SUFFICIENT_FOR_IMPLEMENTATION_PLANNING`;
 `FUNCTIONAL_IMPLEMENTATION_PENDING_AUTHORIZATION`.
 
+The planning package was independently accepted against commit
+`8dec3f37adcb8a90948cb7312ee3ec4a6fbde685`. F17 is recorded as a required
+implementation integration clarification: unify MCP eager inspection and
+enrichment inspection through one request-scoped, revision-bound projection.
+This does not reopen D1, close D2 production qualification, or authorize
+implementation.
+
 ## References
 
 - Canadian Well Logging Society, [LAS Version 2.0 specification](https://www.cwls.org/wp-content/uploads/2014/09/LAS_20_Update_Jan2014.pdf).
 - LASIO 0.32, [reader source documentation](https://lasio.readthedocs.io/en/latest/_modules/lasio/reader.html) and [encoding documentation](https://lasio.readthedocs.io/en/latest/encodings.html).
 - Equinor, [DLISIO 1.0.4 API](https://dlisio.readthedocs.io/en/stable/dlis/api.html) and [error handling](https://dlisio.readthedocs.io/en/stable/dlis/errors.html).
+- Python Software Foundation, [Python 3.12 `resource`](https://docs.python.org/3.12/library/resource.html) and [`subprocess`](https://docs.python.org/3.12/library/subprocess.html) documentation.
+- Linux man-pages, [`getrlimit(2)`](https://man7.org/linux/man-pages/man2/getrlimit.2.html).
 - Well ID, [dliswriter source](https://github.com/well-id/dliswriter) and [PyPI 1.2.0 artifact](https://pypi.org/project/dliswriter/1.2.0/).
 - ggml-org, [llama.cpp server API](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md).
 

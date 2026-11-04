@@ -177,6 +177,19 @@ baseline promotion, provider call, endpoint call, or live/scientific
 qualification is authorized. Functional implementation remains pending
 separate authorization; A09 remains open.
 
+The D2 planning candidate was independently accepted at
+`8dec3f37adcb8a90948cb7312ee3ec4a6fbde685`. Review finding F17 requires the
+bounded implementation plan to reconcile eager source inspection in
+`src/wellplot/mcp/agentic.py::_request_context()` with later loading in
+`SemanticEnricher._load_source()`. Use one request-scoped, source-revision-bound
+inspection projection; inspect only when source-dependent work selects a
+source; reuse the projection for reconciliation and final revalidation. A
+structural-only request must not parse unrelated DLIS. Rich metadata identities
+not supported by the existing DLIS renderer remain `UNADDRESSABLE`. The exact
+entry points, provisional safety-control proposal and source-ownership tests
+are recorded in the D2 feasibility result. F17 does not reopen D1 or authorize
+source implementation.
+
 The accepted documentation-only D1 joint semantic-catalog/source-inspection
 design is recorded in
 `docs/architecture/A09_JOINT_SEMANTIC_CATALOG_AND_SOURCE_INSPECTION_DESIGN.md`.
