@@ -5,7 +5,7 @@
 **Accepted design:** `daef5d171828495b2f0dfcea25ae372f0bc39af4`
 **A09 implementation:** Not released by this package
 **Live/provider/scientific/C02 activity:** None
-**D1 joint design:** `docs/architecture/A09_JOINT_SEMANTIC_CATALOG_AND_SOURCE_INSPECTION_DESIGN.md` (review pending)
+**D1 joint design:** Accepted at `da23cd69792b4c75ed1da30bc0de35ca69ddcb38`; acceptance record at `docs/architecture/A09_D1_ACCEPTANCE_RECORD.md`
 
 ## Decision Summary
 
@@ -385,16 +385,16 @@ rule, review owner, update/version procedure, closed-world scope, and fallback
 status. Add provider-free positive, collision, missing-catalog, stale-digest,
 untrusted-source-alias, incomplete-inventory, and GR ambiguity regressions.
 
-The integrated D1 proposal is in
+The accepted integrated D1 design is in
 `docs/architecture/A09_JOINT_SEMANTIC_CATALOG_AND_SOURCE_INSPECTION_DESIGN.md`.
 It separates request-term aliases from physical-channel rules, and semantic
 classification from four-state physical resolution, renderer addressability,
 and sample availability. It proposes normalized catalog and source-metadata
 shapes, a two-stage deterministic resolver, direct catalog-digest custody, and
-a provider-free acceptance matrix. It also proposes a narrow amendment to
-accepted F14 bare-token and family-absence semantics; that amendment is pending
-independent D1 acceptance and does not close any D2 feasibility item or
-authorize implementation.
+a provider-free acceptance matrix. Its narrow F14 amendment for ambiguous
+bare-token interpretation and exhaustive-scope family absence was accepted at
+D1; the original historical design remains unchanged. This acceptance does
+not close any D2 feasibility item or authorize implementation.
 
 ### Supplied family JSON audit disposition
 

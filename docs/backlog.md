@@ -150,23 +150,24 @@ and candidate-provided aliases can directly participate in matching. These
 are explicit implementation prerequisites. No production implementation,
 binding-schema or scientific-loader change, baseline promotion, provider call,
 endpoint call, or live/scientific qualification is authorized. A09 remains
-open pending independent review of the D1 integrated design, D2 feasibility
-closure, and subsequent separately authorized bounded implementation and
-qualification.
+open pending D2 feasibility closure and subsequent separately authorized
+bounded implementation and qualification.
 
-A documentation-only D1 joint semantic-catalog/source-inspection design
-candidate is recorded in
+The accepted documentation-only D1 joint semantic-catalog/source-inspection
+design is recorded in
 `docs/architecture/A09_JOINT_SEMANTIC_CATALOG_AND_SOURCE_INSPECTION_DESIGN.md`.
 It integrates the accepted metadata-first design with a governed normalized
 catalog and read-only inspection contract through the existing authoring
-context. D1 is pending independent review; it preserves the historical
-F13/F14 document and proposes a narrow F14 amendment for ambiguous bare-token
-interpretation and family-level absence. The amendment is not accepted yet.
-D1 also addresses review finding F15 by separating request-term recognition
-from physical-channel classification, and binds semantic resolutions to the
-catalog content digest plus immutable release reference.
-D1 does not authorize implementation, select production aliases/defaults or
-resource budgets, or promote the active baseline. Four supplied family
+context. D1 was independently accepted at
+`da23cd69792b4c75ed1da30bc0de35ca69ddcb38`; F15/F16 are closed, including the
+narrow F14 amendment for ambiguous bare-token interpretation and family-level
+absence. The accepted historical F14 document was not rewritten. Request-term
+recognition is distinct from physical-channel classification, and semantic
+resolutions bind the catalog content digest plus immutable release reference.
+The acceptance and Knowledge Delta are recorded in
+`docs/architecture/A09_D1_ACCEPTANCE_RECORD.md`. D1 does not authorize
+implementation, select production aliases/defaults or resource budgets, or
+promote the active baseline. Four supplied family
 JSON files were audited as untrusted reference/collision data; exact findings
 and digests are in the D1 design and feasibility record. Licensing/provenance,
 valid synthetic DLIS fixtures, resource-budget evidence, exact model token

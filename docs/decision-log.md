@@ -1,6 +1,6 @@
 # wellplot Decision Log
 
-Last updated: 2026-11-01
+Last updated: 2026-11-03
 
 ## Purpose
 
@@ -416,3 +416,20 @@ When a decision changes, update this file with:
 The superseded program-generation decision remains in the historical record;
 CM-54 through CM-58 define the separately authorized path for production
 adoption and acceptance.
+
+## A09 Integrated Metadata/Catalog Design Acceptance (2026-11-03)
+
+The integrated A09-CAT/A09-SRC D1 design at
+`da23cd69792b4c75ed1da30bc0de35ca69ddcb38` is independently accepted.
+The review closes F15/F16 and accepts a narrow F14 amendment covering
+ambiguous bare `GR` interpretation and the requirement for an explicitly
+reviewed exhaustive scope before family-level `ABSENT`. Exact physical-channel
+selection retains precedence when the user has unambiguously qualified it.
+
+The accepted candidate is preserved; the historical F14 document was not
+rewritten. The acceptance and its Knowledge Delta are recorded in
+`docs/architecture/A09_D1_ACCEPTANCE_RECORD.md`. The active baseline is not
+promoted by this decision. D2 feasibility remains open, and A09 implementation
+and A10 integration qualification are not authorized. Catalog mappings,
+presentation presets, resource limits, and model-token accounting remain
+unselected pending their respective feasibility and governance evidence.

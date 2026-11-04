@@ -5,7 +5,7 @@
 - State: security/observability tranche accepted; A09 overall open
 - Accepted security/observability checkpoint: `7ea43a6548a8bd1e5b44eb20c085a7027932e0db`
 - Accepted metadata-first design checkpoint: `daef5d171828495b2f0dfcea25ae372f0bc39af4`
-- Current work: D1 joint semantic-catalog/source-inspection design candidate; D2 feasibility remains open
+- Current work: D1 accepted; prepare/close D2 feasibility; implementation remains unauthorized
 - Provider, model, and endpoint calls: `0`
 - Scientific turns: `0`
 - C02 exposure: `0`
@@ -91,17 +91,25 @@ The provider-free feasibility results and evidence limits are recorded in
 `docs/evaluations/agent-code-mode/A09-resource-budget-feasibility.md`. They do
 not promote implementation or authorize endpoint/model/scientific work.
 
-## D1 Joint Catalog/Source Design Candidate
+## D1 Joint Catalog/Source Design Acceptance
 
-The documentation-only D1 integrated design candidate is
+The integrated A09-CAT/A09-SRC D1 design was accepted at exact checkpoint
+`da23cd69792b4c75ed1da30bc0de35ca69ddcb38`. The complete decision and
+Knowledge Delta are in `docs/architecture/A09_D1_ACCEPTANCE_RECORD.md`; the
+design itself remains at
 `docs/architecture/A09_JOINT_SEMANTIC_CATALOG_AND_SOURCE_INSPECTION_DESIGN.md`.
-It coordinates the semantic-family catalog and metadata-only LAS/DLIS source
-inspection through the existing authoring-context boundary. D1 acceptance is
-pending independent review; this candidate is not implementation authority
-and does not rewrite the accepted F13/F14 design checkpoint. It proposes a
-narrow F14 amendment for ambiguous bare `GR` interpretation and for requiring
-an explicitly reviewed exhaustive scope before family-level `ABSENT`; the
-original accepted rule remains historical and immutable pending review.
+The accepted metadata-first foundation remains
+`daef5d171828495b2f0dfcea25ae372f0bc39af4`; its historical document was not
+rewritten.
+
+F15/F16 are closed. Accepted F14 amendment: ambiguous bare `GR` requires
+clarification, while an unambiguously qualified physical selector retains
+exact-match precedence; family-level `ABSENT` requires complete inventory
+and an explicitly reviewed exhaustive mapping for the relevant scope. The
+catalog uses separate request-term-to-family and family-to-physical-channel
+rules in one deterministic host resolver. Semantic resolution custody pins
+`catalog_content_sha256` directly and an immutable release reference, with
+digest revalidation before publication.
 
 The four local `examples/families/*.json` inputs were audited read-only. Their
 schema/count/collision findings and exact SHA-256 identities are recorded in
@@ -128,11 +136,10 @@ physical inventory presence or renderer addressability. Semantic resolutions
 carry `catalog_content_sha256` directly plus an immutable release reference,
 and verify the digest again before publication.
 
-The current D1 corrective addresses review findings F15/F16: distinct typed
-rule domains and an explicit, proposed F14 amendment for ambiguous bare-token
-interpretation and exhaustive-scope family absence. The accepted historical
-F14 document remains unchanged. The amendment remains pending independent
-review and must not be treated as accepted policy yet.
+The accepted design remains design-level only. The F14 amendment is accepted
+as a design rule, but no production implementation, catalog mapping,
+presentation preset, unit conversion, or resource budget is authorized by
+D1.
 
 It preserves exact literal channel selection for unclassified vendor channels,
 does not infer family absence from a nonexhaustive catalog, and blocks binding
