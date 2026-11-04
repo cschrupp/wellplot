@@ -123,34 +123,49 @@ Stage-two baseline promotion follows independent implementation acceptance and
 may record only verified contracts, regression evidence, exact checkpoints,
 and residual limitations.
 
-A09 is in provider-free implementation review. The current candidate adds
-failure ownership, safe exception/cancellation stage traces, request/result and
-worker-contract digest linkage, and prompt-injection projection coverage. The
-fixed source-file byte ceiling is explicitly deferred: multi-gigabyte LAS/DLIS
-files must not be rejected solely by total file size. This does not close
-parser resource-safety requirements. Metadata-first inspection, deterministic
-`UNIQUE`/`AMBIGUOUS`/`ABSENT`/`UNKNOWN` channel resolution, and token-aware
-complete-request budgeting require a separate design review before
-implementation. Proposed replacement controls include bounded parser memory
-and time, metadata-volume and read-query budgets, and model-aware token budgets
-with a secondary serialized-byte safety cap. A09 remains incomplete until
-those safeguards are accepted or the residual limitation is explicitly
-accepted.
+A09 security/observability is accepted at
+`7ea43a6548a8bd1e5b44eb20c085a7027932e0db`; A09 overall remains open. The
+security/observability tranche adds failure ownership, safe
+exception/cancellation stage traces, request/result and worker-contract digest
+linkage, and prompt-injection projection coverage. The fixed source-file byte
+ceiling is explicitly rejected: multi-gigabyte LAS/DLIS files must not be
+rejected solely by total file size. This does not close parser resource-safety
+requirements.
 
-The metadata-first inspection / channel-resolution design and its F13/F14
-corrective are captured in
-`docs/architecture/A09_METADATA_FIRST_INSPECTION_AND_CONTEXT_BUDGET_DESIGN.md`
-as a review candidate. It proposes LAS/DLIS metadata-only extraction through
-the existing source-loader boundary, four-state host resolution, a separate
-fail-closed binding-addressability gate against the existing renderer, a
-versioned trusted semantic-alias policy, full-request model-aware token
-budgeting, and explicit `UNKNOWN` on incomplete or resource-limited
-inspection. It selects no numeric budgets and no DLIS hard-containment
-mechanism; both remain review decisions. No implementation, binding-schema or
-scientific-loader change, baseline promotion, provider call, or
-live/scientific qualification is authorized by the design document. A09
-remains open pending independent design acceptance and subsequent bounded
-implementation/qualification.
+The metadata-first inspection/channel-resolution design and its F13/F14
+closure were accepted at exact checkpoint
+`daef5d171828495b2f0dfcea25ae372f0bc39af4` and are recorded in
+`docs/architecture/A09_METADATA_FIRST_INSPECTION_AND_CONTEXT_BUDGET_DESIGN.md`.
+The provider-free feasibility and resource-budget results are recorded in
+`docs/evaluations/agent-code-mode/A09-resource-budget-feasibility.md`. Stock
+LASIO 0.32 avoids sample-array parsing with `ignore_data=True` but scans the
+complete file for section markers; a bounded prefix-to-data-marker adapter is
+a candidate, not implemented. DLISIO 1.0.4 scans/indexes the complete physical
+file; no synthetic DLIS fixture was available, so no DLIS resource timings are
+claimed. WSL2 process address/CPU limits and parent wall termination were
+mechanism-tested; no production limit values are selected. Exact Qwen/llama.cpp
+token counts are unavailable offline without the matching tokenizer/model
+and server build. Current channel aliases lack provenance/version metadata,
+and candidate-provided aliases can directly participate in matching. These
+are explicit implementation prerequisites. No production implementation,
+binding-schema or scientific-loader change, baseline promotion, provider call,
+endpoint call, or live/scientific qualification is authorized. A09 remains
+open pending independent review of the D1 integrated design, D2 feasibility
+closure, and subsequent separately authorized bounded implementation and
+qualification.
+
+A documentation-only D1 joint semantic-catalog/source-inspection design
+candidate is recorded in
+`docs/architecture/A09_JOINT_SEMANTIC_CATALOG_AND_SOURCE_INSPECTION_DESIGN.md`.
+It integrates the accepted metadata-first design with a governed normalized
+catalog and read-only inspection contract through the existing authoring
+context. D1 is pending independent review; it does not alter the accepted
+F13/F14 record, authorize implementation, select production aliases/defaults
+or resource budgets, or promote the active baseline. Four supplied family
+JSON files were audited as untrusted reference/collision data; exact findings
+and digests are in the D1 design and feasibility record. Licensing/provenance,
+valid synthetic DLIS fixtures, resource-budget evidence, exact model token
+accounting, and catalog governance remain D2 prerequisites. A09 remains open.
 
 The bounded A07 shared-identity allocator corrective was independently
 accepted at `c0ea8b9a7ebc0d9590fdf13286adfbd367c7e8ed`. The broader A07

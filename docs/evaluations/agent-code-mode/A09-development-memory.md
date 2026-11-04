@@ -2,8 +2,10 @@
 
 ## Status
 
-- State: provider-free implementation candidate; independent review pending
-- Base: `e1a0c481c26c281dab68f522a2e84f8d8920f893`
+- State: security/observability tranche accepted; A09 overall open
+- Accepted security/observability checkpoint: `7ea43a6548a8bd1e5b44eb20c085a7027932e0db`
+- Accepted metadata-first design checkpoint: `daef5d171828495b2f0dfcea25ae372f0bc39af4`
+- Current work: D1 joint semantic-catalog/source-inspection design candidate; D2 feasibility remains open
 - Provider, model, and endpoint calls: `0`
 - Scientific turns: `0`
 - C02 exposure: `0`
@@ -59,6 +61,74 @@ must establish finite parser memory/time, metadata-volume, read-query, and
 complete-request token budgets, retaining a secondary serialized-byte cap.
 A09 is not complete until these safeguards are accepted or the remaining
 limitation is explicitly accepted.
+
+## Accepted Metadata-First Design
+
+The independent design review accepted the metadata-first inspection and
+context-budget architecture at exact checkpoint
+`daef5d171828495b2f0dfcea25ae372f0bc39af4`. F13 and F14 are closed at that
+checkpoint. The accepted separation is:
+
+1. Metadata resolution identifies declared channel objects.
+2. A separate host-owned addressability check determines whether the exact
+   object can be selected by the existing renderer/binding interface.
+3. Numerical sample availability remains independently unverified unless
+   explicitly checked.
+
+Automatic binding requires a unique metadata candidate and proven existing
+renderer addressability. Semantic roles may match physical mnemonics only by
+trusted, versioned alias evidence; similar names alone do not establish
+scientific equivalence. The design does not authorize modifying the scientific
+loader or binding schema.
+
+No fixed total LAS/DLIS file-size ceiling is permitted. Metadata-only parsing,
+four-state resolution, model-aware complete-request token accounting, and
+replacement parser safeguards remain implementation prerequisites. Numeric
+budgets, DLIS containment, exact Qwen/llama.cpp token accounting, and alias
+catalog governance are not decided by design acceptance.
+
+The provider-free feasibility results and evidence limits are recorded in
+`docs/evaluations/agent-code-mode/A09-resource-budget-feasibility.md`. They do
+not promote implementation or authorize endpoint/model/scientific work.
+
+## D1 Joint Catalog/Source Design Candidate
+
+The documentation-only D1 integrated design candidate is
+`docs/architecture/A09_JOINT_SEMANTIC_CATALOG_AND_SOURCE_INSPECTION_DESIGN.md`.
+It coordinates the semantic-family catalog and metadata-only LAS/DLIS source
+inspection through the existing authoring-context boundary. D1 acceptance is
+pending independent review; this candidate is not implementation authority
+and does not revise the accepted F13/F14 design checkpoint.
+
+The four local `examples/families/*.json` inputs were audited read-only. Their
+schema/count/collision findings and exact SHA-256 identities are recorded in
+the D1 document and feasibility record. They are reference/collision material
+only: no row or presentation default is trusted, no data was copied into
+production, and source licensing/redistribution is unknown. The audit found
+wildcard and exact-assignment collisions, heterogeneous/wildcard units,
+nonphysical/status concepts, sparse presentation values, and incompatible
+family labels across the compatibility projection. These findings require
+curation and provenance before any rule is enabled.
+
+The integrated proposal explicitly keeps separate:
+
+1. Physical channel resolution: `UNIQUE`, `AMBIGUOUS`, `ABSENT`, `UNKNOWN`.
+2. Semantic-family classification: reviewed match, candidate-only,
+   unclassified, or unknown.
+3. Existing-renderer addressability: addressable, unaddressable, or unknown.
+4. Numeric sample availability: normally `NOT_CHECKED`.
+
+It preserves exact literal channel selection for unclassified vendor channels,
+does not infer family absence from a nonexhaustive catalog, and blocks binding
+unless metadata identity is unique and existing renderer addressability is
+proven. No source loader, binding schema, renderer, workflow, or baseline was
+changed.
+
+D1 review and D2 feasibility are distinct. D2 still needs a valid synthetic
+RP66 fixture and measured containment, supported LAS correctness/resource
+matrix, justified finite budgets, exact Qwen/llama.cpp tokenizer/template
+accounting, and accepted catalog provenance/license/governance. No numeric
+limits, mappings, or conversion rules were selected.
 
 ## Boundaries
 
