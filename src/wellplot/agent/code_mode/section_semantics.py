@@ -192,6 +192,8 @@ class SectionSemanticErrorCode(StrEnum):
     SOURCE_CANDIDATE_AMBIGUOUS = "source_candidate_ambiguous"
     CHANNEL_MISSING = "channel_missing"
     CHANNEL_AMBIGUOUS = "channel_ambiguous"
+    CHANNEL_UNADDRESSABLE = "channel_unaddressable"
+    CHANNEL_ADDRESSABILITY_UNKNOWN = "channel_addressability_unknown"
     CHANNEL_KIND_MISMATCH = "channel_kind_mismatch"
     DUPLICATE_TRACK_ID = "duplicate_track_semantic_id"
     DUPLICATE_BINDING_ID = "duplicate_binding_semantic_id"
@@ -268,6 +270,16 @@ def validate_section_semantics(
                     f"Channel '{binding.channel}' is duplicated in the selected source.",
                 )
             channel = matching_channels[0]
+            if channel.addressability == "UNADDRESSABLE":
+                raise SectionSemanticValidationError(
+                    SectionSemanticErrorCode.CHANNEL_UNADDRESSABLE,
+                    f"Channel '{binding.channel}' is not addressable by the current renderer.",
+                )
+            if channel.addressability == "UNKNOWN":
+                raise SectionSemanticValidationError(
+                    SectionSemanticErrorCode.CHANNEL_ADDRESSABILITY_UNKNOWN,
+                    f"Addressability for channel '{binding.channel}' is not established.",
+                )
             expected_kind = "scalar" if binding.kind == "curve" else "array"
             if channel.kind != expected_kind:
                 raise SectionSemanticValidationError(

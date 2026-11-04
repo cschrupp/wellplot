@@ -561,6 +561,18 @@ def test_context_validation_rejects_duplicate_channel_mnemonics() -> None:
     assert error.value.code is SectionSemanticErrorCode.CHANNEL_AMBIGUOUS
 
 
+def test_context_validation_rejects_unknown_channel_addressability() -> None:
+    """Workers fail closed when metadata cannot prove renderer addressability."""
+    source = _source(
+        channels=(ChannelContext(mnemonic="MD", kind="scalar", addressability="UNKNOWN"),)
+    )
+
+    with pytest.raises(SectionSemanticValidationError) as error:
+        validate_section_semantics(_normal_draft(channel="MD"), section_context=_context(source))
+
+    assert error.value.code is SectionSemanticErrorCode.CHANNEL_ADDRESSABILITY_UNKNOWN
+
+
 def test_context_validation_does_not_resolve_channel_aliases() -> None:
     """Output channel selection remains exact-mnemonic only."""
     source = _source(channels=(ChannelContext(mnemonic="GR", kind="scalar", aliases=("GAMMA",)),))

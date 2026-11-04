@@ -13,6 +13,9 @@ from typing import Any
 MAX_LAS_LINE_BYTES = 2 * 1_048_576
 MAX_LAS_PREFIX_BYTES = 16 * 1_048_576
 MAX_METADATA_OBJECTS = 5_001
+# Keep aligned with wellplot.io.las._DEPTH_MNEMONICS: the canonical loader
+# consumes a depth-named first curve as LASIO's index instead of a regular curve.
+_LAS_DEPTH_INDEX_MNEMONICS = {"DEPT", "DEPTH", "MD", "TDEP"}
 
 
 def main(arguments: list[str]) -> int:
@@ -61,15 +64,23 @@ def _inspect_las(path: Path) -> dict[str, Any]:
         mnemonic = str(curve.mnemonic).strip()
         if not mnemonic:
             raise ValueError("blank LAS mnemonic")
+        is_depth_index_curve = index == 0 and mnemonic.upper() in _LAS_DEPTH_INDEX_MNEMONICS
+        has_unique_mnemonic = counts[mnemonic.casefold()] == 1
+        if not has_unique_mnemonic or is_depth_index_curve:
+            addressability = "UNADDRESSABLE"
+        elif mnemonic.upper() in _LAS_DEPTH_INDEX_MNEMONICS:
+            # The loader may omit another depth-named curve if its samples match
+            # LASIO's index; metadata-only inspection cannot establish equality.
+            addressability = "UNKNOWN"
+        else:
+            addressability = "ADDRESSABLE"
         channels.append(
             {
                 "mnemonic": mnemonic,
                 "unit": str(curve.unit).strip() or None,
                 "kind": "scalar",
                 "physical_identity": {"format": "LAS", "curve_index": index},
-                "addressability": (
-                    "ADDRESSABLE" if counts[mnemonic.casefold()] == 1 else "UNADDRESSABLE"
-                ),
+                "addressability": addressability,
                 "frame_indexes": [],
             }
         )

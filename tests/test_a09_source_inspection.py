@@ -26,15 +26,48 @@ from wellplot.agent.code_mode.source_loader import (
     SourceInspectionError,
     _collect_child_stdout,
 )
+from wellplot.io.las import _DEPTH_MNEMONICS
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DLIS_FIXTURE = REPO_ROOT / "tests/fixtures/a09_d2_metadata/multifile_repeated_mnemonics.dlis"
 DLIS_FIXTURE_SHA256 = "b98beba2bc6fedb70794da63d68dd09ac94abe02191fbfb53e6acd2eb85c08b9"
+SHELL_LAS = REPO_ROOT / "workspace/data/30-23a-3 8117_d.las"
+SHELL_LAS_CHANNELS = (
+    "DEPTH",
+    "CAL",
+    "CALI",
+    "CGR",
+    "DRHO",
+    "DT",
+    "DTL",
+    "GR",
+    "GRD",
+    "ILD",
+    "ILM",
+    "MSFL",
+    "NPHI",
+    "PEF",
+    "POTA.",
+    "RHOB",
+    "SFLU",
+    "SP",
+    "THOR",
+    "URAN",
+)
 
 
 def _write_small_las(path: Path) -> None:
     las = lasio.LASFile()
     las.append_curve("DEPT", [100.0, 101.0], unit="m")
+    las.append_curve("GR", [50.0, 51.0], unit="gAPI")
+    las.write(str(path), version=2.0)
+
+
+def _write_las_with_later_depth_alias(path: Path) -> None:
+    """Write a LAS where a later MD curve may be consumed as the index."""
+    las = lasio.LASFile()
+    las.append_curve("DEPTH", [100.0, 101.0], unit="m")
+    las.append_curve("MD", [100.0, 101.0], unit="m")
     las.append_curve("GR", [50.0, 51.0], unit="gAPI")
     las.write(str(path), version=2.0)
 
@@ -50,11 +83,61 @@ def test_las_metadata_inspection_does_not_depend_on_numeric_tail(tmp_path: Path)
 
     assert [channel.mnemonic for channel in first.channels] == ["DEPT", "GR"]
     assert [channel.mnemonic for channel in second.channels] == ["DEPT", "GR"]
-    assert all(channel.addressability == "ADDRESSABLE" for channel in second.channels)
+    assert [channel.addressability for channel in first.channels] == [
+        "UNADDRESSABLE",
+        "ADDRESSABLE",
+    ]
+    assert [channel.addressability for channel in second.channels] == [
+        "UNADDRESSABLE",
+        "ADDRESSABLE",
+    ]
     assert all(channel.sample_availability == "NOT_CHECKED" for channel in second.channels)
     assert all(channel.shape == () for channel in second.channels)
     assert all(channel.description == "" and channel.aliases == () for channel in second.channels)
     assert first.well_metadata == second.well_metadata == ()
+
+
+def test_later_depth_mnemonic_addressability_is_unknown_without_sample_inspection(
+    tmp_path: Path,
+) -> None:
+    """A later depth alias is not presumed addressable from its header alone."""
+    source_path = tmp_path / "later-depth-alias.las"
+    _write_las_with_later_depth_alias(source_path)
+
+    source = LogfileSourceLoader(runtime_root=tmp_path).load(source_path, "las")
+
+    assert [channel.mnemonic for channel in source.channels] == ["DEPTH", "MD", "GR"]
+    assert [channel.physical_identity["curve_index"] for channel in source.channels] == [0, 1, 2]
+    assert [channel.addressability for channel in source.channels] == [
+        "UNADDRESSABLE",
+        "UNKNOWN",
+        "ADDRESSABLE",
+    ]
+    assert all(channel.sample_availability == "NOT_CHECKED" for channel in source.channels)
+    assert all(channel.shape == () for channel in source.channels)
+
+
+def test_las_depth_index_contract_matches_scientific_loader() -> None:
+    """Metadata inspection and the canonical loader share depth-index names."""
+    assert source_inspection_child._LAS_DEPTH_INDEX_MNEMONICS == _DEPTH_MNEMONICS
+
+
+@pytest.mark.skipif(not SHELL_LAS.is_file(), reason="canonical Shell LAS asset unavailable")
+def test_shell_las_projection_preserves_channels_and_marks_depth_index_unaddressable() -> None:
+    """Project the real Shell LAS header without loading numerical samples."""
+    source = LogfileSourceLoader(runtime_root=REPO_ROOT).load(SHELL_LAS, "las")
+
+    assert [channel.mnemonic for channel in source.channels] == list(SHELL_LAS_CHANNELS)
+    assert source.channels[0].physical_identity == {"format": "LAS", "curve_index": 0}
+    assert source.channels[0].mnemonic == "DEPTH"
+    assert source.channels[0].addressability == "UNADDRESSABLE"
+    assert source.channels[14].mnemonic == "POTA."
+    assert source.channels[14].unit is None
+    assert all(channel.sample_availability == "NOT_CHECKED" for channel in source.channels)
+    assert all(channel.shape == () for channel in source.channels)
+    assert [channel.physical_identity["curve_index"] for channel in source.channels] == list(
+        range(20)
+    )
 
 
 def test_incomplete_las_header_fails_closed(tmp_path: Path) -> None:

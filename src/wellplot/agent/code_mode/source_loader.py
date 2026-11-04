@@ -44,7 +44,7 @@ class _ChannelProjection(BaseModel):
     unit: str | None = Field(default=None, max_length=256)
     kind: Literal["scalar", "array"]
     physical_identity: dict[str, str | int | tuple[int, ...]]
-    addressability: Literal["ADDRESSABLE", "UNADDRESSABLE"]
+    addressability: Literal["ADDRESSABLE", "UNADDRESSABLE", "UNKNOWN"]
     frame_indexes: tuple[int, ...] = ()
 
 

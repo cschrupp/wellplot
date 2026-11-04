@@ -101,7 +101,7 @@ class AuthoringChannelCandidate(_ContextModel):
     value_shape: list[int] = Field(default_factory=list)
     source_path: str | None = Field(default=None, min_length=1)
     physical_identity: dict[str, Any] = Field(default_factory=dict)
-    addressability: Literal["ADDRESSABLE", "UNADDRESSABLE"] = "ADDRESSABLE"
+    addressability: Literal["ADDRESSABLE", "UNADDRESSABLE", "UNKNOWN"] = "ADDRESSABLE"
 
 
 class PhysicalChannelResolution(_ContextModel):
@@ -109,7 +109,7 @@ class PhysicalChannelResolution(_ContextModel):
 
     state: PhysicalChannelResolutionState
     candidates: tuple[AuthoringChannelCandidate, ...] = ()
-    addressability: Literal["ADDRESSABLE", "UNADDRESSABLE"] | None = None
+    addressability: Literal["ADDRESSABLE", "UNADDRESSABLE", "UNKNOWN"] | None = None
 
 
 def resolve_physical_channel(
@@ -1151,21 +1151,6 @@ def _resolve_channels(
                 )
             )
             continue
-        if (
-            physical.state is PhysicalChannelResolutionState.UNIQUE
-            and physical.addressability == "UNADDRESSABLE"
-        ):
-            issues.append(
-                AuthoringContextIssue(
-                    path=f"{path}.channel",
-                    code="channel_unaddressable",
-                    message=(
-                        f"Channel {requested!r} has a unique metadata identity that the "
-                        "current renderer cannot address unambiguously."
-                    ),
-                )
-            )
-            continue
         matches, matched_alias = _candidate_matches(str(requested), candidates, channel_aliases)
         if len(matches) != 1:
             code = "channel_missing" if not matches else "channel_ambiguous"
@@ -1184,6 +1169,32 @@ def _resolve_channels(
             )
             continue
         candidate = matches[0]
+        if candidate.addressability == "UNADDRESSABLE":
+            issues.append(
+                AuthoringContextIssue(
+                    path=f"{path}.channel",
+                    code="channel_unaddressable",
+                    message=(
+                        f"Channel {candidate.mnemonic!r} has a unique metadata identity that the "
+                        "current renderer cannot address unambiguously."
+                    ),
+                    candidates=[candidate.mnemonic],
+                )
+            )
+            continue
+        if candidate.addressability == "UNKNOWN":
+            issues.append(
+                AuthoringContextIssue(
+                    path=f"{path}.channel",
+                    code="channel_addressability_unknown",
+                    message=(
+                        f"The current renderer's addressability for channel {candidate.mnemonic!r} "
+                        "cannot be established from inspected metadata."
+                    ),
+                    candidates=[candidate.mnemonic],
+                )
+            )
+            continue
         normalized_kind = _normalize_token(candidate.kind)
         is_raster = isinstance(binding, AuthoringRasterBindingIntent)
         compatible = (

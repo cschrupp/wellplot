@@ -49,7 +49,7 @@ class ChannelContext(_EnrichmentModel):
     description: str = ""
     aliases: tuple[str, ...] = ()
     physical_identity: dict[str, object] = Field(default_factory=dict)
-    addressability: Literal["ADDRESSABLE", "UNADDRESSABLE"] = "ADDRESSABLE"
+    addressability: Literal["ADDRESSABLE", "UNADDRESSABLE", "UNKNOWN"] = "ADDRESSABLE"
     frame_indexes: tuple[int, ...] = ()
     sample_availability: Literal["NOT_CHECKED"] = "NOT_CHECKED"
 

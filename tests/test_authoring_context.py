@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from wellplot.authoring_context import (
     AuthoringChannelAlias,
     AuthoringChannelCandidate,
@@ -11,6 +13,9 @@ from wellplot.authoring_context import (
     resolve_authoring_context,
     resolve_physical_channel,
 )
+from wellplot.authoring_executor import execute_authoring_plan
+from wellplot.authoring_reconciler import reconcile_authoring
+from wellplot.authoring_service import AuthoringService
 from wellplot.model.authoring import (
     ArrayTrackSpec,
     AuthoringDocumentSpec,
@@ -445,6 +450,158 @@ def test_unaddressable_exact_channel_blocks_authoring() -> None:
 
     assert result.ready is False
     assert {issue.code for issue in result.issues} == {"channel_unaddressable"}
+
+
+def test_unknown_addressability_blocks_authoring() -> None:
+    """A unique physical identity is not bindable while renderer access is unknown."""
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [
+                    {
+                        "track_id": "gamma",
+                        "kind": "normal",
+                        "bindings": [{"kind": "curve", "binding_id": "md", "channel": "MD"}],
+                    }
+                ],
+            }
+        ]
+    )
+    result = resolve_authoring_context(
+        intent,
+        available_channels={
+            "main": [
+                {
+                    "mnemonic": "MD",
+                    "kind": "scalar",
+                    "addressability": "UNKNOWN",
+                    "physical_identity": {"format": "LAS", "curve_index": 1},
+                }
+            ]
+        },
+    )
+
+    assert result.ready is False
+    assert {issue.code for issue in result.issues} == {"channel_addressability_unknown"}
+
+
+@pytest.mark.parametrize(
+    ("addressability", "expected_issue"),
+    [
+        ("UNKNOWN", "channel_addressability_unknown"),
+        ("UNADDRESSABLE", "channel_unaddressable"),
+    ],
+)
+def test_alias_selected_nonaddressable_channel_blocks_reconciliation(
+    addressability: str,
+    expected_issue: str,
+) -> None:
+    """Alias resolution cannot bypass addressability or create CRUD operations."""
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [
+                    {
+                        "track_id": "gamma",
+                        "kind": "normal",
+                        "title": "Depth Alias",
+                        "width_mm": 30,
+                        "bindings": [
+                            {
+                                "kind": "curve",
+                                "binding_id": "depth-alias",
+                                "channel": "measured depth",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+    )
+    plan = reconcile_authoring(
+        intent,
+        existing=_document(),
+        available_channels={
+            "main": [
+                {
+                    "mnemonic": "MD",
+                    "kind": "scalar",
+                    "addressability": addressability,
+                    "physical_identity": {"format": "LAS", "curve_index": 1},
+                }
+            ]
+        },
+        channel_aliases=[
+            AuthoringChannelAlias(
+                id="measured_depth",
+                label="Measured Depth",
+                aliases=["measured depth"],
+                mnemonics=["MD"],
+            )
+        ],
+    )
+
+    assert plan.ready is False
+    assert {issue.code for issue in plan.issues} == {expected_issue}
+    assert plan.operations == []
+    service = AuthoringService(_document())
+    before = service.to_mapping()
+    execution = execute_authoring_plan(service, plan)
+    assert execution.success is False
+    assert service.to_mapping() == before
+
+
+def test_alias_selected_addressable_channel_remains_eligible() -> None:
+    """A reviewed semantic alias still resolves when its candidate is addressable."""
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [
+                    {
+                        "track_id": "gamma",
+                        "kind": "normal",
+                        "title": "Depth Alias",
+                        "width_mm": 30,
+                        "bindings": [
+                            {
+                                "kind": "curve",
+                                "binding_id": "depth-alias",
+                                "channel": "measured depth",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+    )
+    plan = reconcile_authoring(
+        intent,
+        existing=_document(),
+        available_channels={
+            "main": [
+                {
+                    "mnemonic": "MD",
+                    "kind": "scalar",
+                    "addressability": "ADDRESSABLE",
+                    "physical_identity": {"format": "LAS", "curve_index": 1},
+                }
+            ]
+        },
+        channel_aliases=[
+            AuthoringChannelAlias(
+                id="measured_depth",
+                label="Measured Depth",
+                aliases=["measured depth"],
+                mnemonics=["MD"],
+            )
+        ],
+    )
+
+    assert plan.ready is True
+    assert plan.operations
 
 
 def test_source_candidate_alias_text_is_not_physical_identity() -> None:
