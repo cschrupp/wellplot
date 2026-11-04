@@ -142,6 +142,7 @@ class CodeModeCompileResult(_CompileModel):
     workers: tuple[CompileWorkerEvidence, ...] = ()
     metrics: CompileMetrics
     obligations: tuple[RequestObligation, ...] = ()
+    inspection_context: EnrichedSemanticContext | None = Field(default=None, exclude=True)
 
     @model_validator(mode="after")
     def validate_result_evidence(self) -> CodeModeCompileResult:
@@ -264,6 +265,7 @@ def _project_graph_result(state: dict[str, object]) -> CodeModeCompileResult:
             workers=workers,
             metrics=metrics,
             obligations=remaining_obligations,
+            inspection_context=enriched_context,
         )
 
     merged_payload = state.get("merged_intent")
@@ -278,6 +280,7 @@ def _project_graph_result(state: dict[str, object]) -> CodeModeCompileResult:
         diagnostics=diagnostics,
         workers=workers,
         metrics=metrics,
+        inspection_context=enriched_context,
     )
 
 

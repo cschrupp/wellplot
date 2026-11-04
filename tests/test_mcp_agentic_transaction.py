@@ -11,6 +11,7 @@ from unittest.mock import patch
 import yaml
 from tests._mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 
+from wellplot.agent.code_mode.source_loader import LogfileSourceLoader
 from wellplot.agent.session import AgentMetrics, AgentSessionResult, AgentWorkerEvidence
 from wellplot.errors import AuthoringPublicationRecoveryError
 from wellplot.mcp.agentic import _apply_failure_owner, _apply_session_result, _request_context
@@ -76,6 +77,24 @@ def test_mcp_apply_rejects_concurrent_yaml_edit() -> None:
         assert statuses == ["stale_snapshot_conflict"]
         assert errors[0].startswith("stale_snapshot_conflict:")
         assert fixture_paths.single_logfile.read_bytes() == concurrent_bytes
+
+
+def test_mcp_request_context_does_not_eagerly_parse_declared_sources() -> None:
+    """MCP records source revisions and defers metadata parsing to enrichment."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="mcp-lazy-inspection-") as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        with patch.object(
+            LogfileSourceLoader,
+            "load",
+            side_effect=AssertionError("source parser invoked during request setup"),
+        ):
+            context = _request_context(str(fixture_paths.single_logfile), root=REPO_ROOT)
+
+    assert context.source_candidates
+    assert all(
+        candidate.inspection_state == "not_inspected" for candidate in context.source_candidates
+    )
+    assert all(candidate.expected_revision_token for candidate in context.source_candidates)
 
 
 def test_mcp_apply_rejects_changed_inspected_source() -> None:

@@ -9,6 +9,7 @@ from wellplot.authoring_context import (
     AuthoringResolutionSource,
     build_authoring_context_snapshot,
     resolve_authoring_context,
+    resolve_physical_channel,
 )
 from wellplot.model.authoring import (
     ArrayTrackSpec,
@@ -162,12 +163,11 @@ def test_nested_parent_scope_does_not_replace_child_identity() -> None:
     )
 
     assert result.ready is True
-    assert result.resolved_values[
-        "sections[main].tracks[resistivity].width_mm"
-    ] == 32.0
-    assert result.resolved_values[
-        "sections[main].tracks[resistivity].bindings[ild-1].style"
-    ]["color"] == "black"
+    assert result.resolved_values["sections[main].tracks[resistivity].width_mm"] == 32.0
+    assert (
+        result.resolved_values["sections[main].tracks[resistivity].bindings[ild-1].style"]["color"]
+        == "black"
+    )
     assert not any("tracks[main]" in path for path in result.resolved_values)
 
 
@@ -244,9 +244,7 @@ def test_channel_alias_resolves_and_preserves_explicit_curve_style() -> None:
     result = resolve_authoring_context(
         intent,
         existing=_document(),
-        available_channels={
-            "main": [AuthoringChannelCandidate(mnemonic="CBL", kind="scalar")]
-        },
+        available_channels={"main": [AuthoringChannelCandidate(mnemonic="CBL", kind="scalar")]},
         channel_aliases=[
             AuthoringChannelAlias(
                 id="cement_bond",
@@ -261,9 +259,9 @@ def test_channel_alias_resolves_and_preserves_explicit_curve_style() -> None:
     binding = result.resolved_intent.sections[0].tracks[0].bindings[0]
     assert isinstance(binding, AuthoringCurveBindingIntent)
     assert binding.channel == "CBL"
-    assert result.resolved_values[
-        "sections[main].tracks[cbl].bindings[cbl-2].style.color"
-    ] == "blue"
+    assert (
+        result.resolved_values["sections[main].tracks[cbl].bindings[cbl-2].style.color"] == "blue"
+    )
 
 
 def test_nested_and_root_binding_references_are_coalesced() -> None:
@@ -396,6 +394,86 @@ def test_missing_and_ambiguous_channels_block_resolution() -> None:
     assert {issue.code for issue in ambiguous.issues} == {"channel_ambiguous"}
 
 
+def test_physical_channel_resolution_preserves_four_states() -> None:
+    """Exact physical identity distinguishes absence, ambiguity, and unknown."""
+    addressable = AuthoringChannelCandidate(mnemonic="GR", kind="scalar")
+    unique = resolve_physical_channel("GR", [addressable], inventory_complete=True)
+    absent = resolve_physical_channel("SP", [addressable], inventory_complete=True)
+    unknown = resolve_physical_channel("SP", [], inventory_complete=False)
+    ambiguous = resolve_physical_channel(
+        "GR",
+        [addressable, AuthoringChannelCandidate(mnemonic="GR", kind="scalar")],
+        inventory_complete=True,
+    )
+
+    assert unique.state.value == "UNIQUE"
+    assert unique.addressability == "ADDRESSABLE"
+    assert absent.state.value == "ABSENT"
+    assert unknown.state.value == "UNKNOWN"
+    assert ambiguous.state.value == "AMBIGUOUS"
+
+
+def test_unaddressable_exact_channel_blocks_authoring() -> None:
+    """A unique metadata identity cannot bypass the existing renderer limit."""
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [
+                    {
+                        "track_id": "gamma",
+                        "kind": "normal",
+                        "bindings": [{"kind": "curve", "binding_id": "gr", "channel": "GR"}],
+                    }
+                ],
+            }
+        ]
+    )
+    result = resolve_authoring_context(
+        intent,
+        available_channels={
+            "main": [
+                {
+                    "mnemonic": "GR",
+                    "kind": "scalar",
+                    "addressability": "UNADDRESSABLE",
+                    "physical_identity": {"format": "DLIS", "copy_number": 1},
+                }
+            ]
+        },
+    )
+
+    assert result.ready is False
+    assert {issue.code for issue in result.issues} == {"channel_unaddressable"}
+
+
+def test_source_candidate_alias_text_is_not_physical_identity() -> None:
+    """Untrusted source aliases cannot satisfy exact physical selection."""
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [
+                    {
+                        "track_id": "gamma",
+                        "kind": "normal",
+                        "bindings": [{"kind": "curve", "binding_id": "gr", "channel": "Gamma Ray"}],
+                    }
+                ],
+            }
+        ]
+    )
+    result = resolve_authoring_context(
+        intent,
+        available_channels={
+            "main": [AuthoringChannelCandidate(mnemonic="GR", aliases=["Gamma Ray"])],
+        },
+    )
+
+    assert result.ready is False
+    assert {issue.code for issue in result.issues} == {"channel_missing"}
+
+
 def test_compatibility_and_duplicate_identity_are_blocking() -> None:
     """Reject incompatible content and duplicate IDs while allowing duplicate channels."""
     intent = AuthoringDocumentIntent(
@@ -497,9 +575,7 @@ def test_defaulted_track_kind_is_used_for_compatibility() -> None:
                 "tracks": [
                     {
                         "track_id": "vdl",
-                        "bindings": [
-                            {"kind": "raster", "binding_id": "vdl-1", "channel": "VDL"}
-                        ],
+                        "bindings": [{"kind": "raster", "binding_id": "vdl-1", "channel": "VDL"}],
                     }
                 ],
             }

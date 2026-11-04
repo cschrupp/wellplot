@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from ...authoring_context import AuthoringChannelCandidate
 from ...file_revision import file_revision_token
 from ...model.authoring import AuthoringDocumentSpec
+from ...model.intent import AuthoringDocumentIntent
 from ..inspection import (
     AuthoringInspectionFacade,
     ChannelInspectionSummary,
@@ -47,6 +48,10 @@ class ChannelContext(_EnrichmentModel):
     shape: tuple[int, ...] = ()
     description: str = ""
     aliases: tuple[str, ...] = ()
+    physical_identity: dict[str, object] = Field(default_factory=dict)
+    addressability: Literal["ADDRESSABLE", "UNADDRESSABLE"] = "ADDRESSABLE"
+    frame_indexes: tuple[int, ...] = ()
+    sample_availability: Literal["NOT_CHECKED"] = "NOT_CHECKED"
 
 
 class SourceCandidate(_EnrichmentModel):
@@ -59,6 +64,7 @@ class SourceCandidate(_EnrichmentModel):
     trusted_format: SourceFormat | None = None
     inspection_state: Literal["inspected", "not_inspected", "unavailable"] = "not_inspected"
     channels: tuple[ChannelContext, ...] = ()
+    expected_revision_token: str | None = None
 
     @field_validator("labels")
     @classmethod
@@ -180,6 +186,8 @@ class EnrichmentErrorCode(StrEnum):
     SOURCE_FORMAT_CONFLICT = "source_format_conflict"
     SOURCE_AMBIGUOUS = "source_ambiguous"
     SOURCE_LOAD_FAILED = "source_load_failed"
+    SOURCE_INSPECTION_BUSY = "source_inspection_busy"
+    SOURCE_INSPECTION_INCOMPLETE = "source_inspection_incomplete"
     SECTION_HINT_UNRESOLVED = "section_hint_unresolved"
     SECTION_HINT_AMBIGUOUS = "section_hint_ambiguous"
     SECTION_TARGET_DUPLICATE = "section_target_duplicate"
@@ -305,7 +313,11 @@ class SemanticEnricher:
         resolved_sources: dict[int, tuple[SourceContext, ...]] = {}
 
         for task_index, task in enumerate(plan.section_tasks):
-            selected = _select_sources(task, candidates, task_index=task_index)
+            selected = (
+                _select_sources(task, candidates, task_index=task_index)
+                if _task_requires_source_inspection(task)
+                else ()
+            )
             resolved_sources[task_index] = tuple(
                 self._load_source(
                     candidate,
@@ -398,63 +410,7 @@ class SemanticEnricher:
         document: AuthoringDocumentSpec,
     ) -> None:
         """Fail closed when captured document or source revisions have changed."""
-        snapshot = context.snapshot
-        if snapshot is None:
-            raise SemanticEnrichmentError(
-                EnrichmentErrorCode.SNAPSHOT_STALE,
-                "Worker context is missing its required inspection snapshot.",
-            )
-        if any(section.snapshot_id != snapshot.snapshot_id for section in context.sections):
-            raise SemanticEnrichmentError(
-                EnrichmentErrorCode.SNAPSHOT_STALE,
-                "Section context is not bound to the captured document snapshot.",
-            )
-        if context.report.snapshot_id != snapshot.snapshot_id:
-            raise SemanticEnrichmentError(
-                EnrichmentErrorCode.SNAPSHOT_STALE,
-                "Report context is not bound to the captured document snapshot.",
-            )
-        if AuthoringInspectionFacade(document).document_revision() != snapshot.document_revision:
-            raise SemanticEnrichmentError(
-                EnrichmentErrorCode.SNAPSHOT_STALE,
-                "The document no longer matches the inspected snapshot.",
-            )
-        inspected_sources = {
-            source.handle: source for section in context.sections for source in section.sources
-        }
-        actual_source_identity = tuple(
-            SnapshotSource(
-                handle=source.handle,
-                inspection_state=source.inspection_state,
-                revision_token=source.revision_token,
-            )
-            for source in sorted(inspected_sources.values(), key=lambda item: item.handle)
-        )
-        if actual_source_identity != snapshot.sources:
-            raise SemanticEnrichmentError(
-                EnrichmentErrorCode.SNAPSHOT_STALE,
-                "Source context no longer matches its captured snapshot identity.",
-            )
-        for source in inspected_sources.values():
-            if source.inspection_state != "inspected":
-                continue
-            if source.canonical_path is None or source.revision_token is None:
-                raise SemanticEnrichmentError(
-                    EnrichmentErrorCode.SNAPSHOT_STALE,
-                    "An inspected source is missing its private revision identity.",
-                )
-            try:
-                current_token = file_revision_token(Path(source.canonical_path))
-            except OSError as exc:
-                raise SemanticEnrichmentError(
-                    EnrichmentErrorCode.SNAPSHOT_STALE,
-                    "An inspected source is no longer available at its snapshot revision.",
-                ) from exc
-            if current_token != source.revision_token:
-                raise SemanticEnrichmentError(
-                    EnrichmentErrorCode.SNAPSHOT_STALE,
-                    "An inspected source changed after the worker snapshot was created.",
-                )
+        validate_enriched_snapshot(context, document)
 
     def _load_source(
         self,
@@ -472,12 +428,19 @@ class SemanticEnricher:
                 source_format=candidate.source_format,
                 inspection_state="unavailable",
             )
-        if candidate.source_format is None:
-            return SourceContext(
+        if not candidate.path.is_file() or not os.access(candidate.path, os.R_OK):
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SOURCE_MISSING,
+                "The selected source is not a readable regular file.",
+                task_index=task_index,
                 candidate_id=candidate.candidate_id,
-                handle=candidate.handle,
-                labels=candidate.labels,
-                inspection_state="unavailable",
+            )
+        if candidate.source_format is None:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SOURCE_FORMAT_UNKNOWN,
+                "The selected source format is not deterministically known.",
+                task_index=task_index,
+                candidate_id=candidate.candidate_id,
             )
         try:
             revision_before = file_revision_token(candidate.path)
@@ -488,6 +451,16 @@ class SemanticEnricher:
                 task_index=task_index,
                 candidate_id=candidate.candidate_id,
             ) from exc
+        if (
+            candidate.expected_revision_token is not None
+            and revision_before != candidate.expected_revision_token
+        ):
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SNAPSHOT_STALE,
+                "A source changed after request context was captured.",
+                task_index=task_index,
+                candidate_id=candidate.candidate_id,
+            )
         cache_key = (candidate.path, candidate.source_format)
         if cache_key not in loaded_cache:
             try:
@@ -496,8 +469,15 @@ class SemanticEnricher:
                     candidate.source_format,
                 )
             except Exception as exc:
+                inspection_code = getattr(exc, "code", None)
+                if inspection_code == "inspection_busy":
+                    code = EnrichmentErrorCode.SOURCE_INSPECTION_BUSY
+                elif isinstance(inspection_code, str):
+                    code = EnrichmentErrorCode.SOURCE_INSPECTION_INCOMPLETE
+                else:
+                    code = EnrichmentErrorCode.SOURCE_LOAD_FAILED
                 raise SemanticEnrichmentError(
-                    EnrichmentErrorCode.SOURCE_LOAD_FAILED,
+                    code,
                     "The selected source could not be inspected.",
                     task_index=task_index,
                     candidate_id=candidate.candidate_id,
@@ -578,6 +558,7 @@ class _NormalizedCandidate:
     source_format: SourceFormat | None
     inspection_state: Literal["inspected", "not_inspected", "unavailable"]
     labels: tuple[str, ...]
+    expected_revision_token: str | None = None
 
 
 def _existing_curves(
@@ -612,6 +593,17 @@ def _existing_curves(
                 )
         return tuple(curves)
     return ()
+
+
+def _task_requires_source_inspection(task: SectionTask) -> bool:
+    """Inspect only when host-bound request facts need physical source evidence."""
+    if task.source_hints or "section.log_plot" in task.capability_ids:
+        return True
+    return any(
+        obligation.field in {"channel", "source"}
+        for obligation in task.obligations
+        if obligation.state.value not in {"FORBIDDEN", "UNRESOLVED"}
+    )
 
 
 def _normalize_roots(roots: Mapping[str, str | Path]) -> dict[str, Path]:
@@ -684,11 +676,11 @@ def _normalize_candidates(
             )
             continue
         try:
-            canonical_path = path.resolve(strict=True)
-        except (FileNotFoundError, OSError) as exc:
+            canonical_path = path.resolve(strict=False)
+        except OSError as exc:
             raise SemanticEnrichmentError(
                 EnrichmentErrorCode.SOURCE_MISSING,
-                "The explicit source candidate does not exist.",
+                "The explicit source candidate cannot be resolved.",
                 candidate_id=candidate.candidate_id,
             ) from exc
         try:
@@ -699,13 +691,7 @@ def _normalize_candidates(
                 "The explicit source candidate resolves outside its allowed root.",
                 candidate_id=candidate.candidate_id,
             ) from exc
-        if not canonical_path.is_file() or not os.access(canonical_path, os.R_OK):
-            raise SemanticEnrichmentError(
-                EnrichmentErrorCode.SOURCE_MISSING,
-                "The explicit source candidate is not a readable regular file.",
-                candidate_id=candidate.candidate_id,
-            )
-        source_format = _source_format(candidate, canonical_path)
+        source_format = _source_format_hint(candidate, canonical_path)
         normalized.append(
             _NormalizedCandidate(
                 candidate_id=candidate.candidate_id,
@@ -714,6 +700,7 @@ def _normalize_candidates(
                 source_format=source_format,
                 inspection_state=candidate.inspection_state,
                 labels=tuple(candidate.labels),
+                expected_revision_token=candidate.expected_revision_token,
             )
         )
     ordered = sorted(normalized, key=lambda item: (item.candidate_id.casefold(), item.candidate_id))
@@ -725,6 +712,7 @@ def _normalize_candidates(
             source_format=item.source_format,
             inspection_state=item.inspection_state,
             labels=item.labels,
+            expected_revision_token=item.expected_revision_token,
         )
         for index, item in enumerate(ordered)
     )
@@ -926,7 +914,159 @@ def _channel_candidate(channel: ChannelContext, *, source_path: str) -> Authorin
         aliases=list(channel.aliases),
         value_shape=list(channel.shape),
         source_path=source_path,
+        physical_identity=channel.physical_identity,
+        addressability=channel.addressability,
     )
+
+
+def reconciliation_channels(
+    context: EnrichedSemanticContext,
+    intent: AuthoringDocumentIntent,
+) -> dict[str, tuple[AuthoringChannelCandidate, ...]]:
+    """Project the exact inspected channels for canonical reconciliation."""
+    available: dict[str, tuple[AuthoringChannelCandidate, ...]] = {}
+    sections = intent.sections if isinstance(intent.sections, list) else []
+    for section_context in context.sections:
+        target_ids: set[str] = set()
+        if section_context.section_id is not None:
+            target_ids.add(section_context.section_id)
+        source_paths = {
+            _normalized_source_path(source.canonical_path)
+            for source in section_context.sources
+            if source.canonical_path is not None
+        }
+        for section in sections:
+            data_source = getattr(section, "data_source", None)
+            requested_path = getattr(data_source, "source_path", None)
+            if (
+                requested_path is not None
+                and _normalized_source_path(requested_path) in source_paths
+            ):
+                target_ids.add(section.section_id)
+        if not target_ids:
+            continue
+        channels = tuple(
+            _channel_candidate(channel, source_path=source.canonical_path)
+            for source in section_context.sources
+            if source.canonical_path is not None
+            for channel in source.channels
+        )
+        for section_id in target_ids:
+            previous = available.get(section_id)
+            if previous is not None and previous != channels:
+                raise SemanticEnrichmentError(
+                    EnrichmentErrorCode.SOURCE_AMBIGUOUS,
+                    "Multiple inspected source projections target one section.",
+                )
+            available[section_id] = channels
+    return available
+
+
+def intent_requires_channel_context(intent: AuthoringDocumentIntent) -> bool:
+    """Return whether canonical reconciliation needs inspected channel facts."""
+    for section in intent.sections if isinstance(intent.sections, list) else ():
+        for track in section.tracks if isinstance(section.tracks, list) else ():
+            if getattr(track, "bindings", None):
+                return True
+    return bool(intent.curve_bindings or intent.raster_bindings)
+
+
+def _normalized_source_path(value: str) -> str:
+    """Normalize only host-side source identity for projection joins."""
+    return str(Path(value).expanduser().resolve(strict=False))
+
+
+def validate_enriched_snapshot(
+    context: EnrichedSemanticContext,
+    document: AuthoringDocumentSpec,
+) -> None:
+    """Validate snapshot binding and recheck source revisions before use."""
+    snapshot = context.snapshot
+    if snapshot is None:
+        raise SemanticEnrichmentError(
+            EnrichmentErrorCode.SNAPSHOT_STALE,
+            "Worker context is missing its required inspection snapshot.",
+        )
+
+    if any(section.snapshot_id != snapshot.snapshot_id for section in context.sections):
+        raise SemanticEnrichmentError(
+            EnrichmentErrorCode.SNAPSHOT_STALE,
+            "Section context is not bound to the captured document snapshot.",
+        )
+    if context.report.snapshot_id != snapshot.snapshot_id:
+        raise SemanticEnrichmentError(
+            EnrichmentErrorCode.SNAPSHOT_STALE,
+            "Report context is not bound to the captured document snapshot.",
+        )
+    if AuthoringInspectionFacade(document).document_revision() != snapshot.document_revision:
+        raise SemanticEnrichmentError(
+            EnrichmentErrorCode.SNAPSHOT_STALE,
+            "The document no longer matches the inspected source snapshot.",
+        )
+
+    snapshot_payload = {
+        "version": snapshot.version,
+        "document_revision": snapshot.document_revision,
+        "sources": [source.model_dump(mode="json") for source in snapshot.sources],
+    }
+    expected_snapshot_id = hashlib.sha256(
+        json.dumps(snapshot_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    if expected_snapshot_id != snapshot.snapshot_id:
+        raise SemanticEnrichmentError(
+            EnrichmentErrorCode.SNAPSHOT_STALE,
+            "Inspection snapshot identity does not match its captured contents.",
+        )
+
+    sources_by_handle: dict[str, SourceContext] = {}
+    for section in context.sections:
+        for source in section.sources:
+            previous = sources_by_handle.get(source.handle)
+            if previous is not None and (
+                previous.inspection_state != source.inspection_state
+                or previous.revision_token != source.revision_token
+                or previous.canonical_path != source.canonical_path
+            ):
+                raise SemanticEnrichmentError(
+                    EnrichmentErrorCode.SNAPSHOT_STALE,
+                    "Repeated source handles do not identify the same inspected source.",
+                )
+            sources_by_handle[source.handle] = source
+
+    actual_source_identity = tuple(
+        SnapshotSource(
+            handle=source.handle,
+            inspection_state=source.inspection_state,
+            revision_token=source.revision_token,
+        )
+        for source in sorted(sources_by_handle.values(), key=lambda item: item.handle)
+    )
+    if actual_source_identity != snapshot.sources:
+        raise SemanticEnrichmentError(
+            EnrichmentErrorCode.SNAPSHOT_STALE,
+            "Source context does not match its captured snapshot identity.",
+        )
+
+    for source in sources_by_handle.values():
+        if source.inspection_state != "inspected":
+            continue
+        if source.canonical_path is None or source.revision_token is None:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SNAPSHOT_STALE,
+                "An inspected source is missing its revision identity.",
+            )
+        try:
+            current = file_revision_token(Path(source.canonical_path))
+        except OSError as exc:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SNAPSHOT_STALE,
+                "An inspected source is no longer available.",
+            ) from exc
+        if current != source.revision_token:
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SNAPSHOT_STALE,
+                "An inspected source changed before canonical publication.",
+            )
 
 
 def _general_slot_ids(document: AuthoringDocumentSpec) -> tuple[str, ...]:

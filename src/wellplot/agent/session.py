@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from ..model.authoring import AuthoringDocumentSpec
 from ..model.intent import AuthoringDocumentIntent
-from .code_mode.enrichment import ChannelContext, SourceCandidate
+from .code_mode.enrichment import ChannelContext, EnrichedSemanticContext, SourceCandidate
 from .code_mode.obligations import RequestObligation
 from .semantic_runtime import SemanticStageEvidence
 
@@ -68,6 +68,7 @@ class AgentSourceConfig(_SessionModel):
     trusted_format: Literal["las", "dlis"] | None = None
     inspection_state: Literal["inspected", "not_inspected", "unavailable"] = "not_inspected"
     channels: tuple[ChannelContext, ...] = ()
+    expected_revision_token: str | None = None
 
     @field_validator("labels")
     @classmethod
@@ -87,6 +88,7 @@ class AgentSourceConfig(_SessionModel):
             trusted_format=self.trusted_format,
             inspection_state=self.inspection_state,
             channels=self.channels,
+            expected_revision_token=self.expected_revision_token,
         )
 
 
@@ -188,6 +190,7 @@ class AgentSessionResult(_SessionModel):
         max_length=64,
         pattern=r"^[0-9a-f]{64}$",
     )
+    inspection_context: EnrichedSemanticContext | None = Field(default=None, exclude=True)
 
     @model_validator(mode="after")
     def validate_result_evidence(self) -> AgentSessionResult:
@@ -284,6 +287,7 @@ class _CompileResultLike(Protocol):
     workers: Sequence[_WorkerLike]
     metrics: _AggregateMetricsLike
     obligations: Sequence[RequestObligation]
+    inspection_context: EnrichedSemanticContext | None
 
 
 class _CompileFacadeProtocol(Protocol):
@@ -380,6 +384,7 @@ def _project_result(result: _CompileResultLike, *, mode: CompilationMode) -> Age
         workers=workers,
         metrics=_project_metrics(result.metrics),
         obligations=result.obligations,
+        inspection_context=getattr(result, "inspection_context", None),
     )
 
 

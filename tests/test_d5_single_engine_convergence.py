@@ -96,6 +96,7 @@ def test_d5_production_manifest_is_current() -> None:
     assert components
     assert "src/wellplot/agent/composition.py" in components
     assert "src/wellplot/agent/code_mode/canonical_workers.py" in components
+    assert "src/wellplot/agent/code_mode/source_inspection_child.py" in components
     assert "src/wellplot/agent/code_mode/typed_section_worker.py" in components
     assert "src/wellplot/agent/code_mode/typed_delivery.py" not in components
     assert "src/wellplot/agent/core.py" not in components

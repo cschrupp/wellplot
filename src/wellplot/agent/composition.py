@@ -108,7 +108,7 @@ def create_canonical_dependencies(
             trace_callback=trace_callback,
         ),
         enricher=SemanticEnricher(
-            loader=LogfileSourceLoader(),
+            loader=LogfileSourceLoader(runtime_root=server_root),
             allowed_roots={"server": server_root},
         ),
         report_compiler=CanonicalReportWorker(backend=backend),

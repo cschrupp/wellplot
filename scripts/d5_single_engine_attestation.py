@@ -23,6 +23,7 @@ D5_CANONICAL_ENTRYPOINTS = (
     "src/wellplot/mcp/agentic.py",
     "src/wellplot/mcp/agentic_server.py",
 )
+D5_DYNAMIC_RUNTIME_COMPONENTS = ("src/wellplot/agent/code_mode/source_inspection_child.py",)
 
 D5_RETIRED_SOURCE_PATHS = (
     "src/wellplot/agent/core.py",
@@ -110,7 +111,9 @@ def canonical_component_paths(repo_root: Path = REPO_ROOT) -> tuple[str, ...]:
         for path in (repo_root / "src" / "wellplot").rglob("*.py")
     }
     pending = [
-        path for relative in D5_CANONICAL_ENTRYPOINTS if (path := repo_root / relative).is_file()
+        path
+        for relative in (*D5_CANONICAL_ENTRYPOINTS, *D5_DYNAMIC_RUNTIME_COMPONENTS)
+        if (path := repo_root / relative).is_file()
     ]
     discovered: set[Path] = set()
     while pending:

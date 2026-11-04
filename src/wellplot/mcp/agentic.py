@@ -10,19 +10,20 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..agent.code_mode.enrichment import LoadedSource
-from ..agent.code_mode.source_loader import LogfileSourceLoader
+from ..agent.code_mode.enrichment import (
+    intent_requires_channel_context,
+    reconciliation_channels,
+    validate_enriched_snapshot,
+)
 from ..agent.execution_trace import AgentRunTrace, bind_agent_trace
 from ..agent.session import AgentSession, AgentSourceConfig
 from ..api.serialize import report_to_dict
-from ..authoring_context import AuthoringChannelCandidate
 from ..authoring_executor import execute_authoring_plan
 from ..authoring_reconciler import reconcile_authoring
 from ..authoring_service import AuthoringService
@@ -59,7 +60,6 @@ class _McpDocumentContext:
     dependency_revisions: tuple[tuple[str, str], ...]
     document: AuthoringDocumentSpec
     source_candidates: tuple[AgentSourceConfig, ...]
-    available_channels: Mapping[str, tuple[AuthoringChannelCandidate, ...]]
 
 
 def _request_context(logfile_path: str, *, root: Path) -> _McpDocumentContext:
@@ -83,51 +83,28 @@ def _request_context(logfile_path: str, *, root: Path) -> _McpDocumentContext:
         allowed_root=root,
     )
     unique_sources = sorted(set(declared.values()), key=lambda item: (str(item[0]), item[1]))
-    loader = LogfileSourceLoader()
-    loaded: dict[tuple[Path, str], LoadedSource] = {}
-    available_channels: dict[str, tuple[AuthoringChannelCandidate, ...]] = {}
     candidates_list: list[AgentSourceConfig] = []
-    candidate_by_source: dict[tuple[Path, str], AgentSourceConfig] = {}
     for index, (path, source_format) in enumerate(unique_sources, start=1):
-        cache_key = (path, source_format)
-        if path.is_file():
-            loaded[cache_key] = loader.load(path, source_format)
-            inspection_state = "inspected"
-            channels = loaded[cache_key].channels
-        else:
-            inspection_state = "unavailable"
-            channels = ()
+        revision = file_revision_token(path) if path.is_file() else None
+        section_labels = tuple(
+            section_id
+            for section_id, declared_source in declared.items()
+            if declared_source == (path, source_format)
+        )
         candidate = AgentSourceConfig(
             candidate_id=f"source-{index}",
             root_id="server",
             path=str(path),
-            labels=(path.name, path.stem, source_format),
+            labels=section_labels or (f"source-{index}",),
             trusted_format=source_format if source_format in {"las", "dlis"} else None,
-            inspection_state=inspection_state,
-            channels=channels,
+            inspection_state="not_inspected",
+            expected_revision_token=revision,
         )
         candidates_list.append(candidate)
-        candidate_by_source[cache_key] = candidate
-    for section_id, (path, source_format) in declared.items():
-        if not path.is_file():
-            continue
-        cache_key = (path, source_format)
-        source = loaded[cache_key]
-        candidate = candidate_by_source[(path, source_format)]
-        available_channels[section_id] = tuple(
-            AuthoringChannelCandidate(
-                mnemonic=channel.mnemonic,
-                kind=channel.kind,
-                unit=channel.unit,
-                description=channel.description,
-                aliases=list(channel.aliases),
-                value_shape=list(channel.shape),
-                source_path=candidate.path,
-            )
-            for channel in source.channels
-        )
     dependency_paths = {
-        candidate.path for candidate in candidates_list if candidate.inspection_state == "inspected"
+        candidate.path
+        for candidate in candidates_list
+        if candidate.expected_revision_token is not None
     }
     dependency_paths.update(str(path) for path in template_paths)
     dependency_revisions = tuple(
@@ -142,7 +119,6 @@ def _request_context(logfile_path: str, *, root: Path) -> _McpDocumentContext:
         dependency_revisions=dependency_revisions,
         document=document,
         source_candidates=tuple(candidates_list),
-        available_channels=available_channels,
     )
 
 
@@ -190,10 +166,35 @@ def _apply_session_result(
         )
 
     private_service = AuthoringService(context.document)
+    inspected = getattr(session_result, "inspection_context", None)
+    if inspected is None:
+        if intent_requires_channel_context(intent):
+            return (
+                False,
+                False,
+                False,
+                ["Source inspection snapshot is missing."],
+                ["reconciliation_blocked"],
+                [section.id for section in context.document.sections],
+            )
+        available_channels = {}
+    else:
+        try:
+            validate_enriched_snapshot(inspected, private_service.document)
+            available_channels = reconciliation_channels(inspected, intent)
+        except ValueError as error:
+            return (
+                False,
+                False,
+                False,
+                [f"stale_or_invalid_inspection_snapshot: {error}"],
+                ["stale_snapshot_conflict"],
+                [section.id for section in context.document.sections],
+            )
     plan = reconcile_authoring(
         intent,
         existing=private_service.document,
-        available_channels=context.available_channels,
+        available_channels=available_channels,
     )
     if not plan.ready:
         return (
@@ -231,6 +232,8 @@ def _apply_session_result(
     changed = context.document.model_dump(mode="json") != accepted.model_dump(mode="json")
     if changed:
         try:
+            if inspected is not None:
+                validate_enriched_snapshot(inspected, context.document)
             service.persist_authoring_document(
                 accepted,
                 logfile_path=context.logfile_path,

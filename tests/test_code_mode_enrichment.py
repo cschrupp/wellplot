@@ -16,6 +16,8 @@ from wellplot.agent.code_mode.enrichment import (
     SemanticEnrichmentError,
     SourceCandidate,
     SourceMetadata,
+    reconciliation_channels,
+    validate_enriched_snapshot,
 )
 from wellplot.agent.code_mode.obligations import compile_request_contract
 from wellplot.agent.code_mode.planner import (
@@ -23,7 +25,9 @@ from wellplot.agent.code_mode.planner import (
     SemanticPlan,
     _attach_compiled_requirements,
 )
+from wellplot.authoring_context import resolve_authoring_context
 from wellplot.model.authoring import AuthoringDocumentSpec
+from wellplot.model.intent import AuthoringDocumentIntent
 
 
 @dataclass
@@ -268,6 +272,46 @@ def test_multiple_explicit_sources_without_a_hint_fail_as_ambiguous(tmp_path: Pa
     assert caught.value.code is EnrichmentErrorCode.SOURCE_AMBIGUOUS
     assert caught.value.candidates == ("main.las", "repeat.las")
     assert loader.calls == []
+
+
+def test_structural_task_does_not_parse_declared_source(tmp_path: Path) -> None:
+    """A task with no source-dependent operation leaves declared data unopened."""
+    (tmp_path / "main.las").write_text("source", encoding="utf-8")
+    enricher, loader = _enricher(tmp_path)
+    structural_plan = _plan()
+    task = structural_plan.section_tasks[0].model_copy(
+        update={"capability_ids": ("track.normal",), "source_hints": ()}
+    )
+    plan = structural_plan.model_copy(update={"section_tasks": (task,)})
+
+    result = enricher.enrich(
+        plan=plan,
+        document=_document(),
+        source_candidates=(_candidate(tmp_path),),
+    )
+
+    assert result.sections[0].sources == ()
+    assert loader.calls == []
+
+
+def test_only_source_selected_by_hint_is_inspected(tmp_path: Path) -> None:
+    """A declared but unselected DLIS candidate is never sent to the loader."""
+    (tmp_path / "main.las").write_text("las", encoding="utf-8")
+    (tmp_path / "repeat.dlis").write_bytes(b"dlis")
+    enricher, loader = _enricher(tmp_path)
+    candidates = (
+        _candidate(tmp_path, name="main.las", labels=("main",)),
+        _candidate(tmp_path, name="repeat.dlis", labels=("repeat",)),
+    )
+
+    result = enricher.enrich(
+        plan=_plan(source_hints=("main",)),
+        document=_document(),
+        source_candidates=candidates,
+    )
+
+    assert [source.candidate_id for source in result.sections[0].sources] == ["main.las"]
+    assert loader.calls == [(tmp_path / "main.las", "las")]
 
 
 @pytest.mark.parametrize(
@@ -682,6 +726,10 @@ def test_snapshot_rejects_changed_document_or_source(tmp_path: Path) -> None:
         enricher.validate_snapshot(context, _document())
     assert stale_source.value.code is EnrichmentErrorCode.SNAPSHOT_STALE
 
+    with pytest.raises(SemanticEnrichmentError) as stale_publication:
+        validate_enriched_snapshot(context, _document())
+    assert stale_publication.value.code is EnrichmentErrorCode.SNAPSHOT_STALE
+
 
 def test_snapshot_rejects_missing_snapshot_and_inspected_source_identity(tmp_path: Path) -> None:
     """An absent snapshot or incomplete private source identity is never a pass."""
@@ -714,6 +762,66 @@ def test_snapshot_rejects_missing_snapshot_and_inspected_source_identity(tmp_pat
     with pytest.raises(SemanticEnrichmentError) as missing_token:
         enricher.validate_snapshot(incomplete, _document())
     assert missing_token.value.code is EnrichmentErrorCode.SNAPSHOT_STALE
+
+
+def test_snapshot_rejects_tampered_snapshot_payload(tmp_path: Path) -> None:
+    """A snapshot digest must bind the exact document and source identity tuple."""
+    source_path = tmp_path / "main.las"
+    source_path.write_text("source", encoding="utf-8")
+    enricher, _loader = _enricher(tmp_path)
+    context = enricher.enrich(
+        plan=_plan(source_hints=("main",)),
+        document=_document(),
+        source_candidates=(_candidate(tmp_path),),
+    )
+    assert context.snapshot is not None
+    changed_snapshot = context.snapshot.model_copy(
+        update={"sources": ()},
+    )
+    changed_context = context.model_copy(update={"snapshot": changed_snapshot})
+
+    with pytest.raises(SemanticEnrichmentError) as caught:
+        validate_enriched_snapshot(changed_context, _document())
+
+    assert caught.value.code is EnrichmentErrorCode.SNAPSHOT_STALE
+
+
+def test_reconciliation_uses_the_inspected_physical_channel_projection(tmp_path: Path) -> None:
+    """Canonical reconciliation receives the same exact metadata projection."""
+    source_path = tmp_path / "main.las"
+    source_path.write_text("source", encoding="utf-8")
+    enricher, _loader = _enricher(tmp_path)
+    context = enricher.enrich(
+        plan=_plan(source_hints=("main",)),
+        document=_document(),
+        source_candidates=(_candidate(tmp_path),),
+    )
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "data_source": {"source_path": str(source_path)},
+                "tracks": [
+                    {
+                        "track_id": "gamma",
+                        "kind": "normal",
+                        "bindings": [{"kind": "curve", "binding_id": "gr", "channel": "GR"}],
+                    }
+                ],
+            }
+        ]
+    )
+
+    projected = reconciliation_channels(context, intent)
+    resolution = resolve_authoring_context(intent, available_channels=projected)
+
+    assert set(projected) == {"main"}
+    assert resolution.ready is True
+    assert resolution.resolved_intent.sections[0].tracks[0].bindings[0].channel == "GR"
+    gamma = next(channel for channel in projected["main"] if channel.mnemonic == "GR")
+    assert gamma.kind == "scalar"
+    assert gamma.unit == "gAPI"
+    assert gamma.source_path == str(source_path.resolve())
 
 
 def test_document_revision_mismatch_fails_before_source_loading(tmp_path: Path) -> None:

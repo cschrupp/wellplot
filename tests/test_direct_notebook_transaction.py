@@ -12,6 +12,7 @@ import pytest
 import yaml
 from tests._mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 
+from wellplot.agent.code_mode.source_loader import LogfileSourceLoader
 from wellplot.agent.direct_notebook import (
     DirectNotebookSession,
     _apply_result,
@@ -68,6 +69,25 @@ def test_notebook_apply_rejects_yaml_changed_after_snapshot() -> None:
         assert stages["persistence"] == "FAIL"
         assert "changed after" in errors[0]
         assert fixture_paths.single_logfile.read_bytes() == concurrent_bytes
+
+
+def test_notebook_context_does_not_eagerly_parse_declared_sources() -> None:
+    """Notebook setup defers parsing until an authoring task needs channels."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="notebook-lazy-inspection-") as temp_dir:
+        root = Path(temp_dir)
+        fixture_paths = create_mcp_fixture_paths(root / "fixture")
+        with patch.object(
+            LogfileSourceLoader,
+            "load",
+            side_effect=AssertionError("source parser invoked during notebook setup"),
+        ):
+            context = _load_document_context(fixture_paths.single_logfile, root=REPO_ROOT)
+
+    assert context.source_candidates
+    assert all(
+        candidate.inspection_state == "not_inspected" for candidate in context.source_candidates
+    )
+    assert all(candidate.expected_revision_token for candidate in context.source_candidates)
 
 
 def test_notebook_apply_rejects_source_changed_after_snapshot() -> None:

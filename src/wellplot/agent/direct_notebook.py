@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Literal, TypeVar
 
 from ..api.serialize import report_to_dict
-from ..authoring_context import AuthoringChannelCandidate
 from ..authoring_executor import execute_authoring_plan
 from ..authoring_reconciler import reconcile_authoring
 from ..authoring_service import AuthoringService
@@ -19,12 +18,15 @@ from ..file_revision import file_revision_token
 from ..logfile import load_logfile_text, resolve_section_data_sources_for_logfile
 from ..mcp import service as mcp_service
 from ..model.authoring import AuthoringDocumentSpec
-from .code_mode.enrichment import LoadedSource
+from .code_mode.enrichment import (
+    intent_requires_channel_context,
+    reconciliation_channels,
+    validate_enriched_snapshot,
+)
 from .code_mode.obligations import (
     verify_document_obligations,
     verify_document_preservation,
 )
-from .code_mode.source_loader import LogfileSourceLoader
 from .composition import create_canonical_compile_facade, create_provider_backend
 from .results import AuthoringResult, AuthoringRunState, AuthoringUserReport
 from .session import (
@@ -45,7 +47,6 @@ class _NotebookDocumentContext:
     dependency_revisions: tuple[tuple[str, str], ...]
     document: AuthoringDocumentSpec
     source_candidates: tuple[AgentSourceConfig, ...]
-    available_channels: Mapping[str, tuple[AuthoringChannelCandidate, ...]]
 
 
 _ProjectionValue = TypeVar("_ProjectionValue")
@@ -100,61 +101,33 @@ def _declared_source_inventory(
     *,
     logfile_path: Path,
     root: Path,
-) -> tuple[
-    tuple[AgentSourceConfig, ...],
-    dict[str, tuple[AuthoringChannelCandidate, ...]],
-]:
-    """Project declared sources and deterministic channel inventories."""
+) -> tuple[AgentSourceConfig, ...]:
+    """Project source identities without eagerly parsing numerical sources."""
     declared = resolve_section_data_sources_for_logfile(
         spec,
         base_dir=logfile_path.parent,
         allowed_root=root,
     )
     unique_sources = sorted(set(declared.values()), key=lambda item: (str(item[0]), item[1]))
-    loader = LogfileSourceLoader()
-    available_channels: dict[str, tuple[AuthoringChannelCandidate, ...]] = {}
-    loaded: dict[tuple[Path, str], LoadedSource] = {}
     candidates_list: list[AgentSourceConfig] = []
-    candidate_by_source: dict[tuple[Path, str], AgentSourceConfig] = {}
     for index, (path, source_format) in enumerate(unique_sources, start=1):
-        cache_key = (path, source_format)
-        if path.is_file():
-            loaded[cache_key] = loader.load(path, source_format)
-            inspection_state = "inspected"
-            channels = loaded[cache_key].channels
-        else:
-            inspection_state = "unavailable"
-            channels = ()
+        revision = file_revision_token(path) if path.is_file() else None
+        section_labels = tuple(
+            section_id
+            for section_id, declared_source in declared.items()
+            if declared_source == (path, source_format)
+        )
         candidate = AgentSourceConfig(
             candidate_id=f"source-{index}",
             root_id="server",
             path=str(path),
-            labels=(path.name, path.stem, source_format),
+            labels=section_labels or (f"source-{index}",),
             trusted_format=source_format if source_format in {"las", "dlis"} else None,
-            inspection_state=inspection_state,
-            channels=channels,
+            inspection_state="not_inspected",
+            expected_revision_token=revision,
         )
         candidates_list.append(candidate)
-        candidate_by_source[cache_key] = candidate
-    for section_id, (path, source_format) in declared.items():
-        if not path.is_file():
-            continue
-        cache_key = (path, source_format)
-        source = loaded[cache_key]
-        candidate = candidate_by_source[(path, source_format)]
-        available_channels[section_id] = tuple(
-            AuthoringChannelCandidate(
-                mnemonic=channel.mnemonic,
-                kind=channel.kind,
-                unit=channel.unit,
-                description=channel.description,
-                aliases=list(channel.aliases),
-                value_shape=list(channel.shape),
-                source_path=candidate.path,
-            )
-            for channel in source.channels
-        )
-    return tuple(candidates_list), available_channels
+    return tuple(candidates_list)
 
 
 def _load_document_context(logfile_path: Path, *, root: Path) -> _NotebookDocumentContext:
@@ -168,7 +141,7 @@ def _load_document_context(logfile_path: Path, *, root: Path) -> _NotebookDocume
         allowed_root=root,
         resolved_template_paths=template_paths,
     )
-    source_candidates, available_channels = _declared_source_inventory(
+    source_candidates = _declared_source_inventory(
         spec,
         logfile_path=logfile_path,
         root=root,
@@ -176,7 +149,7 @@ def _load_document_context(logfile_path: Path, *, root: Path) -> _NotebookDocume
     dependency_paths = {
         candidate.path
         for candidate in source_candidates
-        if candidate.inspection_state == "inspected"
+        if candidate.expected_revision_token is not None
     }
     dependency_paths.update(str(path) for path in template_paths)
     dependency_revisions = tuple(
@@ -192,7 +165,6 @@ def _load_document_context(logfile_path: Path, *, root: Path) -> _NotebookDocume
         dependency_revisions=dependency_revisions,
         document=AuthoringService.from_mapping(report_to_dict(spec)).document,
         source_candidates=source_candidates,
-        available_channels=available_channels,
     )
 
 
@@ -282,10 +254,35 @@ def _apply_result(
         )
 
     private_service = AuthoringService(context.document)
+    inspected = result.inspection_context
+    if inspected is None:
+        if intent_requires_channel_context(result.intent):
+            return (
+                False,
+                False,
+                False,
+                ["Source inspection snapshot is missing."],
+                "reconciliation_blocked",
+                stages,
+            )
+        available_channels = {}
+    else:
+        try:
+            validate_enriched_snapshot(inspected, private_service.document)
+            available_channels = reconciliation_channels(inspected, result.intent)
+        except ValueError as error:
+            return (
+                False,
+                False,
+                False,
+                [f"stale_or_invalid_inspection_snapshot: {error}"],
+                "stale_snapshot_conflict",
+                stages,
+            )
     plan = reconcile_authoring(
         result.intent,
         existing=private_service.document,
-        available_channels=context.available_channels,
+        available_channels=available_channels,
     )
     if not plan.ready:
         errors = [f"{issue.code}: {issue.message}" for issue in plan.issues]
@@ -324,6 +321,8 @@ def _apply_result(
     changed = context.document.model_dump(mode="json") != accepted.model_dump(mode="json")
     if changed:
         try:
+            if inspected is not None:
+                validate_enriched_snapshot(inspected, context.document)
             mcp_service.persist_authoring_document(
                 accepted,
                 logfile_path=context.logfile_path,

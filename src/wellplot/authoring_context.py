@@ -31,7 +31,7 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from enum import StrEnum
 from re import sub
-from typing import Any, TypeAlias
+from typing import Any, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -72,6 +72,15 @@ class AuthoringResolutionStatus(StrEnum):
     INVALID = "invalid"
 
 
+class PhysicalChannelResolutionState(StrEnum):
+    """Four-state result for exact physical-mnemonic resolution."""
+
+    UNIQUE = "UNIQUE"
+    AMBIGUOUS = "AMBIGUOUS"
+    ABSENT = "ABSENT"
+    UNKNOWN = "UNKNOWN"
+
+
 class AuthoringChannelAlias(_ContextModel):
     """Reusable semantic alias entry for source-channel resolution."""
 
@@ -91,6 +100,47 @@ class AuthoringChannelCandidate(_ContextModel):
     description: str = ""
     value_shape: list[int] = Field(default_factory=list)
     source_path: str | None = Field(default=None, min_length=1)
+    physical_identity: dict[str, Any] = Field(default_factory=dict)
+    addressability: Literal["ADDRESSABLE", "UNADDRESSABLE"] = "ADDRESSABLE"
+
+
+class PhysicalChannelResolution(_ContextModel):
+    """Exact physical identity result, separate from semantic classification."""
+
+    state: PhysicalChannelResolutionState
+    candidates: tuple[AuthoringChannelCandidate, ...] = ()
+    addressability: Literal["ADDRESSABLE", "UNADDRESSABLE"] | None = None
+
+
+def resolve_physical_channel(
+    requested_mnemonic: str,
+    candidates: Sequence[AuthoringChannelCandidate],
+    *,
+    inventory_complete: bool,
+) -> PhysicalChannelResolution:
+    """Resolve exact mnemonic identity without treating catalog misses as absence."""
+    requested = requested_mnemonic.strip().casefold()
+    matches = tuple(
+        candidate for candidate in candidates if candidate.mnemonic.strip().casefold() == requested
+    )
+    if len(matches) > 1:
+        return PhysicalChannelResolution(
+            state=PhysicalChannelResolutionState.AMBIGUOUS,
+            candidates=matches,
+        )
+    if not matches:
+        state = (
+            PhysicalChannelResolutionState.ABSENT
+            if inventory_complete
+            else PhysicalChannelResolutionState.UNKNOWN
+        )
+        return PhysicalChannelResolution(state=state)
+    match = matches[0]
+    return PhysicalChannelResolution(
+        state=PhysicalChannelResolutionState.UNIQUE,
+        candidates=matches,
+        addressability=match.addressability,
+    )
 
 
 class AuthoringSourceContext(_ContextModel):
@@ -803,12 +853,10 @@ def _candidate_matches(
     aliases: Sequence[AuthoringChannelAlias],
 ) -> tuple[list[AuthoringChannelCandidate], str | None]:
     """Match a requested channel exactly or through one semantic alias."""
-    normalized = _normalize_token(requested)
     exact = [
         candidate
         for candidate in candidates
-        if normalized == _normalize_token(candidate.mnemonic)
-        or normalized in {_normalize_token(alias) for alias in candidate.aliases}
+        if requested.strip().casefold() == candidate.mnemonic.strip().casefold()
     ]
     if exact:
         return exact, None
@@ -819,10 +867,7 @@ def _candidate_matches(
         _normalize_token(term) for term in [alias.id, alias.label, *alias.aliases, *alias.mnemonics]
     }
     matches = [
-        candidate
-        for candidate in candidates
-        if _normalize_token(candidate.mnemonic) in alias_terms
-        or bool(alias_terms.intersection(_normalize_token(item) for item in candidate.aliases))
+        candidate for candidate in candidates if _normalize_token(candidate.mnemonic) in alias_terms
     ]
     return matches, alias.id
 
@@ -1095,6 +1140,32 @@ def _resolve_channels(
             )
             continue
         candidates = _channel_candidates(raw_candidates)
+        physical = resolve_physical_channel(str(requested), candidates, inventory_complete=True)
+        if physical.state is PhysicalChannelResolutionState.AMBIGUOUS:
+            issues.append(
+                AuthoringContextIssue(
+                    path=f"{path}.channel",
+                    code="channel_ambiguous",
+                    message=f"Multiple physical channels match {requested!r}.",
+                    candidates=[candidate.mnemonic for candidate in physical.candidates],
+                )
+            )
+            continue
+        if (
+            physical.state is PhysicalChannelResolutionState.UNIQUE
+            and physical.addressability == "UNADDRESSABLE"
+        ):
+            issues.append(
+                AuthoringContextIssue(
+                    path=f"{path}.channel",
+                    code="channel_unaddressable",
+                    message=(
+                        f"Channel {requested!r} has a unique metadata identity that the "
+                        "current renderer cannot address unambiguously."
+                    ),
+                )
+            )
+            continue
         matches, matched_alias = _candidate_matches(str(requested), candidates, channel_aliases)
         if len(matches) != 1:
             code = "channel_missing" if not matches else "channel_ambiguous"
