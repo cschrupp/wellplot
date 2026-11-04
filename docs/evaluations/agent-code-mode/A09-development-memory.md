@@ -5,7 +5,8 @@
 - State: security/observability tranche accepted; A09 overall open
 - Accepted security/observability checkpoint: `7ea43a6548a8bd1e5b44eb20c085a7027932e0db`
 - Accepted metadata-first design checkpoint: `daef5d171828495b2f0dfcea25ae372f0bc39af4`
-- Current work: D1 accepted; prepare/close D2 feasibility; implementation remains unauthorized
+- Current work: D1 accepted; D2 feasibility assessed 2026-11-03; parser,
+  token, and catalog implementation remains unauthorized
 - Provider, model, and endpoint calls: `0`
 - Scientific turns: `0`
 - C02 exposure: `0`
@@ -91,6 +92,47 @@ The provider-free feasibility results and evidence limits are recorded in
 `docs/evaluations/agent-code-mode/A09-resource-budget-feasibility.md`. They do
 not promote implementation or authorize endpoint/model/scientific work.
 
+## D2 Feasibility Result (2026-11-03)
+
+The bounded D2 feasibility assessment and its decision table are recorded in
+`docs/evaluations/agent-code-mode/A09-D2-feasibility-result.md`. It updates,
+but does not promote or rewrite, the accepted D1 design.
+
+- LASIO 0.32's EOF scan was confirmed from installed source. A temporary
+  chunked-prefix prototype parsed generated LAS 1.2/2.0 examples with an empty
+  sample matrix and returned `UNKNOWN` on test line/prefix-budget exhaustion.
+  The marker rule follows CWLS LAS 2.0: the first reserved character after
+  `~` chooses the section and the remainder is comment text. `~A` with a
+  descriptive suffix is valid; `~Log_Data` remains outside this candidate.
+  This is feasibility evidence, not production code or a complete format
+  matrix.
+- A 1,020-byte temporary RP66-style fixture generated with MIT `dliswriter`
+  1.2.0 was accepted by locked `dlisio` 1.0.4. A metadata-only projection ran
+  in a child with test-only AS/CPU limits and a parent timeout. No numerical
+  curve APIs or scientific fixtures were used. The writer's `2**32` default
+  output buffer was found to preallocate 4 GiB; the test explicitly supplied
+  a smaller buffer. The writer is not a conformance validator.
+- No numeric production parser limits were selected. Current cgroup memory
+  enforcement is unavailable in the read-only WSL mount, and the empirical
+  set does not represent multi-GB headers, DLIS scaling, or an accepted
+  latency SLO. `RLIMIT_AS` is not direct RSS enforcement.
+- Exact prompt-token admission remains blocked: the matching Qwen tokenizer,
+  deployed llama.cpp build/template and schema-conversion behavior are not
+  locally available. No endpoint `/apply-template` or `/tokenize` POST was
+  made. Character ratios and generic tokenizers are not substitutes.
+- Catalog governance recommendation: begin with zero active semantic-family
+  mappings until each has domain-reviewed evidence, provenance and license
+  status. Exact physical-channel selectors remain available. The supplied
+  family JSON files remain untrusted reference/collision inputs; no mappings
+  are approved by this study.
+
+D2 feasibility is therefore delivered but not fully closed: numeric parser
+budgets and exact model-token accounting remain open prerequisites, and the
+catalog governance recommendation needs independent/domain acceptance before
+mapping data can be enabled. A09 implementation and active-baseline promotion
+remain unauthorized. The detailed primary references, observations, and
+failure semantics are in the D2 result record.
+
 ## D1 Joint Catalog/Source Design Acceptance
 
 The integrated A09-CAT/A09-SRC D1 design was accepted at exact checkpoint
@@ -147,11 +189,15 @@ unless metadata identity is unique and existing renderer addressability is
 proven. No source loader, binding schema, renderer, workflow, or baseline was
 changed.
 
-D1 review and D2 feasibility are distinct. D2 still needs a valid synthetic
-RP66 fixture and measured containment, supported LAS correctness/resource
-matrix, justified finite budgets, exact Qwen/llama.cpp tokenizer/template
-accounting, and accepted catalog provenance/license/governance. No numeric
-limits, mappings, or conversion rules were selected.
+D1 review and D2 feasibility are distinct. The 2026-11-03 D2 feasibility
+package established a tiny synthetic RP66-style fixture and contained metadata
+parse, and a bounded synthetic LAS marker matrix. It did not establish DLIS
+scaling, representative LAS behavior, or production budgets. Exact
+Qwen/llama.cpp token accounting remains unavailable without matching local
+assets/source. Catalog governance remains a recommendation awaiting
+independent/domain acceptance; no semantic mappings or numeric limits were
+selected. See `A09-D2-feasibility-result.md` for the evidence and remaining
+gates.
 
 ## Boundaries
 

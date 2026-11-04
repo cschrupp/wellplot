@@ -15,17 +15,17 @@ implementation or select production budgets.
 
 | Question | Evidence and disposition |
 | --- | --- |
-| LAS metadata without samples | LASIO 0.32 `ignore_data=True` leaves an empty data array, but its section finder scans to EOF. A streaming, bounded prefix-to-data-section adapter is a feasible candidate; its edge cases need tests before implementation. |
-| DLIS metadata and resource behavior | DLISIO 1.0.4 scans/indexes the entire physical file. Metadata access can avoid curve arrays, but no valid synthetic DLIS generator/fixture was available, so parser time/RSS was not measured. |
-| Enforceable process limits | WSL2 supports process `RLIMIT_AS`, `RLIMIT_CPU`, and parent-enforced process-group wall termination. A cgroup-v2 mount is present but read-only here; no finite memory cap is configured for the current scope. Limits were mechanism probes, not selected budgets. |
-| Finite inspection/metadata budgets | Synthetic LAS sweeps characterize some parser costs, but do not represent adversarial or representative production metadata and do not justify final numeric thresholds. |
-| Qwen/llama.cpp token accounting | Not measurable exactly here without a matching tokenizer/model/template implementation. No such local assets or tools were found; endpoint calls were outside scope. |
-| Alias provenance/versioning | Existing catalog is static and unversioned. Source candidate aliases can participate directly in matching. A versioned, provenance-bearing, fail-closed catalog policy is required before semantic-role matching is enabled. |
+| LAS metadata without samples | LASIO 0.32 `ignore_data=True` skips samples but scans to EOF. A synthetic LAS 1.2/2.0 prefix matrix parses expected headers with empty arrays; scanner remains a prototype. |
+| DLIS metadata and resource behavior | DLISIO 1.0.4 scans/indexes the full physical file. A 1,020-byte synthetic RP66-style fixture was generated outside the project and parsed in a child under test-only limits; scale/RSS behavior remains unmeasured. |
+| Enforceable process limits | WSL2 supports `RLIMIT_AS`, `RLIMIT_CPU`, and parent process-group wall termination. The read-only cgroup mount provides no per-job RSS cap. Mechanisms were exercised, not selected as production policy. |
+| Finite inspection/metadata budgets | Existing synthetic LAS sweeps plus the tiny DLIS probe do not represent supported production distributions or a declared SLO; no numeric threshold is justified. |
+| Qwen/llama.cpp token accounting | Exact count remains unavailable without matching tokenizer/model/template and server source/build; no endpoint calls were made. |
+| Alias provenance/versioning | Existing aliases lack per-rule provenance/version. Governance is proposed; no semantic-family mappings are approved from the supplied JSON inputs. |
 
-The next implementation gate requires review of the candidate LAS prefix
-approach, DLIS process-boundary policy, measurement plan, token-counting
-feasibility, and alias governance. No arbitrary source-file size ceiling is
-proposed.
+Implementation remains gated on the LAS matrix, DLIS containment and scale
+review, measured budgets under a declared SLO, exact token-accounting assets,
+and independent/domain acceptance of catalog governance. No arbitrary
+source-file size ceiling is proposed.
 
 The four supplied family-reference JSON files were also structurally audited
 read-only for D1. Counts, SHA-256 identities, wildcard/collision examples,
@@ -175,6 +175,35 @@ inspection. Keep LASIO as the canonical header parser, but feed it a bounded
 prefix ending at the supported data-section marker. The scanner and limits
 remain design-only and require independent review and regression tests.
 
+### LAS marker and limit matrix (2026-11-03)
+
+A temporary scanner prototype was exercised against generated LAS 1.2/2.0
+headers only. The inputs covered LAS 1.2 CRLF with `~A`, LAS 2.0 LF with
+`~ASCII`, CRLF with `~A (ASCII log data)`, leading spaces before a marker,
+non-marker text mentioning `~A`, comment lines containing `~A`, other section
+markers, the LAS 3 `~Log_Data` marker, an over-limit header line, and an
+over-limit cumulative prefix. The accepted marker line was included in the
+prefix passed to LASIO 0.32 `ignore_data=True`; all three valid inputs returned
+the expected `DEPT`/`GR` curve metadata and `data.shape == (0, 2)`. Comment or
+ordinary-text mentions, non-A section markers, and `~Log_Data` did not complete
+the inventory. Line/prefix budget exhaustion returned `UNKNOWN` in the
+prototype rather than an empty inventory.
+
+The scanner predicate was aligned with the CWLS LAS 2.0 rule: a tilde at the
+first non-space position begins a section, the first reserved character after
+it selects the section, and the rest of that line is a comment. Therefore
+`~A` plus a descriptive suffix is still an A/data-section marker; it must not
+be rejected merely for not matching the exact strings `~A` or `~ASCII`. The
+CWLS 2.0 standard says the data section is last and that section line suffix
+is comment text. LAS 3 `~Log_Data` remains unsupported by this LASIO 0.32
+candidate unless separately qualified.
+
+This finite prototype corrects the earlier proof-of-concept's blind spot, but
+is not a production scanner and does not cover all legal encodings, header
+ordering, wrapped variants, malformed section grammar, or arbitrary long
+records. No numeric production budget is inferred from its test-only line and
+prefix caps. Its source was an ephemeral command, not a repository edit.
+
 ## DLISIO 1.0.4 and Process Containment
 
 Installed-source inspection establishes:
@@ -187,11 +216,12 @@ Installed-source inspection establishes:
 - `Frame.curves()` and `Channel.curves()` materialize numerical values as
   NumPy arrays and must not be used in metadata inspection.
 - The installed package exposes a compiled native `dlisio.core` extension.
-  There is no writer/fixture-generation API in the inspected package surface,
-  and repository DLIS files are non-synthetic and were intentionally not
-  used. Consequently, DLIS parser wall-time, peak RSS, metadata scaling, and
-  multi-logical-file identity behavior have **not** been empirically measured
-  in this package.
+
+The `dlisio` package itself exposes no writer/fixture-generation API. A
+separately maintained writer was subsequently found and used only from an
+isolated `/tmp` target; repository DLIS assets were not used. One tiny
+synthetic fixture established parser compatibility and exercised a supervised
+metadata projection, but it is not a scaling or conformance corpus.
 
 Relevant locations:
 
@@ -237,12 +267,44 @@ direct RSS/cgroup limit is mandatory, the supported runtime must provide a
 writable delegated cgroup or equivalent OS job limit. That is an explicit
 prerequisite, not an assumed capability.
 
-**Unresolved DLIS evidence:** A valid, synthetic RP66 fixture or generator is
-needed to exercise logical-file/frame/channel scaling and failure behavior
-without touching scientific fixtures. Only after that exists can a bounded
-sweep report CPU time, wall time, peak RSS, metadata object counts, and
-cache-on/cache-off behavior. No real production DLIS is authorized for this
-decision package.
+### Synthetic RP66 fixture and contained parse probe (2026-11-03)
+
+The upstream `well-id/dliswriter` 1.2.0 project is an MIT-licensed, beta
+Python writer that states it is based on RP66 v1 and documents generated mock
+channels and frames. Its PyPI wheel was downloaded to `/tmp`, not installed in
+the project environment or added as a dependency. The wheel SHA-256 matched
+the PyPI-published digest:
+
+```text
+0f86a7b37a6e01eacc81f62a86e67b870f1439fb359510b9b7e8255f3c4f0cc2
+```
+
+Its default `output_chunk_size` is `2**32`, and its implementation
+preallocates that entire bytearray. The first tiny-file attempt therefore
+demonstrated an unsafe fixture-writer default for this constrained host; it
+was stopped before a fixture was emitted. Passing an explicit 65,536-byte
+output buffer produced a 1,020-byte synthetic physical DLIS containing one
+logical file, one frame, and two channels (`DEPTH`, `GR`). The locked
+`dlisio` 1.0.4 reader successfully indexed it and returned the expected
+logical-file/frame/channel metadata. No `Frame.curves()` or
+`Channel.curves()` API was called. The fixture was deleted after the test.
+
+The same fixture was then parsed in a subprocess with test-only
+`RLIMIT_AS=1 GiB`, `RLIMIT_CPU=10 s`, and a parent 15-second timeout. The child
+exited successfully with the bounded metadata projection. These deliberately
+test-only limits are not proposed production values. Combined with the
+previous OS-mechanism probe (CPU/address-space limits and parent process-group
+termination), this establishes that the available runtime can exercise the
+containment mechanism on a valid minimal fixture. It does not establish limits
+for large, malformed, multi-file, or adversarial DLIS inputs, nor direct RSS
+containment: `RLIMIT_AS` limits virtual address space, and the current WSL2
+cgroup mount is read-only with no per-job `memory.max`.
+
+`dliswriter` is an independent generator, not a normative RP66 conformance
+validator. The test demonstrates a useful fixture path accepted by `dlisio`,
+not full RP66 conformance or compatibility with WellPlot's renderer. A bounded
+fixture matrix and DLIS scaling/resource sweep remain necessary before
+production budgets can be selected. No real production DLIS was used.
 
 ## Inspection and Metadata Budget Derivation
 
@@ -281,10 +343,12 @@ source/header and parser-process budgets.
 
 - LAS metadata performance on non-synthetic or representative multi-gigabyte
   sources; only controlled synthetic tails were used.
-- The bounded-prefix scanner under adversarial encodings, line endings,
-  section marker variants, and large records.
-- Any valid DLIS parse timing, RSS, cache strategy, or native failure under
-  process limits.
+- The bounded-prefix scanner under adversarial encodings, complete supported
+  LAS 1.2/2.0 marker/line-ending variants, and representative large records.
+- DLIS scaling across logical files, frames, channels, records, and sparse or
+  large sample regions; the single tiny fixture is only a compatibility probe.
+- Peak RSS/VSZ, cache-on/cache-off effects, and native failure behavior for
+  DLIS under production-appropriate process limits.
 - A production-selected numeric budget and target inspection latency.
 - Queue/concurrency interaction under more than the current one concurrent
   agent call; no concurrency experiment was run.
@@ -339,6 +403,17 @@ remaining decision requires provision of the exact tokenizer/model/template
 implementation locally or a separately authorized non-generative runtime
 capability check; neither occurred here.
 
+The public llama.cpp server interface documents `/apply-template` and
+`/tokenize` as non-inference operations, which is a plausible later
+measurement mechanism. Those are POST requests and were not called. The
+deployed server build, exact GGUF tokenizer/template and how that build converts
+OpenAI `response_format: json_schema` into prompt text versus grammar are not
+available locally. Current WellPlot code sends system/user messages, the
+Pydantic schema in `response_format`, output limit when configured, and frozen
+request options; that source-level shape alone cannot establish final rendered
+tokens or schema grammar cost. Consequently token admission remains blocked,
+not approximated.
+
 ## Trusted Alias Catalog Governance
 
 Source inspection found the current alias catalog in
@@ -352,6 +427,29 @@ field. Thus the currently inspected contract does not yet prove that every
 alias used for semantic resolution is trusted.
 
 ### Proposed policy, not implementation
+
+**D2 governance recommendation:** the first governed catalog release should
+contain no active semantic-family-to-physical-channel mappings until each
+mapping has a domain-reviewed evidence record. Exact physical-channel
+selection remains usable through the explicit user request and does not
+require alias inference. The supplied `examples/families/*.json` files remain
+untrusted reference/collision inputs: their local presence does not establish
+authorship, license, provenance, or scientific correctness. The current
+evidence does not justify promoting GR/SP or any other family aliases, so no
+initial scientific mapping is approved by this feasibility work.
+
+For any future mapping, require a proposal record with source citation and
+revision, exact evidence location, license/redistribution status, normalized
+request term, exact physical identities, unit/source/frame constraints,
+scope/exhaustiveness claim, conflict analysis, and named domain reviewer.
+Separate two-person semantic and software-schema review; accept only into an
+immutable release after positive, collision, ambiguity, stale-digest, and
+fail-closed tests pass. Version each release and bind canonical content digest
+and release ID into the existing snapshot/custody contract. Updates create a
+new release; they never rewrite evidence or silently change an old resolution.
+Missing, unreviewed, stale, or unavailable catalog data must leave semantic
+classification `UNKNOWN`/clarification-required and must not block an exact
+physical selector solely because a family mapping is absent.
 
 - A catalog release has a stable semantic version and canonical content
   digest; both are included in source-resolution snapshots and custody.
@@ -418,26 +516,34 @@ array/waveform rules individually, with domain evidence and collision tests.
 
 | Decision | Current evidence | Proposed disposition | Remaining gate |
 | --- | --- | --- | --- |
-| LAS parser | Stock API avoids sample arrays but scans tail; prefix proof-of-concept works on synthetic LAS 2.0 | Continue with bounded prefix scanner feeding LASIO; retain full loaders elsewhere | Review scanner limits and matrix before implementation |
-| DLIS parser | Full-file index is confirmed; no synthetic parser measurements | Metadata-only object traversal in a supervised child; no sample APIs | Review RLIMIT_AS/CPU plus wall timeout semantics and obtain valid synthetic RP66 fixture |
-| Resource budgets | Synthetic LAS scaling only; no service SLO or DLIS distribution | Derive per-resource budgets from measured supported matrix; choose no constants in code now | Human/architecture review of measured proposal before implementation |
+| LAS parser | LASIO 0.32 scans EOF; synthetic 1.2/2.0 bounded-prefix cases parse headers with empty arrays; marker semantics anchored to CWLS | Keep bounded prefix adapter as candidate, LASIO as header parser; return `UNKNOWN` on limits | Complete adversarial/representative matrix and approve evidenced operational budgets |
+| DLIS parser | 1,020-byte writer-generated RP66-style fixture loads in dlisio 1.0.4; metadata projection works in a subprocess under test-only limits | Keep metadata-only traversal in supervised child; no sample APIs; no project writer dependency | Scale fixture matrix, validate parser resource behavior, decide acceptable memory enforcement |
+| Resource budgets | Synthetic LAS scaling and one tiny DLIS probe; no service SLO or representative distribution | Derive per-resource budgets from measured supported matrix; choose no constants in code now | Human/architecture review of measured proposal before implementation |
 | Token budget | Existing request shape understood, exact tokenizer/template unavailable | Exact same-build/model tokenization; separate grammar cap and byte cap | Local tokenizer/build availability or separate non-generative authorization |
 | Aliases | Static catalog is unversioned; candidate aliases lack explicit trust marking | Content-addressed, provenance-bearing, scope-aware closed-world registry | Review governance and compatibility correction before enabling role resolution |
 
-### Suggested finite next study
+### D2 feasibility disposition (2026-11-03)
 
-The next provider-free feasibility increment should be limited to:
+The bounded D2 work established the LAS prefix strategy and marker semantics
+for a small synthetic matrix, found and validated an isolated synthetic DLIS
+fixture path, inspected the canonical provider request construction, and
+produced a fail-closed catalog-governance recommendation. It did **not** close
+resource-budget selection or exact model-token accounting. The full D2 result
+and evidence classification are recorded in
+`docs/evaluations/agent-code-mode/A09-D2-feasibility-result.md`.
 
-1. A bounded LAS 1.2/2.0 matrix for the prefix scanner and header/curve
-   budgets, with repeated cold/warm timing and OS RSS measurements.
-2. A separately generated minimal synthetic RP66 fixture (or a documented
-   blocker if a safe generator cannot be built without broad parser work),
-   followed by metadata-only DLIS subprocess tests under child limits.
-3. A review of whether the current WSL2 `RLIMIT_AS` contract is acceptable or
-   a writable delegated memory cgroup is required.
-4. Offline provision of the exact Qwen GGUF/tokenizer and matching llama.cpp
-   source/build for input-template/schema accounting. No endpoint calls.
-5. Alias catalog governance acceptance before any new role mapping is added.
+| Area | D2 status | Implementation gate |
+| --- | --- | --- |
+| LAS metadata-first feasibility | Established on synthetic 1.2/2.0 cases; scanner remains a prototype | Independent review of implementation plan and complete parser matrix |
+| DLIS fixture/containment feasibility | Minimal fixture and child-process mechanism pass; no scale or production-limit evidence | Containment contract and scaling matrix review |
+| Numeric resource budgets | Open; prior observations and tiny fixture do not establish service SLOs or representative distributions | Declare supported envelope/SLO, then measure and approve finite limits |
+| Exact Qwen/llama.cpp token accounting | Blocked: exact local tokenizer/build/template absent; endpoint prohibited | Provision pinned local identities or separately authorize non-generative token endpoints |
+| Catalog governance | Policy proposed; no scientific mappings approved | Obtain domain review/provenance/license evidence per mapping before release |
+
+Do not treat D2 feasibility as permission to implement source inspection,
+catalog mappings, parser limits, token admission, or a second loader. No
+baseline promotion, provider/model/endpoint call, live smoke, scientific
+qualification, or C02 activity is authorized by this record.
 
 Do not broaden this into production code, real-source asset inspection, model
 execution, or scientific qualification. If a required asset/capability cannot
