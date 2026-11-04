@@ -143,19 +143,39 @@ complete file for section markers; a bounded prefix-to-data-marker adapter is
 a candidate, not implemented. The 2026-11-03 D2 feasibility result is in
 `docs/evaluations/agent-code-mode/A09-D2-feasibility-result.md`: a small
 generated LAS 1.2/2.0 marker matrix parses bounded prefixes with LASIO and
-empty sample arrays; a 1,020-byte synthetic RP66-style file generated outside
-the project was indexed by DLISIO 1.0.4 in a child under test-only limits.
-These establish feasibility, not production limits, broad format conformance,
-or representative performance. WSL2 process address/CPU limits and parent
-wall termination are available, but writable cgroup memory enforcement is
-not. No parser budgets are selected. Exact Qwen/llama.cpp token admission
-remains blocked on matching tokenizer/build/template/schema-conversion
-identities; no endpoint was called. Catalog governance proposes zero active
-semantic mappings until provenance, licensing and domain review are complete;
-no mappings are approved. These remain A09 implementation prerequisites. No
+empty sample arrays; a preserved 2,364-byte synthetic RP66-style fixture
+covers two logical files, multiple frames, repeated mnemonics and copy numbers.
+DLISIO 1.0.4 loaded the fixture in a child under test-only limits; strict-error
+truncation probes passed, and SUL-only input was correctly identified as an
+empty-but-incomplete inventory case. These establish feasibility, not
+production limits, broad format conformance, or representative performance.
+WSL2 process address/CPU limits and parent wall termination are available, but
+writable cgroup memory enforcement is not. No parser budgets are selected.
+The 2026-11-04 D2 continuation records provisional, unmeasured end-to-end p95
+qualification targets: LAS 1.2/2.0 bounded inspection up to 1,000 channels in
+2 seconds; DLIS RP66 v1 cold inspection up to 250 MiB in 30 seconds and the
+larger tier up to 1 GiB in 90 seconds; and a valid unchanged-source cache hit
+in 1 second. These are qualification objectives only, not production SLOs,
+timeouts, safety limits, or source-size rejection thresholds. Larger files
+must not be rejected solely by total size. The remaining bounded matrix covers
+LAS adversarial correctness, DLIS inventory completeness/corruption/scaling
+and containment, exact Qwen/llama.cpp token accounting, and a small governed
+catalog proposal. The project owner is nominated as initial domain reviewer,
+pending explicit acceptance; no mappings are approved and Codex must not
+approve its own scientific assertions. See
+`docs/evaluations/agent-code-mode/A09-D2-feasibility-result.md` and
+`A09-resource-budget-feasibility.md`. D2 feasibility is sufficient for
+bounded functional implementation planning: performance targets, p95
+benchmarks, representative scaling, optimized budgets, and exact model-token
+accounting are not prerequisites to provider-free implementation. Basic parser
+isolation, finite reviewed provisional safety controls, exact source identity,
+deterministic four-state resolution, and fail-closed publication remain
+required. Production/provider-backed readiness retains the deferred scaling,
+latency, resource, token-accounting, and domain-approved catalog gates. No
 production implementation, binding-schema or scientific-loader change,
 baseline promotion, provider call, endpoint call, or live/scientific
-qualification is authorized. A09 remains open.
+qualification is authorized. Functional implementation remains pending
+separate authorization; A09 remains open.
 
 The accepted documentation-only D1 joint semantic-catalog/source-inspection
 design is recorded in

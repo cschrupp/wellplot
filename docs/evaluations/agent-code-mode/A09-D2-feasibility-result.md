@@ -1,27 +1,30 @@
 # A09 D2 Feasibility Result
 
-**Date:** 2026-11-03
+**Date:** 2026-11-03; DLIS follow-up 2026-11-04
 **Accepted design:** D1 integrated catalog/source design at
 `da23cd69792b4c75ed1da30bc0de35ca69ddcb38`
-**Disposition:** Feasibility evidence delivered; implementation prerequisites
+**Disposition:** Feasibility evidence sufficient for bounded implementation
+planning; finite provisional safety controls and implementation authorization
 remain open
 **Scope:** Provider-free, synthetic-only, documentation/evidence work
 
 ## Executive result
 
-D2 established a feasible bounded-prefix path for supported synthetic LAS
-1.2/2.0 headers and a safe way to create a small synthetic RP66-style DLIS
-fixture for locked-reader probes. It confirmed that the canonical `dlisio`
-reader still indexes the entire physical file, and that a supervised child can
-be exercised with address-space/CPU limits plus a parent timeout. This is
-mechanism evidence only; no production thresholds are justified.
+D2 established a feasible bounded-prefix path for tested synthetic LAS
+1.2/2.0 headers and a synthetic RP66-style DLIS corpus exercising multiple
+logical files, frames, and repeated channel mnemonics. It confirmed that the
+canonical `dlisio` reader indexes the entire physical file, and that a
+supervised child can be exercised with address-space/CPU limits plus a parent
+timeout. This is mechanism evidence only; no production thresholds are
+justified.
 
 Exact Qwen/llama.cpp request-token admission could not be established without
 the deployed tokenizer, model/template and server implementation. Catalog
 governance can be specified, but the available family files do not establish
 licensed, domain-reviewed semantic mappings. Accordingly, no mappings are
-approved and no numeric parser budgets are selected. **D2 is not a release to
-implementation.**
+approved and no numeric parser budgets are selected. **This D2 result is not
+implementation authorization.** The current implementation gate split is
+recorded in section 6 below.
 
 ## 1. LAS metadata-only feasibility
 
@@ -109,15 +112,75 @@ candidate. Production memory containment remains an open decision between an
 accepted `RLIMIT_AS` contract and providing a writable delegated cgroup or
 equivalent OS job limit.
 
+### Expanded repeatable fixture/corruption probe (2026-11-04)
+
+A larger synthetic fixture is preserved at
+`tests/fixtures/a09_d2_metadata/multifile_repeated_mnemonics.dlis`:
+
+```text
+bytes: 2364
+SHA-256: b98beba2bc6fedb70794da63d68dd09ac94abe02191fbfb53e6acd2eb85c08b9
+generator: dliswriter 1.2.0, output_chunk_size=65536
+reader: locked dlisio 1.0.4
+```
+
+It has two logical files. The first has two frames and repeats `DEPTH` and
+`GR` with distinct channel copy numbers (`0` and `1`); the second repeats the
+same mnemonics in a separate logical-file context. A metadata-only projection
+returned two logical files, channel counts `[4, 2]`, frame counts `[2, 1]`,
+and the expected channel membership/copy numbers. No numerical curve API was
+called. The fixture was parsed in a child process with test-only
+`RLIMIT_AS=1 GiB`, `RLIMIT_CPU=10 s`, and an 8-second parent timeout. It
+completed successfully. These are test limits, not production budgets.
+
+The same child harness used `dlisio.common.ErrorHandler` with `info`, `minor`,
+`major`, and `critical` all set to `Actions.RAISE`:
+
+| Synthetic input | Strict parser result | Required host interpretation |
+| --- | --- | --- |
+| Preserved valid fixture | 2 logical files; 4/2 channels; 2/1 frames | Complete only after validating the projection and terminal inventory marker |
+| Empty bytes | `EOFError` | `UNKNOWN` / inspection failure |
+| 39-byte partial storage-unit label | `RuntimeError` | `UNKNOWN` / inspection failure |
+| 80-byte storage-unit label only | Successful parse with 0 logical files | `UNKNOWN` / incomplete; never `ABSENT` |
+| Valid fixture truncated by one final byte | `RuntimeError` | `UNKNOWN` / inspection failure |
+
+This falsifies the weaker rule “clean child exit means complete inventory”:
+the SUL-only input exits successfully but contains no logical files. The
+supervisor must require at least one logical file and a complete, valid bounded
+projection before marking inventory complete; otherwise channel resolution is
+`UNKNOWN`. Non-info parser violations should fail closed. This still does not
+prove that every semantically incorrect but syntactically parseable mutation
+will be detected, nor does it establish coverage of all RP66-v1 structures.
+
+The file is synthetic test data only, not a production asset or conformance
+corpus. Its external generator remains outside project dependencies; the
+fixture itself can be read with the locked project `dlisio` installation.
+
 ## 3. Resource budgets
 
 No finite production thresholds are selected. The existing LAS measurements
-and one tiny DLIS fixture are not representative distributions; no inspection
-latency SLO or supported metadata envelope has been declared. Arbitrary
-thresholds would turn test caps into unsupported product policy.
+and synthetic DLIS fixtures are not representative distributions. The
+following owner-proposed objectives now bound the next qualification work;
+they are provisional targets, not measured capabilities, production SLOs,
+timeouts, resource limits, or source-size admission ceilings:
 
-Before implementation, the owner must declare the supported runtime envelope
-and inspection SLO. A finite synthetic matrix should then measure separately:
+| Operation and qualification tier | Provisional end-to-end p95 target |
+| --- | ---: |
+| LAS 1.2/2.0 bounded metadata inspection, up to 1,000 channels | 2 seconds |
+| DLIS RP66 v1 cold inspection, files up to 250 MiB | 30 seconds |
+| DLIS RP66 v1 cold inspection, larger tier above 250 MiB and up to 1 GiB | 90 seconds |
+| Valid cached metadata inspection for an unchanged source | 1 second |
+
+The DLIS tiers define benchmark strata only. A source larger than 1 GiB must
+not be rejected solely for its total size. A latency-target miss is a
+performance failure; reaching a separately approved safety/resource limit
+must yield an incomplete result and `UNKNOWN`, blocking publication. Do not
+turn a target into an enforced deadline without separate evidence and review.
+
+Qualification must run on the supported canonical WSL2/local-storage
+environment, bind exact Python/parser/runtime identities, and report cold and
+warm behavior. Include subprocess startup in end-to-end latency and separately
+report startup and parser time. The finite matrix must measure separately:
 
 - bounded LAS header bytes, records, line sizes, curve counts, encodings,
   marker variants, and sample-tail independence;
@@ -126,6 +189,8 @@ and inspection SLO. A finite synthetic matrix should then measure separately:
 - child startup separately from parser CPU and wall time, peak RSS and VSZ,
   limit-trigger behavior, parent cancellation, result bytes, and query count;
 - repeated cold/warm runs, with exact tool/library/runtime identities.
+- end-to-end p50/p95/p99 and individual outliers against each provisional
+  target; do not aggregate different source tiers or cache states.
 
 Choose distinct finite limits for header bytes/records, metadata objects,
 projected output bytes, query count, parser CPU, wall time, and process memory
@@ -134,7 +199,8 @@ must produce an incomplete result and channel-resolution `UNKNOWN`, never
 `ABSENT`. Total LAS/DLIS source bytes are not themselves an admission ceiling.
 
 **Disposition:** `RESOURCE_BUDGETS_OPEN`; no numbers are inferred from these
-probes.
+probes. The provisional latency objectives are `UNVERIFIED`; no operational
+limit or file-size ceiling is selected.
 
 ## 4. Exact Qwen/llama.cpp request-token accounting
 
@@ -190,13 +256,142 @@ promoted to the active baseline.
 
 ## Decision table
 
+### Candidate supported-input envelope (proposal; not approved)
+
+- **Runtime:** current canonical WSL2/Python 3.12 environment with locked
+  LASIO 0.32 and DLISIO 1.0.4. This does not claim portability to other
+  OS/runtime combinations.
+- **LAS:** versions 1.2 and 2.0, standard ASCII header syntax through a
+  terminal A/data-section marker, supporting tested LF/CRLF and descriptive
+  marker comments. LAS 3 `~Log_Data`, undocumented encodings, and malformed or
+  incomplete inventories remain unsupported until separately qualified.
+- **DLIS:** RP66-v1 physical files accepted as a single physical source by
+  DLISIO 1.0.4, including multiple logical files, frames, and compound channel
+  identity. The preserved synthetic fixture demonstrates only the listed
+  subset; it is not an acceptance envelope for all RP66 object types or
+  vendor extensions.
+- **Inspection output:** technical metadata only; no curve sample arrays or
+  free-form descriptions in model context. Metadata identity, renderer
+  addressability, and sample availability remain independent facts.
+- **Failure:** parser error, budget exhaustion, empty/partial inventory,
+  unrecognized required identity, or incomplete projection returns `UNKNOWN`
+  and blocks binding/publication. It never implies `ABSENT`.
+
+This envelope is a candidate for owner review. It does not set maximum source
+bytes, header/record counts, metadata objects, projected bytes, CPU, RSS/VSZ,
+wall time, or concurrency. The provisional latency objectives above bound
+measurement but are not yet an accepted production SLO; the provider's
+900-second timeout is not an inspection SLO.
+
 | Item | Evidence status | Result | Remaining gate |
 | --- | --- | --- | --- |
 | LAS bounded-prefix feasibility | Synthetic LAS 1.2/2.0 cases; installed LASIO source; CWLS marker rule | Candidate supported; not production-qualified | Complete format/adversarial matrix and budgets |
-| DLIS fixture and child containment | Tiny generated fixture accepted by locked dlisio; test-only child limits | Feasible for provider-free tests | Scaling/corruption matrix and accepted memory contract |
-| Numeric parser/resource limits | No SLO or representative distribution | Open; no constants selected | Measure supported envelope and review limits |
+| DLIS fixture and child containment | 2,364-byte generated multi-logical/multi-frame fixture; strict-error corruption matrix under test-only child limits | Feasible for provider-free tests; empty inventory must fail closed | Scaling matrix and accepted memory contract |
+| Numeric parser/resource limits | Provisional p95 targets proposed; representative distributions and resource measurements absent | Open; no production constants selected | Functional implementation needs reviewed provisional safety limits only; production readiness needs measured matrix and approved operational limits |
 | Exact Qwen token accounting | Provider request source inspected; model/tokenizer/build absent | Blocked; exact count unavailable | Provision pinned local assets/source or authorize endpoint capability calls |
-| Catalog governance | D1 invariants plus untrusted local catalogs | Governance process proposed; no mappings approved | Domain/license review and acceptance of release policy |
+| Catalog governance | D1 invariants plus untrusted local catalogs; project owner nominated as initial domain reviewer, acceptance pending | Governance process proposed; no mappings approved | Accept reviewer role; prepare evidence-backed initial batch and obtain domain/license plus independent schema review |
+
+## Bounded D2 qualification matrix and remaining decisions
+
+The following is the remaining provider-free qualification scope. It is
+finite by strata and failure classes; it does not authorize production code or
+choose resource constants.
+
+| Gate | Bounded inputs / measurements | Required disposition |
+| --- | --- | --- |
+| LAS correctness | LAS 1.2/2.0; LF/CRLF; standard marker/comment variants; reordered and long records; malformed/missing markers; hostile descriptions; up to 1,000-channel target stratum; sample tails varied independently | Exact inventory and no sample arrays; incomplete/limit/corrupt cases are `UNKNOWN`; report p95 against 2-second target |
+| DLIS identity/completeness | Preserved multi-LF/multi-frame/repeated-mnemonic fixture; copy-number and LF/frame identity; SUL-only, empty, partial-SUL, truncated, malformed, and incomplete-enumeration cases | Require positive completeness evidence; empty/incomplete inventory is `UNKNOWN`, never `ABSENT`; no numerical curve APIs |
+| DLIS scaling/containment | Synthetic RP66-v1 tiers through 250 MiB and 1 GiB, cold subprocess and cache states, controlled LF/frame/channel/record counts, sparse/large sample regions | Report startup/parser/end-to-end latency, p50/p95/p99, RSS/VSZ, CPU, wall, scanned bytes, output bytes and limit behavior against 30/90-second targets; characterize larger files without size-based rejection |
+| Cache | Same source identity and unchanged revision; valid hit, stale identity, corrupt cache | Valid hit target p95 <=1 second; stale/corrupt cache is not trusted and falls back to bounded inspection or `UNKNOWN` |
+| Token admission | Exact deployed Qwen tokenizer/GGUF, llama.cpp build, template, thinking-off options, request framing, JSON-schema conversion, output reservation and context limit | Exact request admission or bounded blocker; no generic tokenizer or character-ratio substitution; no endpoint call absent separate authorization |
+| Catalog release | Candidate rules for GR, SP, depth, basic resistivities, neutron porosity, bulk density, sonic and caliper; exact source/revision/evidence/license/collision records | No rule active by inclusion alone; project-owner domain review requires explicit acceptance, plus independent software/schema review; wildcard rules remain suggestions |
+
+For latency qualification, record the measurement method and sample count
+before each run; include subprocess startup in end-to-end values and keep
+cold/warm and size tiers separate. A failed target is reported as
+`TARGET_NOT_MET`, not converted into a parser admission limit. Production
+resource budgets remain a later decision based on the measured distributions,
+supported input envelope, enforceable OS controls, and explicit safety margin.
+
+The nominated initial catalog domain reviewer has not yet accepted the role.
+Codex may assemble candidate mappings and evidence but must not approve its
+own scientific assertions. The initial batch is a review scope, not a set of
+approved mappings. Vendor technical documentation can support exact mnemonic
+meaning; CWLS/RP66 format specifications establish representation/identity,
+not scientific equivalence. Broad patterns such as `GR*` and `DT*` remain
+suggestions pending separate qualification. Presentation defaults require
+their own review and must not be inferred from semantic classification.
+
+The bounded LAS adapter, supervised DLIS parser, and semantic catalog remain
+internal capabilities of the existing source-inspection and host-resolution
+path. The DLIS child returns metadata evidence only; it does not interpret
+scientist intent or construct/persist a WellPlot document. Eventual
+implementation acceptance must include a source-reachability/ownership audit
+and negative tests proving that successful publication still goes only
+through the canonical `AuthoringService` path. Existing scientific loaders
+and renderer semantics remain unchanged.
+
+## Implementation and production-readiness gates (2026-11-04)
+
+This gate split supersedes any wording elsewhere in the D2 records that could
+make performance qualification a prerequisite for initial functional
+implementation. It does not authorize implementation; it defines the bounded
+plan to submit for independent review and later Human authorization.
+
+| Requirement | Before bounded functional implementation | Before provider-backed/production readiness |
+| --- | --- | --- |
+| Accepted canonical architecture | Required: D1 remains controlling | Required |
+| LAS/DLIS feasibility | Existing synthetic evidence is sufficient to begin bounded development | Expanded correctness, scaling, containment and supported-envelope qualification |
+| Parser isolation and resource safety | Required: isolate DLIS parsing and set finite provisional safety limits; breaches return incomplete/`UNKNOWN` | Harden and measure enforceability, memory behavior, and operational resource budgets |
+| Source identity and deterministic channel resolution | Required: define exact source/channel identity, four outcomes, ambiguity and fail-closed semantics | Fully validate against supported LAS/DLIS inventory variations, duplicates, frames, and renderer addressability |
+| Production latency SLO and p95 benchmarks | Not required | Required; current targets remain provisional until measured and accepted |
+| Representative large-file scaling | Not required | Required; qualification tiers are not size admission ceilings |
+| Exact Qwen/llama.cpp token accounting | Not required for provider-free implementation | Required before the affected provider-backed qualification; no generic estimate substitutes |
+| Scientific semantic mappings | Synthetic mappings may be used only in isolated deterministic tests | Each active production mapping requires domain evidence/review, provenance/license disposition, and independent schema/software review |
+| Canonical publication ownership | Required: existing reconciliation/CRUD/YAML route and source-level ownership tests | Required, including integration qualification |
+
+Finite provisional parser-safety limits are distinct from performance
+objectives. Their concrete values and enforceable mechanism must be proposed
+and reviewed before implementation starts; this record does not invent them.
+The implementation may not convert latency targets, DLIS benchmark tiers, or
+source byte counts into rejection thresholds. A safety-limit breach must
+produce incomplete evidence and `UNKNOWN`, never `ABSENT` or successful
+publication.
+
+### Bounded provider-free functional implementation candidate
+
+Subject to separate implementation authorization, the candidate is limited to
+metadata extraction, deterministic semantic resolution, and proving
+integration with the existing authoring path. Exact existing entry points to
+extend or preserve are:
+
+| Existing component / entry point | Bounded change boundary |
+| --- | --- |
+| `src/wellplot/agent/composition.py::create_canonical_dependencies` | Keep the single composition root and inject the existing `LogfileSourceLoader`/`SemanticEnricher`; no new graph, planner, or worker. |
+| `src/wellplot/agent/code_mode/source_loader.py::LogfileSourceLoader.load` and `SourceLoaderProtocol` | Add metadata-only LAS/DLIS extraction behind the existing loader contract. A supervised DLIS child is only a parser/metadata mechanism and returns bounded evidence; it cannot resolve intent or create/persist documents. |
+| `src/wellplot/agent/code_mode/enrichment.py::SemanticEnricher.enrich` and `._load_source` | Preserve allowed-root checks, source revision tokens, cache/snapshot validation, bounded projections, and incomplete/unknown outcomes. Extend existing source metadata contracts only as required for identity/completeness evidence. |
+| `src/wellplot/agent/inspection.py::AuthoringInspectionFacade` | Extend fixed read-only projections only for required, sanitized metadata evidence; do not expose raw source paths, samples, or free-form untrusted descriptions to the model. |
+| `src/wellplot/authoring_context.py::AuthoringContextResolver.resolve` and existing channel-resolution helpers | Add deterministic catalog-backed request-term interpretation and physical-channel resolution to the existing resolver. Preserve exact physical selectors, four-state resolution, ambiguity, provenance/version checks, and fail-closed behavior. |
+| `src/wellplot/model/intent.py::AuthoringDocumentIntent` | Preserve as the provider-neutral desired-state boundary. Do not create a second canonical intent or persist parser/catalog-specific identities as model authority. |
+| `src/wellplot/authoring_reconciler.py::reconcile_authoring`, `src/wellplot/authoring_executor.py::AuthoringExecutor.execute`, and `src/wellplot/authoring_service.py::AuthoringService` | Reuse unchanged as the canonical plan, CRUD execution, and validated document mutation route except for narrowly required integration fixes reviewed separately. |
+| Existing YAML and renderer paths | Preserve unchanged. Metadata inspection must not become an alternate loader for scientific rendering or an alternate persistence route. |
+
+Implementation qualification must include source-level reachability/ownership
+tests proving the metadata adapter is reachable only through the existing
+inspection path, does not call numerical sample loaders, and cannot construct
+or publish a WellPlot document. End-to-end provider-free tests must prove that
+successful authoring still reaches `AuthoringDocumentIntent` and then only the
+existing reconciliation, CRUD, `AuthoringService`, YAML, and renderer
+boundaries. Negative tests must cover no parallel graph/engine/loader,
+untrusted metadata injection, stale source/catalog identity, duplicate or
+ambiguous channels, incomplete inventories, unsupported renderer addressing,
+and safety-limit exhaustion.
+
+The candidate remains subject to independent implementation review. Provider-
+backed qualification, scientific qualification, production latency/scaling
+acceptance, active catalog release, and baseline promotion are separate later
+gates. Current disposition: `D2_FEASIBILITY_SUFFICIENT_FOR_IMPLEMENTATION_PLANNING`;
+`FUNCTIONAL_IMPLEMENTATION_PENDING_AUTHORIZATION`.
 
 ## References
 
@@ -210,9 +405,11 @@ promoted to the active baseline.
 
 No production source, config, dependency, active baseline, D1 design, frozen
 population/gold, D5/C02 evidence, or family JSON was modified. No scientific
-LAS/DLIS asset was read for these probes. The generated LAS and DLIS
-fixtures were temporary and contained only synthetic data. No provider,
-generation, model, endpoint, smoke, scientific-turn, or C02 call occurred.
+LAS/DLIS asset was read for these probes. Generated LAS variants were
+temporary; the expanded synthetic DLIS fixture is preserved at
+`tests/fixtures/a09_d2_metadata/multifile_repeated_mnemonics.dlis`. It contains
+only synthetic samples and metadata. No provider, generation, model, endpoint,
+smoke, scientific-turn, or C02 call occurred.
 
 ```text
 provider generation calls = 0

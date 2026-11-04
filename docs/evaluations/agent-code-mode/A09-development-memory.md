@@ -5,8 +5,8 @@
 - State: security/observability tranche accepted; A09 overall open
 - Accepted security/observability checkpoint: `7ea43a6548a8bd1e5b44eb20c085a7027932e0db`
 - Accepted metadata-first design checkpoint: `daef5d171828495b2f0dfcea25ae372f0bc39af4`
-- Current work: D1 accepted; D2 feasibility assessed 2026-11-03; parser,
-  token, and catalog implementation remains unauthorized
+- Current work: D1 accepted; D2 feasibility continuation targets recorded
+  2026-11-04; parser, token, and catalog implementation remains unauthorized
 - Provider, model, and endpoint calls: `0`
 - Scientific turns: `0`
 - C02 exposure: `0`
@@ -82,11 +82,14 @@ trusted, versioned alias evidence; similar names alone do not establish
 scientific equivalence. The design does not authorize modifying the scientific
 loader or binding schema.
 
-No fixed total LAS/DLIS file-size ceiling is permitted. Metadata-only parsing,
-four-state resolution, model-aware complete-request token accounting, and
-replacement parser safeguards remain implementation prerequisites. Numeric
-budgets, DLIS containment, exact Qwen/llama.cpp token accounting, and alias
-catalog governance are not decided by design acceptance.
+No fixed total LAS/DLIS file-size ceiling is permitted. For initial bounded
+provider-free implementation, the required foundations are metadata-only
+inspection, exact source/channel identity, four-state resolution, fail-closed
+ambiguity, parser isolation, and reviewed finite provisional safety limits.
+Production scaling and latency qualification, optimized resource budgets,
+exact Qwen/llama.cpp token accounting, and approved scientific mappings are
+later provider-backed/production-readiness gates. This stage distinction was
+clarified by the 2026-11-04 D2 follow-up and does not reopen D1.
 
 The provider-free feasibility results and evidence limits are recorded in
 `docs/evaluations/agent-code-mode/A09-resource-budget-feasibility.md`. They do
@@ -106,12 +109,18 @@ but does not promote or rewrite, the accepted D1 design.
   descriptive suffix is valid; `~Log_Data` remains outside this candidate.
   This is feasibility evidence, not production code or a complete format
   matrix.
-- A 1,020-byte temporary RP66-style fixture generated with MIT `dliswriter`
-  1.2.0 was accepted by locked `dlisio` 1.0.4. A metadata-only projection ran
-  in a child with test-only AS/CPU limits and a parent timeout. No numerical
-  curve APIs or scientific fixtures were used. The writer's `2**32` default
-  output buffer was found to preallocate 4 GiB; the test explicitly supplied
-  a smaller buffer. The writer is not a conformance validator.
+- The initial 1,020-byte RP66-style fixture was expanded into preserved
+  `tests/fixtures/a09_d2_metadata/multifile_repeated_mnemonics.dlis` (2,364
+  bytes; SHA-256
+  `b98beba2bc6fedb70794da63d68dd09ac94abe02191fbfb53e6acd2eb85c08b9`). It
+  parses as two logical files, three frames, and repeated channel mnemonics
+  with distinct copy numbers. Strict-error child probes also show that
+  truncated input fails while a SUL-only input can return zero logical files
+  successfully; empty inventory must therefore be incomplete/`UNKNOWN`. The
+  probe used test-only AS/CPU/wall limits. No numerical curve APIs or
+  scientific fixtures were used. `dliswriter`'s `2**32` default buffer
+  preallocates 4 GiB; fixture generation explicitly used a bounded buffer. The
+  writer is not a conformance validator.
 - No numeric production parser limits were selected. Current cgroup memory
   enforcement is unavailable in the read-only WSL mount, and the empirical
   set does not represent multi-GB headers, DLIS scaling, or an accepted
@@ -126,12 +135,40 @@ but does not promote or rewrite, the accepted D1 design.
   family JSON files remain untrusted reference/collision inputs; no mappings
   are approved by this study.
 
-D2 feasibility is therefore delivered but not fully closed: numeric parser
-budgets and exact model-token accounting remain open prerequisites, and the
-catalog governance recommendation needs independent/domain acceptance before
-mapping data can be enabled. A09 implementation and active-baseline promotion
-remain unauthorized. The detailed primary references, observations, and
-failure semantics are in the D2 result record.
+D2 feasibility is delivered but not fully closed. The 2026-11-04 continuation
+records provisional, unmeasured end-to-end p95 qualification targets:
+
+- LAS 1.2/2.0 bounded metadata inspection, up to 1,000 channels: 2 seconds.
+- DLIS RP66 v1 cold inspection, up to 250 MiB: 30 seconds.
+- DLIS RP66 v1 cold inspection, larger benchmark tier up to 1 GiB: 90 seconds.
+- Valid cached inspection for an unchanged source: 1 second.
+
+These are benchmark objectives, not accepted production SLOs, timeouts,
+resource limits, or source-size admission ceilings. Larger files must not be
+rejected solely by total size. Qualification is to run on the canonical
+WSL2/local-storage environment, include subprocess startup in end-to-end
+latency, separate startup/parser timing, and report cold/warm p50/p95/p99 plus
+memory, CPU, wall, scanned bytes, metadata/output volume and limit behavior.
+No production limits have been selected.
+
+The remaining bounded matrix and dispositions are in
+`A09-D2-feasibility-result.md`: LAS adversarial/format correctness; DLIS
+positive inventory completeness and corruption, scale and containment; exact
+Qwen/llama.cpp token accounting; and governance of a small reviewed catalog
+batch. The project owner is nominated as the initial scientific/domain
+reviewer, but acceptance of that role is pending. Codex may prepare candidate
+rules but must not approve its own scientific mappings. No mappings are
+approved; broad patterns remain suggestions. D1's four-state resolution and
+canonical single-engine architecture remain controlling.
+
+The bounded LAS adapter, supervised DLIS parser, and catalog must remain
+internal capabilities behind the existing source-inspection/host-resolution
+path. The child returns metadata only and cannot interpret intent or publish a
+WellPlot document. Eventual implementation review requires an ownership and
+source-reachability audit plus negative tests showing publication only via
+the existing canonical `AuthoringService` path. Functional implementation
+remains pending separate Human authorization; A09 promotion and production
+qualification are not authorized.
 
 ## D1 Joint Catalog/Source Design Acceptance
 

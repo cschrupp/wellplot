@@ -1,6 +1,6 @@
 # A09 — Metadata Inspection and Resource-Budget Feasibility
 
-**Date:** 2026-11-03
+**Date:** 2026-11-03; decision follow-up 2026-11-04
 **Status:** Provider-free feasibility package; decisions remain open
 **Accepted design:** `daef5d171828495b2f0dfcea25ae372f0bc39af4`
 **A09 implementation:** Not released by this package
@@ -16,16 +16,21 @@ implementation or select production budgets.
 | Question | Evidence and disposition |
 | --- | --- |
 | LAS metadata without samples | LASIO 0.32 `ignore_data=True` skips samples but scans to EOF. A synthetic LAS 1.2/2.0 prefix matrix parses expected headers with empty arrays; scanner remains a prototype. |
-| DLIS metadata and resource behavior | DLISIO 1.0.4 scans/indexes the full physical file. A 1,020-byte synthetic RP66-style fixture was generated outside the project and parsed in a child under test-only limits; scale/RSS behavior remains unmeasured. |
+| DLIS metadata and resource behavior | DLISIO 1.0.4 indexes the full file. A preserved 2,364-byte synthetic corpus covers two logical files, repeated mnemonics/copy numbers, and multiple frames; strict-error child probes distinguish parser failures from successful empty inventories. Scale/RSS behavior remains unmeasured. |
 | Enforceable process limits | WSL2 supports `RLIMIT_AS`, `RLIMIT_CPU`, and parent process-group wall termination. The read-only cgroup mount provides no per-job RSS cap. Mechanisms were exercised, not selected as production policy. |
-| Finite inspection/metadata budgets | Existing synthetic LAS sweeps plus the tiny DLIS probe do not represent supported production distributions or a declared SLO; no numeric threshold is justified. |
+| Finite inspection/metadata budgets | Existing synthetic probes do not represent production distributions. Provisional p95 qualification targets were proposed on 2026-11-04; no target is measured or accepted as a production SLO, and no numeric resource threshold is justified. |
 | Qwen/llama.cpp token accounting | Exact count remains unavailable without matching tokenizer/model/template and server source/build; no endpoint calls were made. |
-| Alias provenance/versioning | Existing aliases lack per-rule provenance/version. Governance is proposed; no semantic-family mappings are approved from the supplied JSON inputs. |
+| Alias provenance/versioning | Existing aliases lack per-rule provenance/version. Governance is proposed; no semantic-family mappings are approved from the supplied JSON inputs. Project owner nominated for initial domain review; role acceptance pending. |
 
-Implementation remains gated on the LAS matrix, DLIS containment and scale
-review, measured budgets under a declared SLO, exact token-accounting assets,
-and independent/domain acceptance of catalog governance. No arbitrary
-source-file size ceiling is proposed.
+For bounded provider-free functional implementation, the preconditions are the
+accepted D1 ownership/resolution contract, basic parser isolation, exact source
+identity, four-state deterministic resolution, fail-closed behavior, and finite
+provisional safety limits reviewed before implementation. Expanded scaling,
+production resource budgets, exact model-token accounting, domain-approved
+production mappings, and latency-target qualification are later
+provider-backed/production-readiness gates. The provisional targets are not
+measured or approved as production SLOs. No arbitrary source-file size
+ceiling is proposed.
 
 The four supplied family-reference JSON files were also structurally audited
 read-only for D1. Counts, SHA-256 identities, wildcard/collision examples,
@@ -306,17 +311,44 @@ not full RP66 conformance or compatibility with WellPlot's renderer. A bounded
 fixture matrix and DLIS scaling/resource sweep remain necessary before
 production budgets can be selected. No real production DLIS was used.
 
+The expanded multi-logical/multi-frame fixture and strict-error corruption
+results are in `docs/evaluations/agent-code-mode/A09-D2-feasibility-result.md`.
+A valid 80-byte storage-unit label with no logical files is returned by
+`dlisio` as an empty successful result, even with every `ErrorHandler`
+severity configured to raise. The host must reject an empty logical-file
+inventory as incomplete/`UNKNOWN`; a clean subprocess exit alone cannot
+certify completeness. The fixture is preserved at
+`tests/fixtures/a09_d2_metadata/multifile_repeated_mnemonics.dlis` with
+SHA-256 `b98beba2bc6fedb70794da63d68dd09ac94abe02191fbfb53e6acd2eb85c08b9`.
+
 ## Inspection and Metadata Budget Derivation
 
-### Measured bounds are not accepted limits
+### Provisional latency targets are not accepted limits
 
-The synthetic LAS measurements establish only observed points. They do not
-establish supported geological-file distributions, WSL cold-I/O behavior,
-DLIS costs, or a user-facing latency objective. Therefore **no numeric
-production budget is proposed or approved here**.
+The synthetic LAS/DLIS measurements establish only observed points. They do
+not establish supported geological-file distributions, WSL cold-I/O behavior,
+or scaled DLIS costs. The following owner-proposed p95 targets bound
+qualification only; none is measured or approved as a production SLO:
 
-Before implementation, decide a supported runtime envelope and inspection
-SLO, then run a pre-bounded provider-free matrix that includes:
+| Qualification stratum | Provisional end-to-end p95 target |
+| --- | ---: |
+| LAS 1.2/2.0 bounded metadata inspection, up to 1,000 channels | 2 seconds |
+| DLIS RP66 v1 cold inspection, up to 250 MiB | 30 seconds |
+| DLIS RP66 v1 cold inspection, larger tier up to 1 GiB | 90 seconds |
+| Valid cached metadata for an unchanged source | 1 second |
+
+The DLIS sizes are benchmark strata, not source-size admission ceilings.
+Larger files remain eligible for bounded inspection and must not be rejected
+solely by total bytes. A target miss is a performance result, not a safety
+limit. Only separately reviewed resource limits may terminate inspection, and
+their breach must return incomplete/`UNKNOWN` rather than `ABSENT`.
+
+Before production-readiness, run a pre-bounded provider-free qualification
+matrix on the current canonical WSL2/local-storage runtime, pinning
+parser/library versions and recording exact source identities. This is not a
+gate to initial functional implementation. Include subprocess startup in
+end-to-end latency, while also reporting startup and parser time separately.
+The matrix must include:
 
 - LAS 1.2/2.0 headers with varied encoding/line endings and header order;
 - sample tails growing independently of header size, including sparse and
@@ -329,15 +361,20 @@ SLO, then run a pre-bounded provider-free matrix that includes:
   parser time;
 - peak process RSS/VSZ and OS-limit outcomes, wall/CPU time, scanned bytes,
   metadata records, output bytes, and query count.
+- p50/p95/p99 and per-run latency for each distinct file-size and cache tier;
+  do not pool unlike strata. Record the measurement sample count and method
+  before execution.
 
-Derive separate finite controls for header bytes/records, metadata objects,
-projected output bytes, read/query count, CPU, wall time, and process memory.
-Choose the limits from the declared service SLO and measured distribution of
-the supported synthetic envelope, with explicit safety margin and failure
-semantics. A limit breach returns a typed incomplete result and channel
-resolution `UNKNOWN`. It never implies that the whole source is absent or
-invalid. Keep serialized inspection-context bytes as a separate bound from
-source/header and parser-process budgets.
+Initial implementation must use finite provisional safety controls for the
+parser child, header/metadata projection, query count, and serialized context.
+Their values must be explicitly proposed and reviewed before implementation;
+they are safety controls, not optimized production budgets. A limit breach
+returns typed incomplete evidence and channel resolution `UNKNOWN`. It never
+implies that the whole source is absent or invalid. Keep serialized
+inspection-context bytes as a separate bound from source/header and
+parser-process budgets. Production values should later be reviewed against the
+declared service SLO and measured supported distribution, with explicit
+safety margin and failure semantics.
 
 ### What remains unmeasured
 
@@ -349,7 +386,8 @@ source/header and parser-process budgets.
   large sample regions; the single tiny fixture is only a compatibility probe.
 - Peak RSS/VSZ, cache-on/cache-off effects, and native failure behavior for
   DLIS under production-appropriate process limits.
-- A production-selected numeric budget and target inspection latency.
+- Representative performance distributions and feasibility of the provisional
+  latency targets; no production-selected numeric resource budget.
 - Queue/concurrency interaction under more than the current one concurrent
   agent call; no concurrency experiment was run.
 
@@ -516,9 +554,9 @@ array/waveform rules individually, with domain evidence and collision tests.
 
 | Decision | Current evidence | Proposed disposition | Remaining gate |
 | --- | --- | --- | --- |
-| LAS parser | LASIO 0.32 scans EOF; synthetic 1.2/2.0 bounded-prefix cases parse headers with empty arrays; marker semantics anchored to CWLS | Keep bounded prefix adapter as candidate, LASIO as header parser; return `UNKNOWN` on limits | Complete adversarial/representative matrix and approve evidenced operational budgets |
-| DLIS parser | 1,020-byte writer-generated RP66-style fixture loads in dlisio 1.0.4; metadata projection works in a subprocess under test-only limits | Keep metadata-only traversal in supervised child; no sample APIs; no project writer dependency | Scale fixture matrix, validate parser resource behavior, decide acceptable memory enforcement |
-| Resource budgets | Synthetic LAS scaling and one tiny DLIS probe; no service SLO or representative distribution | Derive per-resource budgets from measured supported matrix; choose no constants in code now | Human/architecture review of measured proposal before implementation |
+| LAS parser | LASIO 0.32 scans EOF; synthetic 1.2/2.0 bounded-prefix cases parse headers with empty arrays; marker semantics anchored to CWLS | Keep bounded prefix adapter as candidate, LASIO as header parser; return `UNKNOWN` on limits | Functional implementation: basic supported syntax and finite provisional safety controls. Production readiness: adversarial/representative matrix and evidenced operational budgets |
+| DLIS parser | Preserved 2,364-byte synthetic multi-logical/multi-frame fixture; strict-error truncated cases fail, SUL-only succeeds empty | Keep metadata-only traversal in supervised child; require non-empty complete inventory; no sample APIs or project writer dependency | Scale matrix, verify completeness contract, decide acceptable memory enforcement |
+| Resource budgets | Synthetic probes; provisional p95 targets proposed, not measured/accepted | Separate provisional safety controls from optimized production limits | Functional implementation: review finite provisional safety controls. Production readiness: measure each stratum on canonical WSL2/local storage and approve operational limits |
 | Token budget | Existing request shape understood, exact tokenizer/template unavailable | Exact same-build/model tokenization; separate grammar cap and byte cap | Local tokenizer/build availability or separate non-generative authorization |
 | Aliases | Static catalog is unversioned; candidate aliases lack explicit trust marking | Content-addressed, provenance-bearing, scope-aware closed-world registry | Review governance and compatibility correction before enabling role resolution |
 
@@ -532,13 +570,13 @@ resource-budget selection or exact model-token accounting. The full D2 result
 and evidence classification are recorded in
 `docs/evaluations/agent-code-mode/A09-D2-feasibility-result.md`.
 
-| Area | D2 status | Implementation gate |
+| Area | D2 status | Remaining gate |
 | --- | --- | --- |
-| LAS metadata-first feasibility | Established on synthetic 1.2/2.0 cases; scanner remains a prototype | Independent review of implementation plan and complete parser matrix |
-| DLIS fixture/containment feasibility | Minimal fixture and child-process mechanism pass; no scale or production-limit evidence | Containment contract and scaling matrix review |
-| Numeric resource budgets | Open; prior observations and tiny fixture do not establish service SLOs or representative distributions | Declare supported envelope/SLO, then measure and approve finite limits |
-| Exact Qwen/llama.cpp token accounting | Blocked: exact local tokenizer/build/template absent; endpoint prohibited | Provision pinned local identities or separately authorize non-generative token endpoints |
-| Catalog governance | Policy proposed; no scientific mappings approved | Obtain domain review/provenance/license evidence per mapping before release |
+| LAS metadata-first feasibility | Established on synthetic 1.2/2.0 cases; scanner remains a prototype | Before implementation: bounded correctness behavior and finite provisional safety limits. Production readiness: expanded/adversarial and representative qualification |
+| DLIS fixture/containment feasibility | Expanded synthetic multi-file/multi-frame fixture and strict corruption probes pass; no scale or production-limit evidence | Before implementation: supervised parser isolation, complete-inventory contract, finite provisional safety limits. Production readiness: 250 MiB/1 GiB scaling and hardened containment |
+| Numeric resource budgets | Open; provisional latency targets are qualification-only; prior probes do not establish representative distributions | Not a functional-implementation gate. Measure against targets and approve enforceable production limits before production readiness |
+| Exact Qwen/llama.cpp token accounting | Blocked: exact local tokenizer/build/template absent; endpoint prohibited | Not required for provider-free implementation; required before affected provider-backed qualification |
+| Catalog governance | Policy proposed; no scientific mappings approved; project owner nominated as initial domain reviewer, acceptance pending | Synthetic mappings may support isolated tests. Accept reviewer role and approve evidence-backed production rules before activation, with independent schema review |
 
 Do not treat D2 feasibility as permission to implement source inspection,
 catalog mappings, parser limits, token admission, or a second loader. No
