@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import os
 import subprocess
 import sys
 import time
+from collections import Counter
 from pathlib import Path
+from types import SimpleNamespace
 
 import lasio
 import pytest
@@ -31,6 +34,14 @@ from wellplot.io.las import _DEPTH_MNEMONICS
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DLIS_FIXTURE = REPO_ROOT / "tests/fixtures/a09_d2_metadata/multifile_repeated_mnemonics.dlis"
 DLIS_FIXTURE_SHA256 = "b98beba2bc6fedb70794da63d68dd09ac94abe02191fbfb53e6acd2eb85c08b9"
+CBL_REPEAT_DLIS = (
+    REPO_ROOT / "workspace/tutorials/agent_cbl_log_example_from_prompt/CBL_Repeat.dlis"
+)
+CBL_REPEAT_DLIS_SHA256 = "a4a2e91b495172079fc47bc2e9c936f0ab60c9845bbed8e65bf56555a5e82640"
+CBL_REPEAT_METADATA_SHA256 = "b17fc03542ea815c00da2e063086aee1c97122188a372211d425178733ea887d"
+CBL_REPEAT_UNAFFECTED_CLASSIFICATIONS_SHA256 = (
+    "faba5cc6cbc14ad90f3ba1ddbc8c43f66b861e4be7ceadfeff50a7ee072cbea6"
+)
 SHELL_LAS = REPO_ROOT / "workspace/data/30-23a-3 8117_d.las"
 SHELL_LAS_CHANNELS = (
     "DEPTH",
@@ -186,6 +197,122 @@ def test_dlis_repeated_physical_identities_are_not_renderer_addressable() -> Non
     assert {channel.frame_indexes for channel in depths[:2]} == {(0,), (1,)}
     assert all(channel.sample_availability == "NOT_CHECKED" for channel in source.channels)
     assert all(channel.description == "" and channel.aliases == () for channel in source.channels)
+
+
+def test_dlis_depth_and_frame_index_addressability_is_metadata_conservative(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Frame indexes and sample-dependent scalar depths are not presumed bindable."""
+    from dlisio import dlis
+
+    def channel(name: str, copy_number: int, dimension: tuple[int, ...] = ()) -> SimpleNamespace:
+        return SimpleNamespace(
+            name=name,
+            units="ft",
+            dimension=dimension,
+            origin=7,
+            copynumber=copy_number,
+            type="CHANNEL",
+        )
+
+    channels = [
+        channel("TDEP", 2),
+        channel("DEPTH", 0),
+        channel("MD", 0),
+        channel("DEPT", 0, (2,)),
+        channel("FRAMENO", 0),
+        channel("GR", 0),
+    ]
+
+    def reject_sample_access() -> None:
+        raise AssertionError("metadata inspection must not read frame samples")
+
+    frame = SimpleNamespace(index="TDEP", channels=channels, curves=reject_sample_access)
+    logical_file = SimpleNamespace(channels=channels, frames=[frame])
+    monkeypatch.setattr(dlis, "load", lambda *_args, **_kwargs: [logical_file])
+
+    projection = source_inspection_child._inspect_dlis(tmp_path / "metadata-only.dlis")
+    channels_by_name = {item["mnemonic"]: item for item in projection["channels"]}
+
+    assert projection["complete"] is True
+    assert channels_by_name["TDEP"]["addressability"] == "UNADDRESSABLE"
+    assert channels_by_name["FRAMENO"]["addressability"] == "UNADDRESSABLE"
+    assert channels_by_name["DEPTH"]["addressability"] == "UNKNOWN"
+    assert channels_by_name["MD"]["addressability"] == "UNKNOWN"
+    assert channels_by_name["DEPT"]["kind"] == "array"
+    assert channels_by_name["DEPT"]["addressability"] == "ADDRESSABLE"
+    assert channels_by_name["GR"]["addressability"] == "ADDRESSABLE"
+    assert channels_by_name["TDEP"]["physical_identity"] == {
+        "format": "DLIS",
+        "logical_file_index": 0,
+        "name": "TDEP",
+        "origin": 7,
+        "copy_number": 2,
+        "object_type": "CHANNEL",
+        "frame_indexes": (0,),
+    }
+    source_loader_module._InspectionProjection.model_validate_json(json.dumps(projection))
+
+
+@pytest.mark.skipif(not CBL_REPEAT_DLIS.is_file(), reason="canonical CBL DLIS asset unavailable")
+def test_cbl_repeat_depth_addressability_preserves_metadata_and_other_classes() -> None:
+    """The real CBL projection changes only sample-dependent depth addressability."""
+    assert hashlib.sha256(CBL_REPEAT_DLIS.read_bytes()).hexdigest() == CBL_REPEAT_DLIS_SHA256
+
+    source = LogfileSourceLoader(runtime_root=REPO_ROOT).load(CBL_REPEAT_DLIS, "dlis")
+    channels = [
+        {
+            "mnemonic": channel.mnemonic,
+            "unit": channel.unit,
+            "kind": channel.kind,
+            "physical_identity": channel.physical_identity,
+            "frame_indexes": channel.frame_indexes,
+            "sample_availability": channel.sample_availability,
+        }
+        for channel in source.channels
+    ]
+    metadata_digest = hashlib.sha256(
+        json.dumps(channels, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+    ).hexdigest()
+    depth_channels = [
+        channel
+        for channel in source.channels
+        if channel.mnemonic.upper() in {"DEPT", "DEPTH", "MD", "TDEP"}
+    ]
+    unaffected = [
+        {
+            "mnemonic": channel.mnemonic,
+            "physical_identity": channel.physical_identity,
+            "addressability": channel.addressability,
+        }
+        for channel in source.channels
+        if channel.mnemonic.upper() not in {"DEPT", "DEPTH", "MD", "TDEP"}
+    ]
+    unaffected_digest = hashlib.sha256(
+        json.dumps(unaffected, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+    ).hexdigest()
+
+    assert len(source.channels) == 79
+    assert metadata_digest == CBL_REPEAT_METADATA_SHA256
+    assert Counter(channel.addressability for channel in source.channels) == {
+        "ADDRESSABLE": 67,
+        "UNADDRESSABLE": 10,
+        "UNKNOWN": 2,
+    }
+    assert len([channel for channel in depth_channels if channel.mnemonic == "TDEP"]) == 4
+    assert all(
+        channel.addressability == "UNADDRESSABLE"
+        for channel in depth_channels
+        if channel.mnemonic == "TDEP"
+    )
+    assert {
+        channel.mnemonic: channel.addressability
+        for channel in depth_channels
+        if channel.mnemonic in {"DEPTH", "MD"}
+    } == {"DEPTH": "UNKNOWN", "MD": "UNKNOWN"}
+    assert unaffected_digest == CBL_REPEAT_UNAFFECTED_CLASSIFICATIONS_SHA256
+    assert all(channel.sample_availability == "NOT_CHECKED" for channel in source.channels)
 
 
 def test_parser_lock_is_exclusive_and_released_after_close(tmp_path: Path) -> None:

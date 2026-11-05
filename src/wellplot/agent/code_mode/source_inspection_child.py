@@ -16,6 +16,8 @@ MAX_METADATA_OBJECTS = 5_001
 # Keep aligned with wellplot.io.las._DEPTH_MNEMONICS: the canonical loader
 # consumes a depth-named first curve as LASIO's index instead of a regular curve.
 _LAS_DEPTH_INDEX_MNEMONICS = {"DEPT", "DEPTH", "MD", "TDEP"}
+_DLIS_DEPTH_MNEMONICS = _LAS_DEPTH_INDEX_MNEMONICS
+_DLIS_NONRENDERABLE_MNEMONICS = {"FRAMENO"}
 
 
 def main(arguments: list[str]) -> int:
@@ -173,7 +175,12 @@ def _inspect_dlis(path: Path) -> dict[str, Any]:
         if object_count > MAX_METADATA_OBJECTS:
             raise ValueError("DLIS metadata object limit")
         memberships: dict[int, list[int]] = {id(channel): [] for channel in channels}
+        frame_index_names: dict[int, str] = {}
         for frame_index, frame in enumerate(frames):
+            index_value = getattr(frame, "index", None)
+            index_name = getattr(index_value, "name", index_value)
+            if index_name is not None:
+                frame_index_names[frame_index] = str(index_name).strip()
             for channel in getattr(frame, "channels", []) or []:
                 memberships.setdefault(id(channel), []).append(frame_index)
         for channel in channels:
@@ -181,22 +188,36 @@ def _inspect_dlis(path: Path) -> dict[str, Any]:
             if not mnemonic:
                 raise ValueError("blank DLIS mnemonic")
             frame_indexes = tuple(memberships.get(id(channel), ()))
+            kind = (
+                "array"
+                if any(int(value) > 1 for value in (getattr(channel, "dimension", []) or []))
+                else "scalar"
+            )
             renderer_addressable = (
                 logical_index == 0
                 and renderer_counts[mnemonic.casefold()] == 1
                 and len(frame_indexes) == 1
             )
+            is_frame_index = any(
+                frame_index_names.get(frame_index) == mnemonic for frame_index in frame_indexes
+            )
+            if (
+                not renderer_addressable
+                or is_frame_index
+                or mnemonic.upper() in _DLIS_NONRENDERABLE_MNEMONICS
+            ):
+                addressability = "UNADDRESSABLE"
+            elif kind == "scalar" and mnemonic.upper() in _DLIS_DEPTH_MNEMONICS:
+                # The renderer loader may omit a non-index depth channel when
+                # its samples equal the frame index; metadata cannot decide.
+                addressability = "UNKNOWN"
+            else:
+                addressability = "ADDRESSABLE"
             records.append(
                 {
                     "mnemonic": mnemonic,
                     "unit": _optional_text(getattr(channel, "units", None)),
-                    "kind": (
-                        "array"
-                        if any(
-                            int(value) > 1 for value in (getattr(channel, "dimension", []) or [])
-                        )
-                        else "scalar"
-                    ),
+                    "kind": kind,
                     "physical_identity": {
                         "format": "DLIS",
                         "logical_file_index": logical_index,
@@ -206,7 +227,7 @@ def _inspect_dlis(path: Path) -> dict[str, Any]:
                         "object_type": str(getattr(channel, "type", "CHANNEL")),
                         "frame_indexes": frame_indexes,
                     },
-                    "addressability": ("ADDRESSABLE" if renderer_addressable else "UNADDRESSABLE"),
+                    "addressability": addressability,
                     "frame_indexes": frame_indexes,
                 }
             )
