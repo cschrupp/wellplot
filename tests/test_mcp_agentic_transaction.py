@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import shutil
 import tempfile
 from pathlib import Path
@@ -11,11 +13,20 @@ from unittest.mock import patch
 import yaml
 from tests._mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 
+from wellplot.agent.code_mode.obligations import RequestObligation
 from wellplot.agent.code_mode.source_loader import LogfileSourceLoader
 from wellplot.agent.session import AgentMetrics, AgentSessionResult, AgentWorkerEvidence
+from wellplot.authoring_executor import execute_authoring_plan
+from wellplot.authoring_service import AuthoringService
 from wellplot.errors import AuthoringPublicationRecoveryError
-from wellplot.mcp.agentic import _apply_failure_owner, _apply_session_result, _request_context
-from wellplot.model import AuthoringDocumentIntent
+from wellplot.mcp import service as mcp_service
+from wellplot.mcp.agentic import (
+    GraphAuthoringMcpOperations,
+    _apply_failure_owner,
+    _apply_session_result,
+    _request_context,
+)
+from wellplot.model import AuthoringDocumentIntent, AuthoringDocumentSpec
 
 
 def test_apply_failure_owner_keeps_deterministic_boundaries_distinct() -> None:
@@ -23,6 +34,7 @@ def test_apply_failure_owner_keeps_deterministic_boundaries_distinct() -> None:
     assert _apply_failure_owner(["reconciliation_blocked"], object()) == "reconciliation"
     assert _apply_failure_owner(["execution_failed"], object()) == "executor"
     assert _apply_failure_owner(["validation_failed"], object()) == "executor"
+    assert _apply_failure_owner(["post_lowering_obligation_failed"], object()) == "executor"
     assert _apply_failure_owner(["stale_snapshot_conflict"], object()) == "persistence"
     assert _apply_failure_owner(["publication_recovery_failed"], object()) == "persistence"
     assert (
@@ -34,13 +46,18 @@ def test_apply_failure_owner_keeps_deterministic_boundaries_distinct() -> None:
     )
 
 
-def _successful_result() -> AgentSessionResult:
+def _successful_result(
+    intent: AuthoringDocumentIntent | None = None,
+    *,
+    obligations: tuple[RequestObligation, ...] = (),
+) -> AgentSessionResult:
     """Create one provider-free result that changes the report title."""
     return AgentSessionResult(
         mode="revise",
         success=True,
-        intent=AuthoringDocumentIntent(title="MCP transaction title"),
+        intent=intent or AuthoringDocumentIntent(title="MCP transaction title"),
         workers=(AgentWorkerEvidence(kind="report", plan_order=0, success=True),),
+        obligations=obligations,
         metrics=AgentMetrics(
             worker_count=1,
             successful_workers=1,
@@ -54,6 +71,23 @@ def _successful_result() -> AgentSessionResult:
             total_created_objects=0,
             max_nesting_depth=0,
         ),
+    )
+
+
+def _title_obligation(value: str) -> RequestObligation:
+    request = f"Set the report title to {value}."
+    start = request.index(value)
+    end = start + len(value)
+    return RequestObligation(
+        kind="explicit_field",
+        owner_kind="report",
+        owner_ref="report",
+        field="title",
+        value=value,
+        request_sha256=hashlib.sha256(request.encode()).hexdigest(),
+        start_byte=start,
+        end_byte=end,
+        span_sha256=hashlib.sha256(request[start:end].encode()).hexdigest(),
     )
 
 
@@ -173,3 +207,137 @@ def test_mcp_apply_classifies_publication_recovery_failure() -> None:
         assert rolled_back is False
         assert statuses == ["publication_recovery_failed"]
         assert errors[0].startswith("publication_recovery_failed:")
+
+
+def test_mcp_apply_rejects_unsatisfied_obligation_before_persist() -> None:
+    """A schema-valid private candidate cannot publish an unsatisfied request."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="mcp-postcondition-") as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        context = _request_context(str(fixture_paths.single_logfile), root=REPO_ROOT)
+        original_bytes = fixture_paths.single_logfile.read_bytes()
+        result = _successful_result(
+            AuthoringDocumentIntent(title="Actual title"),
+            obligations=(_title_obligation("Required title"),),
+        )
+
+        with patch("wellplot.mcp.agentic.service.persist_authoring_document") as persist:
+            success, changed, rolled_back, errors, statuses, _section_ids = _apply_session_result(
+                context=context,
+                session_result=result,
+                root=REPO_ROOT,
+            )
+
+        assert success is False
+        assert changed is False
+        assert rolled_back is True
+        assert statuses == ["post_lowering_obligation_failed"]
+        assert "report title" in errors[0]
+        persist.assert_not_called()
+        assert fixture_paths.single_logfile.read_bytes() == original_bytes
+
+
+def test_mcp_revise_rejects_unsatisfied_obligation_before_persist() -> None:
+    """The public MCP operation rejects an unmet postcondition before publication."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="mcp-public-postcondition-") as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        original_bytes = fixture_paths.single_logfile.read_bytes()
+        result = _successful_result(
+            AuthoringDocumentIntent(title="Actual title"),
+            obligations=(_title_obligation("Required title"),),
+        )
+
+        class StubSession:
+            async def revise(self, **_kwargs: object) -> AgentSessionResult:
+                return result
+
+        operations = GraphAuthoringMcpOperations.create(session=StubSession(), root=REPO_ROOT)
+        with patch("wellplot.mcp.agentic.service.persist_authoring_document") as persist:
+            tool_result = asyncio.run(
+                operations.revise(
+                    logfile_path=str(fixture_paths.single_logfile),
+                    request="set the title",
+                )
+            )
+
+        assert tool_result.success is False
+        assert tool_result.changed is False
+        assert tool_result.rolled_back is True
+        assert tool_result.errors
+        assert "report title" in tool_result.errors[0]
+        persist.assert_not_called()
+        assert fixture_paths.single_logfile.read_bytes() == original_bytes
+
+
+def test_mcp_apply_rejects_unapproved_candidate_change_before_persist() -> None:
+    """The MCP path rejects valid-but-out-of-envelope changes before publication."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="mcp-preservation-") as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        context = _request_context(str(fixture_paths.single_logfile), root=REPO_ROOT)
+        original_bytes = fixture_paths.single_logfile.read_bytes()
+        result = _successful_result(
+            AuthoringDocumentIntent(title="MCP transaction title"),
+            obligations=(_title_obligation("MCP transaction title"),),
+        )
+        real_execute = execute_authoring_plan
+
+        def execute_with_unrequested_section_change(
+            service: AuthoringService, plan: object
+        ) -> object:
+            execution = real_execute(service, plan)
+            candidate = service.document.model_dump(mode="python")
+            candidate["sections"][0]["title"] = "Unauthorized section title"
+            service.replace_document(AuthoringDocumentSpec.model_validate(candidate))
+            assert service.validate().valid
+            return execution
+
+        with (
+            patch(
+                "wellplot.mcp.agentic.execute_authoring_plan",
+                side_effect=execute_with_unrequested_section_change,
+            ),
+            patch("wellplot.mcp.agentic.service.persist_authoring_document") as persist,
+        ):
+            success, changed, rolled_back, errors, statuses, _section_ids = _apply_session_result(
+                context=context,
+                session_result=result,
+                root=REPO_ROOT,
+            )
+
+        assert success is False
+        assert changed is False
+        assert rolled_back is True
+        assert statuses == ["post_lowering_obligation_failed"]
+        assert "outside the authorized reconciliation envelope" in errors[0]
+        persist.assert_not_called()
+        assert fixture_paths.single_logfile.read_bytes() == original_bytes
+
+
+def test_mcp_apply_persists_candidate_after_shared_postconditions_pass() -> None:
+    """Verified MCP candidates continue to canonical persistence."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="mcp-postcondition-pass-") as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        context = _request_context(str(fixture_paths.single_logfile), root=REPO_ROOT)
+        original_bytes = fixture_paths.single_logfile.read_bytes()
+        result = _successful_result(
+            AuthoringDocumentIntent(title="MCP transaction title"),
+            obligations=(_title_obligation("MCP transaction title"),),
+        )
+        real_persist = mcp_service.persist_authoring_document
+
+        with patch(
+            "wellplot.mcp.agentic.service.persist_authoring_document",
+            wraps=real_persist,
+        ) as persist:
+            success, changed, rolled_back, errors, statuses, _section_ids = _apply_session_result(
+                context=context,
+                session_result=result,
+                root=REPO_ROOT,
+            )
+
+        assert success is True
+        assert changed is True
+        assert rolled_back is False
+        assert errors == []
+        assert statuses == ["persisted"]
+        persist.assert_called_once()
+        assert fixture_paths.single_logfile.read_bytes() != original_bytes

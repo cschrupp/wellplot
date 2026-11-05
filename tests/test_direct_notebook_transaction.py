@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import shutil
 import tempfile
 from pathlib import Path
@@ -12,6 +13,7 @@ import pytest
 import yaml
 from tests._mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 
+from wellplot.agent.code_mode.obligations import RequestObligation
 from wellplot.agent.code_mode.source_loader import LogfileSourceLoader
 from wellplot.agent.direct_notebook import (
     DirectNotebookSession,
@@ -19,18 +21,25 @@ from wellplot.agent.direct_notebook import (
     _load_document_context,
 )
 from wellplot.agent.session import AgentMetrics, AgentSessionResult, AgentWorkerEvidence
+from wellplot.authoring_executor import execute_authoring_plan
 from wellplot.authoring_service import AuthoringService, CreateTrackRequest
 from wellplot.errors import AuthoringPublicationRecoveryError
-from wellplot.model import AuthoringDocumentIntent
+from wellplot.mcp import service as mcp_service
+from wellplot.model import AuthoringDocumentIntent, AuthoringDocumentSpec
 
 
-def _successful_result(intent: AuthoringDocumentIntent | None = None) -> AgentSessionResult:
+def _successful_result(
+    intent: AuthoringDocumentIntent | None = None,
+    *,
+    obligations: tuple[RequestObligation, ...] = (),
+) -> AgentSessionResult:
     """Build a minimal successful worker result for one supplied intent."""
     return AgentSessionResult(
         mode="revise",
         success=True,
         intent=intent or AuthoringDocumentIntent(title="Updated transaction title"),
         workers=(AgentWorkerEvidence(kind="report", plan_order=0, success=True),),
+        obligations=obligations,
         metrics=AgentMetrics(
             worker_count=1,
             successful_workers=1,
@@ -45,6 +54,134 @@ def _successful_result(intent: AuthoringDocumentIntent | None = None) -> AgentSe
             max_nesting_depth=0,
         ),
     )
+
+
+def _title_obligation(value: str) -> RequestObligation:
+    request = f"Set the report title to {value}."
+    start = request.index(value)
+    end = start + len(value)
+    return RequestObligation(
+        kind="explicit_field",
+        owner_kind="report",
+        owner_ref="report",
+        field="title",
+        value=value,
+        request_sha256=hashlib.sha256(request.encode()).hexdigest(),
+        start_byte=start,
+        end_byte=end,
+        span_sha256=hashlib.sha256(request[start:end].encode()).hexdigest(),
+    )
+
+
+def test_notebook_apply_rejects_unsatisfied_obligation_before_persist() -> None:
+    """A schema-valid private candidate cannot publish an unsatisfied request."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="notebook-postcondition-") as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        context = _load_document_context(fixture_paths.single_logfile, root=REPO_ROOT)
+        original_bytes = fixture_paths.single_logfile.read_bytes()
+        result = _successful_result(
+            AuthoringDocumentIntent(title="Actual title"),
+            obligations=(_title_obligation("Required title"),),
+        )
+
+        with patch(
+            "wellplot.agent.direct_notebook.mcp_service.persist_authoring_document"
+        ) as persist:
+            applied = _apply_result(context=context, result=result, root=REPO_ROOT)
+
+        success, changed, rolled_back, errors, status, stages = applied
+        assert success is False
+        assert changed is False
+        assert rolled_back is True
+        assert status == "post_lowering_obligation_failed"
+        assert stages["canonical_validation"] == "PASS"
+        assert stages["post_lowering_obligation"] == "FAIL"
+        assert "report title" in errors[0]
+        persist.assert_not_called()
+        assert fixture_paths.single_logfile.read_bytes() == original_bytes
+
+
+def test_notebook_apply_rejects_unapproved_candidate_change_before_persist() -> None:
+    """The adapter rejects valid-but-out-of-envelope changes before publication."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="notebook-preservation-") as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        context = _load_document_context(fixture_paths.single_logfile, root=REPO_ROOT)
+        original_bytes = fixture_paths.single_logfile.read_bytes()
+        result = _successful_result(
+            AuthoringDocumentIntent(title="Verified title"),
+            obligations=(_title_obligation("Verified title"),),
+        )
+        real_execute = execute_authoring_plan
+
+        def execute_with_unrequested_section_change(
+            service: AuthoringService, plan: object
+        ) -> object:
+            execution = real_execute(service, plan)
+            candidate = service.document.model_dump(mode="python")
+            candidate["sections"][0]["title"] = "Unauthorized section title"
+            service.replace_document(AuthoringDocumentSpec.model_validate(candidate))
+            assert service.validate().valid
+            return execution
+
+        with (
+            patch(
+                "wellplot.agent.direct_notebook.execute_authoring_plan",
+                side_effect=execute_with_unrequested_section_change,
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.persist_authoring_document"
+            ) as persist,
+        ):
+            success, changed, rolled_back, errors, status, stages = _apply_result(
+                context=context,
+                result=result,
+                root=REPO_ROOT,
+            )
+
+        assert success is False
+        assert changed is False
+        assert rolled_back is True
+        assert status == "post_lowering_obligation_failed"
+        assert stages["post_lowering_obligation"] == "PASS"
+        assert stages["preservation"] == "FAIL"
+        assert "outside the authorized reconciliation envelope" in errors[0]
+        persist.assert_not_called()
+        assert fixture_paths.single_logfile.read_bytes() == original_bytes
+
+
+def test_notebook_apply_persists_candidate_after_shared_postconditions_pass() -> None:
+    """Verified candidates continue to the existing canonical persistence path."""
+    with tempfile.TemporaryDirectory(
+        dir=REPO_ROOT, prefix="notebook-postcondition-pass-"
+    ) as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        context = _load_document_context(fixture_paths.single_logfile, root=REPO_ROOT)
+        original_bytes = fixture_paths.single_logfile.read_bytes()
+        result = _successful_result(
+            AuthoringDocumentIntent(title="Verified title"),
+            obligations=(_title_obligation("Verified title"),),
+        )
+        real_persist = mcp_service.persist_authoring_document
+
+        with patch(
+            "wellplot.agent.direct_notebook.mcp_service.persist_authoring_document",
+            wraps=real_persist,
+        ) as persist:
+            success, changed, rolled_back, errors, status, stages = _apply_result(
+                context=context,
+                result=result,
+                root=REPO_ROOT,
+            )
+
+        assert success is True
+        assert changed is True
+        assert rolled_back is False
+        assert errors == []
+        assert status == "persisted"
+        assert stages["post_lowering_obligation"] == "PASS"
+        assert stages["preservation"] == "PASS"
+        persist.assert_called_once()
+        assert fixture_paths.single_logfile.read_bytes() != original_bytes
 
 
 def test_notebook_apply_rejects_yaml_changed_after_snapshot() -> None:

@@ -24,8 +24,8 @@ from .code_mode.enrichment import (
     validate_enriched_snapshot,
 )
 from .code_mode.obligations import (
-    verify_document_obligations,
-    verify_document_preservation,
+    DocumentPostconditionError,
+    verify_document_postconditions,
 )
 from .composition import create_canonical_compile_facade, create_provider_backend
 from .results import AuthoringResult, AuthoringRunState, AuthoringUserReport
@@ -308,15 +308,20 @@ def _apply_result(
 
     accepted = private_service.document
     try:
-        verify_document_obligations(
+        verify_document_postconditions(
+            context.document,
             accepted,
             result.obligations,
-            grounded_operations=plan.operations,
+            plan.operations,
         )
         stages["post_lowering_obligation"] = "PASS"
-        verify_document_preservation(context.document, accepted, plan.operations)
         stages["preservation"] = "PASS"
-    except ValueError as error:
+    except DocumentPostconditionError as error:
+        if error.check == "obligations":
+            stages["post_lowering_obligation"] = "FAIL"
+        else:
+            stages["post_lowering_obligation"] = "PASS"
+            stages["preservation"] = "FAIL"
         return False, False, True, [str(error)], "post_lowering_obligation_failed", stages
     changed = context.document.model_dump(mode="json") != accepted.model_dump(mode="json")
     if changed:

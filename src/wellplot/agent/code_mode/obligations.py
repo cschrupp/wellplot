@@ -2572,6 +2572,32 @@ def verify_document_obligations(
                 raise ValueError(f"Post-lowering fill {item.field} obligation failed.")
 
 
+class DocumentPostconditionError(ValueError):
+    """Identify which canonical pre-publication postcondition rejected a document."""
+
+    def __init__(self, check: Literal["obligations", "preservation"], message: str) -> None:
+        """Retain the original safe failure text and the failed check category."""
+        self.check = check
+        super().__init__(message)
+
+
+def verify_document_postconditions(
+    before: object,
+    after: object,
+    obligations: tuple[RequestObligation, ...],
+    operations: Sequence[object],
+) -> None:
+    """Verify request obligations and mutation preservation before publication."""
+    try:
+        verify_document_obligations(after, obligations, grounded_operations=operations)
+    except ValueError as error:
+        raise DocumentPostconditionError("obligations", str(error)) from error
+    try:
+        verify_document_preservation(before, after, operations)
+    except ValueError as error:
+        raise DocumentPostconditionError("preservation", str(error)) from error
+
+
 def _document_sections_for_obligation(
     sections: list[object],
     obligation: RequestObligation,
@@ -2621,6 +2647,7 @@ def _binding_matches_compiled_slot(
 __all__ = [
     "CanonicalRequirementSet",
     "CollectionSemantics",
+    "DocumentPostconditionError",
     "ObligationKind",
     "ObligationState",
     "OwnerKind",
@@ -2642,6 +2669,7 @@ __all__ = [
     "verify_anchor_coverage",
     "verify_document_preservation",
     "verify_document_obligations",
+    "verify_document_postconditions",
     "verify_obligation_spans",
     "verify_worker_correction_scope",
 ]

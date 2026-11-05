@@ -2,11 +2,12 @@
 
 ## Status
 
-- State: security/observability tranche accepted; A09 overall open
+- State: metadata implementation candidate at `1d65d8cd36fc6fb288ab3627ebfb9f9246506372`; A09 integrated qualification incomplete and overall open
 - Accepted security/observability checkpoint: `7ea43a6548a8bd1e5b44eb20c085a7027932e0db`
 - Accepted metadata-first design checkpoint: `daef5d171828495b2f0dfcea25ae372f0bc39af4`
-- Current work: D1 accepted; D2 feasibility continuation targets recorded
-  2026-11-04; parser, token, and catalog implementation remains unauthorized
+- Current work: A09-PARITY-01 provider-free implementation candidate pending
+  independent review; integrated qualification remains incomplete and no
+  production promotion is made
 - Provider, model, and endpoint calls: `0`
 - Scientific turns: `0`
 - C02 exposure: `0`
@@ -279,3 +280,80 @@ The candidate does not alter scientific fixtures, populations, gold, C02, or
 semantic operation behavior. It does not add source-size rejection, metadata
 parsing behavior, or provider retries. No knowledge-baseline promotion is
 made before independent acceptance.
+
+## 2026-11-05 Integrated Qualification Candidate and Entrypoint Audit
+
+The accepted DLIS metadata, scalar CBL loading, and VDL array-loading gates
+remain narrow prior evidence at checkpoint
+`1d65d8cd36fc6fb288ab3627ebfb9f9246506372`. The standalone CBL renderer probe
+`a09-cbl-scalar-render-20261104-001` remains
+`INDETERMINATE / TEST_HARNESS`: its single-figure assertion did not follow the
+`RenderResult` contract, and it did not establish a renderer defect.
+
+One integrated provider-free qualification was prepared under
+`workspace/evaluations/a09-canonical-integration-20261105-001/`, using the
+existing canonical metadata loader, physical-channel resolver, authoring
+intent/reconciler/executor/service, persistence service, and WellPlot v1
+render services. The exact invocation was
+`uv run --frozen python workspace/evaluations/a09-canonical-integration-20261105-001/probe.py`.
+It exited with code 2 before Python started because `uv` could not create a
+temporary file under the read-only default cache `/home/user/.cache/uv`.
+Per the one-attempt stop rule, no retry was made. Thus
+the integrated qualification is `INDETERMINATE / PRE-PROBE ENVIRONMENT`, not
+a functional PASS or FAIL. No metadata inspection, numerical load, YAML
+publication, or rendering occurred in that attempt; provider/model/endpoint
+calls and C02 access were zero. The command, stdout, stderr, exit code, and
+probe are retained in that namespace. The probe compiled successfully before
+execution, which did not load the source or render.
+
+Static entrypoint audit at the same checkpoint confirms that notebook and MCP
+share the `AgentSession`/Code Mode composition, reconciliation, executor,
+`AuthoringService`, and canonical persistence service. The notebook's
+`direct_notebook._apply_result()` explicitly runs
+`verify_document_obligations()` and `verify_document_preservation()` before
+persistence. MCP's `mcp.agentic._apply_session_result()` does not. The shared
+reconciler/executor/service do not receive a request-obligation set and do not
+invoke either verifier; `AuthoringService.validate()` performs typed document
+validation only. This establishes a source-level parity gap, but not a
+historical invalid-publication exploit. No adapter refactor was made.
+
+Minimum corrective recommendation for independent review: factor the
+post-lowering obligation and preservation checks into one shared deterministic
+pre-publication boundary used by both adapters, and add an MCP regression that
+proves a violated postcondition prevents persistence. Keep provider calls,
+reconciliation authority, and persistence ownership unchanged. This
+recommendation is not implementation authorization. A09 integrated functional
+acceptance remains open pending a successfully executed bounded qualification
+and independent review of both that result and the adapter-parity finding.
+
+## A09-PARITY-01 Provider-Free Candidate (2026-11-05)
+
+Following explicit bounded implementation authorization, the working candidate
+adds `verify_document_postconditions()` in the existing obligations module. It
+orchestrates the existing request-obligation and document-preservation checks
+and reports which check rejected the private candidate. The direct notebook
+adapter uses the shared boundary while retaining its existing result tuple and
+failure status. The MCP agentic adapter invokes the same boundary after
+canonical execution and typed validation, before the existing persistence
+service; its persistence ownership and result shape remain unchanged.
+
+Provider-free regressions in both adapter transaction modules cover an
+unsatisfied request obligation, an otherwise-valid but unauthorized document
+mutation, and a passing candidate continuing through the existing persistence
+path. Rejections assert that persistence is not called and original YAML bytes
+remain unchanged. The D5 production-component manifest was regenerated using
+`scripts/d5_single_engine_attestation.py --write`.
+
+Focused validation: 71 tests passed across
+`tests/test_direct_notebook_transaction.py`,
+`tests/test_mcp_agentic_transaction.py`, and
+`tests/test_d5_5j_obligations.py`; Ruff check and format check passed. The
+verified `.venv` is Python 3.12.7 with pydantic 2.13.3, pytest 9.0.2, lasio
+0.32, dlisio 1.0.4 and matplotlib 3.10.8, matching the corresponding
+`uv.lock` pins. The prior `uv` cache issue is therefore avoidable for provider-
+free tests with this interpreter; the integrated probe was not executed.
+This remains an implementation candidate pending independent review, not an
+A09 acceptance or baseline promotion. The previously failed integrated
+qualification remains `INDETERMINATE / PRE-PROBE ENVIRONMENT` and was not
+retried. No provider, model, endpoint, scientific, C02, numerical-source, or
+YAML-publication operation was performed by this candidate work.

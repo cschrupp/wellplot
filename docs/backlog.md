@@ -272,3 +272,36 @@ check and replacement. File revision tokens use resolved path and filesystem
 metadata, not full source-content hashing. Directory-entry crash durability is
 not claimed because the parent directory is not fsynced. These limitations
 must remain explicit in independent review and A10 acceptance.
+
+## A09 Integrated Qualification and Adapter-Parity Follow-up (2026-11-05)
+
+The A09 integrated CBL+VDL qualification candidate at checkpoint
+`1d65d8cd36fc6fb288ab3627ebfb9f9246506372` is
+`INDETERMINATE / PRE-PROBE ENVIRONMENT`: the sole invocation stopped in `uv`
+before Python launch because its default cache directory was read-only. It
+did not inspect or numerically load the source, persist YAML, or render; no
+provider/model/endpoint calls or C02 access occurred. Do not count this as a
+functional result or retry within that one-attempt authorization. Evidence is
+in `workspace/evaluations/a09-canonical-integration-20261105-001/`.
+
+Static audit found that notebook applies request-obligation and document-
+preservation postconditions before persistence, while MCP does not explicitly
+apply them and no shared lower layer does so. This is a verified parity gap,
+not proof of a previously published invalid document. Track a narrow shared
+pre-publication verifier plus an MCP no-persistence regression for the next
+reviewed corrective; do not refactor adapters or promote A09 until separately
+authorized and independently reviewed. The earlier isolated CBL render probe
+remains `INDETERMINATE / TEST_HARNESS`, not renderer failure.
+
+### A09-PARITY-01: adapter postcondition parity review
+
+A provider-free candidate introduces one shared pre-publication verifier for
+the existing request-obligation and document-preservation checks and invokes
+it from both the notebook and MCP adapters. Focused regressions cover rejected
+obligations, unauthorized candidate mutations, and successful continuation to
+canonical persistence in both paths, including the public MCP revise operation.
+Candidate validation reports 71 relevant provider-free tests plus Ruff and
+manifest checks; independent review is pending. Do not
+retry the unrelated A09 canonical integration probe, promote the baseline, or
+infer that A09 integrated functional qualification passed from this adapter
+candidate.

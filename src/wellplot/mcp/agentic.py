@@ -21,6 +21,10 @@ from ..agent.code_mode.enrichment import (
     reconciliation_channels,
     validate_enriched_snapshot,
 )
+from ..agent.code_mode.obligations import (
+    DocumentPostconditionError,
+    verify_document_postconditions,
+)
 from ..agent.execution_trace import AgentRunTrace, bind_agent_trace
 from ..agent.session import AgentSession, AgentSourceConfig
 from ..api.serialize import report_to_dict
@@ -229,6 +233,23 @@ def _apply_session_result(
         )
 
     accepted = private_service.document
+    try:
+        verify_document_postconditions(
+            context.document,
+            accepted,
+            tuple(getattr(session_result, "obligations", ())),
+            plan.operations,
+        )
+    except DocumentPostconditionError as error:
+        return (
+            False,
+            False,
+            True,
+            [str(error)],
+            ["post_lowering_obligation_failed"],
+            [section.id for section in context.document.sections],
+        )
+
     changed = context.document.model_dump(mode="json") != accepted.model_dump(mode="json")
     if changed:
         try:
@@ -428,6 +449,7 @@ def _apply_failure_owner(apply_status: list[str], session_result: object) -> str
         "reconciliation_blocked": "reconciliation",
         "execution_failed": "executor",
         "validation_failed": "executor",
+        "post_lowering_obligation_failed": "executor",
         "stale_snapshot_conflict": "persistence",
         "publication_recovery_failed": "persistence",
     }
