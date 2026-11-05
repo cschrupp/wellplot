@@ -1207,7 +1207,13 @@ def _validate_reconstruct_completeness(
     """Require explicit reconstruction channels and tracks from the scoped task."""
     if action.action != "reconstruct":
         return
-    available = {channel.mnemonic for source in context.sources for channel in source.channels}
+    available = {
+        name
+        for source in context.sources
+        for channel in source.channels
+        for name in (channel.mnemonic, channel.request_mnemonic)
+        if name is not None
+    }
     required_channels: dict[str, int] = {}
     required_track_numbers: set[str] = set()
     for requirement in task.requirements:

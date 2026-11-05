@@ -58,10 +58,13 @@ def _inspect_las(path: Path) -> dict[str, Any]:
     curves = list(las.curves)
     if not curves or len(curves) > MAX_METADATA_OBJECTS:
         raise ValueError("incomplete LAS curve inventory")
+    source_tokens = _las_curve_source_tokens(header_text)
+    tokens_align = len(source_tokens) == len(curves)
     counts = Counter(str(curve.mnemonic).strip().casefold() for curve in curves)
     channels = []
     for index, curve in enumerate(curves):
         mnemonic = str(curve.mnemonic).strip()
+        source_token = source_tokens[index] if tokens_align else None
         if not mnemonic:
             raise ValueError("blank LAS mnemonic")
         is_depth_index_curve = index == 0 and mnemonic.upper() in _LAS_DEPTH_INDEX_MNEMONICS
@@ -77,6 +80,7 @@ def _inspect_las(path: Path) -> dict[str, Any]:
         channels.append(
             {
                 "mnemonic": mnemonic,
+                "source_token": source_token,
                 "unit": str(curve.unit).strip() or None,
                 "kind": "scalar",
                 "physical_identity": {"format": "LAS", "curve_index": index},
@@ -90,6 +94,28 @@ def _inspect_las(path: Path) -> dict[str, Any]:
         "well_metadata": {},
         "channels": channels,
     }
+
+
+def _las_curve_source_tokens(header_text: str) -> list[str]:
+    """Return bounded raw curve tokens in source order, without descriptions."""
+    tokens: list[str] = []
+    in_curve_section = False
+    for line in header_text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith("~"):
+            section_marker = stripped[1:2].casefold()
+            in_curve_section = section_marker == "c"
+            continue
+        if not in_curve_section:
+            continue
+        token = stripped.split(maxsplit=1)[0].rstrip(":")
+        if token:
+            tokens.append(token)
+            if len(tokens) > MAX_METADATA_OBJECTS:
+                raise ValueError("LAS curve header limit")
+    return tokens
 
 
 def _read_las_header(path: Path) -> bytes:

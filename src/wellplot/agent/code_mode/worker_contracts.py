@@ -11,9 +11,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ...authoring_context import AuthoringChannelCandidate, source_bound_request_mnemonic
 from ...model.intent import AuthoringDocumentIntent
 from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
-from .enrichment import ReportContext, ResolvedSectionContext
+from .enrichment import ChannelContext, ReportContext, ResolvedSectionContext
 from .obligations import ObligationState, OwnerKind, RequestObligation
 from .planner import (
     MAX_SEMANTIC_OPERATIONS,
@@ -142,6 +143,7 @@ class SectionWorkChannel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     mnemonic: str = Field(min_length=1)
+    request_mnemonic: str | None = None
     kind: str = Field(min_length=1)
     unit: str | None = None
 
@@ -384,8 +386,10 @@ def _channel_kind(
             )
         matches = [
             item.kind
-            for item in section_context.sources[selected_source_index].channels
-            if item.mnemonic.casefold() == mnemonic
+            for item in _matching_source_channels(
+                section_context.sources[selected_source_index].channels,
+                mnemonic,
+            )
         ]
         return matches[0] if len(matches) == 1 else None
 
@@ -393,7 +397,7 @@ def _channel_kind(
         return None
     source_kinds: list[str] = []
     for source in section_context.sources:
-        matches = [item.kind for item in source.channels if item.mnemonic.casefold() == mnemonic]
+        matches = [item.kind for item in _matching_source_channels(source.channels, mnemonic)]
         if len(matches) != 1:
             raise SectionWorkContractError(
                 "section_work_source_ambiguous",
@@ -406,6 +410,29 @@ def _channel_kind(
             "Candidate source inventories disagree for a required channel.",
         )
     return source_kinds[0]
+
+
+def _matching_source_channels(
+    channels: tuple[ChannelContext, ...], mnemonic: str
+) -> list[ChannelContext]:
+    """Prefer exact physical names to the one host-approved request spelling."""
+    exact = [item for item in channels if item.mnemonic.casefold() == mnemonic]
+    if exact:
+        return exact
+    return [item for item in channels if _channel_request_mnemonic(item) == mnemonic]
+
+
+def _channel_request_mnemonic(channel: ChannelContext) -> str | None:
+    """Expose only the source-bound request spelling approved by the host."""
+    candidate = AuthoringChannelCandidate(
+        mnemonic=channel.mnemonic,
+        source_token=channel.source_token,
+        kind=channel.kind,
+        unit=channel.unit,
+        physical_identity=channel.physical_identity,
+        addressability=channel.addressability,
+    )
+    return source_bound_request_mnemonic(candidate)
 
 
 def _source_name(source: object) -> str:
@@ -730,7 +757,12 @@ def build_section_work_contract(
             format=source.source_format,
             inspection_state=source.inspection_state,
             channels=tuple(
-                SectionWorkChannel(mnemonic=channel.mnemonic, kind=channel.kind, unit=channel.unit)
+                SectionWorkChannel(
+                    mnemonic=channel.mnemonic,
+                    request_mnemonic=_channel_request_mnemonic(channel),
+                    kind=channel.kind,
+                    unit=channel.unit,
+                )
                 for channel in source.channels
             ),
         )

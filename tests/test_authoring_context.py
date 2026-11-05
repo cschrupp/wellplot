@@ -418,6 +418,165 @@ def test_physical_channel_resolution_preserves_four_states() -> None:
     assert ambiguous.state.value == "AMBIGUOUS"
 
 
+def test_source_bound_request_mnemonic_resolves_to_physical_identity() -> None:
+    """A narrow inspected request spelling resolves without changing physical ID."""
+    candidate = AuthoringChannelCandidate(
+        mnemonic="POTA.",
+        source_token="POTA..",
+        kind="scalar",
+        physical_identity={"format": "LAS", "curve_index": 14},
+    )
+    resolved = resolve_physical_channel("POTA", [candidate], inventory_complete=True)
+
+    assert resolved.state.value == "UNIQUE"
+    assert resolved.candidates == (candidate,)
+    assert resolved.candidates[0].mnemonic == "POTA."
+    assert resolved.candidates[0].physical_identity == {"format": "LAS", "curve_index": 14}
+    exact_physical = resolve_physical_channel("POTA.", [candidate], inventory_complete=True)
+    assert exact_physical.state.value == "UNIQUE"
+    assert exact_physical.candidates == (candidate,)
+
+
+def test_exact_physical_name_precedes_source_bound_request_name() -> None:
+    """An exact POTA channel wins over a distinct POTA. compatibility candidate."""
+    exact = AuthoringChannelCandidate(mnemonic="POTA", kind="scalar")
+    compatible = AuthoringChannelCandidate(
+        mnemonic="POTA.",
+        source_token="POTA..",
+        kind="scalar",
+        physical_identity={"format": "LAS", "curve_index": 14},
+    )
+
+    resolved = resolve_physical_channel("POTA", [compatible, exact], inventory_complete=True)
+
+    assert resolved.state.value == "UNIQUE"
+    assert resolved.candidates == (exact,)
+
+
+def test_source_bound_request_name_collision_is_ambiguous() -> None:
+    """Multiple source channels cannot be selected by the compatibility spelling."""
+    candidates = [
+        AuthoringChannelCandidate(
+            mnemonic="POTA.",
+            source_token="POTA..",
+            physical_identity={"format": "LAS", "curve_index": 14},
+        ),
+        AuthoringChannelCandidate(
+            mnemonic="POTA.",
+            source_token="POTA..",
+            physical_identity={"format": "LAS", "curve_index": 15},
+        ),
+    ]
+
+    resolved = resolve_physical_channel("POTA", candidates, inventory_complete=True)
+
+    assert resolved.state.value == "AMBIGUOUS"
+
+
+def test_source_bound_request_name_collision_blocks_reconciliation() -> None:
+    """Ambiguous legacy spelling cannot produce an authoring plan."""
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [
+                    {
+                        "track_id": "potassium",
+                        "kind": "normal",
+                        "title": "Potassium",
+                        "width_mm": 30,
+                        "bindings": [{"kind": "curve", "binding_id": "pota", "channel": "POTA"}],
+                    }
+                ],
+            }
+        ]
+    )
+    candidates = [
+        AuthoringChannelCandidate(
+            mnemonic="POTA.",
+            source_token="POTA..",
+            physical_identity={"format": "LAS", "curve_index": index},
+        )
+        for index in (14, 15)
+    ]
+
+    resolution = resolve_authoring_context(
+        intent,
+        existing=_document(),
+        available_channels={"main": candidates},
+    )
+
+    assert resolution.ready is False
+    assert {issue.code for issue in resolution.issues} == {"channel_ambiguous"}
+
+
+def test_unrecognized_punctuation_is_not_a_request_alias() -> None:
+    """Raw source punctuation alone does not authorize a normalized request."""
+    candidate = AuthoringChannelCandidate(
+        mnemonic="POTA..",
+        source_token="POTA...",
+        physical_identity={"format": "LAS", "curve_index": 14},
+    )
+
+    resolved = resolve_physical_channel("POTA", [candidate], inventory_complete=True)
+
+    assert resolved.state.value == "ABSENT"
+
+
+def test_pota_request_mapping_requires_the_observed_blank_unit() -> None:
+    """The host does not apply the legacy spelling when a unit is present."""
+    candidate = AuthoringChannelCandidate(
+        mnemonic="POTA.",
+        source_token="POTA..",
+        unit="ppm",
+        physical_identity={"format": "LAS", "curve_index": 14},
+    )
+
+    resolved = resolve_physical_channel("POTA", [candidate], inventory_complete=True)
+
+    assert resolved.state.value == "ABSENT"
+
+
+def test_source_bound_request_name_reconciliation_persists_physical_key_in_memory() -> None:
+    """Canonical reconciliation receives the physical loader-facing mnemonic."""
+    intent = AuthoringDocumentIntent(
+        sections=[
+            {
+                "section_id": "main",
+                "tracks": [
+                    {
+                        "track_id": "potassium",
+                        "kind": "normal",
+                        "title": "Potassium",
+                        "width_mm": 30,
+                        "bindings": [{"kind": "curve", "binding_id": "pota", "channel": "POTA"}],
+                    }
+                ],
+            }
+        ]
+    )
+    candidate = AuthoringChannelCandidate(
+        mnemonic="POTA.",
+        source_token="POTA..",
+        kind="scalar",
+        physical_identity={"format": "LAS", "curve_index": 14},
+        addressability="ADDRESSABLE",
+    )
+
+    resolution = resolve_authoring_context(
+        intent,
+        existing=_document(),
+        available_channels={"main": [candidate]},
+    )
+    assert resolution.ready is True
+    assert resolution.resolved_intent.sections[0].tracks[0].bindings[0].channel == "POTA."
+
+    plan = reconcile_authoring(resolution, existing=_document())
+
+    assert plan.ready is True
+    assert plan.issues == []
+
+
 def test_unaddressable_exact_channel_blocks_authoring() -> None:
     """A unique metadata identity cannot bypass the existing renderer limit."""
     intent = AuthoringDocumentIntent(

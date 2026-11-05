@@ -132,12 +132,34 @@ def test_shell_las_projection_preserves_channels_and_marks_depth_index_unaddress
     assert source.channels[0].mnemonic == "DEPTH"
     assert source.channels[0].addressability == "UNADDRESSABLE"
     assert source.channels[14].mnemonic == "POTA."
+    assert source.channels[14].source_token == "POTA.."
     assert source.channels[14].unit is None
     assert all(channel.sample_availability == "NOT_CHECKED" for channel in source.channels)
     assert all(channel.shape == () for channel in source.channels)
     assert [channel.physical_identity["curve_index"] for channel in source.channels] == list(
         range(20)
     )
+
+
+def test_other_double_period_record_does_not_receive_pota_request_name(tmp_path: Path) -> None:
+    """The legacy request spelling is assigned only to exact POTA source syntax."""
+    source_path = tmp_path / "other-double-period.las"
+    source_path.write_text(
+        "~Version Information Section\n"
+        "VERS. 2.0\n"
+        "~Well Information Section\n"
+        "STRT.m 100\nSTOP.m 101\nSTEP.m 1\nNULL. -999.25\n"
+        "~Curve Information Section\n"
+        "DEPT.m : Depth\n"
+        "OTHER.. : Other channel with an unspecified unit\n"
+        "~ASCII Log Data Section\n",
+        encoding="ascii",
+    )
+
+    source = LogfileSourceLoader(runtime_root=tmp_path).load(source_path, "las")
+
+    assert [channel.mnemonic for channel in source.channels] == ["DEPT", "OTHER."]
+    assert source.channels[1].source_token == "OTHER.."
 
 
 def test_incomplete_las_header_fails_closed(tmp_path: Path) -> None:

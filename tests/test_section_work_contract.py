@@ -255,6 +255,53 @@ def test_two_track_contract_is_additive_and_provider_safe() -> None:
         assert forbidden not in serialized
 
 
+def test_section_work_contract_keeps_pota_request_and_physical_identity_distinct() -> None:
+    """The worker contract carries a host-approved selector beside physical POTA."""
+    request = (
+        _smoke_request()
+        .replace("Bond Index", "Potassium")
+        .replace("BI", "POTA")
+        .replace("GR_STGC", "GR")
+    )
+    compilation = compile_request_contract(request)
+    task = SectionTask(
+        goal="Add the requested potassium track.",
+        capability_ids=("section.log_plot", "track.normal", "binding.curve"),
+        existing_section_hint="Main Log",
+        obligations=compilation.requirements.requirements,
+    )
+    source = SourceContext(
+        candidate_id="source-1",
+        source_format="las",
+        channels=(
+            ChannelContext(
+                mnemonic="POTA.",
+                source_token="POTA..",
+                kind="array",
+                physical_identity={"format": "LAS", "curve_index": 14},
+            ),
+            ChannelContext(mnemonic="POTA", kind="scalar"),
+            ChannelContext(mnemonic="GR", kind="scalar"),
+        ),
+    )
+    context = ResolvedSectionContext(
+        task_index=0,
+        section_id="main",
+        sources=(source,),
+    )
+
+    contract = build_section_work_contract(task, context)
+
+    pota_binding = next(item for item in contract.required_bindings if item.channel == "POTA")
+    compatibility_channel = next(
+        item for item in contract.source_facts[0].channels if item.mnemonic == "POTA."
+    )
+    assert pota_binding.channel == "POTA"
+    assert pota_binding.kind == "curve"
+    assert compatibility_channel.request_mnemonic == "pota"
+    assert "POTA.." not in contract.model_dump_json()
+
+
 def test_operation_contract_keeps_multi_track_additions_as_independent_ops() -> None:
     """A multi-track request compiles to additive operations, not reconstruction."""
     compilation = compile_request_contract(_smoke_request())

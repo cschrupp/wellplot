@@ -43,6 +43,7 @@ class ChannelContext(_EnrichmentModel):
     """Semantic channel metadata without samples or parser objects."""
 
     mnemonic: str = Field(min_length=1)
+    source_token: str | None = None
     kind: str = Field(min_length=1)
     unit: str | None = Field(default=None, min_length=1)
     shape: tuple[int, ...] = ()
@@ -908,6 +909,7 @@ def _channel_candidate(channel: ChannelContext, *, source_path: str) -> Authorin
     """Adapt bounded source metadata to the canonical inspection facade input."""
     return AuthoringChannelCandidate(
         mnemonic=channel.mnemonic,
+        source_token=channel.source_token,
         kind=channel.kind,
         unit=channel.unit,
         description=channel.description,

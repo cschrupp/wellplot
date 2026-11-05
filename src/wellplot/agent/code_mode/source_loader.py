@@ -41,6 +41,7 @@ class _ChannelProjection(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     mnemonic: str = Field(min_length=1, max_length=256)
+    source_token: str | None = Field(default=None, max_length=512)
     unit: str | None = Field(default=None, max_length=256)
     kind: Literal["scalar", "array"]
     physical_identity: dict[str, str | int | tuple[int, ...]]
@@ -103,6 +104,7 @@ class LogfileSourceLoader(SourceLoaderProtocol):
             channels=tuple(
                 ChannelContext(
                     mnemonic=channel.mnemonic,
+                    source_token=channel.source_token,
                     kind=channel.kind,
                     unit=channel.unit,
                     physical_identity=channel.physical_identity,

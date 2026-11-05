@@ -8,6 +8,10 @@ from typing import Annotated, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from ...authoring_context import (
+    AuthoringChannelCandidate,
+    source_bound_request_mnemonic,
+)
 from ...model.intent import AuthoringStyleIntent
 from .enrichment import ResolvedSectionContext
 
@@ -248,6 +252,7 @@ def validate_section_semantics(
         )
     source = matching_sources[0]
 
+    normalized_tracks = []
     for track in validated.tracks:
         binding_ids = [binding.semantic_id for binding in track.bindings]
         if len(binding_ids) != len(set(binding_ids)):
@@ -255,10 +260,30 @@ def validate_section_semantics(
                 SectionSemanticErrorCode.DUPLICATE_BINDING_ID,
                 f"Binding semantic IDs must be unique within track '{track.semantic_id}'.",
             )
+        normalized_bindings = []
         for binding in track.bindings:
-            matching_channels = [
-                channel for channel in source.channels if channel.mnemonic == binding.channel
+            exact_channels = [
+                channel
+                for channel in source.channels
+                if channel.mnemonic.casefold() == binding.channel.casefold()
             ]
+            matching_channels = exact_channels
+            if not matching_channels:
+                matching_channels = [
+                    channel
+                    for channel in source.channels
+                    if source_bound_request_mnemonic(
+                        AuthoringChannelCandidate(
+                            mnemonic=channel.mnemonic,
+                            source_token=channel.source_token,
+                            kind=channel.kind,
+                            unit=channel.unit,
+                            physical_identity=channel.physical_identity,
+                            addressability=channel.addressability,
+                        )
+                    )
+                    == binding.channel.casefold()
+                ]
             if not matching_channels:
                 raise SectionSemanticValidationError(
                     SectionSemanticErrorCode.CHANNEL_MISSING,
@@ -287,7 +312,13 @@ def validate_section_semantics(
                     f"Channel '{binding.channel}' must be {expected_kind} for a "
                     f"{binding.kind} binding.",
                 )
-    return validated
+            normalized_bindings.append(
+                binding.model_copy(update={"channel": channel.mnemonic})
+                if binding.channel != channel.mnemonic
+                else binding
+            )
+        normalized_tracks.append(track.model_copy(update={"bindings": tuple(normalized_bindings)}))
+    return validated.model_copy(update={"tracks": tuple(normalized_tracks)})
 
 
 def _revalidate(

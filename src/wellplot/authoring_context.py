@@ -94,6 +94,7 @@ class AuthoringChannelCandidate(_ContextModel):
     """One source channel available to a section context."""
 
     mnemonic: str = Field(min_length=1)
+    source_token: str | None = Field(default=None, min_length=1)
     kind: str = Field(default="scalar", min_length=1)
     aliases: list[str] = Field(default_factory=list)
     unit: str | None = Field(default=None, min_length=1)
@@ -118,11 +119,17 @@ def resolve_physical_channel(
     *,
     inventory_complete: bool,
 ) -> PhysicalChannelResolution:
-    """Resolve exact mnemonic identity without treating catalog misses as absence."""
+    """Resolve exact physical names before the narrow source-bound POTA spelling."""
     requested = requested_mnemonic.strip().casefold()
     matches = tuple(
         candidate for candidate in candidates if candidate.mnemonic.strip().casefold() == requested
     )
+    if not matches:
+        matches = tuple(
+            candidate
+            for candidate in candidates
+            if source_bound_request_mnemonic(candidate) == requested
+        )
     if len(matches) > 1:
         return PhysicalChannelResolution(
             state=PhysicalChannelResolutionState.AMBIGUOUS,
@@ -860,6 +867,13 @@ def _candidate_matches(
     ]
     if exact:
         return exact, None
+    request_matches = [
+        candidate
+        for candidate in candidates
+        if source_bound_request_mnemonic(candidate) == requested.strip().casefold()
+    ]
+    if request_matches:
+        return request_matches, None
     alias = _channel_alias_entry(requested, aliases)
     if alias is None:
         return [], None
@@ -870,6 +884,21 @@ def _candidate_matches(
         candidate for candidate in candidates if _normalize_token(candidate.mnemonic) in alias_terms
     ]
     return matches, alias.id
+
+
+def source_bound_request_mnemonic(candidate: AuthoringChannelCandidate) -> str | None:
+    """Return the one approved request spelling for the exact inspected LAS record."""
+    curve_index = candidate.physical_identity.get("curve_index")
+    if (
+        candidate.mnemonic == "POTA."
+        and candidate.source_token == "POTA.."
+        and candidate.unit is None
+        and candidate.physical_identity.get("format") == "LAS"
+        and isinstance(curve_index, int)
+        and curve_index >= 0
+    ):
+        return "pota"
+    return None
 
 
 def _iter_binding_targets(
@@ -1456,4 +1485,5 @@ __all__ = [
     "AuthoringResolutionStatus",
     "build_authoring_context_snapshot",
     "resolve_authoring_context",
+    "source_bound_request_mnemonic",
 ]

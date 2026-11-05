@@ -584,6 +584,102 @@ def test_context_validation_does_not_resolve_channel_aliases() -> None:
     assert error.value.code is SectionSemanticErrorCode.CHANNEL_MISSING
 
 
+@pytest.mark.parametrize(
+    ("requested", "expected_physical"),
+    [
+        ("POTA", "POTA"),
+        ("pota", "POTA"),
+        ("Pota", "POTA"),
+        ("POTA.", "POTA."),
+    ],
+)
+def test_typed_compilation_prefers_case_insensitive_physical_name(
+    requested: str,
+    expected_physical: str,
+) -> None:
+    """Exact physical identity wins case-insensitively over POTA compatibility."""
+    source = _source(
+        channels=(
+            ChannelContext(
+                mnemonic="POTA",
+                kind="scalar",
+                physical_identity={"format": "LAS", "curve_index": 13},
+                addressability="ADDRESSABLE",
+            ),
+            ChannelContext(
+                mnemonic="POTA.",
+                source_token="POTA..",
+                kind="scalar",
+                unit=None,
+                physical_identity={"format": "LAS", "curve_index": 14},
+                addressability="ADDRESSABLE",
+            ),
+        )
+    )
+    intent = compile_section_semantics(
+        _normal_draft(channel=requested),
+        section_context=_context(source),
+        document=_document(),
+        section_id_hint="pota-section",
+    )
+
+    assert intent.sections[0].tracks[0].bindings[0].channel == expected_physical
+    assert source.channels[1].unit is None
+    assert source.channels[1].physical_identity == {"format": "LAS", "curve_index": 14}
+
+
+def test_typed_validation_rejects_case_insensitive_physical_collision() -> None:
+    """Duplicate exact names differing only by case remain ambiguous."""
+    source = _source(
+        channels=(
+            ChannelContext(mnemonic="POTA", kind="scalar"),
+            ChannelContext(mnemonic="pota", kind="scalar"),
+            ChannelContext(
+                mnemonic="POTA.",
+                source_token="POTA..",
+                kind="scalar",
+                physical_identity={"format": "LAS", "curve_index": 14},
+            ),
+        )
+    )
+
+    with pytest.raises(SectionSemanticValidationError) as error:
+        validate_section_semantics(
+            _normal_draft(channel="Pota"),
+            section_context=_context(source),
+        )
+
+    assert error.value.code is SectionSemanticErrorCode.CHANNEL_AMBIGUOUS
+
+
+def test_typed_validation_rejects_ambiguous_pota_compatibility_candidates() -> None:
+    """Multiple source-grounded POTA. records cannot satisfy request POTA."""
+    source = _source(
+        channels=(
+            ChannelContext(
+                mnemonic="POTA.",
+                source_token="POTA..",
+                kind="scalar",
+                physical_identity={"format": "LAS", "curve_index": 14},
+            ),
+            ChannelContext(
+                mnemonic="POTA.",
+                source_token="POTA..",
+                kind="scalar",
+                physical_identity={"format": "LAS", "curve_index": 15},
+            ),
+        )
+    )
+
+    with pytest.raises(SectionSemanticValidationError) as error:
+        validate_section_semantics(
+            _normal_draft(channel="POTA"),
+            section_context=_context(source),
+        )
+
+    assert error.value.code is SectionSemanticErrorCode.CHANNEL_AMBIGUOUS
+
+
 def test_context_validation_rejects_channel_kind_mismatch_and_duplicate_semantics() -> None:
     """Scalar/array truth and semantic identity uniqueness remain contextual."""
     with pytest.raises(SectionSemanticValidationError) as mismatch:
