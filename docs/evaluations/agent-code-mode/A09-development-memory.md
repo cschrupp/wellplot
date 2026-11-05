@@ -344,7 +344,7 @@ path. Rejections assert that persistence is not called and original YAML bytes
 remain unchanged. The D5 production-component manifest was regenerated using
 `scripts/d5_single_engine_attestation.py --write`.
 
-Focused validation: 71 tests passed across
+Initial candidate validation: 71 tests passed across
 `tests/test_direct_notebook_transaction.py`,
 `tests/test_mcp_agentic_transaction.py`, and
 `tests/test_d5_5j_obligations.py`; Ruff check and format check passed. The
@@ -357,3 +357,15 @@ A09 acceptance or baseline promotion. The previously failed integrated
 qualification remains `INDETERMINATE / PRE-PROBE ENVIRONMENT` and was not
 retried. No provider, model, endpoint, scientific, C02, numerical-source, or
 YAML-publication operation was performed by this candidate work.
+
+### A09-PARITY-01 Review Condition Correction
+
+Independent review identified that MCP used a permissive `getattr(..., ())`
+fallback for the obligations field. The corrective now types the application
+boundary to `AgentSessionResult`, explicitly rejects nonconforming result
+objects as `compile_failed`, and reads `session_result.obligations` directly.
+A provider-free regression supplies a success-shaped object without the
+obligations contract and verifies persistence is not invoked and original YAML
+bytes remain unchanged. The final relevant test set passes 72 tests; Ruff
+checks pass. This corrective awaits final independent acceptance and does not
+authorize or run the integrated qualification.

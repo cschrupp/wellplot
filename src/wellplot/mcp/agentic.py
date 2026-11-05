@@ -26,7 +26,7 @@ from ..agent.code_mode.obligations import (
     verify_document_postconditions,
 )
 from ..agent.execution_trace import AgentRunTrace, bind_agent_trace
-from ..agent.session import AgentSession, AgentSourceConfig
+from ..agent.session import AgentSession, AgentSessionResult, AgentSourceConfig
 from ..api.serialize import report_to_dict
 from ..authoring_executor import execute_authoring_plan
 from ..authoring_reconciler import reconcile_authoring
@@ -144,10 +144,20 @@ def _execution_errors(execution: object) -> list[str]:
 def _apply_session_result(
     *,
     context: _McpDocumentContext,
-    session_result: object,
+    session_result: AgentSessionResult,
     root: Path,
 ) -> tuple[bool, bool, bool, list[str], list[str], list[str]]:
     """Apply one successful session intent through a private canonical clone."""
+    if not isinstance(session_result, AgentSessionResult):
+        return (
+            False,
+            False,
+            False,
+            ["session_result_contract_invalid: expected AgentSessionResult"],
+            ["compile_failed"],
+            [section.id for section in context.document.sections],
+        )
+
     if not getattr(session_result, "success", False):
         return (
             False,
@@ -237,7 +247,7 @@ def _apply_session_result(
         verify_document_postconditions(
             context.document,
             accepted,
-            tuple(getattr(session_result, "obligations", ())),
+            session_result.obligations,
             plan.operations,
         )
     except DocumentPostconditionError as error:

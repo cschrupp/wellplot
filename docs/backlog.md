@@ -300,8 +300,14 @@ the existing request-obligation and document-preservation checks and invokes
 it from both the notebook and MCP adapters. Focused regressions cover rejected
 obligations, unauthorized candidate mutations, and successful continuation to
 canonical persistence in both paths, including the public MCP revise operation.
-Candidate validation reports 71 relevant provider-free tests plus Ruff and
-manifest checks; independent review is pending. Do not
+Initial candidate validation reported 71 relevant provider-free tests plus
+Ruff and manifest checks. Do not
 retry the unrelated A09 canonical integration probe, promote the baseline, or
 infer that A09 integrated functional qualification passed from this adapter
 candidate.
+
+The review condition requiring explicit typed MCP obligations consumption is
+covered by a corrective regression: a success-shaped non-`AgentSessionResult`
+without obligations is rejected as `compile_failed` before persistence. The
+corrective is awaiting final independent acceptance; the integrated probe
+remains unrun.

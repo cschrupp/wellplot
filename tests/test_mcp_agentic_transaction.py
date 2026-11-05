@@ -236,6 +236,33 @@ def test_mcp_apply_rejects_unsatisfied_obligation_before_persist() -> None:
         assert fixture_paths.single_logfile.read_bytes() == original_bytes
 
 
+def test_mcp_apply_rejects_result_missing_obligations_contract() -> None:
+    """A success-shaped result without typed obligations cannot reach persistence."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="mcp-missing-obligations-") as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        context = _request_context(str(fixture_paths.single_logfile), root=REPO_ROOT)
+        original_bytes = fixture_paths.single_logfile.read_bytes()
+        malformed_result = SimpleNamespace(
+            success=True,
+            intent=AuthoringDocumentIntent(title="Unverified title"),
+        )
+
+        with patch("wellplot.mcp.agentic.service.persist_authoring_document") as persist:
+            success, changed, rolled_back, errors, statuses, _section_ids = _apply_session_result(
+                context=context,
+                session_result=malformed_result,
+                root=REPO_ROOT,
+            )
+
+        assert success is False
+        assert changed is False
+        assert rolled_back is False
+        assert statuses == ["compile_failed"]
+        assert errors == ["session_result_contract_invalid: expected AgentSessionResult"]
+        persist.assert_not_called()
+        assert fixture_paths.single_logfile.read_bytes() == original_bytes
+
+
 def test_mcp_revise_rejects_unsatisfied_obligation_before_persist() -> None:
     """The public MCP operation rejects an unmet postcondition before publication."""
     with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="mcp-public-postcondition-") as temp_dir:
