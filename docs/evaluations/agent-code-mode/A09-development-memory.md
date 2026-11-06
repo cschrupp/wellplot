@@ -388,6 +388,10 @@ and relevant locked dependency versions. The real source
 `a4a2e91b495172079fc47bc2e9c936f0ab60c9845bbed8e65bf56555a5e82640`.
 The canonical metadata-only inspector resolved exact CBL and VDL physical
 identities and reported both `ADDRESSABLE`; no numerical sample API was used.
+CBL identity: DLIS logical file 0, CHANNEL name `CBL`, origin 61, copy 0,
+frame 0, scalar, unit `mV`. VDL identity: DLIS logical file 0, CHANNEL name
+`VDL`, origin 61, copy 0, frame 2, array, unit unspecified. The prepared
+probe pins both identities and fails closed on drift.
 The fresh proposed namespace is
 `workspace/evaluations/a09-canonical-integration-20261105-002/`, confirmed
 unused; its parent is writable. This was preparation, not an integrated test.
