@@ -2,12 +2,11 @@
 
 ## Status
 
-- State: metadata implementation candidate at `1d65d8cd36fc6fb288ab3627ebfb9f9246506372`; A09 integrated qualification incomplete and overall open
+- State: A09-PARITY-01 accepted at `a12640591abbd6ff832a988ce1e6adc7c6fcfb79`; integrated CBL+VDL qualification remains unattempted and A09 overall open
 - Accepted security/observability checkpoint: `7ea43a6548a8bd1e5b44eb20c085a7027932e0db`
 - Accepted metadata-first design checkpoint: `daef5d171828495b2f0dfcea25ae372f0bc39af4`
-- Current work: A09-PARITY-01 provider-free implementation candidate pending
-  independent review; integrated qualification remains incomplete and no
-  production promotion is made
+- Current work: prepare fresh provider-free integrated CBL+VDL qualification
+  in a new namespace; execution requires separate authorization
 - Provider, model, and endpoint calls: `0`
 - Scientific turns: `0`
 - C02 exposure: `0`
@@ -367,5 +366,34 @@ objects as `compile_failed`, and reads `session_result.obligations` directly.
 A provider-free regression supplies a success-shaped object without the
 obligations contract and verifies persistence is not invoked and original YAML
 bytes remain unchanged. The final relevant test set passes 72 tests; Ruff
-checks pass. This corrective awaits final independent acceptance and does not
-authorize or run the integrated qualification.
+checks pass. At this entry it awaited final independent acceptance and did not
+authorize or run integrated qualification; it was subsequently accepted at
+`a12640591abbd6ff832a988ce1e6adc7c6fcfb79`.
+
+## A09-PARITY-01 Acceptance and Integration Preflight (2026-11-05)
+
+Independent review accepted exact commit
+`a12640591abbd6ff832a988ce1e6adc7c6fcfb79` and its typed MCP result guard.
+The accepted Knowledge Delta is promoted in
+`docs/agent-code-mode-current-baseline.md`. A09 adapter parity is closed;
+integrated CBL+VDL qualification remains unattempted.
+
+Provider-free preparation verified the canonical root and Git top-level as
+`/home/user/projects/well_log_os`, branch
+`engineering-d5-binding-path-repair`, HEAD
+`a12640591abbd6ff832a988ce1e6adc7c6fcfb79`, and the existing venv interpreter
+and relevant locked dependency versions. The real source
+`workspace/tutorials/agent_cbl_log_example_from_prompt/CBL_Repeat.dlis` is
+3,294,924 bytes with SHA-256
+`a4a2e91b495172079fc47bc2e9c936f0ab60c9845bbed8e65bf56555a5e82640`.
+The canonical metadata-only inspector resolved exact CBL and VDL physical
+identities and reported both `ADDRESSABLE`; no numerical sample API was used.
+The fresh proposed namespace is
+`workspace/evaluations/a09-canonical-integration-20261105-002/`, confirmed
+unused; its parent is writable. This was preparation, not an integrated test.
+
+The prior namespace `...-001` remains immutable and
+`INDETERMINATE / PRE-PROBE ENVIRONMENT`. No provider/model/endpoint calls,
+scientific grading, C02 access, YAML persistence, or rendering occurred in
+this preflight. A fresh execution attempt remains unauthorized pending the
+preflight report and separate integration-smoke authority.

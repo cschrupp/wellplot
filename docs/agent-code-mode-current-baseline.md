@@ -612,6 +612,20 @@ of current authority.
   handling, shared `SectionObjectBindings`, and the single canonical
   `RepairContract` correction protocol. Exact-checkpoint live smoke remains a
   separate engineering qualification step.
+- **A09-PARITY-01 accepted implementation at
+  `a12640591abbd6ff832a988ce1e6adc7c6fcfb79`.** The canonical notebook and MCP
+  authoring adapters must run the same request-obligation and document-
+  preservation postconditions after canonical execution/validation and before
+  persistence. Their existing verifiers remain authoritative; adapters must
+  not reimplement these checks. MCP must consume a validated
+  `AgentSessionResult` and fail closed on a nonconforming result rather than
+  treating missing obligations as an empty set. Evidence class:
+  `ADAPTED / EMPIRICALLY_SUPPORTED`; independent review accepted the source
+  and regressions. The 72 focused tests were reported by Codex, not rerun by
+  the reviewer. Regressions cover rejected obligations, unauthorized
+  mutations, no-persistence/YAML preservation, successful persistence, and
+  malformed MCP result rejection. This closes adapter-verification parity;
+  it does not qualify A09's integrated CBL+VDL inspection-to-render path.
 
 ### Changed
 
@@ -660,3 +674,5 @@ of current authority.
 - Provider-free acceptance must retain the exact H-01 through H-08 contract
   checks and must not treat the unavailable historical tutorial DLIS asset as
   a semantic result.
+- Future notebook/MCP authoring changes must preserve the shared pre-publication
+  postcondition boundary and its no-publication negative regressions.

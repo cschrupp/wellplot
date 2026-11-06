@@ -301,13 +301,15 @@ it from both the notebook and MCP adapters. Focused regressions cover rejected
 obligations, unauthorized candidate mutations, and successful continuation to
 canonical persistence in both paths, including the public MCP revise operation.
 Initial candidate validation reported 71 relevant provider-free tests plus
-Ruff and manifest checks. Do not
-retry the unrelated A09 canonical integration probe, promote the baseline, or
-infer that A09 integrated functional qualification passed from this adapter
-candidate.
+Ruff and manifest checks. Do not retry the unrelated A09 canonical integration
+probe, promote the baseline, or infer that A09 integrated functional
+qualification passed from this adapter candidate.
 
 The review condition requiring explicit typed MCP obligations consumption is
 covered by a corrective regression: a success-shaped non-`AgentSessionResult`
 without obligations is rejected as `compile_failed` before persistence. The
-corrective is awaiting final independent acceptance; the integrated probe
-remains unrun.
+corrective was accepted at `a12640591abbd6ff832a988ce1e6adc7c6fcfb79` and
+promoted to the active baseline. A09 integrated CBL+VDL qualification remains
+open. Provider-free preflight confirms the accepted source identity and exact
+CBL/VDL metadata identities; a fresh namespace is prepared, but execution is
+not authorized. Preserve the failed `...-001` attempt unchanged.
