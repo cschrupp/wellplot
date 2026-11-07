@@ -19,7 +19,7 @@ import re
 from collections.abc import Mapping
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class _CatalogModel(BaseModel):
@@ -170,30 +170,77 @@ class SemanticResolutionEvidence(_CatalogModel):
     """Catalog/source identities bound to one deterministic channel decision."""
 
     requested_term: str = Field(min_length=1)
+    section_id: str = Field(min_length=1)
+    track_id: str = Field(min_length=1)
+    binding_id: str = Field(min_length=1)
     family_id: str = Field(min_length=1)
     catalog_id: str = Field(min_length=1)
     catalog_version: str = Field(min_length=1)
     catalog_release_ref: str = Field(min_length=1)
     catalog_content_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
     source_revision: str = Field(min_length=1)
-    physical_identity: dict[str, object]
+    physical_identity_json: str = Field(min_length=2)
+
+    @field_validator("physical_identity_json")
+    @classmethod
+    def validate_physical_identity_json(cls, value: str) -> str:
+        """Require canonical nonempty object JSON for immutable identity custody."""
+        try:
+            identity = json.loads(value)
+        except json.JSONDecodeError as error:
+            raise ValueError("Physical identity evidence must be valid JSON.") from error
+        if not isinstance(identity, dict) or not identity:
+            raise ValueError("Physical identity evidence must be a nonempty JSON object.")
+        if canonical_physical_identity(identity) != value:
+            raise ValueError("Physical identity evidence must use canonical JSON encoding.")
+        return value
 
 
 def verify_semantic_resolution_evidence(
     evidence: SemanticResolutionEvidence,
     catalog: SemanticChannelCatalog,
     *,
+    expected_section_id: str,
+    expected_track_id: str,
+    expected_binding_id: str,
+    expected_physical_identity: Mapping[str, object],
     current_source_revision: str,
 ) -> bool:
-    """Revalidate immutable catalog and source identities before publication."""
-    return (
-        catalog.verify_digest()
-        and evidence.catalog_id == catalog.catalog_id
-        and evidence.catalog_version == catalog.catalog_version
-        and evidence.catalog_release_ref == catalog.release_ref
-        and evidence.catalog_content_sha256 == catalog.content_sha256
-        and evidence.source_revision == current_source_revision
+    """Revalidate catalog, source, binding scope, and exact physical identity."""
+    try:
+        expected_identity_json = canonical_physical_identity(expected_physical_identity)
+    except (TypeError, ValueError):
+        return False
+    return all(
+        (
+            catalog.verify_digest(),
+            evidence.catalog_id == catalog.catalog_id,
+            evidence.catalog_version == catalog.catalog_version,
+            evidence.catalog_release_ref == catalog.release_ref,
+            evidence.catalog_content_sha256 == catalog.content_sha256,
+            evidence.source_revision == current_source_revision,
+            evidence.section_id == expected_section_id,
+            evidence.track_id == expected_track_id,
+            evidence.binding_id == expected_binding_id,
+            evidence.physical_identity_json == expected_identity_json,
+        )
     )
+
+
+def canonical_physical_identity(identity: Mapping[str, object]) -> str:
+    """Return immutable canonical JSON for a host-selected physical identity."""
+    if not identity:
+        raise ValueError("Physical identity must be nonempty.")
+    canonical = json.dumps(
+        dict(identity),
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+    if not isinstance(json.loads(canonical), dict):
+        raise ValueError("Physical identity must be a JSON object.")
+    return canonical
 
 
 def semantic_catalog_digest(payload: Mapping[str, object]) -> str:
@@ -271,6 +318,7 @@ __all__ = [
     "SemanticChannelFamily",
     "SemanticResolutionEvidence",
     "build_semantic_catalog",
+    "canonical_physical_identity",
     "catalog_from_payload",
     "normalize_request_term",
     "semantic_catalog_digest",

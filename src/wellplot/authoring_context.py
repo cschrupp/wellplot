@@ -50,6 +50,7 @@ from .semantic_catalog import (
     EMPTY_SEMANTIC_CHANNEL_CATALOG,
     SemanticChannelCatalog,
     SemanticResolutionEvidence,
+    canonical_physical_identity,
     normalize_request_term,
 )
 
@@ -889,6 +890,43 @@ def _channel_inventory(
     return _channel_candidates(value), True, None
 
 
+def _has_trustworthy_physical_identity(candidate: AuthoringChannelCandidate) -> bool:
+    """Require one supported loader identity shape for catalog authorization."""
+    identity = candidate.physical_identity
+    if not identity:
+        return False
+    try:
+        canonical_physical_identity(identity)
+    except (TypeError, ValueError):
+        return False
+    if identity.get("format") == "LAS":
+        curve_index = identity.get("curve_index")
+        return (
+            isinstance(curve_index, int) and not isinstance(curve_index, bool) and curve_index >= 0
+        )
+    if identity.get("format") != "DLIS":
+        return False
+
+    logical_file_index = identity.get("logical_file_index")
+    origin = identity.get("origin")
+    copy_number = identity.get("copy_number")
+    frame_indexes = identity.get("frame_indexes")
+    return (
+        isinstance(logical_file_index, int)
+        and not isinstance(logical_file_index, bool)
+        and logical_file_index >= 0
+        and identity.get("name") == candidate.mnemonic
+        and isinstance(origin, int)
+        and not isinstance(origin, bool)
+        and isinstance(copy_number, int)
+        and not isinstance(copy_number, bool)
+        and identity.get("object_type") == "CHANNEL"
+        and isinstance(frame_indexes, (list, tuple))
+        and bool(frame_indexes)
+        and all(isinstance(index, int) and not isinstance(index, bool) for index in frame_indexes)
+    )
+
+
 def _catalog_family_match(
     requested: str,
     candidates: Sequence[AuthoringChannelCandidate],
@@ -1369,6 +1407,59 @@ def _resolve_channels(
                         )
                     )
                     continue
+                selected = family_matches[0]
+                if not _has_trustworthy_physical_identity(selected):
+                    issues.append(
+                        AuthoringContextIssue(
+                            path=f"{path}.channel",
+                            code="channel_physical_identity_missing",
+                            message=(
+                                "Catalog-backed resolution requires a complete host-inspected "
+                                "physical identity."
+                            ),
+                            candidates=[selected.mnemonic],
+                        )
+                    )
+                    continue
+                if "addressability" not in selected.model_fields_set:
+                    issues.append(
+                        AuthoringContextIssue(
+                            path=f"{path}.channel",
+                            code="channel_addressability_unproven",
+                            message=(
+                                "Catalog-backed resolution requires explicitly inspected "
+                                "renderer addressability."
+                            ),
+                            candidates=[selected.mnemonic],
+                        )
+                    )
+                    continue
+                if selected.addressability == "UNADDRESSABLE":
+                    issues.append(
+                        AuthoringContextIssue(
+                            path=f"{path}.channel",
+                            code="channel_unaddressable",
+                            message=(
+                                f"Channel {selected.mnemonic!r} is not addressable by the "
+                                "existing renderer binding contract."
+                            ),
+                            candidates=[selected.mnemonic],
+                        )
+                    )
+                    continue
+                if selected.addressability == "UNKNOWN":
+                    issues.append(
+                        AuthoringContextIssue(
+                            path=f"{path}.channel",
+                            code="channel_addressability_unknown",
+                            message=(
+                                f"Renderer addressability for channel {selected.mnemonic!r} "
+                                "is unknown."
+                            ),
+                            candidates=[selected.mnemonic],
+                        )
+                    )
+                    continue
                 if expected_catalog_digest is not None and (
                     not semantic_catalog.verify_digest()
                     or semantic_catalog.content_sha256 != expected_catalog_digest
@@ -1399,13 +1490,18 @@ def _resolve_channels(
                 semantic_resolutions.append(
                     SemanticResolutionEvidence(
                         requested_term=str(requested),
+                        section_id=section_id,
+                        track_id=track_id,
+                        binding_id=binding_id,
                         family_id=str(family_id),
                         catalog_id=semantic_catalog.catalog_id,
                         catalog_version=semantic_catalog.catalog_version,
                         catalog_release_ref=semantic_catalog.release_ref,
                         catalog_content_sha256=semantic_catalog.content_sha256,
                         source_revision=source_revision,
-                        physical_identity=family_matches[0].physical_identity,
+                        physical_identity_json=canonical_physical_identity(
+                            selected.physical_identity
+                        ),
                     )
                 )
                 matches = list(family_matches)

@@ -5,6 +5,7 @@ from __future__ import annotations
 from copy import deepcopy
 
 import pytest
+from pydantic import ValidationError
 
 from wellplot.authoring_context import (
     AuthoringChannelCandidate,
@@ -12,8 +13,10 @@ from wellplot.authoring_context import (
     AuthoringContextResolver,
     resolve_authoring_context,
 )
+from wellplot.authoring_executor import execute_authoring_plan
 from wellplot.authoring_reconciler import reconcile_authoring
-from wellplot.model.authoring import AuthoringScale
+from wellplot.authoring_service import AuthoringService
+from wellplot.model.authoring import AuthoringDocumentSpec, AuthoringScale
 from wellplot.model.intent import AuthoringDocumentIntent
 from wellplot.semantic_catalog import (
     EMPTY_SEMANTIC_CHANNEL_CATALOG,
@@ -110,10 +113,13 @@ def _intent(
         sections=[
             {
                 "section_id": "main",
+                "title": "Main",
                 "tracks": [
                     {
                         "track_id": "track-1",
+                        "title": "Curves",
                         "kind": track_kind,
+                        "width_mm": 20,
                         "bindings": [binding],
                     }
                 ],
@@ -132,6 +138,19 @@ def _inventory(
         complete=complete,
         source_revision="source-revision-1",
     )
+
+
+def _dlis_identity(mnemonic: str, *, frame: int = 0) -> dict[str, object]:
+    """Return the inspected DLIS physical identity shape used by production."""
+    return {
+        "format": "DLIS",
+        "logical_file_index": 0,
+        "name": mnemonic,
+        "origin": 61,
+        "copy_number": 0,
+        "object_type": "CHANNEL",
+        "frame_indexes": [frame],
+    }
 
 
 def test_empty_catalog_preserves_exact_cbl_and_vdl_and_explicit_scale() -> None:
@@ -155,6 +174,24 @@ def test_empty_catalog_preserves_exact_cbl_and_vdl_and_explicit_scale() -> None:
     assert vdl.resolved_intent.sections[0].tracks[0].bindings[0].channel == "VDL"
     assert not cbl.semantic_resolutions
     assert not vdl.semantic_resolutions
+
+    cbl_plan = reconcile_authoring(
+        _intent("CBL", scale=cbl_scale),
+        available_channels={"main": [AuthoringChannelCandidate(mnemonic="CBL")]},
+    )
+    vdl_plan = reconcile_authoring(
+        _intent("VDL", kind="raster"),
+        available_channels={"main": [AuthoringChannelCandidate(mnemonic="VDL", kind="array")]},
+    )
+    assert cbl_plan.ready is True
+    assert vdl_plan.ready is True
+    assert cbl_plan.operations
+    assert vdl_plan.operations
+    cbl_binding_operation = next(
+        operation for operation in cbl_plan.operations if operation.object_kind == "curve_binding"
+    )
+    assert cbl_binding_operation.payload["object"]["scale"]["minimum"] == -0.125
+    assert cbl_binding_operation.payload["object"]["scale"]["maximum"] == 1.1
 
 
 def test_unknown_vendor_channel_remains_selectable_by_exact_identity() -> None:
@@ -229,7 +266,8 @@ def test_reviewed_family_rule_resolves_through_existing_context_resolver() -> No
                     mnemonic="GR_STGC",
                     unit="gAPI",
                     source_path="synthetic.dlis",
-                    physical_identity={"logical_file": 0, "frame": 0, "copy": 0},
+                    physical_identity=_dlis_identity("GR_STGC"),
+                    addressability="ADDRESSABLE",
                 )
             )
         },
@@ -241,6 +279,13 @@ def test_reviewed_family_rule_resolves_through_existing_context_resolver() -> No
     assert evidence.catalog_content_sha256 == catalog.content_sha256
     assert evidence.catalog_release_ref == catalog.release_ref
     assert evidence.source_revision == "source-revision-1"
+    assert evidence.section_id == "main"
+    assert evidence.track_id == "track-1"
+    assert evidence.binding_id == "binding-1"
+    assert evidence.physical_identity_json == (
+        '{"copy_number":0,"format":"DLIS","frame_indexes":[0],'
+        '"logical_file_index":0,"name":"GR_STGC","object_type":"CHANNEL","origin":61}'
+    )
 
 
 def test_unreviewed_request_or_physical_rules_never_authorize_a_match() -> None:
@@ -304,7 +349,7 @@ def test_semantic_match_still_requires_proven_renderer_addressability(addressabi
                 AuthoringChannelCandidate(
                     mnemonic="GR_STGC",
                     addressability=addressability,
-                    physical_identity={"logical_file": 0, "frame": 0},
+                    physical_identity=_dlis_identity("GR_STGC"),
                 )
             )
         },
@@ -324,7 +369,9 @@ def test_catalog_digest_and_source_revision_are_revalidated() -> None:
     catalog = _reviewed_catalog()
     inventory = _inventory(
         AuthoringChannelCandidate(
-            mnemonic="GR_STGC", physical_identity={"logical_file": 0, "frame": 0}
+            mnemonic="GR_STGC",
+            physical_identity=_dlis_identity("GR_STGC"),
+            addressability="ADDRESSABLE",
         )
     )
     stale_catalog = AuthoringContextResolver(semantic_catalog=catalog).resolve(
@@ -340,18 +387,135 @@ def test_catalog_digest_and_source_revision_are_revalidated() -> None:
     assert "semantic_catalog_stale" in {issue.code for issue in stale_catalog.issues}
     assert current.ready
     assert not verify_semantic_resolution_evidence(
-        current.semantic_resolutions[0], catalog, current_source_revision="source-revision-2"
+        current.semantic_resolutions[0],
+        catalog,
+        expected_section_id="main",
+        expected_track_id="track-1",
+        expected_binding_id="binding-1",
+        expected_physical_identity=_dlis_identity("GR_STGC"),
+        current_source_revision="source-revision-2",
     )
     assert verify_semantic_resolution_evidence(
-        current.semantic_resolutions[0], catalog, current_source_revision="source-revision-1"
+        current.semantic_resolutions[0],
+        catalog,
+        expected_section_id="main",
+        expected_track_id="track-1",
+        expected_binding_id="binding-1",
+        expected_physical_identity=_dlis_identity("GR_STGC"),
+        current_source_revision="source-revision-1",
     )
+
+    evidence = current.semantic_resolutions[0]
+    mismatched_scope = verify_semantic_resolution_evidence(
+        evidence,
+        catalog,
+        expected_section_id="other",
+        expected_track_id="track-1",
+        expected_binding_id="binding-1",
+        expected_physical_identity=_dlis_identity("GR_STGC"),
+        current_source_revision="source-revision-1",
+    )
+    mismatched_track = verify_semantic_resolution_evidence(
+        evidence,
+        catalog,
+        expected_section_id="main",
+        expected_track_id="other-track",
+        expected_binding_id="binding-1",
+        expected_physical_identity=_dlis_identity("GR_STGC"),
+        current_source_revision="source-revision-1",
+    )
+    mismatched_binding = verify_semantic_resolution_evidence(
+        evidence,
+        catalog,
+        expected_section_id="main",
+        expected_track_id="track-1",
+        expected_binding_id="other-binding",
+        expected_physical_identity=_dlis_identity("GR_STGC"),
+        current_source_revision="source-revision-1",
+    )
+    mismatched_identity = verify_semantic_resolution_evidence(
+        evidence,
+        catalog,
+        expected_section_id="main",
+        expected_track_id="track-1",
+        expected_binding_id="binding-1",
+        expected_physical_identity=_dlis_identity("GR_STGC", frame=1),
+        current_source_revision="source-revision-1",
+    )
+    assert not mismatched_scope
+    assert not mismatched_track
+    assert not mismatched_binding
+    assert not mismatched_identity
+    with pytest.raises(ValidationError):
+        evidence.physical_identity_json = "{}"
 
     changed = current.semantic_resolutions[0].model_copy(
         update={"catalog_content_sha256": "0" * 64}
     )
     assert not verify_semantic_resolution_evidence(
-        changed, catalog, current_source_revision="source-revision-1"
+        changed,
+        catalog,
+        expected_section_id="main",
+        expected_track_id="track-1",
+        expected_binding_id="binding-1",
+        expected_physical_identity=_dlis_identity("GR_STGC"),
+        current_source_revision="source-revision-1",
     )
+
+
+def test_semantic_resolution_rejects_empty_physical_identity() -> None:
+    """A unique catalog mnemonic without source identity is not authoritative."""
+    result = AuthoringContextResolver(semantic_catalog=_reviewed_catalog()).resolve(
+        _intent("Gamma Ray"),
+        available_channels={
+            "main": [
+                AuthoringChannelCandidate(
+                    mnemonic="GR_STGC",
+                    addressability="ADDRESSABLE",
+                )
+            ]
+        },
+    )
+
+    assert not result.ready
+    assert "channel_physical_identity_missing" in {issue.code for issue in result.issues}
+
+
+def test_semantic_resolution_rejects_unrecognized_physical_identity_shape() -> None:
+    """A nonempty opaque object is not a supported source identity contract."""
+    result = AuthoringContextResolver(semantic_catalog=_reviewed_catalog()).resolve(
+        _intent("Gamma Ray"),
+        available_channels={
+            "main": [
+                AuthoringChannelCandidate(
+                    mnemonic="GR_STGC",
+                    physical_identity={"format": "OTHER", "opaque_id": "channel-1"},
+                    addressability="ADDRESSABLE",
+                )
+            ]
+        },
+    )
+
+    assert not result.ready
+    assert "channel_physical_identity_missing" in {issue.code for issue in result.issues}
+
+
+def test_semantic_resolution_rejects_default_addressability() -> None:
+    """The candidate model default is not evidence of renderer addressability."""
+    candidate = AuthoringChannelCandidate(
+        mnemonic="GR_STGC",
+        physical_identity=_dlis_identity("GR_STGC"),
+    )
+    assert candidate.addressability == "ADDRESSABLE"
+    assert "addressability" not in candidate.model_fields_set
+
+    result = AuthoringContextResolver(semantic_catalog=_reviewed_catalog()).resolve(
+        _intent("Gamma Ray"),
+        available_channels={"main": _inventory(candidate)},
+    )
+
+    assert not result.ready
+    assert "channel_addressability_unproven" in {issue.code for issue in result.issues}
 
 
 def test_catalog_payload_tampering_is_rejected() -> None:
@@ -401,4 +565,74 @@ def test_resolution_failure_produces_no_reconciliation_operations() -> None:
 
     assert plan.ready is False
     assert plan.operations == []
-    assert "channel_ambiguous" in {issue.code for issue in plan.issues}
+    assert "semantic_catalog_activation_disabled" in {issue.code for issue in plan.issues}
+
+
+def test_nonempty_catalog_reconciliation_is_disabled_before_execution() -> None:
+    """A nonempty catalog cannot yield a plan executable by the canonical engine."""
+    document = AuthoringDocumentSpec(
+        name="catalog-activation-test",
+        title="Original",
+        sections=[
+            {
+                "id": "main",
+                "title": "Main",
+                "tracks": [
+                    {
+                        "id": "track-1",
+                        "title": "Curves",
+                        "kind": "normal",
+                        "width_mm": 20,
+                        "bindings": [],
+                    }
+                ],
+            }
+        ],
+    )
+    service = AuthoringService(document)
+    catalog = _reviewed_catalog()
+    plan = reconcile_authoring(
+        _intent("Gamma Ray"),
+        available_channels={
+            "main": _inventory(
+                AuthoringChannelCandidate(
+                    mnemonic="GR_STGC",
+                    physical_identity=_dlis_identity("GR_STGC"),
+                    addressability="ADDRESSABLE",
+                )
+            )
+        },
+        semantic_catalog=catalog,
+    )
+
+    result = execute_authoring_plan(service, plan)
+
+    assert not plan.ready
+    assert plan.operations == []
+    assert "semantic_catalog_activation_disabled" in {issue.code for issue in plan.issues}
+    assert not result.success
+    assert service.document == document
+
+
+def test_pre_resolved_catalog_evidence_cannot_bypass_activation_guard() -> None:
+    """A resolution object retains its activation evidence at reconciliation."""
+    catalog = _reviewed_catalog()
+    resolution = AuthoringContextResolver(semantic_catalog=catalog).resolve(
+        _intent("Gamma Ray"),
+        available_channels={
+            "main": _inventory(
+                AuthoringChannelCandidate(
+                    mnemonic="GR_STGC",
+                    physical_identity=_dlis_identity("GR_STGC"),
+                    addressability="ADDRESSABLE",
+                )
+            )
+        },
+    )
+    assert resolution.ready
+
+    plan = reconcile_authoring(resolution)
+
+    assert not plan.ready
+    assert plan.operations == []
+    assert "semantic_catalog_activation_disabled" in {issue.code for issue in plan.issues}

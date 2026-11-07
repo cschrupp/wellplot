@@ -1,6 +1,6 @@
 # A09-CAT-01 Knowledge Delta Candidate
 
-Status: `IMPLEMENTATION_CANDIDATE / INDEPENDENT_REVIEW_PENDING`
+Status: `CORRECTIVE_CANDIDATE / INDEPENDENT_REVIEW_PENDING`
 
 This candidate records the provider-free semantic-catalog foundation added on
 the `engineering-d5-binding-path-repair` development lineage. It is not an
@@ -34,27 +34,36 @@ loader, executor, renderer, or persistence path is introduced.
   physical selector includes the complete physical identity.
 - Incomplete inventories cannot establish absence. Family-level absence stays
   open-world because no reviewed exhaustive-scope contract is implemented.
-- Semantic results bind the selected physical identity to the catalog release,
-  catalog digest, and source revision. The reconciliation plan preserves this
-  evidence. A verification helper rejects catalog or source revision drift.
+- Isolated semantic-resolution evidence binds section, track, binding ID,
+  selected physical identity, catalog release/digest, and source revision. The
+  selected identity is stored as canonical immutable JSON. A verifier rejects
+  scope, identity, catalog, or source-revision drift.
 - Physical identity, renderer addressability, and numerical sample availability
   remain separate. `UNADDRESSABLE` and `UNKNOWN` candidates cannot be bound.
+- Catalog-backed resolution requires a nonempty supported LAS/DLIS physical
+  identity and an explicitly supplied `ADDRESSABLE` value; model defaults do
+  not establish addressability.
+- `reconcile_authoring()` blocks any nonempty catalog or pre-resolved semantic
+  evidence with `semantic_catalog_activation_disabled`, before returning
+  executable operations. The canonical executor rejects the resulting plan.
 - Untrusted channel descriptions are not interpreted as rules or instructions.
 - Explicit user scale settings are retained; no implicit CBL scale is added.
 
 ## Qualification evidence
 
-Provider-free regressions cover exact CBL/VDL selection, explicit CBL scale,
-unknown vendor mnemonics, bare-GR ambiguity, explicit physical selection,
-reviewed versus unreviewed rules, duplicate candidates, incomplete inventory,
-addressability, digest/source drift, payload tampering, untrusted descriptions,
-and reconciliation rejection without executable operations.
+Provider-free regressions cover exact CBL/VDL resolution and reconciliation,
+explicit CBL scale, unknown vendor mnemonics, bare-GR ambiguity, explicit
+physical selection, reviewed versus unreviewed rules, duplicate candidates,
+incomplete inventory, addressability, physical identity shape, scope/identity/
+digest/source drift, payload tampering, untrusted descriptions, and fail-closed
+reconciliation/execution when catalog activation is disabled.
 
 Validation reported for this candidate:
 
-- 91 focused and adjacent authoring tests passed.
-- Ruff lint, formatting, and Python compilation are to be recorded after final
-  candidate checks.
+- Original focused cross-component command plus corrective regressions:
+  `97 passed`, exit code `0`.
+- Ruff lint, formatting, Python compilation, and single-engine attestation:
+  `PASS`.
 - Provider, model, endpoint, scientific-campaign, and C02 calls: 0.
 - Numerical sample loading, YAML publication, and renderer execution: not
   performed by this slice.
@@ -62,12 +71,14 @@ Validation reported for this candidate:
 ## Activation boundary and remaining work
 
 No production semantic mappings are approved or activated. The current
-notebook/MCP reconciliation entry points continue to use the empty default
-catalog. The semantic evidence and revalidation contract are exercised through
-the existing resolver/reconciler APIs, but must be connected to the shared
-pre-publication verification boundary before any nonempty production catalog
-can be enabled. This is an explicit activation prerequisite, not a claim that
-catalog-backed persistence has been qualified.
+notebook/MCP reconciliation entry points use the empty default catalog. In
+addition, direct `reconcile_authoring()` calls with nonempty catalogs or
+pre-resolved semantic evidence now fail closed before generating operations.
+The resolver can still be exercised in isolation for provider-free catalog
+development, but its result cannot pass canonical reconciliation while
+activation is disabled. The evidence verifier is not yet wired into the shared
+pre-publication boundary; catalog-backed persistence remains unqualified and
+activation must stay blocked until that later slice is independently accepted.
 
 The initial family mappings, source provenance/rights review, exhaustive-scope
 evidence, and catalog release governance remain domain-review decisions. The
@@ -81,8 +92,8 @@ integrated qualification.
 
 ## Review and promotion
 
-Independent review must inspect the exact source/test diff, verify the zero-rule
-runtime default and canonical ownership, and assess the activation prerequisite
-above. Promotion into `docs/agent-code-mode-current-baseline.md` requires
-independent acceptance and a later Knowledge Delta update. No baseline
-promotion is included here.
+Independent review must inspect the exact corrective source/test diff, verify
+the activation guard, immutable binding-scoped evidence, zero-rule runtime
+default, and canonical ownership. Promotion into
+`docs/agent-code-mode-current-baseline.md` requires independent acceptance and
+a later Knowledge Delta update. No baseline promotion is included here.

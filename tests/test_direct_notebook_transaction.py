@@ -22,6 +22,10 @@ from wellplot.agent.direct_notebook import (
 )
 from wellplot.agent.session import AgentMetrics, AgentSessionResult, AgentWorkerEvidence
 from wellplot.authoring_executor import execute_authoring_plan
+from wellplot.authoring_reconciler import (
+    AuthoringReconciliationIssue,
+    AuthoringReconciliationPlan,
+)
 from wellplot.authoring_service import AuthoringService, CreateTrackRequest
 from wellplot.errors import AuthoringPublicationRecoveryError
 from wellplot.mcp import service as mcp_service
@@ -97,6 +101,48 @@ def test_notebook_apply_rejects_unsatisfied_obligation_before_persist() -> None:
         assert stages["canonical_validation"] == "PASS"
         assert stages["post_lowering_obligation"] == "FAIL"
         assert "report title" in errors[0]
+        persist.assert_not_called()
+        assert fixture_paths.single_logfile.read_bytes() == original_bytes
+
+
+def test_notebook_does_not_publish_catalog_activation_blocked_plan() -> None:
+    """A reconciliation activation guard stops before execution and persistence."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="notebook-catalog-block-") as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        context = _load_document_context(fixture_paths.single_logfile, root=REPO_ROOT)
+        original_bytes = fixture_paths.single_logfile.read_bytes()
+        blocked_plan = AuthoringReconciliationPlan(
+            ready=False,
+            issues=[
+                AuthoringReconciliationIssue(
+                    path="semantic_catalog",
+                    code="semantic_catalog_activation_disabled",
+                    message="Catalog verification is not enabled at publication.",
+                )
+            ],
+        )
+
+        with (
+            patch("wellplot.agent.direct_notebook.reconcile_authoring", return_value=blocked_plan),
+            patch("wellplot.agent.direct_notebook.execute_authoring_plan") as execute,
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.persist_authoring_document"
+            ) as persist,
+        ):
+            applied = _apply_result(
+                context=context,
+                result=_successful_result(AuthoringDocumentIntent(title="Updated title")),
+                root=REPO_ROOT,
+            )
+
+        success, changed, rolled_back, errors, status, stages = applied
+        assert success is False
+        assert changed is False
+        assert rolled_back is False
+        assert status == "reconciliation_blocked"
+        assert "semantic_catalog_activation_disabled" in errors[0]
+        assert stages["private_execution"] == "NOT_REACHED"
+        execute.assert_not_called()
         persist.assert_not_called()
         assert fixture_paths.single_logfile.read_bytes() == original_bytes
 

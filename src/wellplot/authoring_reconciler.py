@@ -1309,6 +1309,31 @@ def reconcile_authoring(
     previously resolved intent can be passed directly to avoid repeating that
     work in a planner/executor pipeline.
     """
+    pre_resolved = desired if isinstance(desired, AuthoringContextResolution) else None
+    catalog_has_content = bool(
+        semantic_catalog.source_provenance
+        or semantic_catalog.families
+        or semantic_catalog.request_term_rules
+        or semantic_catalog.physical_channel_rules
+    )
+    if catalog_has_content or (pre_resolved and pre_resolved.semantic_resolutions):
+        return AuthoringReconciliationPlan(
+            ready=False,
+            issues=[
+                AuthoringReconciliationIssue(
+                    path="semantic_catalog",
+                    code="semantic_catalog_activation_disabled",
+                    message=(
+                        "Catalog-backed reconciliation is disabled until semantic evidence "
+                        "is verified at the canonical publication boundary."
+                    ),
+                )
+            ],
+            semantic_resolutions=(
+                list(pre_resolved.semantic_resolutions) if pre_resolved is not None else []
+            ),
+        )
+
     resolution = (
         desired
         if isinstance(desired, AuthoringContextResolution)
