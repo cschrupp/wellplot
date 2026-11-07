@@ -676,3 +676,61 @@ of current authority.
   a semantic result.
 - Future notebook/MCP authoring changes must preserve the shared pre-publication
   postcondition boundary and its no-publication negative regressions.
+- **WP-A09-CBL-SCALE-01 accepted read-only finding:** for the inspected
+  `CBL_Repeat.dlis` CBL channel (logical file 0, CHANNEL CBL, origin 61,
+  copy 0, frame 0), preserve the declared `CBL Amplitude` identity and `mV`
+  unit. Representation code 2 describes numeric encoding, not a physical
+  conversion. The linked normalization/calibration records do not establish
+  an applicable scale transform; do not multiply samples or infer
+  dimensionlessness. Binding-level linear display scales are already supported
+  and affect presentation, not sample values. A data-fitted `-0.125..1.1 mV`
+  range is only a diagnostic candidate, not a universal default. The exact
+  acquisition calibration semantics remain unresolved. The `-999.25` sample
+  masking issue is separate ingestion debt; this decision does not authorize
+  changing loader or null behavior. Evidence class:
+  `EMPIRICALLY_SUPPORTED` for source identity/distribution and
+  `ESTABLISHED` for the DLIS representation/unit distinction. Independent
+  review accepted the audit; provider/model calls were zero. The accepted
+  audit does not qualify A09's integrated authoring-to-render path.
+
+### A09-CAT-01 Foundation Accepted — Activation Disabled
+
+- **Status:** `A09_CAT_01_FOUNDATION_ACCEPTED / ACTIVATION_DISABLED`
+- **Evidence:** `ADAPTED`; provider-free implementation at foundation commit
+  `2c54149b9bc7e717c20db46e647e85c065b02dc1`, corrective commit
+  `e44713cc37712aae18197284ccf40c0406f7ed04`, independently accepted.
+- **Scope:** a strict, versioned, provenance-bearing semantic catalog contract
+  and resolver/reconciler foundation in the existing authoring path. No
+  production semantic-family mappings are approved or active. The untracked
+  `examples/families/` inputs remain untrusted reference material.
+- **Enforcement:** `reconcile_authoring()` blocks nonempty catalog content and
+  pre-resolved semantic-resolution evidence with
+  `semantic_catalog_activation_disabled`, `ready=False`, and no operations.
+  Do not remove or bypass this reconciliation guard until shared
+  pre-publication semantic evidence verification is wired and independently
+  qualified.
+- **Evidence contract:** semantic-resolution evidence binds section, track,
+  binding ID, catalog release/digest, source revision, and exact selected
+  physical identity as immutable canonical JSON. Catalog-backed resolution
+  rejects unsupported/missing identities and requires explicitly supplied
+  renderer addressability. The verifier is a foundation API, not yet called by
+  production publication.
+- **Important boundary:** this is a reconciliation-level activation guard,
+  not executor-wide authorization. The executor does not revalidate arbitrary
+  preconstructed plans. Also, explicit addressability in a candidate is not
+  itself proof that it came from the trusted host inspection snapshot. Future
+  activation must bind semantic evidence and addressability to the
+  authoritative source snapshot at the shared publication boundary.
+- **Compatibility:** zero-catalog exact physical CBL/VDL authoring remains
+  operational; explicit binding-level CBL scales are preserved. No sample
+  values, LAS/DLIS numerical loaders, null handling, rendering, or persistence
+  behavior changed.
+- **Validation:** 97 focused cross-component tests passed, with Ruff, format,
+  compile, manifest attestation, and diff checks passing. These were
+  Codex-executed results reviewed from submitted logs; the independent
+  reviewer did not rerun them. No provider/model/endpoint call, C02 access,
+  integration smoke, or scientific run occurred.
+- **Qualification limits:** catalog-backed publication remains unqualified;
+  A09 integrated qualification remains open. Attempt 003 retains its original
+  `FAIL` terminal. This acceptance does not authorize A10/A12 or mapping
+  activation.

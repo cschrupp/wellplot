@@ -313,3 +313,43 @@ promoted to the active baseline. A09 integrated CBL+VDL qualification remains
 open. Provider-free preflight confirms the accepted source identity and exact
 CBL/VDL metadata identities; a fresh namespace is prepared, but execution is
 not authorized. Preserve the failed `...-001` attempt unchanged.
+
+## WP-A09-CBL-SCALE-01 — Accepted read-only audit
+
+The measurement-semantics and display-scale audit for
+`CBL_Repeat.dlis` was independently accepted. Preserve the selected channel as
+CBL Amplitude with its declared `mV` unit. The file's linked
+`CBL_AMPLITUDE_NORMALIZATION` and related calibration metadata do not define a
+supported conversion to apply; do not multiply samples by 100 or infer that
+the values are dimensionless. A binding-level fixed scale is supported by the
+existing authoring contract and changes presentation only. The proposed
+`-0.125..1.1 mV` range is a data-fitted diagnostic candidate, not a universal
+CBL default. Calibration semantics remain unresolved pending authoritative
+QSLT/SSLT documentation. The exact `-999.25` null/masking behavior remains a
+separate WellPlot v1 ingestion concern and was not modified. Audit evidence is
+in `workspace/evaluations/wp-a09-cbl-scale-01-20261106-001/`; the captured
+stdout SHA-256 is
+`04f0ef4a0e20f8cbe121d40c28b46ff652ebd2fd5e5002b9f49cac858ec3d242`.
+No production code, rendering, YAML publication, model/provider call, or
+integration rerun was part of this audit. This finding does not change the
+historical terminal of attempt 003 or establish integrated A09 qualification.
+
+## A09-CAT-01 — Foundation Accepted, Activation Disabled
+
+The semantic-catalog foundation and corrective are independently accepted at
+`2c54149b9bc7e717c20db46e647e85c065b02dc1` and
+`e44713cc37712aae18197284ccf40c0406f7ed04`. The current reconciler blocks
+nonempty catalog content and pre-resolved semantic evidence before producing
+operations. Preserve this guard. No production family mappings are approved;
+`examples/families/` remains an untrusted reference corpus.
+
+The foundation does not qualify catalog-backed publication. Its evidence
+verifier has no production caller, the guard is reconciliation-level rather
+than executor-wide, and explicitly populated addressability is not yet proven
+to originate in the trusted source snapshot. A future A09-CAT-02 should connect
+the existing evidence contract to the shared notebook/MCP pre-publication
+postcondition boundary and verify source/catalog revision plus exact binding
+scope and physical identity before persistence. Do not add another resolver,
+executor, or publication path. A09 integrated qualification remains open;
+attempt 003 remains `FAIL`. No mapping activation, integration run, A10/A12
+qualification, or provider/scientific authority follows from this acceptance.

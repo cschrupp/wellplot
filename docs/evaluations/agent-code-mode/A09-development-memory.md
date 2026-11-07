@@ -401,3 +401,81 @@ The prior namespace `...-001` remains immutable and
 scientific grading, C02 access, YAML persistence, or rendering occurred in
 this preflight. A fresh execution attempt remains unauthorized pending the
 preflight report and separate integration-smoke authority.
+
+## WP-A09-CBL-SCALE-01 — Independent audit accepted (2026-11-06)
+
+The read-only CBL measurement-semantics audit was accepted. It inspected the
+existing CBL channel in `CBL_Repeat.dlis` using the canonical metadata path and
+`wellplot.io.dlis.load_dlis`; it did not change production code, source values,
+null handling, YAML, rendering, or prior qualification evidence. The source
+SHA-256 was unchanged before and after:
+`a4a2e91b495172079fc47bc2e9c936f0ab60c9845bbed8e65bf56555a5e82640`.
+
+Identity is DLIS logical file 0, CHANNEL CBL (origin 61, copy 0), frame 0,
+scalar, index TDEP, long name `CBL Amplitude`, declared unit `mV`, representation
+code 2. The source tool is QSLT-BB (origin 61, copy 0). Representation code 2
+establishes the stored numeric encoding, not an engineering-unit conversion.
+The linked calibration records include `CBL_AMPLITUDE_NORMALIZATION`, method
+`CALI_METHOD_NONE`, and gain coefficients of 1.0 with reference values 0.5;
+the available evidence does not define a conversion from them. Preserve the
+decoded measurements and do not multiply by 100 or call them dimensionless.
+
+The canonical loader returned 523 samples, including 81 exact `-999.25`
+sentinels. Excluding that sentinel solely for diagnostic statistics leaves 442
+values ranging from approximately -0.1125 to 1.05 mV, with median 0.0625 and
+P95 0.8. The sentinel was not masked in production. A fixed 0-1 mV display
+would clip 47 negative and 4 above-range values; 0-10 and 0-100 mV avoid high
+clipping but use only about 8% and 0.8% of the width at P95. A data-fitted
+`-0.125..1.1 mV` scale is only a diagnostic display candidate, not an
+authoritative acquisition calibration or universal default. Existing
+binding-level `AuthoringScale`/YAML scale support is sufficient and affects
+display limits, not sample values.
+
+Disposition: `INDETERMINATE — MEASUREMENT SEMANTICS UNRESOLVED`, with the audit
+accepted and closed. The outstanding vendor calibration interpretation and
+the `-999.25` masking issue are separate concerns; no further CBL scale
+investigation, implementation, render, or integration execution follows from
+this acceptance. The latter remains tracked in `docs/backlog.md`. Evidence is
+in `workspace/evaluations/wp-a09-cbl-scale-01-20261106-001/`; stdout SHA-256:
+`04f0ef4a0e20f8cbe121d40c28b46ff652ebd2fd5e5002b9f49cac858ec3d242`.
+Provider/endpoint calls were zero; rendering and YAML publication were not
+attempted. Attempt 003's original terminal remains immutable and integrated
+A09 qualification remains open.
+
+## A09-CAT-01R — Foundation Acceptance (2026-11-07)
+
+Independent review accepted the semantic-catalog foundation with disposition
+`A09_CAT_01_FOUNDATION_ACCEPTED — ACTIVATION_DISABLED`.
+
+- Foundation: `2c54149b9bc7e717c20db46e647e85c065b02dc1`.
+- Corrective: `e44713cc37712aae18197284ccf40c0406f7ed04`.
+- Review package SHA-256:
+  `447e885490185bff7e154c3d3bceeadbac885dd170f556a0775d74f4805ae3e3`.
+- Corrective closes IR-001 by blocking nonempty catalog content or
+  pre-resolved semantic evidence at `reconcile_authoring()` before operations
+  are produced. IR-002 is closed at foundation level by binding evidence to
+  section/track/binding, exact physical identity encoded as canonical immutable
+  JSON, catalog release/digest, and source revision. Supported identity shape
+  and explicit addressability checks fail closed.
+- Empty-catalog exact CBL/VDL authoring and explicit CBL scale regressions
+  remain passing. The focused cross-component command reported 97 passed;
+  Ruff, format, compile, single-engine attestation, and diff checks passed.
+  The reviewer inspected supplied logs and source but did not independently
+  rerun the tests.
+- No production mappings are approved. `examples/families/` remains untrusted
+  reference data. The reconciliation guard is mandatory and must not be
+  removed or bypassed pending shared pre-publication verification.
+- The verifier has no production caller; catalog-backed publication remains
+  unqualified. The guard is not executor-wide for arbitrary preconstructed
+  plans, and addressability must later be bound to the authoritative source
+  snapshot, not inferred from an explicitly set field alone.
+- No production mappings, provider/model/endpoint calls, C02 activity, YAML
+  publication, integration smoke, or scientific execution occurred. A09
+  integrated qualification remains open; attempt 003 remains `FAIL`. No A10,
+  A12, or mapping activation authority is implied.
+
+The next recommended slice is A09-CAT-02: connect the existing semantic
+evidence verifier to the shared canonical pre-publication boundary used by
+notebook and MCP, including source/catalog revision and binding identity
+revalidation. This recommendation is not implementation authorization and
+must not create another resolver, executor, or persistence path.
