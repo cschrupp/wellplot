@@ -734,3 +734,36 @@ of current authority.
   A09 integrated qualification remains open. Attempt 003 retains its original
   `FAIL` terminal. This acceptance does not authorize A10/A12 or mapping
   activation.
+
+### A09-CAT-02D Trusted Catalog and Source-Binding Design Accepted
+
+- **Status:** `A09_CAT_02D_DESIGN_ACCEPTED / CAT-02I_AUTHORIZED`.
+- **Evidence:** `ADAPTED` for deployment-pinned release authority and
+  pre-publication verification; `NOVEL` for WellPlot's request-scoped
+  source/evidence joins. Independent design review accepted R2 and closed
+  F20-F23. The accepted design is recorded in
+  `docs/architecture/A09_CAT_02D_TRUSTED_CATALOG_AND_SOURCE_BINDING_DESIGN.md`.
+- **Trust identities:** `catalog_artifact_sha256` is the SHA-256 of exact
+  packaged catalog bytes; `content_sha256` is the canonical semantic-content
+  digest. They are distinct and need not be equal. The approval manifest and
+  accepted release record bind both, while the deployment-pinned descriptor
+  supplies runtime authority. Neither digest alone establishes scientific
+  approval or deployment trust. Validate the manifest bytes/schema, catalog
+  artifact bytes/schema, recomputed canonical content, and pinned identity in
+  that order, then repeat before publication.
+- **Source/evidence integrity:** bind section scope through candidate ID,
+  transaction-scoped source handle, inspection snapshot/revision, exact
+  source-local physical identity, and final canonical binding. Host-compile
+  the expected semantic-binding set independently of resolver evidence and
+  require exact one-to-one agreement at the existing shared
+  `verify_document_postconditions()` boundary.
+- **Implementation boundary:** CAT-02I is authorized as bounded provider-free
+  trust/verifier integration. Keep `semantic_catalog_activation_disabled`
+  enforced; positive evidence is limited to isolated synthetic shared-verifier
+  tests, not a test-only adapter/reconciler bypass. Preserve empty-catalog
+  behavior. Positive catalog-backed notebook/MCP transactions and any guard
+  removal are CAT-03 work requiring separate authorization and qualification.
+- **Qualification boundary:** this design acceptance does not qualify A09's
+  integrated inspection-to-render path, approve production mappings, change
+  scientific loaders, or authorize provider/scientific execution. Attempt 003
+  retains its historical `FAIL` terminal.

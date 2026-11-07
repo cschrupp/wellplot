@@ -353,3 +353,43 @@ scope and physical identity before persistence. Do not add another resolver,
 executor, or publication path. A09 integrated qualification remains open;
 attempt 003 remains `FAIL`. No mapping activation, integration run, A10/A12
 qualification, or provider/scientific authority follows from this acceptance.
+
+## A09-CAT-02D — Trusted Catalog and Source Binding Design
+
+Design candidate prepared from the CAT-02 preflight stop at baseline
+`44a6fea47fb2d3e5c9d296080c73070ba13ed645`. It proposes one host-owned,
+request-scoped approved catalog release pin and binds semantic evidence to a
+source handle, inspection snapshot/revision, exact physical identity, and
+section/track/binding in the existing authoring path. The shared
+`verify_document_postconditions()` remains the sole publication verifier.
+
+Initial independent design review returned `CHANGES_REQUIRED` (F20-F22); R1
+resolved those findings and R2 resolved F23. Independent review accepted
+CAT-02D R2 as `A09_CAT_02D_DESIGN_ACCEPTED`. The accepted contract distinguishes
+exact artifact-byte `catalog_artifact_sha256` from canonical semantic
+`content_sha256`, binds both in the approval manifest/release record and
+deployment pin, and specifies separate validation of each. It also freezes
+the deployment-pinned approval chain, source joins/cardinality for existing
+and new sections, and the host-compiled expected semantic-binding set.
+
+CAT-02I is authorized as a bounded provider-free implementation slice. It
+must keep activation disabled, use isolated synthetic verifier positives,
+and must not use a test-only adapter/reconciler bypass. Positive
+catalog-backed notebook/MCP transactions and any guard removal belong to
+separately authorized CAT-03.
+
+The CAT-01
+`semantic_catalog_activation_disabled` guard remains mandatory. No catalog
+artifact is approved, `examples/families/` remains untrusted reference data,
+and no production code, tests, activation, baseline promotion, integration
+qualification, provider call, or scientific execution is authorized. Open
+residual risks include reliance on existing application deployment integrity,
+offline revocation requiring deployment reload, package-data selection, and
+the non-cryptographic nature of filesystem revision tokens. See
+`docs/architecture/A09_CAT_02D_TRUSTED_CATALOG_AND_SOURCE_BINDING_DESIGN.md`.
+
+The design uses TUF/Sigstore only as trust-model comparisons; it does not
+select a runtime framework or add a dependency. After independent design
+acceptance, implementation requires its own applicable authorization. A09
+integrated qualification remains open and attempt 003 retains its historical
+`FAIL` terminal.

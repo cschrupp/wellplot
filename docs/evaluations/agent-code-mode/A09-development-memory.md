@@ -479,3 +479,64 @@ evidence verifier to the shared canonical pre-publication boundary used by
 notebook and MCP, including source/catalog revision and binding identity
 revalidation. This recommendation is not implementation authorization and
 must not create another resolver, executor, or persistence path.
+
+## A09-CAT-02D — Trusted Authority and Source Binding Design Candidate (2026-11-07)
+
+The CAT-02 implementation preflight correctly stopped because notebook/MCP
+transactions do not independently supply a nonempty approved catalog release,
+and the reconciliation channel projection does not preserve per-candidate
+source handle/revision through the publication boundary. The stop is accepted;
+no code was changed.
+
+Documentation-only candidate:
+`docs/architecture/A09_CAT_02D_TRUSTED_CATALOG_AND_SOURCE_BINDING_DESIGN.md`.
+It provisionally selects a host-owned request-scoped release pin by extending
+the current host composition/transaction path and defines source identity as
+inspection snapshot + request-scoped source handle + revision + exact physical
+identity. The current compile facade does not own notebook/MCP transaction
+construction; a shared transaction-context factory does not yet exist. The
+design leaves the minimum integration point for CAT-02I review. Semantic
+evidence remains derived and independently verified; the existing
+`verify_document_postconditions()` stays the single publication gate.
+
+The initial design compares this adapted repository approval model with
+primary TUF and Sigstore references. It does not add a signing framework,
+catalog service, runtime dependency, or storage mechanism. The R1 amendment
+now resolves approval, source continuity, and evidence completeness at the
+design-contract level; residual deployment-integrity and offline-revocation
+assumptions remain explicit below.
+
+Independent review returned `CHANGES_REQUIRED` with F20-F22. This R1 amendment
+defines: (1) an accepted repository release record bound by a deployment-trusted
+pin to exact catalog/manifest digests, with revocation effective on deployment
+reload; (2) exact existing/new-section joins from section scope through
+candidate ID, source handle, snapshot/revision, physical identity, and final
+binding; and (3) an independently host-compiled expected semantic-binding set
+whose entries must biject with evidence and final bindings. Filesystem
+revision tokens remain optimistic metadata fingerprints, not content hashes.
+
+CAT-02I is limited to trust/verifier integration, negative adapter publication
+tests, empty-catalog compatibility, and isolated synthetic shared-verifier
+tests. It must not bypass `semantic_catalog_activation_disabled` for positive
+adapter transactions. CAT-03 owns separately authorized positive
+catalog-backed transactions and any guard removal.
+
+Status: `A09_CAT_02D_DESIGN_ACCEPTED / CAT-02I_AUTHORIZED`.
+Independent review accepted F20-F22 but returned one narrow F23 correction:
+the trust contract must distinguish exact artifact-byte
+`catalog_artifact_sha256` from canonical semantic `content_sha256`. The R2
+amendment binds both in the approval manifest, accepted release record, and
+deployment pin; verifies raw bytes against the artifact digest; recomputes
+canonical content identity after strict parsing; and repeats both checks
+before publication. The two digests are explicitly independent and need not
+be equal. Independent review accepted CAT-02D R2 and closed F20-F23. This
+acceptance is design-level; it does not qualify integrated A09 execution.
+CAT-02I is authorized as bounded provider-free implementation with the
+activation guard retained. Positive catalog-backed notebook/MCP transactions
+and guard removal remain CAT-03.
+
+The CAT-01 activation guard remains mandatory. No mapping is approved,
+`examples/families/` remains untrusted, and no implementation, baseline
+promotion, integration rerun, provider call, or scientific execution is
+authorized by the design amendment. A09 attempt 003 remains `FAIL`; integrated
+qualification is open.
