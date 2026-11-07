@@ -35,9 +35,10 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .authoring_context import (
     AuthoringChannelAlias,
-    AuthoringChannelInput,
+    AuthoringChannelInventoryInput,
     AuthoringContextIssue,
     AuthoringContextResolution,
+    ExplicitPhysicalChannelSelector,
     resolve_authoring_context,
 )
 from .model.authoring import AuthoringDocumentSpec
@@ -54,6 +55,11 @@ from .model.intent import (
     AuthoringSectionIntent,
     AuthoringServiceTitleIntent,
     AuthoringTrackIntent,
+)
+from .semantic_catalog import (
+    EMPTY_SEMANTIC_CHANNEL_CATALOG,
+    SemanticChannelCatalog,
+    SemanticResolutionEvidence,
 )
 
 
@@ -134,6 +140,7 @@ class AuthoringReconciliationPlan(_ReconcilerModel):
     issues: list[AuthoringReconciliationIssue] = Field(default_factory=list)
     unchanged_paths: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    semantic_resolutions: list[SemanticResolutionEvidence] = Field(default_factory=list)
 
 
 _MISSING = object()
@@ -387,9 +394,7 @@ class _PlanBuilder:
     def flatten(self) -> list[AuthoringOperation]:
         """Return operations in the declared dependency order."""
         return [
-            operation
-            for phase in AuthoringOperationPhase
-            for operation in self.operations[phase]
+            operation for phase in AuthoringOperationPhase for operation in self.operations[phase]
         ]
 
 
@@ -969,9 +974,7 @@ def _process_track(
         else:
             unchanged.append(f"{base_path}.structure")
     track_dependency = create_id or section_dependency
-    track_for_children = (
-        _MISSING if current is _MISSING and embedded_in_section_create else current
-    )
+    track_for_children = _MISSING if current is _MISSING and embedded_in_section_create else current
     _add_track_clear_operations(
         builder,
         intent,
@@ -1292,9 +1295,13 @@ def reconcile_authoring(
     existing: AuthoringDocumentSpec | None = None,
     scaffold: AuthoringDocumentSpec | None = None,
     defaults: Mapping[str, Any] | None = None,
-    available_channels: Mapping[str, Sequence[AuthoringChannelInput]] | None = None,
+    available_channels: Mapping[str, AuthoringChannelInventoryInput] | None = None,
     channel_aliases: Sequence[AuthoringChannelAlias | Mapping[str, Any]] = (),
     header_aliases: Mapping[str, Sequence[str]] | None = None,
+    semantic_catalog: SemanticChannelCatalog = EMPTY_SEMANTIC_CHANNEL_CATALOG,
+    expected_catalog_digest: str | None = None,
+    explicit_physical_selectors: Mapping[str, ExplicitPhysicalChannelSelector | Mapping[str, Any]]
+    | None = None,
 ) -> AuthoringReconciliationPlan:
     """Return an idempotent ordered plan for one partial desired state.
 
@@ -1313,12 +1320,20 @@ def reconcile_authoring(
             available_channels=available_channels,
             channel_aliases=channel_aliases,
             header_aliases=header_aliases,
+            semantic_catalog=semantic_catalog,
+            expected_catalog_digest=expected_catalog_digest,
+            explicit_physical_selectors=explicit_physical_selectors,
         )
     )
     issues: list[AuthoringReconciliationIssue] = []
     _context_issues(issues, resolution.issues)
     if not resolution.ready:
-        return AuthoringReconciliationPlan(ready=False, issues=issues, warnings=resolution.warnings)
+        return AuthoringReconciliationPlan(
+            ready=False,
+            issues=issues,
+            warnings=resolution.warnings,
+            semantic_resolutions=resolution.semantic_resolutions,
+        )
 
     intent = resolution.resolved_intent
     decisions = _decision_map(resolution)
@@ -1330,8 +1345,10 @@ def reconcile_authoring(
         desired_value = _effective_field(intent, field_name, "", decisions)
         if desired_value is _MISSING:
             continue
-        if _is_clear(desired_value) or existing is None or not _same(
-            _value(_mapping(existing), field_name), desired_value
+        if (
+            _is_clear(desired_value)
+            or existing is None
+            or not _same(_value(_mapping(existing), field_name), desired_value)
         ):
             report_patch[field_name] = _plain(desired_value)
     if report_patch:
@@ -1390,9 +1407,7 @@ def reconcile_authoring(
         )
     elif isinstance(intent.header, AuthoringHeaderIntent):
         current_header = (
-            existing.header
-            if existing is not None and existing.header is not None
-            else {}
+            existing.header if existing is not None and existing.header is not None else {}
         )
         header_patch = _patch_for_model(
             intent.header,
@@ -1471,9 +1486,7 @@ def reconcile_authoring(
             ]
             embedded = current_section is _MISSING
             bootstrap_track_id = (
-                section_intent.tracks[0].track_id
-                if embedded and section_intent.tracks
-                else None
+                section_intent.tracks[0].track_id if embedded and section_intent.tracks else None
             )
             track_dependencies: dict[str, str] = {}
             for track_intent in section_intent.tracks:
@@ -1601,9 +1614,7 @@ def reconcile_authoring(
         for item in items:
             section_id, track_id = _child_scope(item.section_id, item.track_id)
             object_id = (
-                item.fill_id
-                if isinstance(item, AuthoringFillIntent)
-                else item.annotation_id
+                item.fill_id if isinstance(item, AuthoringFillIntent) else item.annotation_id
             )
             if not section_id or not track_id:
                 _add_issue(
@@ -1651,6 +1662,7 @@ def reconcile_authoring(
         issues=issues,
         unchanged_paths=list(dict.fromkeys(unchanged)),
         warnings=resolution.warnings,
+        semantic_resolutions=resolution.semantic_resolutions,
     )
 
 

@@ -30,6 +30,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from enum import StrEnum
+from fnmatch import fnmatchcase
 from re import sub
 from typing import Any, Literal, TypeAlias
 
@@ -44,6 +45,12 @@ from .model.intent import (
     AuthoringRemoveIntent,
     AuthoringSectionIntent,
     AuthoringTrackIntent,
+)
+from .semantic_catalog import (
+    EMPTY_SEMANTIC_CHANNEL_CATALOG,
+    SemanticChannelCatalog,
+    SemanticResolutionEvidence,
+    normalize_request_term,
 )
 
 
@@ -103,6 +110,21 @@ class AuthoringChannelCandidate(_ContextModel):
     source_path: str | None = Field(default=None, min_length=1)
     physical_identity: dict[str, Any] = Field(default_factory=dict)
     addressability: Literal["ADDRESSABLE", "UNADDRESSABLE", "UNKNOWN"] = "ADDRESSABLE"
+
+
+class AuthoringChannelInventory(_ContextModel):
+    """One complete/incomplete, revision-bound source-channel inventory."""
+
+    channels: tuple[AuthoringChannelCandidate, ...]
+    complete: bool
+    source_revision: str = Field(min_length=1)
+
+
+class ExplicitPhysicalChannelSelector(_ContextModel):
+    """User-authorized exact physical selector, including compound identity."""
+
+    mnemonic: str = Field(min_length=1)
+    physical_identity: dict[str, Any] = Field(min_length=1)
 
 
 class PhysicalChannelResolution(_ContextModel):
@@ -220,9 +242,13 @@ class AuthoringContextResolution(_ContextModel):
     decisions: list[AuthoringResolutionDecision] = Field(default_factory=list)
     issues: list[AuthoringContextIssue] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    semantic_resolutions: list[SemanticResolutionEvidence] = Field(default_factory=list)
 
 
 AuthoringChannelInput: TypeAlias = str | AuthoringChannelCandidate | Mapping[str, Any]
+AuthoringChannelInventoryInput: TypeAlias = (
+    Sequence[AuthoringChannelInput] | AuthoringChannelInventory
+)
 
 _MISSING = object()
 _IDENTITY_FIELDS = (
@@ -854,6 +880,76 @@ def _channel_candidates(
     return candidates
 
 
+def _channel_inventory(
+    value: AuthoringChannelInventoryInput,
+) -> tuple[list[AuthoringChannelCandidate], bool, str | None]:
+    """Normalize legacy channel sequences and explicit inventory evidence."""
+    if isinstance(value, AuthoringChannelInventory):
+        return list(value.channels), value.complete, value.source_revision
+    return _channel_candidates(value), True, None
+
+
+def _catalog_family_match(
+    requested: str,
+    candidates: Sequence[AuthoringChannelCandidate],
+    *,
+    inventory_complete: bool,
+    catalog: SemanticChannelCatalog,
+) -> tuple[str, tuple[AuthoringChannelCandidate, ...], str | None]:
+    """Resolve exact reviewed request terms and physical rules without ordering."""
+    normalized_request = normalize_request_term(requested)
+    request_rules = tuple(
+        rule
+        for rule in catalog.request_term_rules
+        if rule.status == "reviewed"
+        and any(normalize_request_term(term) == normalized_request for term in rule.terms)
+    )
+    if not request_rules:
+        return "not_a_family_term", (), None
+
+    family_ids = {rule.family_id for rule in request_rules}
+    if len(family_ids) != 1:
+        return "ambiguous_family", (), None
+    family_id = next(iter(family_ids))
+    physical_rules = tuple(
+        rule
+        for rule in catalog.physical_channel_rules
+        if rule.status == "reviewed" and rule.family_id == family_id
+    )
+    matched: list[AuthoringChannelCandidate] = []
+    for candidate in candidates:
+        mnemonic = candidate.mnemonic.casefold()
+        for rule in physical_rules:
+            pattern = rule.matcher_value.casefold()
+            matcher_hit = (
+                mnemonic == pattern
+                if rule.matcher_kind == "exact_mnemonic"
+                else fnmatchcase(mnemonic, pattern)
+            )
+            if not matcher_hit:
+                continue
+            if rule.source_scope and candidate.source_path not in rule.source_scope:
+                continue
+            if rule.unit_constraints and (
+                candidate.unit is None
+                or candidate.unit.casefold()
+                not in {unit.casefold() for unit in rule.unit_constraints}
+            ):
+                continue
+            matched.append(candidate)
+            break
+
+    if not inventory_complete:
+        return "unknown_inventory", tuple(matched), family_id
+    if len(matched) > 1:
+        return "ambiguous_physical", tuple(matched), family_id
+    if matched:
+        return "unique", tuple(matched), family_id
+    # Family-level absence stays open-world until an exhaustive scope contract
+    # is implemented and independently approved.
+    return "unknown_open_world", (), family_id
+
+
 def _candidate_matches(
     requested: str,
     candidates: Sequence[AuthoringChannelCandidate],
@@ -1098,10 +1194,14 @@ def _resolve_channels(
     intent: AuthoringDocumentIntent,
     *,
     existing: AuthoringDocumentSpec | None,
-    available_channels: Mapping[str, Sequence[AuthoringChannelInput]] | None,
+    available_channels: Mapping[str, AuthoringChannelInventoryInput] | None,
     channel_aliases: Sequence[AuthoringChannelAlias],
+    semantic_catalog: SemanticChannelCatalog,
+    expected_catalog_digest: str | None,
+    explicit_physical_selectors: Mapping[str, ExplicitPhysicalChannelSelector | Mapping[str, Any]],
     decisions: list[AuthoringResolutionDecision],
     issues: list[AuthoringContextIssue],
+    semantic_resolutions: list[SemanticResolutionEvidence],
 ) -> None:
     """Resolve channel aliases and enforce source-channel kind compatibility."""
     seen_bindings: dict[str, str] = {}
@@ -1168,19 +1268,175 @@ def _resolve_channels(
                 )
             )
             continue
-        candidates = _channel_candidates(raw_candidates)
-        physical = resolve_physical_channel(str(requested), candidates, inventory_complete=True)
-        if physical.state is PhysicalChannelResolutionState.AMBIGUOUS:
-            issues.append(
-                AuthoringContextIssue(
-                    path=f"{path}.channel",
-                    code="channel_ambiguous",
-                    message=f"Multiple physical channels match {requested!r}.",
-                    candidates=[candidate.mnemonic for candidate in physical.candidates],
-                )
+        candidates, inventory_complete, source_revision = _channel_inventory(raw_candidates)
+        raw_selector = explicit_physical_selectors.get(binding_id)
+        if raw_selector is not None:
+            selector = (
+                raw_selector
+                if isinstance(raw_selector, ExplicitPhysicalChannelSelector)
+                else ExplicitPhysicalChannelSelector.model_validate(raw_selector)
             )
-            continue
-        matches, matched_alias = _candidate_matches(str(requested), candidates, channel_aliases)
+            matches = [
+                candidate
+                for candidate in candidates
+                if candidate.mnemonic.casefold() == selector.mnemonic.casefold()
+                and candidate.physical_identity == selector.physical_identity
+            ]
+            if len(matches) != 1:
+                issues.append(
+                    AuthoringContextIssue(
+                        path=f"{path}.channel",
+                        code=("channel_ambiguous" if len(matches) > 1 else "channel_missing"),
+                        message="The explicit physical selector does not identify one channel.",
+                        candidates=[candidate.mnemonic for candidate in matches],
+                    )
+                )
+                continue
+            matched_alias = None
+        else:
+            physical = resolve_physical_channel(
+                str(requested),
+                candidates,
+                inventory_complete=inventory_complete,
+            )
+            family_status, family_matches, family_id = _catalog_family_match(
+                str(requested),
+                candidates,
+                inventory_complete=inventory_complete,
+                catalog=semantic_catalog,
+            )
+            if family_status == "ambiguous_family":
+                issues.append(
+                    AuthoringContextIssue(
+                        path=f"{path}.channel",
+                        code="semantic_term_ambiguous",
+                        message=f"Multiple reviewed families recognize {requested!r}.",
+                    )
+                )
+                continue
+            if family_status == "ambiguous_physical":
+                issues.append(
+                    AuthoringContextIssue(
+                        path=f"{path}.channel",
+                        code="channel_ambiguous",
+                        message=f"Multiple physical channels match family term {requested!r}.",
+                        candidates=[candidate.mnemonic for candidate in family_matches],
+                    )
+                )
+                continue
+            if family_status in {"unknown_inventory", "unknown_open_world"}:
+                if physical.state is PhysicalChannelResolutionState.UNIQUE:
+                    issues.append(
+                        AuthoringContextIssue(
+                            path=f"{path}.channel",
+                            code="channel_interpretation_ambiguous",
+                            message=(
+                                f"{requested!r} can name a physical channel or a semantic family; "
+                                "use an explicit physical selector or a distinct family term."
+                            ),
+                            candidates=[physical.candidates[0].mnemonic],
+                        )
+                    )
+                    continue
+                code = {
+                    "unknown_inventory": "channel_inventory_incomplete",
+                    "unknown_open_world": "semantic_family_unresolved",
+                }[family_status]
+                issues.append(
+                    AuthoringContextIssue(
+                        path=f"{path}.channel",
+                        code=code,
+                        message=(
+                            f"The semantic family for {requested!r} has no safe physical match."
+                        ),
+                    )
+                )
+                continue
+            if family_status == "unique":
+                if physical.state is PhysicalChannelResolutionState.UNIQUE:
+                    issues.append(
+                        AuthoringContextIssue(
+                            path=f"{path}.channel",
+                            code="channel_interpretation_ambiguous",
+                            message=(
+                                f"{requested!r} can name a physical channel or a semantic family; "
+                                "use an explicit physical selector or a distinct family term."
+                            ),
+                            candidates=[
+                                physical.candidates[0].mnemonic,
+                                family_matches[0].mnemonic,
+                            ],
+                        )
+                    )
+                    continue
+                if expected_catalog_digest is not None and (
+                    not semantic_catalog.verify_digest()
+                    or semantic_catalog.content_sha256 != expected_catalog_digest
+                ):
+                    issues.append(
+                        AuthoringContextIssue(
+                            path=f"{path}.channel",
+                            code="semantic_catalog_stale",
+                            message=(
+                                "The semantic catalog changed after the expected "
+                                "release was pinned."
+                            ),
+                        )
+                    )
+                    continue
+                if source_revision is None:
+                    issues.append(
+                        AuthoringContextIssue(
+                            path=f"{path}.channel",
+                            code="source_revision_missing",
+                            message=(
+                                "Semantic channel resolution requires a revision-bound source "
+                                "inventory."
+                            ),
+                        )
+                    )
+                    continue
+                semantic_resolutions.append(
+                    SemanticResolutionEvidence(
+                        requested_term=str(requested),
+                        family_id=str(family_id),
+                        catalog_id=semantic_catalog.catalog_id,
+                        catalog_version=semantic_catalog.catalog_version,
+                        catalog_release_ref=semantic_catalog.release_ref,
+                        catalog_content_sha256=semantic_catalog.content_sha256,
+                        source_revision=source_revision,
+                        physical_identity=family_matches[0].physical_identity,
+                    )
+                )
+                matches = list(family_matches)
+                matched_alias = f"family:{family_id}"
+            elif physical.state is PhysicalChannelResolutionState.AMBIGUOUS:
+                issues.append(
+                    AuthoringContextIssue(
+                        path=f"{path}.channel",
+                        code="channel_ambiguous",
+                        message=f"Multiple physical channels match {requested!r}.",
+                        candidates=[candidate.mnemonic for candidate in physical.candidates],
+                    )
+                )
+                continue
+            else:
+                if (
+                    physical.state is PhysicalChannelResolutionState.UNIQUE
+                    and not inventory_complete
+                ):
+                    issues.append(
+                        AuthoringContextIssue(
+                            path=f"{path}.channel",
+                            code="channel_inventory_incomplete",
+                            message="An incomplete inventory cannot establish mnemonic uniqueness.",
+                            candidates=[candidate.mnemonic for candidate in physical.candidates],
+                        )
+                    )
+                    continue
+                matches, matched_alias = _candidate_matches(
+                    str(requested), candidates, channel_aliases
+                )
         if len(matches) != 1:
             code = "channel_missing" if not matches else "channel_ambiguous"
             message = (
@@ -1367,8 +1623,9 @@ class AuthoringContextResolver:
         *,
         channel_aliases: Sequence[AuthoringChannelAlias | Mapping[str, Any]] = (),
         header_aliases: Mapping[str, Sequence[str]] | None = None,
+        semantic_catalog: SemanticChannelCatalog = EMPTY_SEMANTIC_CHANNEL_CATALOG,
     ) -> None:
-        """Initialize reusable alias catalogs without loading provider state."""
+        """Initialize deterministic catalogs without loading provider state."""
         self.channel_aliases = tuple(
             item
             if isinstance(item, AuthoringChannelAlias)
@@ -1376,6 +1633,9 @@ class AuthoringContextResolver:
             for item in channel_aliases
         )
         self.header_aliases = deepcopy(dict(header_aliases or {}))
+        if not semantic_catalog.verify_digest():
+            raise ValueError("Semantic catalog failed content-digest validation.")
+        self.semantic_catalog = semantic_catalog
 
     def resolve(
         self,
@@ -1384,13 +1644,19 @@ class AuthoringContextResolver:
         existing: AuthoringDocumentSpec | None = None,
         scaffold: AuthoringDocumentSpec | None = None,
         defaults: Mapping[str, Any] | None = None,
-        available_channels: Mapping[str, Sequence[AuthoringChannelInput]] | None = None,
+        available_channels: Mapping[str, AuthoringChannelInventoryInput] | None = None,
+        expected_catalog_digest: str | None = None,
+        explicit_physical_selectors: Mapping[
+            str, ExplicitPhysicalChannelSelector | Mapping[str, Any]
+        ]
+        | None = None,
     ) -> AuthoringContextResolution:
         """Resolve aliases, precedence, and compatibility without mutation."""
         resolved_intent = intent.model_copy(deep=True)
         decisions: list[AuthoringResolutionDecision] = []
         issues: list[AuthoringContextIssue] = []
         resolved_values: dict[str, Any] = {}
+        semantic_resolutions: list[SemanticResolutionEvidence] = []
         root_defaults = dict(defaults or {})
 
         _resolve_header_aliases(
@@ -1407,8 +1673,12 @@ class AuthoringContextResolver:
             existing=existing,
             available_channels=available_channels,
             channel_aliases=self.channel_aliases,
+            semantic_catalog=self.semantic_catalog,
+            expected_catalog_digest=expected_catalog_digest,
+            explicit_physical_selectors=dict(explicit_physical_selectors or {}),
             decisions=decisions,
             issues=issues,
+            semantic_resolutions=semantic_resolutions,
         )
         _walk_intent(
             resolved_intent,
@@ -1445,6 +1715,7 @@ class AuthoringContextResolver:
             decisions=decisions,
             issues=issues,
             warnings=[],
+            semantic_resolutions=semantic_resolutions,
         )
 
 
@@ -1454,26 +1725,35 @@ def resolve_authoring_context(
     existing: AuthoringDocumentSpec | None = None,
     scaffold: AuthoringDocumentSpec | None = None,
     defaults: Mapping[str, Any] | None = None,
-    available_channels: Mapping[str, Sequence[AuthoringChannelInput]] | None = None,
+    available_channels: Mapping[str, AuthoringChannelInventoryInput] | None = None,
     channel_aliases: Sequence[AuthoringChannelAlias | Mapping[str, Any]] = (),
     header_aliases: Mapping[str, Sequence[str]] | None = None,
+    semantic_catalog: SemanticChannelCatalog = EMPTY_SEMANTIC_CHANNEL_CATALOG,
+    expected_catalog_digest: str | None = None,
+    explicit_physical_selectors: Mapping[str, ExplicitPhysicalChannelSelector | Mapping[str, Any]]
+    | None = None,
 ) -> AuthoringContextResolution:
     """Resolve one desired state using an explicit contextual input bundle."""
     return AuthoringContextResolver(
         channel_aliases=channel_aliases,
         header_aliases=header_aliases,
+        semantic_catalog=semantic_catalog,
     ).resolve(
         intent,
         existing=existing,
         scaffold=scaffold,
         defaults=defaults,
         available_channels=available_channels,
+        expected_catalog_digest=expected_catalog_digest,
+        explicit_physical_selectors=explicit_physical_selectors,
     )
 
 
 __all__ = [
     "AuthoringChannelAlias",
     "AuthoringChannelCandidate",
+    "AuthoringChannelInventory",
+    "ExplicitPhysicalChannelSelector",
     "AuthoringContextIssue",
     "AuthoringContextResolution",
     "AuthoringContextResolver",
