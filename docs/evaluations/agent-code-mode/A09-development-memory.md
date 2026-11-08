@@ -632,6 +632,21 @@ reconcile/execute/shared-verifier positive is included; no YAML persistence,
 provider/model call, live smoke, C02, or scientific execution was performed.
 
 The catalog, approval manifest, and fixed pin are candidate release artifacts
-only. Independent review remains pending; no active-baseline promotion or
-production-readiness claim is made. The accepted A09 baseline still governs
-until CAT-03 candidate acceptance is recorded.
+only. The candidate pin deliberately omits `approved_repository_commit` and is
+rejected by strict pin validation until a documentation-only CAT-03 release
+acceptance record exists. Independent review remains pending; no
+active-baseline promotion or production-readiness claim is made. The accepted
+A09 baseline still governs until CAT-03 candidate acceptance is recorded.
+
+### CAT-03 R1 trust-artifact correction (2026-11-08)
+
+The CAT-03 provenance SHA for `cat03-domain-approval` now equals the exact
+SHA-256 of the referenced Human/domain approval document. Catalog canonical
+content SHA, raw catalog artifact SHA, approval-manifest catalog digests, raw
+manifest SHA, and deployment-pin digest fields were recomputed in dependency
+order. A regression verifies the provenance-to-document byte binding. The
+candidate pin omits `approved_repository_commit`; the existing strict schema
+therefore rejects it fail-closed until the independently accepted repository
+release record is committed and a subsequent pin-finalization commit binds
+that record. Do not run positive catalog-backed transactions before that
+sequence and separate authorization.

@@ -3,12 +3,12 @@
   "catalog_id": "wellplot.semantic-curve-catalog",
   "catalog_version": "0.1.0-cat03-gr-fixture",
   "release_ref": "wellplot.semantic-curve-catalog/0.1.0-cat03-gr-fixture",
-  "content_sha256": "e89f4b61c67930bdecdec14eab9a326225f90c7e8232910bca98fcff32cb5a4c",
+  "content_sha256": "bbe9e40439c263c3471b0532bdfb59f4b66d17ba2fa4d5b0a68727dba619b49d",
   "source_provenance": [
     {
       "id": "cat03-domain-approval",
       "source_id": "A09_CAT_03_INITIAL_GAMMA_RAY_MAPPING_APPROVAL",
-      "source_sha256": "8097910a3eb0086c792ac2f5006666cd5d95d9543c6f33c94df04ff9617692bd",
+      "source_sha256": "162f21dd3d3a558b5554a9bd10082c1bd60ac0a1b5c5f589456bce70fbf738c2",
       "evidence_ref": "docs/architecture/A09_CAT_03_INITIAL_GAMMA_RAY_MAPPING_APPROVAL.md",
       "license_status": "not_applicable",
       "redistribution_status": "not_applicable"

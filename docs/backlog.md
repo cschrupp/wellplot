@@ -415,6 +415,15 @@ cannot establish catalog or source-hash authority. The exact catalog artifact,
 approval manifest and pin are currently candidate files, not independently
 accepted release artifacts.
 
+CAT-03 R1 corrects the domain-approval provenance digest to the exact bytes
+of the referenced approval document and recomputes the canonical catalog,
+artifact, manifest, and pin digests in dependency order. The candidate pin
+intentionally has no `approved_repository_commit`; strict validation rejects
+it until an independent CAT-03 repository release-acceptance record is
+committed and a later pin-finalization commit references that record. Positive
+catalog-backed transactions remain unauthorized and impossible through this
+unfinalized package pin.
+
 Focused provider-free tests cover approved path/hash eligibility, wrong or
 replaced bytes at the approved path, identical bytes at an unapproved path,
 pre-publication source drift, no-hash legacy behavior, and a canonical

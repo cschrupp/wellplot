@@ -150,8 +150,8 @@ def test_notebook_does_not_publish_catalog_activation_blocked_plan() -> None:
         assert fixture_paths.single_logfile.read_bytes() == original_bytes
 
 
-def test_notebook_missing_semantic_evidence_does_not_publish() -> None:
-    """A semantic host expectation fails closed at shared postconditions."""
+def test_notebook_unfinalized_catalog_pin_does_not_publish() -> None:
+    """The candidate release pin blocks semantic publication fail-closed."""
     with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="notebook-semantic-pin-") as temp_dir:
         fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
         context = _load_document_context(fixture_paths.single_logfile, root=REPO_ROOT)
@@ -191,7 +191,7 @@ def test_notebook_missing_semantic_evidence_does_not_publish() -> None:
         assert rolled_back is True
         assert status == "semantic_postcondition_failed"
         assert stages["semantic_postcondition"] == "FAIL"
-        assert "semantic_evidence_set_mismatch" in errors[0]
+        assert "semantic_catalog_pin_invalid" in errors[0]
         persist.assert_not_called()
         assert fixture_paths.single_logfile.read_bytes() == original_bytes
 

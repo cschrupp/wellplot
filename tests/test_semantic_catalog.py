@@ -921,17 +921,32 @@ def test_catalog_release_rejects_revoked_manifest() -> None:
         _trusted_release(_reviewed_catalog(), status="revoked")
 
 
-def test_catalog_release_loader_returns_the_approved_cat03_release() -> None:
-    """The fixed package pin selects only the reviewed CAT-03 release."""
-    release = load_deployed_catalog_release()
+def test_cat03_domain_approval_provenance_digest_matches_approval_record() -> None:
+    """The catalog provenance digest binds the referenced approval bytes."""
+    repository_root = Path(__file__).resolve().parents[1]
+    catalog_path = repository_root / "src/wellplot/mcp/assets/semantic_catalog/catalog.json"
+    catalog_payload = json.loads(catalog_path.read_text(encoding="utf-8"))
+    provenance = next(
+        item
+        for item in catalog_payload["source_provenance"]
+        if item["id"] == "cat03-domain-approval"
+    )
+    approval_path = repository_root / provenance["evidence_ref"]
 
-    assert release.pin.approved_release_id == "cat03-gamma-ray-openhole-las-v1"
-    assert release.catalog.catalog_id == "wellplot.semantic-curve-catalog"
-    assert len(release.catalog.request_term_rules) == 1
-    assert release.catalog.request_term_rules[0].terms == ("Gamma Ray",)
-    assert len(release.catalog.physical_channel_rules) == 1
-    assert release.catalog.physical_channel_rules[0].matcher_value == "GR"
-    assert "GR" not in release.catalog.request_term_rules[0].terms
+    assert hashlib.sha256(approval_path.read_bytes()).hexdigest() == provenance["source_sha256"]
+
+
+def test_deployed_cat03_candidate_pin_fails_closed_until_repository_acceptance() -> None:
+    """The candidate pin is unusable until an accepted repository commit exists."""
+    pin_path = (
+        Path(__file__).resolve().parents[1]
+        / "src/wellplot/mcp/assets/semantic_catalog/release-pin.json"
+    )
+    pin_payload = json.loads(pin_path.read_text(encoding="utf-8"))
+
+    assert "approved_repository_commit" not in pin_payload
+    with pytest.raises(SemanticCatalogTrustError, match="semantic_catalog_pin_invalid"):
+        load_deployed_catalog_release()
 
 
 def test_catalog_release_revalidation_rejects_a_replaced_transaction_pin(
