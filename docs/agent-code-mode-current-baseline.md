@@ -767,3 +767,37 @@ of current authority.
   integrated inspection-to-render path, approve production mappings, change
   scientific loaders, or authorize provider/scientific execution. Attempt 003
   retains its historical `FAIL` terminal.
+
+### A09-CAT-02I Trust and Publication Verification Accepted
+
+- **Status:** `A09_CAT_02I_ACCEPTED / ACTIVATION_REMAINS_DISABLED`.
+- **Accepted lineage:** CAT-02D design acceptance
+  `7b72f5d96da31f233d913583c9f3c038fdee003a`; CAT-02I implementation
+  `1d5673cd304beef549916816cb266c8e2f5e04d7`; review-status commit
+  `cce30be6bc4ce6eff61e70a1f0062d695e8ebbe9`; CAT-02I-R1 regression
+  completion `7c6f6df850e94f2cf408e0b2035c56264da0d18e`.
+- **Accepted capability:** deployment-pinned catalog artifact/content trust
+  contracts, source candidate/handle/snapshot/revision/binding continuity,
+  and host-derived expected semantic-binding evidence are implemented and
+  checked against observed evidence and the final canonical document.
+  Semantic verification uses the existing shared
+  `verify_document_postconditions()` pre-publication boundary. Notebook and
+  MCP rejection paths preserve no-publication behavior.
+- **Mechanical coverage:** CAT-02I-R1 adds regressions for source-chain
+  mismatches, cross-source physical-identity isolation, new-section joins,
+  source-assignment cardinality, exact evidence-set matching, final-document
+  mutation, and addressability rejection. The committed-tree focused suite
+  reports 177 passed. Ruff, formatting, Python compilation,
+  `git diff --check`, and single-engine attestation passed. The independent
+  reviewer inspected the implementation and R1 patch but did not independently
+  execute the 177 tests; that test result remains Codex-produced evidence.
+- **Activation restriction:**
+  `semantic_catalog_activation_disabled` remains mandatory. No production
+  semantic mapping is approved, no deployment pin/catalog release is active,
+  and `examples/families/` remains untrusted reference material. No positive
+  catalog-backed notebook/MCP transaction has been qualified. CAT-03 requires
+  separate authorization and qualification; CAT-02I acceptance does not
+  authorize it or remove the guard.
+- **Qualification boundary:** A09 integrated qualification remains open.
+  Historical attempt 003 retains its `FAIL` terminal. No provider/model/
+  endpoint, C02, live, or scientific execution occurred under CAT-02I.

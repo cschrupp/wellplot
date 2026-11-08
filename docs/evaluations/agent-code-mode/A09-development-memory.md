@@ -565,3 +565,39 @@ execution, A09 integration retry, C02 access, or active-baseline promotion
 occurred. Candidate acceptance and CAT-03 activation remain pending
 independent review and separate authorization. This Knowledge Delta has not
 been promoted into the active baseline.
+
+## A09-CAT-02I — Independent Acceptance (2026-11-07)
+
+Independent review accepted CAT-02I and the R1 regression-only corrective as
+`A09_CAT_02I_ACCEPTED — ACTIVATION_REMAINS_DISABLED`.
+
+Accepted lineage:
+
+- CAT-02D design acceptance: `7b72f5d96da31f233d913583c9f3c038fdee003a`.
+- CAT-02I implementation: `1d5673cd304beef549916816cb266c8e2f5e04d7`.
+- CAT-02I review-status commit: `cce30be6bc4ce6eff61e70a1f0062d695e8ebbe9`.
+- CAT-02I-R1 mechanical regressions: `7c6f6df850e94f2cf408e0b2035c56264da0d18e`.
+
+The accepted implementation verifies deployment-pinned catalog artifact and
+canonical-content identities, maintains source candidate/handle/snapshot/
+revision/binding continuity, and compares observed semantic evidence against
+an independently host-derived expected set and the final canonical document.
+Notebook and MCP use the existing shared `verify_document_postconditions()`
+boundary; semantic rejection does not persist. R1's new tests call production
+`verify_semantic_publication()` directly for source, identity, evidence-set,
+final-document, and addressability cases.
+
+The committed-tree focused validation reported 177 passed; Ruff, formatting,
+Python compilation, `git diff --check`, and single-engine attestation passed.
+The independent reviewer inspected the implementation, R1 patch, and test
+map, but did not independently execute the 177 tests. Preserve that evidence
+qualification in any subsequent report.
+
+Restrictions remain in force: `semantic_catalog_activation_disabled` is
+mandatory; no production semantic mapping or deployment pin/catalog release
+is active; `examples/families/` is untrusted reference material; and no
+positive catalog-backed notebook/MCP transaction is qualified. CAT-03 needs
+separate authorization. A09 integrated qualification remains open, attempt
+003 retains its historical `FAIL`, and no provider/model/endpoint, C02, live,
+or scientific execution occurred. CAT-02 is closed; this acceptance neither
+authorizes CAT-03 nor changes the A09 integration gate.

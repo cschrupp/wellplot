@@ -417,3 +417,29 @@ passed 151 tests, Ruff/format/compile/diff checks passed, and the single-engine
 manifest attestation passed. Independent acceptance and CAT-03 activation
 remain pending. No baseline promotion, integration retry, provider call, C02
 access, or scientific execution occurred.
+
+### CAT-02I independent acceptance (2026-11-07)
+
+Independent review accepted CAT-02I and its test-only R1 corrective as
+`A09_CAT_02I_ACCEPTED — ACTIVATION_REMAINS_DISABLED`. Accepted lineage:
+CAT-02D `7b72f5d96da31f233d913583c9f3c038fdee003a`, implementation
+`1d5673cd304beef549916816cb266c8e2f5e04d7`, review-status commit
+`cce30be6bc4ce6eff61e70a1f0062d695e8ebbe9`, and R1 tests
+`7c6f6df850e94f2cf408e0b2035c56264da0d18e`.
+
+The accepted contracts cover independently pinned catalog artifact and
+canonical-content trust, transaction-scoped source/binding continuity,
+host-derived expected semantic evidence, and verification at the existing
+shared pre-publication boundary. Notebook/MCP semantic rejection remains
+non-publishing. The R1 tests reach production `verify_semantic_publication()`;
+the reported committed-tree focused validation is 177 passed. Independent
+review inspected the source and test patch but did not rerun that suite.
+
+This acceptance does not activate a catalog: keep
+`semantic_catalog_activation_disabled`; approve no production mapping; treat
+`examples/families/` as untrusted reference data; and do not claim a positive
+catalog-backed notebook/MCP transaction is qualified. CAT-03 requires separate
+authorization. A09 integrated qualification remains open and attempt 003
+retains its historical `FAIL`. No provider/model/endpoint, C02, live, or
+scientific execution occurred. CAT-02 is closed; this record does not release
+CAT-03 or change the integrated-qualification gate.
