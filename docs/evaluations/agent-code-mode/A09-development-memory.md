@@ -540,3 +540,24 @@ The CAT-01 activation guard remains mandatory. No mapping is approved,
 promotion, integration rerun, provider call, or scientific execution is
 authorized by the design amendment. A09 attempt 003 remains `FAIL`; integrated
 qualification is open.
+
+## A09-CAT-02I — Provider-Free Implementation Candidate (2026-11-07)
+
+CAT-02I implementation is being prepared for independent review against the
+accepted CAT-02D R2 design. The candidate extends the existing catalog,
+authoring-context, enrichment, AgentSession/facade, shared postcondition, and
+notebook/MCP transaction boundaries. It adds strict separate artifact-byte,
+approval-manifest-byte, and canonical-content digest validation; a fixed
+package-resource release pin; a request-scoped immutable release carried with
+the host publication contract and revalidated before publication; exact
+host-derived semantic expectation/source joins; and pre-publication semantic
+verification through `verify_document_postconditions()`.
+
+The CAT-01 `semantic_catalog_activation_disabled` guard remains unchanged.
+No deployment pin or approved catalog is shipped, and no positive
+catalog-backed adapter transaction is enabled. Synthetic positives exercise
+the shared verifier only; notebook/MCP regressions confirm no publication
+when semantic trust is absent. No provider/model/endpoint calls, numerical
+scientific execution, A09 integration retry, C02 access, or active-baseline
+promotion occurred. Candidate acceptance and CAT-03 activation remain pending
+independent review and separate authorization.

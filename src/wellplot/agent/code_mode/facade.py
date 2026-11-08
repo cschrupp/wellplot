@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ...model.authoring import AuthoringDocumentSpec
 from ...model.intent import AuthoringDocumentIntent
+from ...semantic_catalog import SemanticPublicationContract
 from ..providers.base import ProviderFailureCategory, ProviderRequestError
 from ..providers.response_diagnostics import (
     ProviderResponseFailureReason,
@@ -143,6 +144,10 @@ class CodeModeCompileResult(_CompileModel):
     metrics: CompileMetrics
     obligations: tuple[RequestObligation, ...] = ()
     inspection_context: EnrichedSemanticContext | None = Field(default=None, exclude=True)
+    semantic_publication_contract: SemanticPublicationContract | None = Field(
+        default=None,
+        exclude=True,
+    )
 
     @model_validator(mode="after")
     def validate_result_evidence(self) -> CodeModeCompileResult:
@@ -180,6 +185,7 @@ class CodeModeCompileFacade:
         planner_temperature: float | None = 0.0,
         temperature: float | None = None,
         max_output_tokens: int | None = None,
+        semantic_publication_contract: SemanticPublicationContract | None = None,
     ) -> CodeModeCompileResult:
         """Invoke the v2 graph natively from an async host."""
         state: CodeModeGraphState = {
@@ -217,7 +223,10 @@ class CodeModeCompileFacade:
             )
         except SemanticEnrichmentError as error:
             return self._observe_result(_failure_result((_enrichment_diagnostic(error),)))
-        return self._observe_result(_project_graph_result(result))
+        projected = _project_graph_result(result).model_copy(
+            update={"semantic_publication_contract": semantic_publication_contract}
+        )
+        return self._observe_result(projected)
 
     def _observe_result(self, result: CodeModeCompileResult) -> CodeModeCompileResult:
         """Expose the same safe result to opt-in diagnostics, then return it unchanged."""

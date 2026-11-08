@@ -19,6 +19,7 @@ from ..logfile import load_logfile_text, resolve_section_data_sources_for_logfil
 from ..mcp import service as mcp_service
 from ..model.authoring import AuthoringDocumentSpec
 from .code_mode.enrichment import (
+    bind_semantic_publication_sources,
     intent_requires_channel_context,
     reconciliation_channels,
     validate_enriched_snapshot,
@@ -239,6 +240,7 @@ def _apply_result(
         "canonical_validation": "NOT_REACHED",
         "post_lowering_obligation": "NOT_REACHED",
         "preservation": "NOT_REACHED",
+        "semantic_postcondition": "NOT_REACHED",
         "persistence": "NOT_REACHED",
     }
     if not result.success:
@@ -266,10 +268,17 @@ def _apply_result(
                 stages,
             )
         available_channels = {}
+        semantic_contract = result.semantic_publication_contract
     else:
         try:
             validate_enriched_snapshot(inspected, private_service.document)
             available_channels = reconciliation_channels(inspected, result.intent)
+            semantic_contract = result.semantic_publication_contract
+            if semantic_contract is not None and semantic_contract.expected_bindings:
+                semantic_contract = bind_semantic_publication_sources(
+                    semantic_contract,
+                    inspected,
+                )
         except ValueError as error:
             return (
                 False,
@@ -313,10 +322,15 @@ def _apply_result(
             accepted,
             result.obligations,
             plan.operations,
+            semantic_contract=semantic_contract,
+            semantic_evidence=plan.semantic_resolutions,
         )
         stages["post_lowering_obligation"] = "PASS"
         stages["preservation"] = "PASS"
     except DocumentPostconditionError as error:
+        if error.check == "semantic":
+            stages["semantic_postcondition"] = "FAIL"
+            return False, False, True, [str(error)], "semantic_postcondition_failed", stages
         if error.check == "obligations":
             stages["post_lowering_obligation"] = "FAIL"
         else:

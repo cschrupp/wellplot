@@ -30,6 +30,7 @@ from wellplot.agent.semantic_runtime import SemanticDiagnostic, SemanticStageEvi
 from wellplot.authoring_program.models import ProgramMetrics
 from wellplot.model.authoring import AuthoringDocumentSpec
 from wellplot.model.intent import AuthoringDocumentIntent
+from wellplot.semantic_catalog import SemanticPublicationContract
 
 
 def _document() -> AuthoringDocumentSpec:
@@ -223,6 +224,22 @@ def test_revise_uses_revise_mode_and_projects_bounded_inspection(
     assert "generated authoring source" not in serialized
     assert "LangGraph" not in serialized
     assert "data/example" not in serialized
+
+
+def test_semantic_publication_contract_is_transported_to_host_result() -> None:
+    """The host contract reaches the result projection as a distinct input."""
+    contract = SemanticPublicationContract()
+    compiler = _Compiler(_success_result())
+    result = _run(
+        AgentSession(compiler=compiler).build(
+            request="Build.",
+            document=_document(),
+            semantic_publication_contract=contract,
+        )
+    )
+
+    assert compiler.calls[0]["semantic_publication_contract"] is contract
+    assert result.semantic_publication_contract is contract
 
 
 def test_failed_compilation_projects_without_intent() -> None:

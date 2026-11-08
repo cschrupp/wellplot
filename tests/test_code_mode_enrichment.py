@@ -17,6 +17,7 @@ from wellplot.agent.code_mode.enrichment import (
     SourceCandidate,
     SourceMetadata,
     reconciliation_channels,
+    semantic_source_bindings,
     validate_enriched_snapshot,
 )
 from wellplot.agent.code_mode.obligations import compile_request_contract
@@ -28,6 +29,7 @@ from wellplot.agent.code_mode.planner import (
 from wellplot.authoring_context import resolve_authoring_context
 from wellplot.model.authoring import AuthoringDocumentSpec
 from wellplot.model.intent import AuthoringDocumentIntent
+from wellplot.semantic_catalog import ExpectedSemanticBinding
 
 
 @dataclass
@@ -49,12 +51,14 @@ class _Loader:
                     unit="gAPI",
                     shape=(),
                     description="Gamma ray",
+                    physical_identity={"format": "LAS", "curve_index": 0},
                 ),
                 ChannelContext(
                     mnemonic="VDL",
                     kind="array",
                     unit="mV",
                     shape=(64,),
+                    physical_identity={"format": "LAS", "curve_index": 1},
                 ),
             ),
         )
@@ -822,6 +826,34 @@ def test_reconciliation_uses_the_inspected_physical_channel_projection(tmp_path:
     assert gamma.kind == "scalar"
     assert gamma.unit == "gAPI"
     assert gamma.source_path == str(source_path.resolve())
+    assert gamma.source_candidate_id == context.sections[0].sources[0].candidate_id
+    assert gamma.source_handle == context.sections[0].sources[0].handle
+    assert gamma.inspection_snapshot_id == context.snapshot.snapshot_id
+    assert gamma.source_revision == context.sections[0].sources[0].revision_token
+
+    expected = ExpectedSemanticBinding(
+        request_kind="SEMANTIC_FAMILY",
+        requirement_id="requirement-1",
+        request_sha256="a" * 64,
+        scope_key="existing:main",
+        track_scope="curves",
+        binding_slot="curves.binding.1",
+        requested_term="Gamma Ray",
+        source_candidate_id=context.sections[0].sources[0].candidate_id,
+        source_handle=context.sections[0].sources[0].handle,
+        inspection_snapshot_id=context.snapshot.snapshot_id,
+        source_revision=context.sections[0].sources[0].revision_token,
+        task_index=0,
+        section_id="main",
+        track_id="gamma",
+        binding_id="gr",
+    )
+    source_bindings = semantic_source_bindings(context, (expected,))
+    assert len(source_bindings) == 1
+    assert source_bindings[0].scope_key == expected.scope_key
+    assert source_bindings[0].candidate_id == expected.source_candidate_id
+    assert source_bindings[0].source_handle == expected.source_handle
+    assert source_bindings[0].inspection_snapshot_id == expected.inspection_snapshot_id
 
 
 def test_document_revision_mismatch_fails_before_source_loading(tmp_path: Path) -> None:

@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from ..model.authoring import AuthoringDocumentSpec
 from ..model.intent import AuthoringDocumentIntent
+from ..semantic_catalog import SemanticPublicationContract
 from .code_mode.enrichment import ChannelContext, EnrichedSemanticContext, SourceCandidate
 from .code_mode.obligations import RequestObligation
 from .semantic_runtime import SemanticStageEvidence
@@ -191,6 +192,10 @@ class AgentSessionResult(_SessionModel):
         pattern=r"^[0-9a-f]{64}$",
     )
     inspection_context: EnrichedSemanticContext | None = Field(default=None, exclude=True)
+    semantic_publication_contract: SemanticPublicationContract | None = Field(
+        default=None,
+        exclude=True,
+    )
 
     @model_validator(mode="after")
     def validate_result_evidence(self) -> AgentSessionResult:
@@ -288,6 +293,7 @@ class _CompileResultLike(Protocol):
     metrics: _AggregateMetricsLike
     obligations: Sequence[RequestObligation]
     inspection_context: EnrichedSemanticContext | None
+    semantic_publication_contract: SemanticPublicationContract | None
 
 
 class _CompileFacadeProtocol(Protocol):
@@ -304,6 +310,7 @@ class _CompileFacadeProtocol(Protocol):
         planner_temperature: float | None = 0.0,
         temperature: float | None = None,
         max_output_tokens: int | None = None,
+        semantic_publication_contract: SemanticPublicationContract | None = None,
     ) -> _CompileResultLike:
         """Compile one host-owned document through the v2 graph."""
 
@@ -321,6 +328,7 @@ class AgentSession:
         request: str,
         document: AuthoringDocumentSpec,
         sources: Sequence[AgentSourceConfig] = (),
+        semantic_publication_contract: SemanticPublicationContract | None = None,
     ) -> AgentSessionResult:
         """Compile a reconstruction without applying or retaining its intent."""
         return await self._compile(
@@ -328,6 +336,7 @@ class AgentSession:
             mode="reconstruct",
             document=document,
             sources=sources,
+            semantic_publication_contract=semantic_publication_contract,
         )
 
     async def revise(
@@ -336,6 +345,7 @@ class AgentSession:
         request: str,
         document: AuthoringDocumentSpec,
         sources: Sequence[AgentSourceConfig] = (),
+        semantic_publication_contract: SemanticPublicationContract | None = None,
     ) -> AgentSessionResult:
         """Compile a sparse revision without applying or retaining its intent."""
         return await self._compile(
@@ -343,6 +353,7 @@ class AgentSession:
             mode="revise",
             document=document,
             sources=sources,
+            semantic_publication_contract=semantic_publication_contract,
         )
 
     async def _compile(
@@ -352,12 +363,16 @@ class AgentSession:
         mode: CompilationMode,
         document: AuthoringDocumentSpec,
         sources: Sequence[AgentSourceConfig],
+        semantic_publication_contract: SemanticPublicationContract | None = None,
     ) -> AgentSessionResult:
         """Project one compiler call into the public result boundary."""
         normalized_request = request.strip()
         if not normalized_request:
             raise ValueError("request must be a non-empty string.")
         internal_sources = tuple(source._internal() for source in sources)
+        compile_kwargs: dict[str, object] = {}
+        if semantic_publication_contract is not None:
+            compile_kwargs["semantic_publication_contract"] = semantic_publication_contract
         result = await self.compiler.compile(
             request=normalized_request,
             mode=mode,
@@ -367,10 +382,16 @@ class AgentSession:
             planner_temperature=self.config.planner_temperature,
             temperature=self.config.temperature,
             max_output_tokens=self.config.max_output_tokens,
+            **compile_kwargs,
         )
         projected = _project_result(result, mode=mode)
         request_sha256 = hashlib.sha256(normalized_request.encode("utf-8")).hexdigest()
-        return projected.model_copy(update={"request_sha256": request_sha256})
+        return projected.model_copy(
+            update={
+                "request_sha256": request_sha256,
+                "semantic_publication_contract": semantic_publication_contract,
+            }
+        )
 
 
 def _project_result(result: _CompileResultLike, *, mode: CompilationMode) -> AgentSessionResult:
@@ -385,6 +406,7 @@ def _project_result(result: _CompileResultLike, *, mode: CompilationMode) -> Age
         metrics=_project_metrics(result.metrics),
         obligations=result.obligations,
         inspection_context=getattr(result, "inspection_context", None),
+        semantic_publication_contract=getattr(result, "semantic_publication_contract", None),
     )
 
 

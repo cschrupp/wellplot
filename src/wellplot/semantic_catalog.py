@@ -16,7 +16,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from importlib.resources import files
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -26,6 +27,45 @@ class _CatalogModel(BaseModel):
     """Strict immutable base for semantic catalog records."""
 
     model_config = ConfigDict(extra="forbid", frozen=True, str_strip_whitespace=True)
+
+
+class CatalogReleasePin(_CatalogModel):
+    """Deployment-pinned identities for one reviewed catalog release."""
+
+    pin_schema_version: Literal["1"] = "1"
+    approved_release_id: str = Field(min_length=1)
+    catalog_id: str = Field(min_length=1)
+    catalog_version: str = Field(min_length=1)
+    release_ref: str = Field(min_length=1)
+    content_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    catalog_artifact_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    approval_manifest_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    approval_record_ref: str = Field(min_length=1)
+    approved_repository_commit: str = Field(pattern=r"^[a-f0-9]{40}$")
+
+
+class CatalogApprovalManifest(_CatalogModel):
+    """Approval metadata bound to both packaged and semantic catalog digests."""
+
+    manifest_schema_version: Literal["1"] = "1"
+    approved_release_id: str = Field(min_length=1)
+    catalog_id: str = Field(min_length=1)
+    catalog_version: str = Field(min_length=1)
+    release_ref: str = Field(min_length=1)
+    content_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    catalog_artifact_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    approval_record_ref: str = Field(min_length=1)
+    review_scope: str = Field(min_length=1)
+    status: Literal["approved", "revoked"]
+
+
+class SemanticCatalogTrustError(ValueError):
+    """Fail-closed catalog release error with a stable safe code."""
+
+    def __init__(self, code: str) -> None:
+        """Store only a stable classification, never artifact contents."""
+        self.code = code
+        super().__init__(code)
 
 
 class CatalogProvenance(_CatalogModel):
@@ -166,6 +206,14 @@ class SemanticChannelCatalog(_CatalogModel):
         return self.content_sha256 == semantic_catalog_digest(self.model_dump(mode="json"))
 
 
+class TrustedCatalogRelease(_CatalogModel):
+    """Validated package release retained for one host transaction."""
+
+    pin: CatalogReleasePin
+    manifest: CatalogApprovalManifest
+    catalog: SemanticChannelCatalog
+
+
 class SemanticResolutionEvidence(_CatalogModel):
     """Catalog/source identities bound to one deterministic channel decision."""
 
@@ -178,6 +226,16 @@ class SemanticResolutionEvidence(_CatalogModel):
     catalog_version: str = Field(min_length=1)
     catalog_release_ref: str = Field(min_length=1)
     catalog_content_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    catalog_artifact_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    requirement_id: str | None = Field(default=None, min_length=1)
+    request_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    scope_key: str | None = Field(default=None, min_length=1)
+    track_scope: str | None = Field(default=None, min_length=1)
+    binding_slot: str | None = Field(default=None, min_length=1)
+    physical_mnemonic: str | None = Field(default=None, min_length=1)
+    source_candidate_id: str | None = Field(default=None, min_length=1)
+    source_handle: str | None = Field(default=None, min_length=1)
+    inspection_snapshot_id: str | None = Field(default=None, min_length=1)
     source_revision: str = Field(min_length=1)
     physical_identity_json: str = Field(min_length=2)
 
@@ -194,6 +252,101 @@ class SemanticResolutionEvidence(_CatalogModel):
         if canonical_physical_identity(identity) != value:
             raise ValueError("Physical identity evidence must use canonical JSON encoding.")
         return value
+
+
+class ExpectedSemanticBinding(_CatalogModel):
+    """Host-compiled semantic request slot expected at publication."""
+
+    request_kind: Literal["SEMANTIC_FAMILY"]
+    requirement_id: str = Field(min_length=1)
+    request_sha256: str = Field(pattern=r"^[a-f0-9]{64}$")
+    scope_key: str = Field(min_length=1)
+    track_scope: str = Field(min_length=1)
+    binding_slot: str = Field(min_length=1)
+    requested_term: str = Field(min_length=1)
+    source_candidate_id: str = Field(min_length=1)
+    source_handle: str = Field(min_length=1)
+    inspection_snapshot_id: str = Field(min_length=1)
+    source_revision: str = Field(min_length=1)
+    task_index: int = Field(ge=0)
+    section_id: str = Field(min_length=1)
+    track_id: str = Field(min_length=1)
+    binding_id: str = Field(min_length=1)
+
+
+class SemanticRequestClassification(_CatalogModel):
+    """Host classification for one compiled channel-request obligation."""
+
+    requirement_id: str = Field(min_length=1)
+    request_kind: Literal["SEMANTIC_FAMILY", "EXPLICIT_PHYSICAL", "UNRESOLVED"]
+    expected_binding: ExpectedSemanticBinding | None = None
+
+    @model_validator(mode="after")
+    def validate_classification_payload(self) -> SemanticRequestClassification:
+        """Only semantic-family classifications carry publication expectations."""
+        if (self.request_kind == "SEMANTIC_FAMILY") != (self.expected_binding is not None):
+            raise ValueError("Semantic request classification payload is inconsistent.")
+        if (
+            self.expected_binding is not None
+            and self.expected_binding.requirement_id != self.requirement_id
+        ):
+            raise ValueError("Semantic request classification requirement id differs.")
+        return self
+
+
+class SemanticSourceChannel(_CatalogModel):
+    """One physical channel projection in a host-owned inspected source map."""
+
+    mnemonic: str = Field(min_length=1)
+    physical_identity_json: str = Field(min_length=2)
+    addressability: Literal["ADDRESSABLE", "UNADDRESSABLE", "UNKNOWN"]
+
+    @field_validator("physical_identity_json")
+    @classmethod
+    def validate_identity_json(cls, value: str) -> str:
+        """Require canonical object identity JSON."""
+        try:
+            identity = json.loads(value)
+        except json.JSONDecodeError as error:
+            raise ValueError("Physical identity evidence must be valid JSON.") from error
+        if not isinstance(identity, dict) or not identity:
+            raise ValueError("Physical identity evidence must be a nonempty JSON object.")
+        if canonical_physical_identity(identity) != value:
+            raise ValueError("Physical identity evidence must use canonical JSON encoding.")
+        return value
+
+
+class SemanticSourceBinding(_CatalogModel):
+    """One section scope's request-scoped source snapshot and channels."""
+
+    scope_key: str = Field(min_length=1)
+    candidate_id: str = Field(min_length=1)
+    source_handle: str = Field(min_length=1)
+    inspection_snapshot_id: str = Field(min_length=1)
+    source_revision: str = Field(min_length=1)
+    channels: tuple[SemanticSourceChannel, ...]
+
+
+class SemanticPublicationContract(_CatalogModel):
+    """Host-owned expected set and source map for shared publication checks."""
+
+    expected_bindings: tuple[ExpectedSemanticBinding, ...] = ()
+    source_bindings: tuple[SemanticSourceBinding, ...] = ()
+    trusted_release: TrustedCatalogRelease | None = Field(default=None, exclude=True)
+
+    @model_validator(mode="after")
+    def validate_unique_host_keys(self) -> SemanticPublicationContract:
+        """Reject duplicate expected slots and ambiguous source scope mappings."""
+        expected_keys = [
+            (item.request_sha256, item.requirement_id, item.scope_key, item.binding_slot)
+            for item in self.expected_bindings
+        ]
+        if len(expected_keys) != len(set(expected_keys)):
+            raise ValueError("Expected semantic binding slots must be unique.")
+        source_keys = [(item.scope_key, item.source_handle) for item in self.source_bindings]
+        if len(source_keys) != len(set(source_keys)):
+            raise ValueError("Semantic source scope/handle pairs must be unique.")
+        return self
 
 
 def verify_semantic_resolution_evidence(
@@ -225,6 +378,160 @@ def verify_semantic_resolution_evidence(
             evidence.physical_identity_json == expected_identity_json,
         )
     )
+
+
+def verify_semantic_publication(
+    document: object,
+    *,
+    observed: Sequence[SemanticResolutionEvidence],
+    contract: SemanticPublicationContract,
+    release: TrustedCatalogRelease,
+) -> None:
+    """Require exact expected/evidence/source/document agreement before publish."""
+    if not release.catalog.verify_digest():
+        raise ValueError("semantic_catalog_untrusted")
+    if (
+        release.pin.content_sha256 != release.catalog.content_sha256
+        or release.pin.catalog_id != release.catalog.catalog_id
+        or release.pin.catalog_version != release.catalog.catalog_version
+        or release.pin.release_ref != release.catalog.release_ref
+    ):
+        raise ValueError("semantic_catalog_untrusted")
+
+    expected = contract.expected_bindings
+    expected_keys = [_semantic_evidence_key(item) for item in expected]
+    observed_keys = [_semantic_evidence_key(item) for item in observed]
+    if len(expected_keys) != len(set(expected_keys)):
+        raise ValueError("semantic_expected_binding_duplicate")
+    if len(observed_keys) != len(set(observed_keys)):
+        raise ValueError("semantic_evidence_duplicate")
+    if set(expected_keys) != set(observed_keys):
+        raise ValueError("semantic_evidence_set_mismatch")
+
+    source_map: dict[tuple[str, str], SemanticSourceBinding] = {}
+    for source in contract.source_bindings:
+        key = (source.scope_key, source.source_handle)
+        if key in source_map:
+            raise ValueError("semantic_source_binding_ambiguous")
+        source_map[key] = source
+
+    expected_by_key = {_semantic_evidence_key(item): item for item in expected}
+    for evidence in observed:
+        key = _semantic_evidence_key(evidence)
+        expectation = expected_by_key[key]
+        if not _semantic_evidence_matches_expected(evidence, expectation, release.pin):
+            raise ValueError("semantic_evidence_mismatch")
+
+        source = source_map.get((expectation.scope_key, expectation.source_handle))
+        if source is None or not _semantic_source_matches_expected(source, expectation):
+            raise ValueError("semantic_source_binding_mismatch")
+        channels = [
+            channel
+            for channel in source.channels
+            if channel.physical_identity_json == evidence.physical_identity_json
+            and channel.mnemonic == evidence.physical_mnemonic
+        ]
+        if len(channels) != 1 or channels[0].addressability != "ADDRESSABLE":
+            raise ValueError("semantic_channel_not_addressable")
+
+        if not _document_has_semantic_binding(
+            document,
+            section_id=expectation.section_id,
+            track_id=expectation.track_id,
+            binding_id=expectation.binding_id,
+            channel=evidence.physical_mnemonic or "",
+        ):
+            raise ValueError("semantic_binding_document_mismatch")
+
+
+def _semantic_evidence_key(
+    item: ExpectedSemanticBinding | SemanticResolutionEvidence,
+) -> tuple[str, str, str, str]:
+    """Return the independently compiled semantic request slot identity."""
+    requirement_id = item.requirement_id
+    request_sha256 = item.request_sha256
+    scope_key = item.scope_key
+    binding_slot = item.binding_slot
+    if not all((requirement_id, request_sha256, scope_key, binding_slot)):
+        raise ValueError("semantic_evidence_request_identity_missing")
+    return (str(request_sha256), str(requirement_id), str(scope_key), str(binding_slot))
+
+
+def _semantic_evidence_matches_expected(
+    evidence: SemanticResolutionEvidence,
+    expected: ExpectedSemanticBinding,
+    pin: CatalogReleasePin,
+) -> bool:
+    """Compare every request, binding, release, and source identity field."""
+    return all(
+        (
+            evidence.requested_term == expected.requested_term,
+            evidence.section_id == expected.section_id,
+            evidence.track_id == expected.track_id,
+            evidence.binding_id == expected.binding_id,
+            evidence.catalog_id == pin.catalog_id,
+            evidence.catalog_version == pin.catalog_version,
+            evidence.catalog_release_ref == pin.release_ref,
+            evidence.catalog_content_sha256 == pin.content_sha256,
+            evidence.catalog_artifact_sha256 == pin.catalog_artifact_sha256,
+            evidence.source_candidate_id == expected.source_candidate_id,
+            evidence.source_handle == expected.source_handle,
+            evidence.inspection_snapshot_id == expected.inspection_snapshot_id,
+            evidence.source_revision == expected.source_revision,
+            evidence.track_scope == expected.track_scope,
+        )
+    )
+
+
+def _semantic_source_matches_expected(
+    source: SemanticSourceBinding,
+    expected: ExpectedSemanticBinding,
+) -> bool:
+    """Verify source-handle continuity from the host inspection snapshot."""
+    return all(
+        (
+            source.candidate_id == expected.source_candidate_id,
+            source.source_handle == expected.source_handle,
+            source.inspection_snapshot_id == expected.inspection_snapshot_id,
+            source.source_revision == expected.source_revision,
+        )
+    )
+
+
+def _document_has_semantic_binding(
+    document: object,
+    *,
+    section_id: str,
+    track_id: str,
+    binding_id: str,
+    channel: str,
+) -> bool:
+    """Find exactly one final canonical binding at its host-compiled scope."""
+    value = document.model_dump(mode="json") if isinstance(document, BaseModel) else document
+    if not isinstance(value, Mapping):
+        return False
+    sections = value.get("sections")
+    if not isinstance(sections, list):
+        return False
+    matches: list[Mapping[str, object]] = []
+    for section in sections:
+        if not isinstance(section, Mapping) or section.get("id") != section_id:
+            continue
+        tracks = section.get("tracks")
+        if not isinstance(tracks, list):
+            continue
+        for track in tracks:
+            if not isinstance(track, Mapping) or track.get("id") != track_id:
+                continue
+            bindings = track.get("bindings")
+            if not isinstance(bindings, list):
+                continue
+            matches.extend(
+                binding
+                for binding in bindings
+                if isinstance(binding, Mapping) and binding.get("binding_id") == binding_id
+            )
+    return len(matches) == 1 and matches[0].get("channel") == channel
 
 
 def canonical_physical_identity(identity: Mapping[str, object]) -> str:
@@ -259,6 +566,137 @@ def semantic_catalog_digest(payload: Mapping[str, object]) -> str:
 def catalog_from_payload(payload: Mapping[str, object]) -> SemanticChannelCatalog:
     """Validate a raw payload and require its supplied digest to match."""
     return SemanticChannelCatalog.model_validate(dict(payload))
+
+
+def _strict_object_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    """Reject duplicate JSON members instead of accepting last-value-wins."""
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate_json_member")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(_value: str) -> None:
+    """Reject non-standard JSON constants such as NaN and Infinity."""
+    raise ValueError("invalid_constant")
+
+
+def _strict_json_object(raw: bytes, *, code: str) -> dict[str, object]:
+    """Decode one strict JSON object without retaining unsafe parser details."""
+    try:
+        decoded = json.loads(
+            raw.decode("utf-8"),
+            object_pairs_hook=_strict_object_pairs,
+            parse_constant=_reject_json_constant,
+        )
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+        raise SemanticCatalogTrustError(code) from None
+    if not isinstance(decoded, dict):
+        raise SemanticCatalogTrustError(code)
+    return decoded
+
+
+def _verify_catalog_release_bytes(
+    *,
+    pin_bytes: bytes,
+    manifest_bytes: bytes,
+    catalog_bytes: bytes,
+) -> TrustedCatalogRelease:
+    """Verify release payloads in the accepted digest and schema order.
+
+    This bytes-level verifier does not establish deployment trust for the pin.
+    Production callers must obtain pin bytes through the fixed package-resource
+    loader below; direct use is intended for isolated provider-free tests.
+    """
+    pin_payload = _strict_json_object(pin_bytes, code="semantic_catalog_pin_invalid")
+    try:
+        pin = CatalogReleasePin.model_validate(pin_payload)
+    except ValueError:
+        raise SemanticCatalogTrustError("semantic_catalog_pin_invalid") from None
+
+    if hashlib.sha256(manifest_bytes).hexdigest() != pin.approval_manifest_sha256:
+        raise SemanticCatalogTrustError("semantic_catalog_untrusted")
+    manifest_payload = _strict_json_object(
+        manifest_bytes,
+        code="semantic_catalog_manifest_invalid",
+    )
+    try:
+        manifest = CatalogApprovalManifest.model_validate(manifest_payload)
+    except ValueError:
+        raise SemanticCatalogTrustError("semantic_catalog_manifest_invalid") from None
+
+    manifest_identity_matches = all(
+        (
+            manifest.approved_release_id == pin.approved_release_id,
+            manifest.catalog_id == pin.catalog_id,
+            manifest.catalog_version == pin.catalog_version,
+            manifest.release_ref == pin.release_ref,
+            manifest.content_sha256 == pin.content_sha256,
+            manifest.catalog_artifact_sha256 == pin.catalog_artifact_sha256,
+            manifest.approval_record_ref == pin.approval_record_ref,
+        )
+    )
+    if not manifest_identity_matches:
+        raise SemanticCatalogTrustError("semantic_catalog_untrusted")
+    if manifest.status != "approved":
+        raise SemanticCatalogTrustError("semantic_catalog_unapproved")
+
+    if hashlib.sha256(catalog_bytes).hexdigest() != pin.catalog_artifact_sha256:
+        raise SemanticCatalogTrustError("semantic_catalog_untrusted")
+    catalog_payload = _strict_json_object(
+        catalog_bytes,
+        code="semantic_catalog_invalid",
+    )
+    try:
+        catalog = catalog_from_payload(catalog_payload)
+    except ValueError:
+        raise SemanticCatalogTrustError("semantic_catalog_invalid") from None
+
+    catalog_identity_matches = all(
+        (
+            catalog.content_sha256 == pin.content_sha256,
+            catalog.catalog_id == pin.catalog_id,
+            catalog.catalog_version == pin.catalog_version,
+            catalog.release_ref == pin.release_ref,
+        )
+    )
+    if not catalog_identity_matches:
+        raise SemanticCatalogTrustError("semantic_catalog_untrusted")
+    return TrustedCatalogRelease(pin=pin, manifest=manifest, catalog=catalog)
+
+
+def load_deployed_catalog_release() -> TrustedCatalogRelease:
+    """Load the one fixed, deployment-packaged semantic catalog release.
+
+    The release pin is trusted only because it is shipped at a fixed resource
+    path inside the trusted WellPlot application package. No environment,
+    branch, caller-supplied path, or catalog field can select another release.
+    CAT-02I ships no approved pin, so the production default is fail-closed.
+    """
+    release_root = files("wellplot.mcp.assets").joinpath("semantic_catalog")
+    try:
+        pin_bytes = release_root.joinpath("release-pin.json").read_bytes()
+        manifest_bytes = release_root.joinpath("approval-manifest.json").read_bytes()
+        catalog_bytes = release_root.joinpath("catalog.json").read_bytes()
+    except (FileNotFoundError, OSError):
+        raise SemanticCatalogTrustError("semantic_catalog_pin_missing") from None
+    return _verify_catalog_release_bytes(
+        pin_bytes=pin_bytes,
+        manifest_bytes=manifest_bytes,
+        catalog_bytes=catalog_bytes,
+    )
+
+
+def revalidate_deployed_catalog_release(
+    expected: TrustedCatalogRelease,
+) -> TrustedCatalogRelease:
+    """Re-read the fixed package resources and require the same transaction pin."""
+    current = load_deployed_catalog_release()
+    if current.pin != expected.pin:
+        raise SemanticCatalogTrustError("semantic_catalog_stale")
+    return current
 
 
 def build_semantic_catalog(payload: Mapping[str, object]) -> SemanticChannelCatalog:
@@ -309,18 +747,30 @@ def normalize_request_term(value: str) -> str:
 
 
 __all__ = [
+    "CatalogApprovalManifest",
+    "CatalogReleasePin",
     "CatalogProvenance",
     "CatalogReview",
+    "ExpectedSemanticBinding",
     "EMPTY_SEMANTIC_CHANNEL_CATALOG",
     "PhysicalChannelRule",
     "RequestTermRule",
+    "SemanticCatalogTrustError",
     "SemanticChannelCatalog",
+    "SemanticPublicationContract",
+    "SemanticRequestClassification",
     "SemanticChannelFamily",
     "SemanticResolutionEvidence",
+    "SemanticSourceBinding",
+    "SemanticSourceChannel",
+    "TrustedCatalogRelease",
     "build_semantic_catalog",
     "canonical_physical_identity",
     "catalog_from_payload",
+    "load_deployed_catalog_release",
     "normalize_request_term",
+    "revalidate_deployed_catalog_release",
     "semantic_catalog_digest",
+    "verify_semantic_publication",
     "verify_semantic_resolution_evidence",
 ]

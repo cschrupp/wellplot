@@ -17,6 +17,7 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..agent.code_mode.enrichment import (
+    bind_semantic_publication_sources,
     intent_requires_channel_context,
     reconciliation_channels,
     validate_enriched_snapshot,
@@ -192,10 +193,17 @@ def _apply_session_result(
                 [section.id for section in context.document.sections],
             )
         available_channels = {}
+        semantic_contract = session_result.semantic_publication_contract
     else:
         try:
             validate_enriched_snapshot(inspected, private_service.document)
             available_channels = reconciliation_channels(inspected, intent)
+            semantic_contract = session_result.semantic_publication_contract
+            if semantic_contract is not None and semantic_contract.expected_bindings:
+                semantic_contract = bind_semantic_publication_sources(
+                    semantic_contract,
+                    inspected,
+                )
         except ValueError as error:
             return (
                 False,
@@ -249,6 +257,8 @@ def _apply_session_result(
             accepted,
             session_result.obligations,
             plan.operations,
+            semantic_contract=semantic_contract,
+            semantic_evidence=plan.semantic_resolutions,
         )
     except DocumentPostconditionError as error:
         return (
@@ -256,7 +266,11 @@ def _apply_session_result(
             False,
             True,
             [str(error)],
-            ["post_lowering_obligation_failed"],
+            [
+                "semantic_postcondition_failed"
+                if error.check == "semantic"
+                else "post_lowering_obligation_failed"
+            ],
             [section.id for section in context.document.sections],
         )
 
@@ -460,6 +474,7 @@ def _apply_failure_owner(apply_status: list[str], session_result: object) -> str
         "execution_failed": "executor",
         "validation_failed": "executor",
         "post_lowering_obligation_failed": "executor",
+        "semantic_postcondition_failed": "executor",
         "stale_snapshot_conflict": "persistence",
         "publication_recovery_failed": "persistence",
     }

@@ -30,12 +30,14 @@ from wellplot.authoring_service import AuthoringService, CreateTrackRequest
 from wellplot.errors import AuthoringPublicationRecoveryError
 from wellplot.mcp import service as mcp_service
 from wellplot.model import AuthoringDocumentIntent, AuthoringDocumentSpec
+from wellplot.semantic_catalog import ExpectedSemanticBinding, SemanticPublicationContract
 
 
 def _successful_result(
     intent: AuthoringDocumentIntent | None = None,
     *,
     obligations: tuple[RequestObligation, ...] = (),
+    semantic_publication_contract: SemanticPublicationContract | None = None,
 ) -> AgentSessionResult:
     """Build a minimal successful worker result for one supplied intent."""
     return AgentSessionResult(
@@ -44,6 +46,7 @@ def _successful_result(
         intent=intent or AuthoringDocumentIntent(title="Updated transaction title"),
         workers=(AgentWorkerEvidence(kind="report", plan_order=0, success=True),),
         obligations=obligations,
+        semantic_publication_contract=semantic_publication_contract,
         metrics=AgentMetrics(
             worker_count=1,
             successful_workers=1,
@@ -143,6 +146,52 @@ def test_notebook_does_not_publish_catalog_activation_blocked_plan() -> None:
         assert "semantic_catalog_activation_disabled" in errors[0]
         assert stages["private_execution"] == "NOT_REACHED"
         execute.assert_not_called()
+        persist.assert_not_called()
+        assert fixture_paths.single_logfile.read_bytes() == original_bytes
+
+
+def test_notebook_semantic_expectation_without_deployed_pin_does_not_publish() -> None:
+    """A semantic host expectation fails closed at shared postconditions."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="notebook-semantic-pin-") as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        context = _load_document_context(fixture_paths.single_logfile, root=REPO_ROOT)
+        original_bytes = fixture_paths.single_logfile.read_bytes()
+        expected = ExpectedSemanticBinding(
+            request_kind="SEMANTIC_FAMILY",
+            requirement_id="requirement-1",
+            request_sha256="a" * 64,
+            scope_key="existing:main",
+            track_scope="curves",
+            binding_slot="curves.binding.1",
+            requested_term="Gamma Ray",
+            source_candidate_id="candidate-1",
+            source_handle="source-1",
+            inspection_snapshot_id="snapshot-1",
+            source_revision="revision-1",
+            task_index=0,
+            section_id="main",
+            track_id="track-1",
+            binding_id="binding-1",
+        )
+        result = _successful_result(
+            AuthoringDocumentIntent(title="Updated semantic title"),
+            semantic_publication_contract=SemanticPublicationContract(
+                expected_bindings=(expected,),
+            ),
+        )
+
+        with patch(
+            "wellplot.agent.direct_notebook.mcp_service.persist_authoring_document"
+        ) as persist:
+            applied = _apply_result(context=context, result=result, root=REPO_ROOT)
+
+        success, changed, rolled_back, errors, status, stages = applied
+        assert success is False
+        assert changed is False
+        assert rolled_back is True
+        assert status == "semantic_postcondition_failed"
+        assert stages["semantic_postcondition"] == "FAIL"
+        assert "semantic_catalog_pin_missing" in errors[0]
         persist.assert_not_called()
         assert fixture_paths.single_logfile.read_bytes() == original_bytes
 

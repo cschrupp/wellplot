@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from copy import deepcopy
 
 import pytest
 from pydantic import ValidationError
 
+from wellplot.agent.code_mode.obligations import (
+    ObligationKind,
+    OwnerKind,
+    RequestObligation,
+    compile_semantic_publication_contract,
+    verify_document_postconditions,
+)
 from wellplot.authoring_context import (
     AuthoringChannelCandidate,
     AuthoringChannelInventory,
@@ -20,9 +29,20 @@ from wellplot.model.authoring import AuthoringDocumentSpec, AuthoringScale
 from wellplot.model.intent import AuthoringDocumentIntent
 from wellplot.semantic_catalog import (
     EMPTY_SEMANTIC_CHANNEL_CATALOG,
+    ExpectedSemanticBinding,
+    SemanticCatalogTrustError,
     SemanticChannelCatalog,
+    SemanticPublicationContract,
+    SemanticRequestClassification,
+    SemanticResolutionEvidence,
+    SemanticSourceBinding,
+    SemanticSourceChannel,
+    TrustedCatalogRelease,
+    _verify_catalog_release_bytes,
     build_semantic_catalog,
     catalog_from_payload,
+    load_deployed_catalog_release,
+    verify_semantic_publication,
     verify_semantic_resolution_evidence,
 )
 
@@ -151,6 +171,50 @@ def _dlis_identity(mnemonic: str, *, frame: int = 0) -> dict[str, object]:
         "object_type": "CHANNEL",
         "frame_indexes": [frame],
     }
+
+
+def _trusted_release(
+    catalog: SemanticChannelCatalog,
+    *,
+    status: str = "approved",
+) -> TrustedCatalogRelease:
+    """Build an isolated package-shaped trusted release for verifier tests."""
+    catalog_bytes = json.dumps(
+        catalog.model_dump(mode="json"),
+        indent=2,
+    ).encode("utf-8")
+    artifact_sha256 = hashlib.sha256(catalog_bytes).hexdigest()
+    manifest_payload = {
+        "manifest_schema_version": "1",
+        "approved_release_id": "test-release",
+        "catalog_id": catalog.catalog_id,
+        "catalog_version": catalog.catalog_version,
+        "release_ref": catalog.release_ref,
+        "content_sha256": catalog.content_sha256,
+        "catalog_artifact_sha256": artifact_sha256,
+        "approval_record_ref": "test-review-record",
+        "review_scope": "isolated test fixture",
+        "status": status,
+    }
+    manifest_bytes = json.dumps(manifest_payload, sort_keys=True).encode("utf-8")
+    pin_payload = {
+        "pin_schema_version": "1",
+        "approved_release_id": "test-release",
+        "catalog_id": catalog.catalog_id,
+        "catalog_version": catalog.catalog_version,
+        "release_ref": catalog.release_ref,
+        "content_sha256": catalog.content_sha256,
+        "catalog_artifact_sha256": artifact_sha256,
+        "approval_manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+        "approval_record_ref": "test-review-record",
+        "approved_repository_commit": "1" * 40,
+    }
+    pin_bytes = json.dumps(pin_payload, sort_keys=True).encode("utf-8")
+    return _verify_catalog_release_bytes(
+        pin_bytes=pin_bytes,
+        manifest_bytes=manifest_bytes,
+        catalog_bytes=catalog_bytes,
+    )
 
 
 def test_empty_catalog_preserves_exact_cbl_and_vdl_and_explicit_scale() -> None:
@@ -636,3 +700,403 @@ def test_pre_resolved_catalog_evidence_cannot_bypass_activation_guard() -> None:
     assert not plan.ready
     assert plan.operations == []
     assert "semantic_catalog_activation_disabled" in {issue.code for issue in plan.issues}
+
+
+def test_catalog_release_binds_artifact_and_canonical_content_digests_separately() -> None:
+    """The package-byte identity is independent from normalized catalog content."""
+    catalog = _reviewed_catalog()
+    release = _trusted_release(catalog)
+
+    assert release.pin.content_sha256 == catalog.content_sha256
+    assert release.pin.catalog_artifact_sha256 != catalog.content_sha256
+    assert release.manifest.content_sha256 == release.pin.content_sha256
+    assert release.manifest.catalog_artifact_sha256 == release.pin.catalog_artifact_sha256
+
+
+def test_catalog_release_rejects_artifact_byte_change() -> None:
+    """A byte-level change is rejected even when parsed semantic content is same."""
+    catalog = _reviewed_catalog()
+    release = _trusted_release(catalog)
+    pin_bytes = json.dumps(release.pin.model_dump(mode="json"), sort_keys=True).encode()
+    manifest_bytes = json.dumps(
+        release.manifest.model_dump(mode="json"),
+        sort_keys=True,
+    ).encode()
+    catalog_bytes = json.dumps(catalog.model_dump(mode="json"), indent=2).encode()
+
+    with pytest.raises(SemanticCatalogTrustError, match="semantic_catalog_untrusted"):
+        _verify_catalog_release_bytes(
+            pin_bytes=pin_bytes,
+            manifest_bytes=manifest_bytes,
+            catalog_bytes=catalog_bytes + b" ",
+        )
+
+
+def test_catalog_release_rejects_approval_manifest_byte_change() -> None:
+    """A valid-looking approval record must match its exact pinned bytes."""
+    catalog = _reviewed_catalog()
+    release = _trusted_release(catalog)
+    pin_bytes = json.dumps(release.pin.model_dump(mode="json"), sort_keys=True).encode()
+    manifest_bytes = json.dumps(
+        release.manifest.model_dump(mode="json"),
+        sort_keys=True,
+    ).encode()
+    catalog_bytes = json.dumps(catalog.model_dump(mode="json"), indent=2).encode()
+
+    with pytest.raises(SemanticCatalogTrustError, match="semantic_catalog_untrusted"):
+        _verify_catalog_release_bytes(
+            pin_bytes=pin_bytes,
+            manifest_bytes=manifest_bytes + b" ",
+            catalog_bytes=catalog_bytes,
+        )
+
+
+def test_catalog_release_rejects_duplicate_members_and_nonstandard_numbers() -> None:
+    """Release JSON parsing rejects ambiguous or non-standard values."""
+    with pytest.raises(SemanticCatalogTrustError, match="semantic_catalog_pin_invalid"):
+        _verify_catalog_release_bytes(
+            pin_bytes=b'{"pin_schema_version":"1","pin_schema_version":"1"}',
+            manifest_bytes=b"{}",
+            catalog_bytes=b"{}",
+        )
+
+    with pytest.raises(SemanticCatalogTrustError, match="semantic_catalog_pin_invalid"):
+        _verify_catalog_release_bytes(
+            pin_bytes=b'{"value":NaN}',
+            manifest_bytes=b"{}",
+            catalog_bytes=b"{}",
+        )
+
+
+def test_catalog_release_rejects_revoked_manifest() -> None:
+    """A digest-valid manifest cannot self-authorize a revoked release."""
+    with pytest.raises(SemanticCatalogTrustError, match="semantic_catalog_unapproved"):
+        _trusted_release(_reviewed_catalog(), status="revoked")
+
+
+def test_catalog_release_loader_fails_closed_without_deployed_pin() -> None:
+    """No package pin means no production semantic catalog release."""
+    with pytest.raises(SemanticCatalogTrustError, match="semantic_catalog_pin_missing"):
+        load_deployed_catalog_release()
+
+
+def test_catalog_release_revalidation_rejects_a_replaced_transaction_pin(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A request cannot publish under a replacement deployment pin."""
+    import wellplot.semantic_catalog as semantic_catalog_module
+
+    release = _trusted_release(_reviewed_catalog())
+    changed_pin = release.pin.model_copy(update={"approval_record_ref": "replacement-record"})
+    changed = release.model_copy(update={"pin": changed_pin})
+    monkeypatch.setattr(
+        semantic_catalog_module,
+        "load_deployed_catalog_release",
+        lambda: changed,
+    )
+
+    with pytest.raises(SemanticCatalogTrustError, match="semantic_catalog_stale"):
+        semantic_catalog_module.revalidate_deployed_catalog_release(release)
+
+
+def test_shared_semantic_publication_verifier_checks_exact_binding_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The shared verifier accepts only one exact expected/source/document join."""
+    catalog = _reviewed_catalog()
+    release = _trusted_release(catalog)
+    identity = _dlis_identity("GR_STGC")
+    identity_json = json.dumps(identity, sort_keys=True, separators=(",", ":"))
+    expected = ExpectedSemanticBinding(
+        request_kind="SEMANTIC_FAMILY",
+        requirement_id="requirement-1",
+        request_sha256="a" * 64,
+        scope_key="existing:main",
+        track_scope="curves",
+        binding_slot="curves.binding.1",
+        requested_term="Gamma Ray",
+        source_candidate_id="candidate-1",
+        source_handle="source-1",
+        inspection_snapshot_id="snapshot-1",
+        source_revision="revision-1",
+        task_index=0,
+        section_id="main",
+        track_id="track-1",
+        binding_id="binding-1",
+    )
+    evidence = SemanticResolutionEvidence(
+        requested_term=expected.requested_term,
+        section_id=expected.section_id,
+        track_id=expected.track_id,
+        binding_id=expected.binding_id,
+        family_id="family.gamma-ray.test",
+        catalog_id=release.pin.catalog_id,
+        catalog_version=release.pin.catalog_version,
+        catalog_release_ref=release.pin.release_ref,
+        catalog_content_sha256=release.pin.content_sha256,
+        catalog_artifact_sha256=release.pin.catalog_artifact_sha256,
+        requirement_id=expected.requirement_id,
+        request_sha256=expected.request_sha256,
+        scope_key=expected.scope_key,
+        track_scope=expected.track_scope,
+        binding_slot=expected.binding_slot,
+        physical_mnemonic="GR_STGC",
+        source_candidate_id=expected.source_candidate_id,
+        source_handle=expected.source_handle,
+        inspection_snapshot_id=expected.inspection_snapshot_id,
+        source_revision=expected.source_revision,
+        physical_identity_json=identity_json,
+    )
+    source = SemanticSourceBinding(
+        scope_key=expected.scope_key,
+        candidate_id=expected.source_candidate_id,
+        source_handle=expected.source_handle,
+        inspection_snapshot_id=expected.inspection_snapshot_id,
+        source_revision=expected.source_revision,
+        channels=(
+            SemanticSourceChannel(
+                mnemonic="GR_STGC",
+                physical_identity_json=identity_json,
+                addressability="ADDRESSABLE",
+            ),
+        ),
+    )
+    contract = SemanticPublicationContract(
+        expected_bindings=(expected,),
+        source_bindings=(source,),
+        trusted_release=release,
+    )
+    document = AuthoringDocumentSpec(
+        name="semantic-publication-test",
+        title="Synthetic",
+        sections=[
+            {
+                "id": "main",
+                "title": "Main",
+                "tracks": [
+                    {
+                        "id": "track-1",
+                        "title": "Curves",
+                        "kind": "normal",
+                        "width_mm": 20,
+                        "bindings": [
+                            {
+                                "kind": "curve",
+                                "binding_id": "binding-1",
+                                "channel": "GR_STGC",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ],
+    )
+
+    verify_semantic_publication(
+        document,
+        observed=(evidence,),
+        contract=contract,
+        release=release,
+    )
+
+    import wellplot.semantic_catalog as semantic_catalog_module
+
+    monkeypatch.setattr(
+        semantic_catalog_module,
+        "load_deployed_catalog_release",
+        lambda: release,
+    )
+    verify_document_postconditions(
+        document,
+        document,
+        (),
+        (),
+        semantic_contract=contract,
+        semantic_evidence=(evidence,),
+    )
+
+    stale_source = source.model_copy(update={"source_revision": "revision-2"})
+    stale_contract = contract.model_copy(update={"source_bindings": (stale_source,)})
+    with pytest.raises(ValueError, match="semantic_source_binding_mismatch"):
+        verify_semantic_publication(
+            document,
+            observed=(evidence,),
+            contract=stale_contract,
+            release=release,
+        )
+
+
+def test_shared_semantic_publication_verifier_rejects_missing_evidence() -> None:
+    """Expected semantic requests cannot disappear from observed evidence."""
+    expected = ExpectedSemanticBinding(
+        request_kind="SEMANTIC_FAMILY",
+        requirement_id="requirement-1",
+        request_sha256="a" * 64,
+        scope_key="existing:main",
+        track_scope="curves",
+        binding_slot="curves.binding.1",
+        requested_term="Gamma Ray",
+        source_candidate_id="candidate-1",
+        source_handle="source-1",
+        inspection_snapshot_id="snapshot-1",
+        source_revision="revision-1",
+        task_index=0,
+        section_id="main",
+        track_id="track-1",
+        binding_id="binding-1",
+    )
+    contract = SemanticPublicationContract(expected_bindings=(expected,))
+    release = _trusted_release(_reviewed_catalog())
+
+    with pytest.raises(ValueError, match="semantic_evidence_set_mismatch"):
+        verify_semantic_publication(
+            {},
+            observed=(),
+            contract=contract,
+            release=release,
+        )
+
+
+def test_expected_semantic_set_is_compiled_from_channel_obligations() -> None:
+    """Semantic publication expectations bind to host request requirement IDs."""
+    request = "Plot Gamma Ray on Curves."
+    request_sha256 = hashlib.sha256(request.encode()).hexdigest()
+    obligation = RequestObligation(
+        kind=ObligationKind.EXPLICIT_FIELD,
+        owner_kind=OwnerKind.BINDING,
+        owner_ref="curves",
+        field="channel",
+        value="Gamma Ray",
+        request_sha256=request_sha256,
+        start_byte=5,
+        end_byte=14,
+        span_sha256=hashlib.sha256(b"Gamma Ray").hexdigest(),
+        requirement_id="requirement-channel-1",
+        scope_key="existing:main",
+        slot_key="curves.binding.1",
+    )
+    expected = ExpectedSemanticBinding(
+        request_kind="SEMANTIC_FAMILY",
+        requirement_id=obligation.requirement_id,
+        request_sha256=request_sha256,
+        scope_key="existing:main",
+        track_scope="curves",
+        binding_slot="curves.binding.1",
+        requested_term="Gamma Ray",
+        source_candidate_id="candidate-1",
+        source_handle="source-1",
+        inspection_snapshot_id="snapshot-1",
+        source_revision="revision-1",
+        task_index=0,
+        section_id="main",
+        track_id="track-1",
+        binding_id="binding-1",
+    )
+
+    release = _trusted_release(_reviewed_catalog())
+    contract = compile_semantic_publication_contract(
+        (obligation,),
+        (
+            SemanticRequestClassification(
+                requirement_id=obligation.requirement_id,
+                request_kind="SEMANTIC_FAMILY",
+                expected_binding=expected,
+            ),
+        ),
+        trusted_release=release,
+    )
+
+    assert contract.expected_bindings == (expected,)
+    assert contract.trusted_release is release
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("scope_key", "existing:other"),
+        ("track_scope", "other-track"),
+        ("binding_slot", "curves.binding.2"),
+    ),
+)
+def test_expected_semantic_set_rejects_scope_and_slot_reassignment(
+    field: str,
+    value: str,
+) -> None:
+    """Classification cannot reassign a request obligation to another slot."""
+    request = "Plot Gamma Ray on Curves."
+    request_sha256 = hashlib.sha256(request.encode()).hexdigest()
+    obligation = RequestObligation(
+        kind=ObligationKind.EXPLICIT_FIELD,
+        owner_kind=OwnerKind.BINDING,
+        owner_ref="curves",
+        field="channel",
+        value="Gamma Ray",
+        request_sha256=request_sha256,
+        start_byte=5,
+        end_byte=14,
+        span_sha256=hashlib.sha256(b"Gamma Ray").hexdigest(),
+        requirement_id="requirement-channel-1",
+        scope_key="existing:main",
+        slot_key="curves.binding.1",
+    )
+    expected_values: dict[str, object] = {
+        "request_kind": "SEMANTIC_FAMILY",
+        "requirement_id": obligation.requirement_id,
+        "request_sha256": request_sha256,
+        "scope_key": "existing:main",
+        "track_scope": "curves",
+        "binding_slot": "curves.binding.1",
+        "requested_term": "Gamma Ray",
+        "source_candidate_id": "candidate-1",
+        "source_handle": "source-1",
+        "inspection_snapshot_id": "snapshot-1",
+        "source_revision": "revision-1",
+        "task_index": 0,
+        "section_id": "main",
+        "track_id": "track-1",
+        "binding_id": "binding-1",
+    }
+    expected_values[field] = value
+
+    with pytest.raises(ValueError, match="semantic_expected_binding_request_mismatch"):
+        compile_semantic_publication_contract(
+            (obligation,),
+            (
+                SemanticRequestClassification(
+                    requirement_id=obligation.requirement_id,
+                    request_kind="SEMANTIC_FAMILY",
+                    expected_binding=ExpectedSemanticBinding.model_validate(expected_values),
+                ),
+            ),
+        )
+
+
+def test_expected_semantic_set_rejects_unclassified_or_unresolved_channel() -> None:
+    """Missing classification cannot silently turn a semantic request literal."""
+    request = "Plot Gamma Ray."
+    request_sha256 = hashlib.sha256(request.encode()).hexdigest()
+    obligation = RequestObligation(
+        kind=ObligationKind.EXPLICIT_FIELD,
+        owner_kind=OwnerKind.BINDING,
+        owner_ref="request",
+        field="channel",
+        value="Gamma Ray",
+        request_sha256=request_sha256,
+        start_byte=5,
+        end_byte=14,
+        span_sha256=hashlib.sha256(b"Gamma Ray").hexdigest(),
+        requirement_id="requirement-channel-1",
+    )
+
+    with pytest.raises(ValueError, match="semantic_request_classification_incomplete"):
+        compile_semantic_publication_contract((obligation,), ())
+    with pytest.raises(ValueError, match="semantic_request_unresolved"):
+        compile_semantic_publication_contract(
+            (obligation,),
+            (
+                SemanticRequestClassification(
+                    requirement_id=obligation.requirement_id,
+                    request_kind="UNRESOLVED",
+                ),
+            ),
+        )

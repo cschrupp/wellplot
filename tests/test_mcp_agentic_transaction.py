@@ -27,6 +27,7 @@ from wellplot.mcp.agentic import (
     _request_context,
 )
 from wellplot.model import AuthoringDocumentIntent, AuthoringDocumentSpec
+from wellplot.semantic_catalog import ExpectedSemanticBinding, SemanticPublicationContract
 
 
 def test_apply_failure_owner_keeps_deterministic_boundaries_distinct() -> None:
@@ -50,6 +51,7 @@ def _successful_result(
     intent: AuthoringDocumentIntent | None = None,
     *,
     obligations: tuple[RequestObligation, ...] = (),
+    semantic_publication_contract: SemanticPublicationContract | None = None,
 ) -> AgentSessionResult:
     """Create one provider-free result that changes the report title."""
     return AgentSessionResult(
@@ -58,6 +60,7 @@ def _successful_result(
         intent=intent or AuthoringDocumentIntent(title="MCP transaction title"),
         workers=(AgentWorkerEvidence(kind="report", plan_order=0, success=True),),
         obligations=obligations,
+        semantic_publication_contract=semantic_publication_contract,
         metrics=AgentMetrics(
             worker_count=1,
             successful_workers=1,
@@ -129,6 +132,52 @@ def test_mcp_request_context_does_not_eagerly_parse_declared_sources() -> None:
         candidate.inspection_state == "not_inspected" for candidate in context.source_candidates
     )
     assert all(candidate.expected_revision_token for candidate in context.source_candidates)
+
+
+def test_mcp_semantic_expectation_without_deployed_pin_does_not_publish() -> None:
+    """MCP shares fail-closed semantic verification before YAML persistence."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="mcp-semantic-pin-") as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        context = _request_context(str(fixture_paths.single_logfile), root=REPO_ROOT)
+        original_bytes = fixture_paths.single_logfile.read_bytes()
+        expected = ExpectedSemanticBinding(
+            request_kind="SEMANTIC_FAMILY",
+            requirement_id="requirement-1",
+            request_sha256="a" * 64,
+            scope_key="existing:main",
+            track_scope="curves",
+            binding_slot="curves.binding.1",
+            requested_term="Gamma Ray",
+            source_candidate_id="candidate-1",
+            source_handle="source-1",
+            inspection_snapshot_id="snapshot-1",
+            source_revision="revision-1",
+            task_index=0,
+            section_id="main",
+            track_id="track-1",
+            binding_id="binding-1",
+        )
+
+        with patch("wellplot.mcp.agentic.service.persist_authoring_document") as persist:
+            outcome = _apply_session_result(
+                context=context,
+                session_result=_successful_result(
+                    AuthoringDocumentIntent(title="MCP semantic title"),
+                    semantic_publication_contract=SemanticPublicationContract(
+                        expected_bindings=(expected,),
+                    ),
+                ),
+                root=REPO_ROOT,
+            )
+
+        success, changed, rolled_back, errors, statuses, _section_ids = outcome
+        assert success is False
+        assert changed is False
+        assert rolled_back is True
+        assert statuses == ["semantic_postcondition_failed"]
+        assert "semantic_catalog_pin_missing" in errors[0]
+        persist.assert_not_called()
+        assert fixture_paths.single_logfile.read_bytes() == original_bytes
 
 
 def test_mcp_apply_rejects_changed_inspected_source() -> None:

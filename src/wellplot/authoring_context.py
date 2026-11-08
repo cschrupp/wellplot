@@ -48,7 +48,9 @@ from .model.intent import (
 )
 from .semantic_catalog import (
     EMPTY_SEMANTIC_CHANNEL_CATALOG,
+    ExpectedSemanticBinding,
     SemanticChannelCatalog,
+    SemanticPublicationContract,
     SemanticResolutionEvidence,
     canonical_physical_identity,
     normalize_request_term,
@@ -111,6 +113,10 @@ class AuthoringChannelCandidate(_ContextModel):
     source_path: str | None = Field(default=None, min_length=1)
     physical_identity: dict[str, Any] = Field(default_factory=dict)
     addressability: Literal["ADDRESSABLE", "UNADDRESSABLE", "UNKNOWN"] = "ADDRESSABLE"
+    source_candidate_id: str | None = Field(default=None, min_length=1)
+    source_handle: str | None = Field(default=None, min_length=1)
+    inspection_snapshot_id: str | None = Field(default=None, min_length=1)
+    source_revision: str | None = Field(default=None, min_length=1)
 
 
 class AuthoringChannelInventory(_ContextModel):
@@ -1228,6 +1234,35 @@ def _existing_binding_channel(
     return None
 
 
+def _matching_semantic_expectation(
+    contract: SemanticPublicationContract | None,
+    *,
+    section_id: str,
+    track_id: str,
+    binding_id: str,
+    requested_term: str,
+    selected: AuthoringChannelCandidate,
+) -> ExpectedSemanticBinding:
+    """Bind resolver evidence to one independently compiled request slot."""
+    if contract is None:
+        raise ValueError("semantic_expected_binding_missing")
+    matches = [
+        expected
+        for expected in contract.expected_bindings
+        if expected.section_id == section_id
+        and expected.track_id == track_id
+        and expected.binding_id == binding_id
+        and expected.requested_term.casefold() == requested_term.casefold()
+        and expected.source_candidate_id == selected.source_candidate_id
+        and expected.source_handle == selected.source_handle
+        and expected.inspection_snapshot_id == selected.inspection_snapshot_id
+        and expected.source_revision == selected.source_revision
+    ]
+    if len(matches) != 1:
+        raise ValueError("semantic_expected_binding_missing_or_ambiguous")
+    return matches[0]
+
+
 def _resolve_channels(
     intent: AuthoringDocumentIntent,
     *,
@@ -1236,6 +1271,8 @@ def _resolve_channels(
     channel_aliases: Sequence[AuthoringChannelAlias],
     semantic_catalog: SemanticChannelCatalog,
     expected_catalog_digest: str | None,
+    catalog_artifact_sha256: str | None,
+    semantic_publication_contract: SemanticPublicationContract | None,
     explicit_physical_selectors: Mapping[str, ExplicitPhysicalChannelSelector | Mapping[str, Any]],
     decisions: list[AuthoringResolutionDecision],
     issues: list[AuthoringContextIssue],
@@ -1475,6 +1512,21 @@ def _resolve_channels(
                         )
                     )
                     continue
+                candidate_revision = selected.source_revision
+                if (
+                    candidate_revision is not None
+                    and source_revision is not None
+                    and candidate_revision != source_revision
+                ):
+                    issues.append(
+                        AuthoringContextIssue(
+                            path=f"{path}.channel",
+                            code="source_revision_mismatch",
+                            message="Inspected channel and inventory revisions differ.",
+                        )
+                    )
+                    continue
+                source_revision = candidate_revision or source_revision
                 if source_revision is None:
                     issues.append(
                         AuthoringContextIssue(
@@ -1487,6 +1539,26 @@ def _resolve_channels(
                         )
                     )
                     continue
+                expectation: ExpectedSemanticBinding | None = None
+                if catalog_artifact_sha256 is not None:
+                    try:
+                        expectation = _matching_semantic_expectation(
+                            semantic_publication_contract,
+                            section_id=section_id,
+                            track_id=track_id,
+                            binding_id=binding_id,
+                            requested_term=str(requested),
+                            selected=selected,
+                        )
+                    except ValueError as error:
+                        issues.append(
+                            AuthoringContextIssue(
+                                path=f"{path}.channel",
+                                code="semantic_expected_binding_missing",
+                                message=str(error),
+                            )
+                        )
+                        continue
                 semantic_resolutions.append(
                     SemanticResolutionEvidence(
                         requested_term=str(requested),
@@ -1498,7 +1570,21 @@ def _resolve_channels(
                         catalog_version=semantic_catalog.catalog_version,
                         catalog_release_ref=semantic_catalog.release_ref,
                         catalog_content_sha256=semantic_catalog.content_sha256,
+                        catalog_artifact_sha256=catalog_artifact_sha256,
+                        requirement_id=(
+                            None if expectation is None else expectation.requirement_id
+                        ),
+                        request_sha256=(
+                            None if expectation is None else expectation.request_sha256
+                        ),
+                        scope_key=(None if expectation is None else expectation.scope_key),
+                        track_scope=(None if expectation is None else expectation.track_scope),
+                        binding_slot=(None if expectation is None else expectation.binding_slot),
+                        source_candidate_id=selected.source_candidate_id,
+                        source_handle=selected.source_handle,
+                        inspection_snapshot_id=selected.inspection_snapshot_id,
                         source_revision=source_revision,
+                        physical_mnemonic=selected.mnemonic,
                         physical_identity_json=canonical_physical_identity(
                             selected.physical_identity
                         ),
@@ -1720,6 +1806,8 @@ class AuthoringContextResolver:
         channel_aliases: Sequence[AuthoringChannelAlias | Mapping[str, Any]] = (),
         header_aliases: Mapping[str, Sequence[str]] | None = None,
         semantic_catalog: SemanticChannelCatalog = EMPTY_SEMANTIC_CHANNEL_CATALOG,
+        catalog_artifact_sha256: str | None = None,
+        semantic_publication_contract: SemanticPublicationContract | None = None,
     ) -> None:
         """Initialize deterministic catalogs without loading provider state."""
         self.channel_aliases = tuple(
@@ -1732,6 +1820,8 @@ class AuthoringContextResolver:
         if not semantic_catalog.verify_digest():
             raise ValueError("Semantic catalog failed content-digest validation.")
         self.semantic_catalog = semantic_catalog
+        self.catalog_artifact_sha256 = catalog_artifact_sha256
+        self.semantic_publication_contract = semantic_publication_contract
 
     def resolve(
         self,
@@ -1771,6 +1861,8 @@ class AuthoringContextResolver:
             channel_aliases=self.channel_aliases,
             semantic_catalog=self.semantic_catalog,
             expected_catalog_digest=expected_catalog_digest,
+            catalog_artifact_sha256=self.catalog_artifact_sha256,
+            semantic_publication_contract=self.semantic_publication_contract,
             explicit_physical_selectors=dict(explicit_physical_selectors or {}),
             decisions=decisions,
             issues=issues,
@@ -1825,6 +1917,8 @@ def resolve_authoring_context(
     channel_aliases: Sequence[AuthoringChannelAlias | Mapping[str, Any]] = (),
     header_aliases: Mapping[str, Sequence[str]] | None = None,
     semantic_catalog: SemanticChannelCatalog = EMPTY_SEMANTIC_CHANNEL_CATALOG,
+    catalog_artifact_sha256: str | None = None,
+    semantic_publication_contract: SemanticPublicationContract | None = None,
     expected_catalog_digest: str | None = None,
     explicit_physical_selectors: Mapping[str, ExplicitPhysicalChannelSelector | Mapping[str, Any]]
     | None = None,
@@ -1834,6 +1928,8 @@ def resolve_authoring_context(
         channel_aliases=channel_aliases,
         header_aliases=header_aliases,
         semantic_catalog=semantic_catalog,
+        catalog_artifact_sha256=catalog_artifact_sha256,
+        semantic_publication_contract=semantic_publication_contract,
     ).resolve(
         intent,
         existing=existing,

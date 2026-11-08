@@ -393,3 +393,24 @@ select a runtime framework or add a dependency. After independent design
 acceptance, implementation requires its own applicable authorization. A09
 integrated qualification remains open and attempt 003 retains its historical
 `FAIL` terminal.
+
+### CAT-02I implementation candidate (2026-11-07)
+
+CAT-02I provider-free implementation is being prepared for independent review
+on the existing development branch. It extends the existing catalog,
+authoring-context, enrichment, AgentSession/facade, shared postcondition, and
+notebook/MCP transaction boundaries. It adds strict separate artifact-byte,
+approval-manifest-byte, and canonical-content digest validation; a fixed
+package-resource release pin; a request-scoped immutable release carried with
+the host publication contract and revalidated before publication; exact
+host-derived semantic expectation/source joins; and semantic verification at
+the existing shared pre-publication boundary.
+
+The CAT-01 `semantic_catalog_activation_disabled` guard remains unchanged.
+No deployment pin or approved catalog is shipped, and no positive
+catalog-backed adapter transaction is enabled. Synthetic positives exercise
+the shared verifier only; notebook/MCP regressions verify no publication when
+semantic trust is absent. Candidate validation is provider-free; independent
+acceptance and CAT-03 activation remain pending. No baseline promotion,
+integration retry, provider call, C02 access, or scientific execution is
+authorized by this implementation candidate.

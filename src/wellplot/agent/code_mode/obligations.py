@@ -12,6 +12,18 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from ...semantic_catalog import (
+    ExpectedSemanticBinding,
+    SemanticCatalogTrustError,
+    SemanticPublicationContract,
+    SemanticRequestClassification,
+    SemanticResolutionEvidence,
+    TrustedCatalogRelease,
+    load_deployed_catalog_release,
+    revalidate_deployed_catalog_release,
+    verify_semantic_publication,
+)
+
 if TYPE_CHECKING:
     from ...model.intent import AuthoringDocumentIntent
     from .enrichment import ResolvedSectionContext
@@ -2575,10 +2587,67 @@ def verify_document_obligations(
 class DocumentPostconditionError(ValueError):
     """Identify which canonical pre-publication postcondition rejected a document."""
 
-    def __init__(self, check: Literal["obligations", "preservation"], message: str) -> None:
+    def __init__(
+        self,
+        check: Literal["obligations", "preservation", "semantic"],
+        message: str,
+    ) -> None:
         """Retain the original safe failure text and the failed check category."""
         self.check = check
         super().__init__(message)
+
+
+def compile_semantic_publication_contract(
+    obligations: Sequence[RequestObligation],
+    classifications: Sequence[SemanticRequestClassification],
+    *,
+    trusted_release: TrustedCatalogRelease | None = None,
+) -> SemanticPublicationContract:
+    """Bind host channel classifications to exact request obligations.
+
+    Every compiled channel obligation must be classified as an explicit
+    physical selector, a semantic family request with a full expected-binding
+    record, or unresolved. Unclassified and unresolved requests fail closed.
+    """
+    channel_obligations = {
+        item.requirement_id: item
+        for item in obligations
+        if item.owner_kind is OwnerKind.BINDING and item.field == "channel"
+    }
+    classified: dict[str, SemanticRequestClassification] = {}
+    for item in classifications:
+        if item.requirement_id in classified:
+            raise ValueError("semantic_request_classification_duplicate")
+        if item.requirement_id not in channel_obligations:
+            raise ValueError("semantic_request_classification_unexpected")
+        classified[item.requirement_id] = item
+    if set(classified) != set(channel_obligations):
+        raise ValueError("semantic_request_classification_incomplete")
+
+    expected: list[ExpectedSemanticBinding] = []
+    for requirement_id, obligation in channel_obligations.items():
+        classification = classified[requirement_id]
+        if classification.request_kind == "UNRESOLVED":
+            raise ValueError("semantic_request_unresolved")
+        if classification.request_kind == "EXPLICIT_PHYSICAL":
+            continue
+        binding = classification.expected_binding
+        if binding is None:
+            raise ValueError("semantic_expected_binding_missing")
+        if (
+            binding.request_sha256 != obligation.request_sha256
+            or binding.requirement_id != obligation.requirement_id
+            or binding.requested_term != str(obligation.value)
+            or (obligation.scope_key is not None and binding.scope_key != obligation.scope_key)
+            or (obligation.slot_key is not None and binding.binding_slot != obligation.slot_key)
+            or binding.track_scope != obligation.owner_ref
+        ):
+            raise ValueError("semantic_expected_binding_request_mismatch")
+        expected.append(binding)
+    return SemanticPublicationContract(
+        expected_bindings=tuple(expected),
+        trusted_release=trusted_release,
+    )
 
 
 def verify_document_postconditions(
@@ -2586,8 +2655,11 @@ def verify_document_postconditions(
     after: object,
     obligations: tuple[RequestObligation, ...],
     operations: Sequence[object],
+    *,
+    semantic_contract: SemanticPublicationContract | None = None,
+    semantic_evidence: Sequence[SemanticResolutionEvidence] = (),
 ) -> None:
-    """Verify request obligations and mutation preservation before publication."""
+    """Verify request, preservation, and optional semantic trust before publish."""
     try:
         verify_document_obligations(after, obligations, grounded_operations=operations)
     except ValueError as error:
@@ -2596,6 +2668,26 @@ def verify_document_postconditions(
         verify_document_preservation(before, after, operations)
     except ValueError as error:
         raise DocumentPostconditionError("preservation", str(error)) from error
+    expected = () if semantic_contract is None else semantic_contract.expected_bindings
+    if not expected and not semantic_evidence:
+        return
+    if semantic_contract is None:
+        raise DocumentPostconditionError("semantic", "semantic_expected_set_missing")
+    try:
+        release = semantic_contract.trusted_release
+        if release is None:
+            release = load_deployed_catalog_release()
+        release = revalidate_deployed_catalog_release(release)
+        verify_semantic_publication(
+            after,
+            observed=semantic_evidence,
+            contract=semantic_contract,
+            release=release,
+        )
+    except SemanticCatalogTrustError as error:
+        raise DocumentPostconditionError("semantic", error.code) from error
+    except ValueError as error:
+        raise DocumentPostconditionError("semantic", str(error)) from error
 
 
 def _document_sections_for_obligation(
@@ -2662,6 +2754,7 @@ __all__ = [
     "SharedScopeRule",
     "SupportedAnchor",
     "compile_request_contract",
+    "compile_semantic_publication_contract",
     "extract_supported_anchors",
     "extract_supported_obligations",
     "validate_report_obligations",

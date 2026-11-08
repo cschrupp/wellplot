@@ -17,6 +17,13 @@ from ...authoring_context import AuthoringChannelCandidate
 from ...file_revision import file_revision_token
 from ...model.authoring import AuthoringDocumentSpec
 from ...model.intent import AuthoringDocumentIntent
+from ...semantic_catalog import (
+    ExpectedSemanticBinding,
+    SemanticPublicationContract,
+    SemanticSourceBinding,
+    SemanticSourceChannel,
+    canonical_physical_identity,
+)
 from ..inspection import (
     AuthoringInspectionFacade,
     ChannelInspectionSummary,
@@ -334,7 +341,7 @@ class SemanticEnricher:
             if section_id is None:
                 continue
             available_channels[section_id] = [
-                _channel_candidate(channel, source_path=source.canonical_path)
+                _channel_candidate(channel, source=source, inspection_snapshot_id=None)
                 for source in sources
                 for channel in source.channels
             ]
@@ -905,7 +912,12 @@ def _validate_unique_section_targets(section_ids: Sequence[str | None]) -> None:
         first_by_id[section_id] = task_index
 
 
-def _channel_candidate(channel: ChannelContext, *, source_path: str) -> AuthoringChannelCandidate:
+def _channel_candidate(
+    channel: ChannelContext,
+    *,
+    source: SourceContext,
+    inspection_snapshot_id: str | None,
+) -> AuthoringChannelCandidate:
     """Adapt bounded source metadata to the canonical inspection facade input."""
     return AuthoringChannelCandidate(
         mnemonic=channel.mnemonic,
@@ -915,9 +927,13 @@ def _channel_candidate(channel: ChannelContext, *, source_path: str) -> Authorin
         description=channel.description,
         aliases=list(channel.aliases),
         value_shape=list(channel.shape),
-        source_path=source_path,
+        source_path=source.canonical_path,
         physical_identity=channel.physical_identity,
         addressability=channel.addressability,
+        source_candidate_id=source.candidate_id,
+        source_handle=source.handle,
+        inspection_snapshot_id=inspection_snapshot_id,
+        source_revision=source.revision_token,
     )
 
 
@@ -948,7 +964,11 @@ def reconciliation_channels(
         if not target_ids:
             continue
         channels = tuple(
-            _channel_candidate(channel, source_path=source.canonical_path)
+            _channel_candidate(
+                channel,
+                source=source,
+                inspection_snapshot_id=section_context.snapshot_id,
+            )
             for source in section_context.sources
             if source.canonical_path is not None
             for channel in source.channels
@@ -962,6 +982,67 @@ def reconciliation_channels(
                 )
             available[section_id] = channels
     return available
+
+
+def semantic_source_bindings(
+    context: EnrichedSemanticContext,
+    expected: Sequence[ExpectedSemanticBinding],
+) -> tuple[SemanticSourceBinding, ...]:
+    """Build the private source-to-scope map required for semantic publication."""
+    scope_by_task: dict[int, str] = {}
+    for binding in expected:
+        previous = scope_by_task.get(binding.task_index)
+        if previous is not None and previous != binding.scope_key:
+            raise ValueError("semantic_source_scope_ambiguous")
+        scope_by_task[binding.task_index] = binding.scope_key
+
+    sections_by_task = {section.task_index: section for section in context.sections}
+    if len(sections_by_task) != len(context.sections):
+        raise ValueError("semantic_inspection_task_duplicate")
+
+    result: dict[tuple[str, str, str], SemanticSourceBinding] = {}
+    for task_index, scope_key in scope_by_task.items():
+        section = sections_by_task.get(task_index)
+        if section is None or section.snapshot_id is None:
+            raise ValueError("semantic_inspection_snapshot_missing")
+        for source in section.sources:
+            if not source.candidate_id or not source.handle or not source.revision_token:
+                raise ValueError("semantic_source_identity_missing")
+            channels: list[SemanticSourceChannel] = []
+            for channel in source.channels:
+                if not channel.physical_identity:
+                    raise ValueError("semantic_physical_identity_missing")
+                channels.append(
+                    SemanticSourceChannel(
+                        mnemonic=channel.mnemonic,
+                        physical_identity_json=canonical_physical_identity(
+                            channel.physical_identity
+                        ),
+                        addressability=channel.addressability,
+                    )
+                )
+            source_binding = SemanticSourceBinding(
+                scope_key=scope_key,
+                candidate_id=source.candidate_id,
+                source_handle=source.handle,
+                inspection_snapshot_id=section.snapshot_id,
+                source_revision=source.revision_token,
+                channels=tuple(channels),
+            )
+            result[(scope_key, source.candidate_id, source.handle)] = source_binding
+    return tuple(result[key] for key in sorted(result))
+
+
+def bind_semantic_publication_sources(
+    contract: SemanticPublicationContract,
+    context: EnrichedSemanticContext,
+) -> SemanticPublicationContract:
+    """Attach the current inspected source map to the host expected set."""
+    return SemanticPublicationContract(
+        expected_bindings=contract.expected_bindings,
+        source_bindings=semantic_source_bindings(context, contract.expected_bindings),
+        trusted_release=contract.trusted_release,
+    )
 
 
 def intent_requires_channel_context(intent: AuthoringDocumentIntent) -> bool:
@@ -1149,4 +1230,6 @@ __all__ = [
     "SourceLoaderProtocol",
     "SourceMetadata",
     "SnapshotSource",
+    "bind_semantic_publication_sources",
+    "semantic_source_bindings",
 ]

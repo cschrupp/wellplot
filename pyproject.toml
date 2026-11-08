@@ -122,6 +122,7 @@ version = {attr = "wellplot._version.__version__"}
   "packet_blueprints/*.yaml",
   "production/*/*.md",
   "production/*/*.yaml",
+  "semantic_catalog/*.json",
 ]
 
 [tool.uv]
