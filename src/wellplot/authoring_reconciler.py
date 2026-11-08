@@ -29,18 +29,22 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from enum import StrEnum
+from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from .authoring_context import (
     AuthoringChannelAlias,
+    AuthoringChannelCandidate,
+    AuthoringChannelInventory,
     AuthoringChannelInventoryInput,
     AuthoringContextIssue,
     AuthoringContextResolution,
     ExplicitPhysicalChannelSelector,
     resolve_authoring_context,
 )
+from .file_revision import file_revision_token
 from .model.authoring import AuthoringDocumentSpec
 from .model.intent import (
     AuthoringAnnotationIntent,
@@ -58,8 +62,12 @@ from .model.intent import (
 )
 from .semantic_catalog import (
     EMPTY_SEMANTIC_CHANNEL_CATALOG,
+    SemanticCatalogTrustError,
     SemanticChannelCatalog,
+    SemanticPublicationContract,
     SemanticResolutionEvidence,
+    load_deployed_catalog_release,
+    sha256_file,
 )
 
 
@@ -141,6 +149,10 @@ class AuthoringReconciliationPlan(_ReconcilerModel):
     unchanged_paths: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     semantic_resolutions: list[SemanticResolutionEvidence] = Field(default_factory=list)
+    semantic_publication_contract: SemanticPublicationContract | None = Field(
+        default=None,
+        exclude=True,
+    )
 
 
 _MISSING = object()
@@ -1300,6 +1312,7 @@ def reconcile_authoring(
     header_aliases: Mapping[str, Sequence[str]] | None = None,
     semantic_catalog: SemanticChannelCatalog = EMPTY_SEMANTIC_CHANNEL_CATALOG,
     expected_catalog_digest: str | None = None,
+    semantic_publication_contract: SemanticPublicationContract | None = None,
     explicit_physical_selectors: Mapping[str, ExplicitPhysicalChannelSelector | Mapping[str, Any]]
     | None = None,
 ) -> AuthoringReconciliationPlan:
@@ -1316,7 +1329,16 @@ def reconcile_authoring(
         or semantic_catalog.request_term_rules
         or semantic_catalog.physical_channel_rules
     )
+    trusted_release = None
     if catalog_has_content or (pre_resolved and pre_resolved.semantic_resolutions):
+        try:
+            trusted_release = load_deployed_catalog_release()
+        except SemanticCatalogTrustError:
+            trusted_release = None
+    if (
+        catalog_has_content
+        and (trusted_release is None or semantic_catalog != trusted_release.catalog)
+    ) or (pre_resolved is not None and pre_resolved.semantic_resolutions):
         return AuthoringReconciliationPlan(
             ready=False,
             issues=[
@@ -1334,6 +1356,31 @@ def reconcile_authoring(
             ),
         )
 
+    if trusted_release is not None:
+        semantic_catalog = trusted_release.catalog
+        expected_catalog_digest = trusted_release.pin.content_sha256
+        try:
+            available_channels = _apply_scoped_source_digests(
+                available_channels,
+                semantic_catalog,
+            )
+        except ValueError as error:
+            return AuthoringReconciliationPlan(
+                ready=False,
+                issues=[
+                    AuthoringReconciliationIssue(
+                        path="semantic_catalog.source_scope",
+                        code=str(error),
+                        message="An approved source could not be content-verified.",
+                    )
+                ],
+            )
+        if semantic_publication_contract is not None:
+            semantic_publication_contract = _bind_catalog_source_map(
+                semantic_publication_contract,
+                available_channels,
+            )
+
     resolution = (
         desired
         if isinstance(desired, AuthoringContextResolution)
@@ -1347,6 +1394,10 @@ def reconcile_authoring(
             header_aliases=header_aliases,
             semantic_catalog=semantic_catalog,
             expected_catalog_digest=expected_catalog_digest,
+            catalog_artifact_sha256=(
+                None if trusted_release is None else trusted_release.pin.catalog_artifact_sha256
+            ),
+            semantic_publication_contract=semantic_publication_contract,
             explicit_physical_selectors=explicit_physical_selectors,
         )
     )
@@ -1688,7 +1739,127 @@ def reconcile_authoring(
         unchanged_paths=list(dict.fromkeys(unchanged)),
         warnings=resolution.warnings,
         semantic_resolutions=resolution.semantic_resolutions,
+        semantic_publication_contract=semantic_publication_contract,
     )
+
+
+def _apply_scoped_source_digests(
+    available_channels: Mapping[str, AuthoringChannelInventoryInput] | None,
+    catalog: SemanticChannelCatalog,
+) -> Mapping[str, AuthoringChannelInventoryInput] | None:
+    """Hash only sources selected by a trusted content-bound catalog rule."""
+    if available_channels is None:
+        return None
+    constrained_rules = tuple(
+        rule
+        for rule in catalog.physical_channel_rules
+        if rule.status == "reviewed" and rule.source_content_sha256 is not None
+    )
+    if not constrained_rules:
+        return available_channels
+
+    digest_by_path: dict[str, str] = {}
+    revision_by_path: dict[str, str] = {}
+
+    def update_candidate(candidate: AuthoringChannelCandidate) -> AuthoringChannelCandidate:
+        path = candidate.source_path
+        if path is None or not any(
+            _same_source_scope(path, scope)
+            for rule in constrained_rules
+            for scope in rule.source_scope
+        ):
+            return candidate
+        try:
+            canonical_path = str(Path(path).expanduser().resolve(strict=True))
+            revision_now = file_revision_token(Path(canonical_path))
+        except OSError as error:
+            raise ValueError("semantic_source_content_unavailable") from error
+        if candidate.source_revision is not None and revision_now != candidate.source_revision:
+            raise ValueError("semantic_source_revision_changed")
+        digest = digest_by_path.get(canonical_path)
+        if digest is None:
+            try:
+                digest = sha256_file(canonical_path)
+                revision_after = file_revision_token(Path(canonical_path))
+            except OSError as error:
+                raise ValueError("semantic_source_content_unavailable") from error
+            if revision_now != revision_after:
+                raise ValueError("semantic_source_revision_changed")
+            digest_by_path[canonical_path] = digest
+            revision_by_path[canonical_path] = revision_now
+        elif revision_by_path[canonical_path] != revision_now:
+            raise ValueError("semantic_source_revision_changed")
+        return candidate.model_copy(update={"source_content_sha256": digest})
+
+    updated: dict[str, AuthoringChannelInventoryInput] = {}
+    for section_id, inventory in available_channels.items():
+        if isinstance(inventory, AuthoringChannelInventory):
+            updated[section_id] = inventory.model_copy(
+                update={"channels": tuple(update_candidate(item) for item in inventory.channels)}
+            )
+            continue
+        if isinstance(inventory, Sequence) and not isinstance(inventory, (str, bytes)):
+            candidates: list[object] = []
+            for item in inventory:
+                if isinstance(item, AuthoringChannelCandidate):
+                    candidates.append(update_candidate(item))
+                elif isinstance(item, Mapping):
+                    candidates.append(
+                        update_candidate(AuthoringChannelCandidate.model_validate(item))
+                    )
+                else:
+                    candidates.append(item)
+            updated[section_id] = tuple(candidates)  # type: ignore[assignment]
+        else:
+            updated[section_id] = inventory
+    return updated
+
+
+def _bind_catalog_source_map(
+    contract: SemanticPublicationContract,
+    available_channels: Mapping[str, AuthoringChannelInventoryInput] | None,
+) -> SemanticPublicationContract:
+    """Enrich host source bindings from the same candidates used to resolve."""
+    if available_channels is None:
+        return contract
+    candidates: list[AuthoringChannelCandidate] = []
+    for inventory in available_channels.values():
+        if isinstance(inventory, AuthoringChannelInventory):
+            candidates.extend(inventory.channels)
+        elif isinstance(inventory, Sequence) and not isinstance(inventory, (str, bytes)):
+            for item in inventory:
+                if isinstance(item, AuthoringChannelCandidate):
+                    candidates.append(item)
+                elif isinstance(item, Mapping):
+                    candidates.append(AuthoringChannelCandidate.model_validate(item))
+    bindings = []
+    for binding in contract.source_bindings:
+        matches = [
+            candidate
+            for candidate in candidates
+            if candidate.source_candidate_id == binding.candidate_id
+            and candidate.source_handle == binding.source_handle
+        ]
+        if len(matches) == 1:
+            candidate = matches[0]
+            bindings.append(
+                binding.model_copy(
+                    update={
+                        "source_path": candidate.source_path,
+                        "source_content_sha256": candidate.source_content_sha256,
+                    }
+                )
+            )
+        else:
+            bindings.append(binding)
+    return contract.model_copy(update={"source_bindings": tuple(bindings)})
+
+
+def _same_source_scope(candidate_path: str, scope: str) -> bool:
+    """Compare an inspected canonical path with a trusted catalog scope."""
+    resolved_candidate = Path(candidate_path).expanduser().resolve(strict=False)
+    resolved_scope = Path(scope).expanduser().resolve(strict=False)
+    return resolved_candidate == resolved_scope
 
 
 __all__ = [

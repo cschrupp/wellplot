@@ -31,6 +31,7 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from enum import StrEnum
 from fnmatch import fnmatchcase
+from pathlib import Path
 from re import sub
 from typing import Any, Literal, TypeAlias
 
@@ -111,6 +112,7 @@ class AuthoringChannelCandidate(_ContextModel):
     description: str = ""
     value_shape: list[int] = Field(default_factory=list)
     source_path: str | None = Field(default=None, min_length=1)
+    source_content_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     physical_identity: dict[str, Any] = Field(default_factory=dict)
     addressability: Literal["ADDRESSABLE", "UNADDRESSABLE", "UNKNOWN"] = "ADDRESSABLE"
     source_candidate_id: str | None = Field(default=None, min_length=1)
@@ -972,7 +974,22 @@ def _catalog_family_match(
             )
             if not matcher_hit:
                 continue
-            if rule.source_scope and candidate.source_path not in rule.source_scope:
+            if rule.source_scope and (
+                candidate.source_path is None
+                or not any(
+                    _same_catalog_source_path(candidate.source_path, scope)
+                    for scope in rule.source_scope
+                )
+            ):
+                continue
+            if (
+                rule.source_content_sha256 is not None
+                and candidate.source_content_sha256 != rule.source_content_sha256
+            ):
+                continue
+            if rule.kind_constraints and candidate.kind.casefold() not in {
+                kind.casefold() for kind in rule.kind_constraints
+            }:
                 continue
             if rule.unit_constraints and (
                 candidate.unit is None
@@ -992,6 +1009,13 @@ def _catalog_family_match(
     # Family-level absence stays open-world until an exhaustive scope contract
     # is implemented and independently approved.
     return "unknown_open_world", (), family_id
+
+
+def _same_catalog_source_path(candidate_path: str, source_scope: str) -> bool:
+    """Resolve a catalog path scope against the host's canonical source path."""
+    return Path(candidate_path).expanduser().resolve(strict=False) == Path(
+        source_scope
+    ).expanduser().resolve(strict=False)
 
 
 def _candidate_matches(

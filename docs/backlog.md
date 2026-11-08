@@ -394,6 +394,36 @@ acceptance, implementation requires its own applicable authorization. A09
 integrated qualification remains open and attempt 003 retains its historical
 `FAIL` terminal.
 
+## A09-CAT-03 — Fixture-Scoped Gamma Ray Activation Candidate
+
+On 2026-11-08 the project owner/domain reviewer approved one rule only:
+semantic request `Gamma Ray` → family `gamma_ray` → exact scalar `GR`, unit
+`gAPI`, addressable, for `workspace/data/30-23a-3 8117_d.las` with exact
+source SHA-256
+`7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9`.
+`CGR`, `GRD`, all other gamma-like mnemonics, bare `GR` as a family term,
+transformations, and display presets are excluded. The approved record is
+`docs/architecture/A09_CAT_03_INITIAL_GAMMA_RAY_MAPPING_APPROVAL.md`.
+
+The provider-free implementation candidate adds optional per-rule source
+content SHA enforcement. The host hashes only a source whose canonical path
+matches a trusted reviewed rule scope, keeps that digest separate from the
+filesystem revision token, and rehashes at the existing shared
+`verify_document_postconditions()` boundary before persistence. The runtime
+catalog remains selected from the fixed package pin; caller/model/evidence
+cannot establish catalog or source-hash authority. The exact catalog artifact,
+approval manifest and pin are currently candidate files, not independently
+accepted release artifacts.
+
+Focused provider-free tests cover approved path/hash eligibility, wrong or
+replaced bytes at the approved path, identical bytes at an unapproved path,
+pre-publication source drift, no-hash legacy behavior, and a canonical
+in-memory reconcile/execute/shared-verifier transaction. This is not a
+positive notebook/MCP persistence qualification and does not close A09
+integrated qualification. Independent review of the candidate is pending;
+do not promote the active baseline, run provider/model or scientific work, or
+claim production readiness before that review.
+
 ### CAT-02I implementation candidate (2026-11-07)
 
 CAT-02I provider-free implementation is being prepared for independent review

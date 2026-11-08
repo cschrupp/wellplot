@@ -1015,6 +1015,8 @@ def semantic_source_bindings(
                 channels.append(
                     SemanticSourceChannel(
                         mnemonic=channel.mnemonic,
+                        kind=channel.kind,
+                        unit=channel.unit,
                         physical_identity_json=canonical_physical_identity(
                             channel.physical_identity
                         ),
@@ -1027,6 +1029,7 @@ def semantic_source_bindings(
                 source_handle=source.handle,
                 inspection_snapshot_id=section.snapshot_id,
                 source_revision=source.revision_token,
+                source_path=source.canonical_path,
                 channels=tuple(channels),
             )
             result[(scope_key, source.candidate_id, source.handle)] = source_binding

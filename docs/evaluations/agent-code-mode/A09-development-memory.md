@@ -601,3 +601,37 @@ separate authorization. A09 integrated qualification remains open, attempt
 003 retains its historical `FAIL`, and no provider/model/endpoint, C02, live,
 or scientific execution occurred. CAT-02 is closed; this acceptance neither
 authorizes CAT-03 nor changes the A09 integration gate.
+
+## A09-CAT-03 — Initial Gamma Ray Candidate (2026-11-08)
+
+The project owner/domain reviewer approved one fixture-bound semantic rule:
+`Gamma Ray` → family `gamma_ray` → exact physical mnemonic `GR`, scalar,
+`gAPI`, `ADDRESSABLE`, for
+`workspace/data/30-23a-3 8117_d.las`, source SHA-256
+`7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9`.
+The approved preflight found exactly one GR at LAS curve index 7; `CGR` and
+`GRD` remain excluded and distinct. Bare `GR` is not a semantic request term.
+No transformation or display preset is approved. Rights remain
+`REFERENCE_ONLY / REDISTRIBUTION_NOT_ESTABLISHED` for the SLB citation and
+`LOCAL_QUALIFICATION_ASSET / REDISTRIBUTION_NOT_ESTABLISHED` for the LAS; the
+catalog stores the fixture path/hash, not the LAS bytes. See
+`docs/architecture/A09_CAT_03_INITIAL_GAMMA_RAY_MAPPING_APPROVAL.md`.
+
+The current unaccepted provider-free candidate adds an optional
+`source_content_sha256` constraint to the existing physical rule and host
+candidate/source-binding models. The fixed deployment-pinned package release
+is loaded independently of reconciliation/evidence. The host hashes only
+sources matching a reviewed content-bound scope before resolution, compares
+the exact digest as part of applicability, and rehashes at the existing shared
+`verify_document_postconditions()` publication boundary. Filesystem revision
+tokens remain optimistic change-detection identities, not content hashes.
+Tests cover matching/mismatching path and digest, same-path replacement,
+unapproved path with identical bytes, source drift before publication, and
+legacy rules without a content hash. A provider-free canonical in-memory
+reconcile/execute/shared-verifier positive is included; no YAML persistence,
+provider/model call, live smoke, C02, or scientific execution was performed.
+
+The catalog, approval manifest, and fixed pin are candidate release artifacts
+only. Independent review remains pending; no active-baseline promotion or
+production-readiness claim is made. The accepted A09 baseline still governs
+until CAT-03 candidate acceptance is recorded.

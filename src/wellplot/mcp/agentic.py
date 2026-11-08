@@ -36,6 +36,11 @@ from ..errors import AuthoringPublicationRecoveryError, AuthoringSnapshotConflic
 from ..file_revision import file_revision_token
 from ..logfile import load_logfile_text, resolve_section_data_sources_for_logfile
 from ..model.authoring import AuthoringDocumentSpec
+from ..semantic_catalog import (
+    EMPTY_SEMANTIC_CHANNEL_CATALOG,
+    SemanticCatalogTrustError,
+    load_deployed_catalog_release,
+)
 from . import service
 
 
@@ -182,6 +187,8 @@ def _apply_session_result(
 
     private_service = AuthoringService(context.document)
     inspected = getattr(session_result, "inspection_context", None)
+    semantic_catalog = EMPTY_SEMANTIC_CHANNEL_CATALOG
+    semantic_contract = session_result.semantic_publication_contract
     if inspected is None:
         if intent_requires_channel_context(intent):
             return (
@@ -193,17 +200,29 @@ def _apply_session_result(
                 [section.id for section in context.document.sections],
             )
         available_channels = {}
-        semantic_contract = session_result.semantic_publication_contract
     else:
         try:
             validate_enriched_snapshot(inspected, private_service.document)
             available_channels = reconciliation_channels(inspected, intent)
-            semantic_contract = session_result.semantic_publication_contract
             if semantic_contract is not None and semantic_contract.expected_bindings:
                 semantic_contract = bind_semantic_publication_sources(
                     semantic_contract,
                     inspected,
                 )
+                trusted_release = load_deployed_catalog_release()
+                semantic_catalog = trusted_release.catalog
+                semantic_contract = semantic_contract.model_copy(
+                    update={"trusted_release": trusted_release}
+                )
+        except SemanticCatalogTrustError as error:
+            return (
+                False,
+                False,
+                False,
+                [f"{error.code}: trusted semantic catalog unavailable."],
+                ["reconciliation_blocked"],
+                [section.id for section in context.document.sections],
+            )
         except ValueError as error:
             return (
                 False,
@@ -213,11 +232,23 @@ def _apply_session_result(
                 ["stale_snapshot_conflict"],
                 [section.id for section in context.document.sections],
             )
-    plan = reconcile_authoring(
-        intent,
-        existing=private_service.document,
-        available_channels=available_channels,
-    )
+    try:
+        plan = reconcile_authoring(
+            intent,
+            existing=private_service.document,
+            available_channels=available_channels,
+            semantic_catalog=semantic_catalog,
+            semantic_publication_contract=semantic_contract,
+        )
+    except SemanticCatalogTrustError as error:
+        return (
+            False,
+            False,
+            False,
+            [f"{error.code}: trusted semantic catalog unavailable."],
+            ["reconciliation_blocked"],
+            [section.id for section in context.document.sections],
+        )
     if not plan.ready:
         return (
             False,
@@ -227,6 +258,8 @@ def _apply_session_result(
             ["reconciliation_blocked"],
             [section.id for section in context.document.sections],
         )
+    if plan.semantic_publication_contract is not None:
+        semantic_contract = plan.semantic_publication_contract
 
     execution = execute_authoring_plan(private_service, plan)
     if not execution.success:

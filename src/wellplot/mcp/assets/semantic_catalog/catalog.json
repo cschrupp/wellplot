@@ -1,0 +1,74 @@
+{
+  "schema_version": "1",
+  "catalog_id": "wellplot.semantic-curve-catalog",
+  "catalog_version": "0.1.0-cat03-gr-fixture",
+  "release_ref": "wellplot.semantic-curve-catalog/0.1.0-cat03-gr-fixture",
+  "content_sha256": "e89f4b61c67930bdecdec14eab9a326225f90c7e8232910bca98fcff32cb5a4c",
+  "source_provenance": [
+    {
+      "id": "cat03-domain-approval",
+      "source_id": "A09_CAT_03_INITIAL_GAMMA_RAY_MAPPING_APPROVAL",
+      "source_sha256": "8097910a3eb0086c792ac2f5006666cd5d95d9543c6f33c94df04ff9617692bd",
+      "evidence_ref": "docs/architecture/A09_CAT_03_INITIAL_GAMMA_RAY_MAPPING_APPROVAL.md",
+      "license_status": "not_applicable",
+      "redistribution_status": "not_applicable"
+    },
+    {
+      "id": "cat03-open-hole-fixture",
+      "source_id": "workspace/data/30-23a-3 8117_d.las",
+      "source_sha256": "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9",
+      "evidence_ref": "docs/architecture/A09_CAT_03_INITIAL_GAMMA_RAY_MAPPING_APPROVAL.md#approved-rule",
+      "license_status": "not_established",
+      "redistribution_status": "not_established"
+    }
+  ],
+  "families": [
+    {
+      "id": "gamma_ray",
+      "label": "Gamma Ray",
+      "concept_kind": "physical_quantity",
+      "measurement_type": null,
+      "compatible_unit_ids": ["gAPI"],
+      "supported_visualization_types": ["curve"],
+      "absence_scope": "OPEN_WORLD"
+    }
+  ],
+  "request_term_rules": [
+    {
+      "id": "request-term-gamma-ray-v1",
+      "family_id": "gamma_ray",
+      "terms": ["Gamma Ray"],
+      "normalization_profile_id": "casefold_whitespace_v1",
+      "status": "reviewed",
+      "provenance_ids": ["cat03-domain-approval"],
+      "review": {
+        "reviewer": "Carlos Schrupp",
+        "reviewer_role": "Project Owner / Wireline & Petrophysics Domain Reviewer",
+        "reviewed_at": "2026-11-08",
+        "scope": "Exact GR curve, gAPI, scalar/addressable, source path and SHA-256 in CAT-03 approval record",
+        "decision": "approved"
+      }
+    }
+  ],
+  "physical_channel_rules": [
+    {
+      "id": "physical-gamma-ray-gr-fixture-v1",
+      "family_id": "gamma_ray",
+      "matcher_kind": "exact_mnemonic",
+      "matcher_value": "GR",
+      "source_scope": ["workspace/data/30-23a-3 8117_d.las"],
+      "source_content_sha256": "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9",
+      "kind_constraints": ["scalar"],
+      "unit_constraints": ["gAPI"],
+      "status": "reviewed",
+      "provenance_ids": ["cat03-domain-approval"],
+      "review": {
+        "reviewer": "Carlos Schrupp",
+        "reviewer_role": "Project Owner / Wireline & Petrophysics Domain Reviewer",
+        "reviewed_at": "2026-11-08",
+        "scope": "Exact GR curve, gAPI, scalar/addressable, source path and SHA-256 in CAT-03 approval record",
+        "decision": "approved"
+      }
+    }
+  ]
+}

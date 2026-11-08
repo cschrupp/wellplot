@@ -131,6 +131,8 @@ class PhysicalChannelRule(_CatalogModel):
     matcher_kind: Literal["exact_mnemonic", "restricted_glob"]
     matcher_value: str = Field(min_length=1)
     source_scope: tuple[str, ...] = ()
+    source_content_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
+    kind_constraints: tuple[str, ...] = ()
     unit_constraints: tuple[str, ...] = ()
     status: Literal["candidate", "reviewed", "deprecated"]
     provenance_ids: tuple[str, ...] = ()
@@ -143,6 +145,8 @@ class PhysicalChannelRule(_CatalogModel):
             character in self.matcher_value for character in "[]"
         ):
             raise ValueError("Restricted glob matchers do not support character classes.")
+        if self.source_content_sha256 is not None and not self.source_scope:
+            raise ValueError("Content-bound source rules require an explicit source scope.")
         return self
 
 
@@ -298,6 +302,8 @@ class SemanticSourceChannel(_CatalogModel):
     """One physical channel projection in a host-owned inspected source map."""
 
     mnemonic: str = Field(min_length=1)
+    kind: str = Field(default="scalar", min_length=1)
+    unit: str | None = Field(default=None, min_length=1)
     physical_identity_json: str = Field(min_length=2)
     addressability: Literal["ADDRESSABLE", "UNADDRESSABLE", "UNKNOWN"]
 
@@ -324,7 +330,16 @@ class SemanticSourceBinding(_CatalogModel):
     source_handle: str = Field(min_length=1)
     inspection_snapshot_id: str = Field(min_length=1)
     source_revision: str = Field(min_length=1)
+    source_path: str | None = Field(default=None, min_length=1)
+    source_content_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     channels: tuple[SemanticSourceChannel, ...]
+
+    @model_validator(mode="after")
+    def validate_content_identity(self) -> SemanticSourceBinding:
+        """Require a path whenever a host source binding carries a content hash."""
+        if self.source_content_sha256 is not None and self.source_path is None:
+            raise ValueError("A source content digest requires its host source path.")
+        return self
 
 
 class SemanticPublicationContract(_CatalogModel):
@@ -433,6 +448,13 @@ def verify_semantic_publication(
         ]
         if len(channels) != 1 or channels[0].addressability != "ADDRESSABLE":
             raise ValueError("semantic_channel_not_addressable")
+        _verify_source_applicability(
+            release.catalog,
+            family_id=evidence.family_id,
+            requested_term=evidence.requested_term,
+            channel=channels[0],
+            source=source,
+        )
 
         if not _document_has_semantic_binding(
             document,
@@ -442,6 +464,87 @@ def verify_semantic_publication(
             channel=evidence.physical_mnemonic or "",
         ):
             raise ValueError("semantic_binding_document_mismatch")
+
+
+def _verify_source_applicability(
+    catalog: SemanticChannelCatalog,
+    *,
+    family_id: str,
+    requested_term: str,
+    channel: SemanticSourceChannel,
+    source: SemanticSourceBinding,
+) -> None:
+    """Recheck the trusted rule's path, content, kind, and unit constraints."""
+    request_family_ids = {
+        rule.family_id
+        for rule in catalog.request_term_rules
+        if rule.status == "reviewed"
+        and any(
+            normalize_request_term(term) == normalize_request_term(requested_term)
+            for term in rule.terms
+        )
+    }
+    if request_family_ids != {family_id}:
+        raise ValueError("semantic_request_family_mismatch")
+    applicable_rules = [
+        rule
+        for rule in catalog.physical_channel_rules
+        if rule.status == "reviewed"
+        and rule.family_id == family_id
+        and rule.matcher_kind == "exact_mnemonic"
+        and rule.matcher_value.casefold() == channel.mnemonic.casefold()
+        and (
+            not rule.kind_constraints
+            or channel.kind.casefold() in {item.casefold() for item in rule.kind_constraints}
+        )
+        and (
+            not rule.unit_constraints
+            or (
+                channel.unit is not None
+                and channel.unit.casefold() in {item.casefold() for item in rule.unit_constraints}
+            )
+        )
+        and (
+            not rule.source_scope
+            or (
+                source.source_path is not None
+                and any(_same_source_path(source.source_path, item) for item in rule.source_scope)
+            )
+        )
+    ]
+    if len(applicable_rules) != 1:
+        raise ValueError("semantic_source_applicability_mismatch")
+    rule = applicable_rules[0]
+    if rule.source_content_sha256 is None:
+        return
+    if source.source_content_sha256 != rule.source_content_sha256:
+        raise ValueError("semantic_source_content_mismatch")
+    if source.source_path is None:
+        raise ValueError("semantic_source_path_missing")
+    try:
+        current_digest = sha256_file(source.source_path)
+    except OSError:
+        raise ValueError("semantic_source_content_unavailable") from None
+    if current_digest != rule.source_content_sha256:
+        raise ValueError("semantic_source_content_mismatch")
+
+
+def _same_source_path(left: str, right: str) -> bool:
+    """Compare host paths after resolving relative catalog scopes at runtime."""
+    from pathlib import Path
+
+    return Path(left).expanduser().resolve(strict=False) == Path(right).expanduser().resolve(
+        strict=False
+    )
+
+
+def sha256_file(path: str) -> str:
+    """Hash one source file incrementally without retaining its contents."""
+    digest = hashlib.sha256()
+    with open(path, "rb") as source_file:
+        for block in iter(lambda: source_file.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def _semantic_evidence_key(

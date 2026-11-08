@@ -18,6 +18,11 @@ from ..file_revision import file_revision_token
 from ..logfile import load_logfile_text, resolve_section_data_sources_for_logfile
 from ..mcp import service as mcp_service
 from ..model.authoring import AuthoringDocumentSpec
+from ..semantic_catalog import (
+    EMPTY_SEMANTIC_CHANNEL_CATALOG,
+    SemanticCatalogTrustError,
+    load_deployed_catalog_release,
+)
 from .code_mode.enrichment import (
     bind_semantic_publication_sources,
     intent_requires_channel_context,
@@ -257,6 +262,8 @@ def _apply_result(
 
     private_service = AuthoringService(context.document)
     inspected = result.inspection_context
+    semantic_catalog = EMPTY_SEMANTIC_CHANNEL_CATALOG
+    semantic_contract = result.semantic_publication_contract
     if inspected is None:
         if intent_requires_channel_context(result.intent):
             return (
@@ -268,7 +275,6 @@ def _apply_result(
                 stages,
             )
         available_channels = {}
-        semantic_contract = result.semantic_publication_contract
     else:
         try:
             validate_enriched_snapshot(inspected, private_service.document)
@@ -279,6 +285,21 @@ def _apply_result(
                     semantic_contract,
                     inspected,
                 )
+            if semantic_contract is not None and semantic_contract.expected_bindings:
+                trusted_release = load_deployed_catalog_release()
+                semantic_catalog = trusted_release.catalog
+                semantic_contract = semantic_contract.model_copy(
+                    update={"trusted_release": trusted_release}
+                )
+        except SemanticCatalogTrustError as error:
+            return (
+                False,
+                False,
+                False,
+                [f"{error.code}: trusted semantic catalog unavailable."],
+                "reconciliation_blocked",
+                stages,
+            )
         except ValueError as error:
             return (
                 False,
@@ -288,14 +309,28 @@ def _apply_result(
                 "stale_snapshot_conflict",
                 stages,
             )
-    plan = reconcile_authoring(
-        result.intent,
-        existing=private_service.document,
-        available_channels=available_channels,
-    )
+    try:
+        plan = reconcile_authoring(
+            result.intent,
+            existing=private_service.document,
+            available_channels=available_channels,
+            semantic_catalog=semantic_catalog,
+            semantic_publication_contract=semantic_contract,
+        )
+    except SemanticCatalogTrustError as error:
+        return (
+            False,
+            False,
+            False,
+            [f"{error.code}: trusted semantic catalog unavailable."],
+            "reconciliation_blocked",
+            stages,
+        )
     if not plan.ready:
         errors = [f"{issue.code}: {issue.message}" for issue in plan.issues]
         return False, False, False, errors, "reconciliation_blocked", stages
+    if plan.semantic_publication_contract is not None:
+        semantic_contract = plan.semantic_publication_contract
     stages["reconciliation"] = "PASS"
 
     execution = execute_authoring_plan(private_service, plan)

@@ -5,11 +5,13 @@ from __future__ import annotations
 import hashlib
 import json
 from copy import deepcopy
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
 from wellplot.agent.code_mode.obligations import (
+    DocumentPostconditionError,
     ObligationKind,
     OwnerKind,
     RequestObligation,
@@ -19,12 +21,14 @@ from wellplot.agent.code_mode.obligations import (
 from wellplot.authoring_context import (
     AuthoringChannelCandidate,
     AuthoringChannelInventory,
+    AuthoringContextResolution,
     AuthoringContextResolver,
     resolve_authoring_context,
 )
 from wellplot.authoring_executor import execute_authoring_plan
-from wellplot.authoring_reconciler import reconcile_authoring
+from wellplot.authoring_reconciler import _apply_scoped_source_digests, reconcile_authoring
 from wellplot.authoring_service import AuthoringService
+from wellplot.file_revision import file_revision_token
 from wellplot.model.authoring import AuthoringDocumentSpec, AuthoringScale
 from wellplot.model.intent import AuthoringDocumentIntent
 from wellplot.semantic_catalog import (
@@ -53,6 +57,10 @@ def _reviewed_catalog(
     request_status: str = "reviewed",
     physical_mnemonics: tuple[str, ...] = ("GR_STGC",),
     physical_status: str = "reviewed",
+    source_scope: tuple[str, ...] = (),
+    source_content_sha256: str | None = None,
+    kind_constraints: tuple[str, ...] = (),
+    unit_constraints: tuple[str, ...] = (),
 ) -> SemanticChannelCatalog:
     """Create an isolated synthetic catalog; no production mapping is implied."""
     provenance = {
@@ -103,6 +111,10 @@ def _reviewed_catalog(
                     "family_id": "family.gamma-ray.test",
                     "matcher_kind": "exact_mnemonic",
                     "matcher_value": mnemonic,
+                    "source_scope": list(source_scope),
+                    "source_content_sha256": source_content_sha256,
+                    "kind_constraints": list(kind_constraints),
+                    "unit_constraints": list(unit_constraints),
                     "status": physical_status,
                     "provenance_ids": ["synthetic-fixture"],
                     "review": review if physical_status == "reviewed" else None,
@@ -230,6 +242,9 @@ def _publication_case(
     channel: str = "GR_STGC",
     frame: int = 0,
     addressability: str = "ADDRESSABLE",
+    catalog: SemanticChannelCatalog | None = None,
+    source_path: str | None = None,
+    source_content_sha256: str | None = None,
 ) -> tuple[
     AuthoringDocumentSpec,
     SemanticPublicationContract,
@@ -237,7 +252,7 @@ def _publication_case(
     TrustedCatalogRelease,
 ]:
     """Build one synthetic, fully joined semantic publication fixture."""
-    release = _trusted_release(_reviewed_catalog())
+    release = _trusted_release(catalog or _reviewed_catalog())
     identity_json = json.dumps(
         _dlis_identity(channel, frame=frame),
         sort_keys=True,
@@ -289,9 +304,13 @@ def _publication_case(
         source_handle=expected.source_handle,
         inspection_snapshot_id=expected.inspection_snapshot_id,
         source_revision=expected.source_revision,
+        source_path=source_path,
+        source_content_sha256=source_content_sha256,
         channels=(
             SemanticSourceChannel(
                 mnemonic=channel,
+                kind="scalar",
+                unit="gAPI",
                 physical_identity_json=identity_json,
                 addressability=addressability,
             ),
@@ -902,10 +921,17 @@ def test_catalog_release_rejects_revoked_manifest() -> None:
         _trusted_release(_reviewed_catalog(), status="revoked")
 
 
-def test_catalog_release_loader_fails_closed_without_deployed_pin() -> None:
-    """No package pin means no production semantic catalog release."""
-    with pytest.raises(SemanticCatalogTrustError, match="semantic_catalog_pin_missing"):
-        load_deployed_catalog_release()
+def test_catalog_release_loader_returns_the_approved_cat03_release() -> None:
+    """The fixed package pin selects only the reviewed CAT-03 release."""
+    release = load_deployed_catalog_release()
+
+    assert release.pin.approved_release_id == "cat03-gamma-ray-openhole-las-v1"
+    assert release.catalog.catalog_id == "wellplot.semantic-curve-catalog"
+    assert len(release.catalog.request_term_rules) == 1
+    assert release.catalog.request_term_rules[0].terms == ("Gamma Ray",)
+    assert len(release.catalog.physical_channel_rules) == 1
+    assert release.catalog.physical_channel_rules[0].matcher_value == "GR"
+    assert "GR" not in release.catalog.request_term_rules[0].terms
 
 
 def test_catalog_release_revalidation_rejects_a_replaced_transaction_pin(
@@ -1366,3 +1392,316 @@ def test_expected_semantic_set_rejects_unclassified_or_unresolved_channel() -> N
                 ),
             ),
         )
+
+
+def _content_bound_gamma_catalog(path: Path, approved_sha256: str) -> SemanticChannelCatalog:
+    """Build one exact, source-content-bound Gamma Ray rule for tests."""
+    return _reviewed_catalog(
+        physical_mnemonics=("GR",),
+        source_scope=(str(path),),
+        source_content_sha256=approved_sha256,
+        kind_constraints=("scalar",),
+        unit_constraints=("gAPI",),
+    )
+
+
+def _source_candidate(path: Path, *, digest: str | None = None) -> AuthoringChannelCandidate:
+    """Build a host-shaped GR candidate tied to one inspected file revision."""
+    return AuthoringChannelCandidate(
+        mnemonic="GR",
+        kind="scalar",
+        unit="gAPI",
+        source_path=str(path),
+        source_content_sha256=digest,
+        physical_identity={"format": "LAS", "curve_index": 7},
+        addressability="ADDRESSABLE",
+        source_candidate_id="candidate-1",
+        source_handle="source-1",
+        inspection_snapshot_id="snapshot-1",
+        source_revision=file_revision_token(path),
+    )
+
+
+def _resolve_content_bound_gamma(
+    catalog: SemanticChannelCatalog,
+    candidate: AuthoringChannelCandidate,
+) -> AuthoringContextResolution:
+    """Resolve the semantic family through the existing canonical resolver."""
+    return resolve_authoring_context(
+        _intent("Gamma Ray"),
+        available_channels={"main": [candidate]},
+        semantic_catalog=catalog,
+        expected_catalog_digest=catalog.content_sha256,
+    )
+
+
+def test_content_bound_rule_accepts_approved_path_and_digest(tmp_path: Path) -> None:
+    """The trusted host hash makes the exact reviewed source eligible."""
+    source = tmp_path / "approved.las"
+    source.write_bytes(b"approved LAS fixture bytes")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    catalog = _content_bound_gamma_catalog(source, digest)
+    raw_candidate = _source_candidate(source)
+    related_candidates = [
+        raw_candidate,
+        raw_candidate.model_copy(
+            update={"mnemonic": "CGR", "physical_identity": {"format": "LAS", "curve_index": 3}}
+        ),
+        raw_candidate.model_copy(
+            update={"mnemonic": "GRD", "physical_identity": {"format": "LAS", "curve_index": 8}}
+        ),
+    ]
+
+    inventory = _apply_scoped_source_digests(
+        {"main": related_candidates},
+        catalog,
+    )
+    candidate = next(item for item in inventory["main"] if item.mnemonic == "GR")
+    result = _resolve_content_bound_gamma(catalog, candidate)
+
+    assert candidate.source_content_sha256 == digest
+    assert result.ready is True
+    assert result.resolved_intent.sections[0].tracks[0].bindings[0].channel == "GR"
+    assert len(result.semantic_resolutions) == 1
+    assert {item.mnemonic for item in inventory["main"]} == {"GR", "CGR", "GRD"}
+
+
+def test_bare_gr_remains_an_explicit_physical_request(tmp_path: Path) -> None:
+    """The semantic request-term table does not claim the physical mnemonic."""
+    source = tmp_path / "approved.las"
+    source.write_bytes(b"approved LAS fixture bytes")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    catalog = _content_bound_gamma_catalog(source, digest)
+    candidate = _source_candidate(source, digest=digest)
+
+    result = resolve_authoring_context(
+        _intent("GR"),
+        available_channels={"main": [candidate]},
+        semantic_catalog=catalog,
+        expected_catalog_digest=catalog.content_sha256,
+    )
+
+    assert result.ready is True
+    assert result.resolved_intent.sections[0].tracks[0].bindings[0].channel == "GR"
+    assert result.semantic_resolutions == []
+
+
+def test_content_bound_rule_rejects_wrong_digest_at_approved_path(tmp_path: Path) -> None:
+    """Changed content at the approved path cannot satisfy the pinned rule."""
+    source = tmp_path / "approved.las"
+    source.write_bytes(b"approved bytes")
+    approved_digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    catalog = _content_bound_gamma_catalog(source, approved_digest)
+    source.write_bytes(b"different bytes")
+    candidate = _source_candidate(source)
+
+    inventory = _apply_scoped_source_digests({"main": [candidate]}, catalog)
+    result = _resolve_content_bound_gamma(catalog, inventory["main"][0])
+
+    assert inventory["main"][0].source_content_sha256 != approved_digest
+    assert result.ready is False
+    assert "semantic_family_unresolved" in {issue.code for issue in result.issues}
+
+
+def test_content_bound_rule_rejects_replacement_at_same_approved_path(
+    tmp_path: Path,
+) -> None:
+    """Replacing the bytes at a still-approved path invalidates applicability."""
+    source = tmp_path / "approved.las"
+    source.write_bytes(b"reviewed source")
+    approved_digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    catalog = _content_bound_gamma_catalog(source, approved_digest)
+    replacement = tmp_path / "replacement.las"
+    replacement.write_bytes(b"replacement source")
+    source.write_bytes(replacement.read_bytes())
+    candidate = _source_candidate(source)
+
+    inventory = _apply_scoped_source_digests({"main": [candidate]}, catalog)
+    result = _resolve_content_bound_gamma(catalog, inventory["main"][0])
+
+    assert candidate.source_path == str(source)
+    assert inventory["main"][0].source_content_sha256 != approved_digest
+    assert result.ready is False
+
+
+def test_content_bound_rule_does_not_expand_to_other_path_with_same_bytes(
+    tmp_path: Path,
+) -> None:
+    """The approved digest alone cannot authorize an unapproved source path."""
+    approved = tmp_path / "approved.las"
+    other = tmp_path / "other.las"
+    approved.write_bytes(b"identical approved bytes")
+    other.write_bytes(approved.read_bytes())
+    digest = hashlib.sha256(approved.read_bytes()).hexdigest()
+    catalog = _content_bound_gamma_catalog(approved, digest)
+    candidate = _source_candidate(other)
+
+    inventory = _apply_scoped_source_digests({"main": [candidate]}, catalog)
+    result = _resolve_content_bound_gamma(catalog, inventory["main"][0])
+
+    assert inventory["main"][0].source_content_sha256 is None
+    assert result.ready is False
+
+
+def test_shared_postcondition_rejects_source_changed_after_resolution(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The existing publication verifier rehashes constrained source bytes."""
+    import wellplot.semantic_catalog as semantic_catalog_module
+
+    source = tmp_path / "approved.las"
+    source.write_bytes(b"approved source")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    catalog = _content_bound_gamma_catalog(source, digest)
+    document, contract, evidence, release = _publication_case(
+        channel="GR",
+        catalog=catalog,
+        source_path=str(source),
+        source_content_sha256=digest,
+    )
+    monkeypatch.setattr(
+        semantic_catalog_module,
+        "load_deployed_catalog_release",
+        lambda: release,
+    )
+    source.write_bytes(b"changed after resolution")
+
+    with pytest.raises(DocumentPostconditionError, match="semantic_source_content_mismatch"):
+        verify_document_postconditions(
+            document,
+            document,
+            (),
+            (),
+            semantic_contract=contract,
+            semantic_evidence=(evidence,),
+        )
+
+
+def test_rules_without_source_hash_keep_existing_resolution_behavior(tmp_path: Path) -> None:
+    """Legacy reviewed rules need not hash sources unless explicitly scoped."""
+    source = tmp_path / "unconstrained.las"
+    source.write_bytes(b"unconstrained source")
+    catalog = _reviewed_catalog(
+        physical_mnemonics=("GR",),
+        source_scope=(str(source),),
+        kind_constraints=("scalar",),
+        unit_constraints=("gAPI",),
+    )
+    candidate = _source_candidate(source)
+
+    inventory = _apply_scoped_source_digests({"main": [candidate]}, catalog)
+    result = _resolve_content_bound_gamma(catalog, inventory["main"][0])
+
+    assert inventory["main"][0].source_content_sha256 is None
+    assert result.ready is True
+
+
+def test_pinned_content_bound_rule_reaches_canonical_in_memory_transaction(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A fixed trusted release resolves GR through canonical reconcile/execute/verify."""
+    import wellplot.authoring_reconciler as reconciler_module
+    import wellplot.semantic_catalog as semantic_catalog_module
+
+    source = tmp_path / "approved.las"
+    source.write_bytes(b"approved source")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    catalog = _content_bound_gamma_catalog(source, digest)
+    release = _trusted_release(catalog)
+    monkeypatch.setattr(reconciler_module, "load_deployed_catalog_release", lambda: release)
+    monkeypatch.setattr(semantic_catalog_module, "load_deployed_catalog_release", lambda: release)
+
+    candidate = _source_candidate(source)
+    revision = candidate.source_revision
+    assert revision is not None
+    identity_json = json.dumps(
+        candidate.physical_identity,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    expected = ExpectedSemanticBinding(
+        request_kind="SEMANTIC_FAMILY",
+        requirement_id="requirement-1",
+        request_sha256="a" * 64,
+        scope_key="existing:main",
+        track_scope="curves",
+        binding_slot="curves.binding.1",
+        requested_term="Gamma Ray",
+        source_candidate_id="candidate-1",
+        source_handle="source-1",
+        inspection_snapshot_id="snapshot-1",
+        source_revision=revision,
+        task_index=0,
+        section_id="main",
+        track_id="track-1",
+        binding_id="binding-1",
+    )
+    source_binding = SemanticSourceBinding(
+        scope_key="existing:main",
+        candidate_id="candidate-1",
+        source_handle="source-1",
+        inspection_snapshot_id="snapshot-1",
+        source_revision=revision,
+        source_path=str(source),
+        channels=(
+            SemanticSourceChannel(
+                mnemonic="GR",
+                kind="scalar",
+                unit="gAPI",
+                physical_identity_json=identity_json,
+                addressability="ADDRESSABLE",
+            ),
+        ),
+    )
+    contract = SemanticPublicationContract(
+        expected_bindings=(expected,),
+        source_bindings=(source_binding,),
+        trusted_release=release,
+    )
+    before = AuthoringDocumentSpec(
+        name="cat03-test",
+        title="Before",
+        sections=[
+            {
+                "id": "main",
+                "title": "Main",
+                "tracks": [
+                    {
+                        "id": "track-1",
+                        "title": "Curves",
+                        "kind": "normal",
+                        "width_mm": 20,
+                        "bindings": [],
+                    }
+                ],
+            }
+        ],
+    )
+
+    plan = reconcile_authoring(
+        _intent("Gamma Ray"),
+        existing=before,
+        available_channels={"main": [candidate]},
+        semantic_catalog=release.catalog,
+        semantic_publication_contract=contract,
+    )
+    assert plan.ready is True
+    assert len(plan.semantic_resolutions) == 1
+    assert plan.semantic_resolutions[0].physical_mnemonic == "GR"
+    assert plan.semantic_publication_contract is not None
+    assert plan.semantic_publication_contract.source_bindings[0].source_content_sha256 == digest
+
+    service = AuthoringService(before)
+    execution = execute_authoring_plan(service, plan)
+    assert execution.success is True
+    verify_document_postconditions(
+        before,
+        service.document,
+        (),
+        plan.operations,
+        semantic_contract=plan.semantic_publication_contract,
+        semantic_evidence=plan.semantic_resolutions,
+    )
+    assert service.document.sections[0].tracks[0].bindings[0].channel == "GR"
