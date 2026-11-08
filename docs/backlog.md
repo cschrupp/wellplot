@@ -410,7 +410,10 @@ The CAT-01 `semantic_catalog_activation_disabled` guard remains unchanged.
 No deployment pin or approved catalog is shipped, and no positive
 catalog-backed adapter transaction is enabled. Synthetic positives exercise
 the shared verifier only; notebook/MCP regressions verify no publication when
-semantic trust is absent. Candidate validation is provider-free; independent
-acceptance and CAT-03 activation remain pending. No baseline promotion,
-integration retry, provider call, C02 access, or scientific execution is
-authorized by this implementation candidate.
+semantic trust is absent. Candidate commit
+`1d5673cd304beef549916816cb266c8e2f5e04d7` is based on
+`7b72f5d96da31f233d913583c9f3c038fdee003a`; its focused provider-free suite
+passed 151 tests, Ruff/format/compile/diff checks passed, and the single-engine
+manifest attestation passed. Independent acceptance and CAT-03 activation
+remain pending. No baseline promotion, integration retry, provider call, C02
+access, or scientific execution occurred.
