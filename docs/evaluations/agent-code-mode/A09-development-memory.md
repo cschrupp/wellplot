@@ -650,3 +650,14 @@ therefore rejects it fail-closed until the independently accepted repository
 release record is committed and a subsequent pin-finalization commit binds
 that record. Do not run positive catalog-backed transactions before that
 sequence and separate authorization.
+
+### CAT-03 deployment pin finalization
+
+After repository release-acceptance record
+`a0eca857f797ab6514e1fd5933229a71fe287f71` was committed, the deployment pin
+was finalized to reference that exact commit. Catalog, approval-manifest, and
+domain-approval bytes/digests remain unchanged from accepted R1. The fixed
+release loader can now verify the package authority. This does not authorize
+positive Notebook/MCP transactions: deployment trust is finalized, positive
+qualification awaits separate authorization, CAT-03 controlled activation is
+not accepted, and A09 integrated qualification remains open.

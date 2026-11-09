@@ -7,5 +7,6 @@
   "content_sha256": "bbe9e40439c263c3471b0532bdfb59f4b66d17ba2fa4d5b0a68727dba619b49d",
   "catalog_artifact_sha256": "8a7cccaaa19eeeb6ada7ab794bf4361f14968730c5edb29a23daffd5e4abd414",
   "approval_manifest_sha256": "1da34bd238652694376de33d5baf3dbfe894e816e519979b2a7f4dd0ebf52f9a",
-  "approval_record_ref": "docs/architecture/A09_CAT_03_INITIAL_GAMMA_RAY_MAPPING_APPROVAL.md"
+  "approval_record_ref": "docs/architecture/A09_CAT_03_INITIAL_GAMMA_RAY_MAPPING_APPROVAL.md",
+  "approved_repository_commit": "a0eca857f797ab6514e1fd5933229a71fe287f71"
 }

@@ -936,17 +936,58 @@ def test_cat03_domain_approval_provenance_digest_matches_approval_record() -> No
     assert hashlib.sha256(approval_path.read_bytes()).hexdigest() == provenance["source_sha256"]
 
 
-def test_deployed_cat03_candidate_pin_fails_closed_until_repository_acceptance() -> None:
-    """The candidate pin is unusable until an accepted repository commit exists."""
-    pin_path = (
-        Path(__file__).resolve().parents[1]
-        / "src/wellplot/mcp/assets/semantic_catalog/release-pin.json"
-    )
-    pin_payload = json.loads(pin_path.read_text(encoding="utf-8"))
+def test_deployed_cat03_release_loads_with_accepted_repository_commit() -> None:
+    """The finalized package pin binds the accepted CAT-03 record and digests."""
+    repository_root = Path(__file__).resolve().parents[1]
+    release_root = repository_root / "src/wellplot/mcp/assets/semantic_catalog"
+    release = load_deployed_catalog_release()
+    rule = release.catalog.physical_channel_rules[0]
 
-    assert "approved_repository_commit" not in pin_payload
+    assert release.pin.approved_repository_commit == ("a0eca857f797ab6514e1fd5933229a71fe287f71")
+    assert release.pin.content_sha256 == (
+        "bbe9e40439c263c3471b0532bdfb59f4b66d17ba2fa4d5b0a68727dba619b49d"
+    )
+    assert (
+        release.pin.catalog_artifact_sha256
+        == hashlib.sha256((release_root / "catalog.json").read_bytes()).hexdigest()
+    )
+    assert (
+        release.pin.approval_manifest_sha256
+        == hashlib.sha256((release_root / "approval-manifest.json").read_bytes()).hexdigest()
+    )
+    assert release.catalog.content_sha256 == release.pin.content_sha256
+    assert rule.matcher_value == "GR"
+    assert rule.source_scope == ("workspace/data/30-23a-3 8117_d.las",)
+    assert rule.source_content_sha256 == (
+        "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9"
+    )
+    provenance = next(
+        item for item in release.catalog.source_provenance if item.id == "cat03-domain-approval"
+    )
+    assert provenance.source_sha256 == (
+        "162f21dd3d3a558b5554a9bd10082c1bd60ac0a1b5c5f589456bce70fbf738c2"
+    )
+
+
+@pytest.mark.parametrize("commit_state", ["missing", "malformed"])
+def test_catalog_release_rejects_missing_or_malformed_repository_commit(
+    commit_state: str,
+) -> None:
+    """A release without a repository approval SHA fails closed."""
+    repository_root = Path(__file__).resolve().parents[1]
+    release_root = repository_root / "src/wellplot/mcp/assets/semantic_catalog"
+    pin_payload = json.loads((release_root / "release-pin.json").read_text(encoding="utf-8"))
+    if commit_state == "missing":
+        pin_payload.pop("approved_repository_commit")
+    else:
+        pin_payload["approved_repository_commit"] = "not-a-commit"
+
     with pytest.raises(SemanticCatalogTrustError, match="semantic_catalog_pin_invalid"):
-        load_deployed_catalog_release()
+        _verify_catalog_release_bytes(
+            pin_bytes=json.dumps(pin_payload).encode("utf-8"),
+            manifest_bytes=(release_root / "approval-manifest.json").read_bytes(),
+            catalog_bytes=(release_root / "catalog.json").read_bytes(),
+        )
 
 
 def test_catalog_release_revalidation_rejects_a_replaced_transaction_pin(

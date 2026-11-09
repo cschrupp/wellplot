@@ -424,6 +424,16 @@ committed and a later pin-finalization commit references that record. Positive
 catalog-backed transactions remain unauthorized and impossible through this
 unfinalized package pin.
 
+### CAT-03 deployment pin finalization
+
+The pin is finalized with `approved_repository_commit` bound to repository
+release-acceptance record `a0eca857f797ab6514e1fd5933229a71fe287f71`. The
+catalog and approval-manifest bytes remain those accepted at R1. Deployment
+trust is finalized, but positive Notebook/MCP qualification remains pending
+separate authorization; CAT-03 controlled activation is not accepted and A09
+integrated qualification remains open. See
+`docs/architecture/A09_CAT_03_DEPLOYMENT_PIN_FINALIZATION.md`.
+
 Focused provider-free tests cover approved path/hash eligibility, wrong or
 replaced bytes at the approved path, identical bytes at an unapproved path,
 pre-publication source drift, no-hash legacy behavior, and a canonical

@@ -134,8 +134,8 @@ def test_mcp_request_context_does_not_eagerly_parse_declared_sources() -> None:
     assert all(candidate.expected_revision_token for candidate in context.source_candidates)
 
 
-def test_mcp_unfinalized_catalog_pin_does_not_publish() -> None:
-    """The candidate release pin blocks semantic publication fail-closed."""
+def test_mcp_missing_semantic_evidence_does_not_publish() -> None:
+    """MCP shares fail-closed semantic verification before YAML persistence."""
     with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="mcp-semantic-pin-") as temp_dir:
         fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
         context = _request_context(str(fixture_paths.single_logfile), root=REPO_ROOT)
@@ -175,7 +175,7 @@ def test_mcp_unfinalized_catalog_pin_does_not_publish() -> None:
         assert changed is False
         assert rolled_back is True
         assert statuses == ["semantic_postcondition_failed"]
-        assert "semantic_catalog_pin_invalid" in errors[0]
+        assert "semantic_evidence_set_mismatch" in errors[0]
         persist.assert_not_called()
         assert fixture_paths.single_logfile.read_bytes() == original_bytes
 
