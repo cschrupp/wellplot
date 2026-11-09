@@ -360,6 +360,7 @@ def _apply_result(
             semantic_contract=semantic_contract,
             semantic_evidence=plan.semantic_resolutions,
         )
+        stages["semantic_postcondition"] = "PASS"
         stages["post_lowering_obligation"] = "PASS"
         stages["preservation"] = "PASS"
     except DocumentPostconditionError as error:

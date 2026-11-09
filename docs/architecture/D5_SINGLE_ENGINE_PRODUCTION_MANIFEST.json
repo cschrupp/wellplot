@@ -32,7 +32,7 @@
     "src/wellplot/agent/code_mode/worker_contracts.py": "73e3c2b239684d83034441fcebae167b5666c8e0252641a7b72ba83e70edf048",
     "src/wellplot/agent/code_mode/workflow.py": "0e0ccbdc020a8fcde2cfceef08681918c4efceb1d83a0ae6908399cf910cdd20",
     "src/wellplot/agent/composition.py": "6e31cc659fd0499561b127f8074948ce3bc8d037c4548f7720a93eeb0988439e",
-    "src/wellplot/agent/direct_notebook.py": "a39f42563c7772818b51c0616e41f0e96ddbdfdd1e4eaf219d5a5d861593297a",
+    "src/wellplot/agent/direct_notebook.py": "b4668ee72f97c14d57b1e951bbb99060343489ca1dade365e76eda6b735a649f",
     "src/wellplot/agent/execution_trace.py": "746337a8dcc7580a4b71dc6ab42c91f11852dcb2f87afa623987e72f26db715e",
     "src/wellplot/agent/identity.py": "274c99ee1442e251561ef616918b0f9062dadd2459ca1f5642b5408d23b015ae",
     "src/wellplot/agent/inspection.py": "8a1c2b311d94f1cabd294a57f4ba28df76d1babfd3cf0016df999e38be0b1b25",

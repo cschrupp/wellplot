@@ -13,7 +13,11 @@ import pytest
 import yaml
 from tests._mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 
-from wellplot.agent.code_mode.obligations import RequestObligation
+from wellplot.agent.code_mode.obligations import (
+    DocumentPostconditionError,
+    RequestObligation,
+    verify_document_postconditions,
+)
 from wellplot.agent.code_mode.source_loader import LogfileSourceLoader
 from wellplot.agent.direct_notebook import (
     DirectNotebookSession,
@@ -108,7 +112,7 @@ def test_notebook_apply_rejects_unsatisfied_obligation_before_persist() -> None:
         assert fixture_paths.single_logfile.read_bytes() == original_bytes
 
 
-def test_notebook_does_not_publish_catalog_activation_blocked_plan() -> None:
+def test_notebook_semantic_stage_not_reached_before_verifier() -> None:
     """A reconciliation activation guard stops before execution and persistence."""
     with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="notebook-catalog-block-") as temp_dir:
         fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
@@ -128,6 +132,7 @@ def test_notebook_does_not_publish_catalog_activation_blocked_plan() -> None:
         with (
             patch("wellplot.agent.direct_notebook.reconcile_authoring", return_value=blocked_plan),
             patch("wellplot.agent.direct_notebook.execute_authoring_plan") as execute,
+            patch("wellplot.agent.direct_notebook.verify_document_postconditions") as verify,
             patch(
                 "wellplot.agent.direct_notebook.mcp_service.persist_authoring_document"
             ) as persist,
@@ -145,12 +150,14 @@ def test_notebook_does_not_publish_catalog_activation_blocked_plan() -> None:
         assert status == "reconciliation_blocked"
         assert "semantic_catalog_activation_disabled" in errors[0]
         assert stages["private_execution"] == "NOT_REACHED"
+        assert stages["semantic_postcondition"] == "NOT_REACHED"
         execute.assert_not_called()
+        verify.assert_not_called()
         persist.assert_not_called()
         assert fixture_paths.single_logfile.read_bytes() == original_bytes
 
 
-def test_notebook_missing_semantic_evidence_does_not_publish() -> None:
+def test_notebook_semantic_postcondition_fails_without_persistence() -> None:
     """A semantic host expectation fails closed at shared postconditions."""
     with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="notebook-semantic-pin-") as temp_dir:
         fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
@@ -180,9 +187,27 @@ def test_notebook_missing_semantic_evidence_does_not_publish() -> None:
             ),
         )
 
-        with patch(
-            "wellplot.agent.direct_notebook.mcp_service.persist_authoring_document"
-        ) as persist:
+        verifier_events: list[str] = []
+        real_verify = verify_document_postconditions
+
+        def record_semantic_rejection(*args: object, **kwargs: object) -> None:
+            verifier_events.append("verifier_enter")
+            try:
+                real_verify(*args, **kwargs)
+            except DocumentPostconditionError as error:
+                if error.check == "semantic":
+                    verifier_events.append("verifier_rejected_semantic")
+                raise
+
+        with (
+            patch(
+                "wellplot.agent.direct_notebook.verify_document_postconditions",
+                side_effect=record_semantic_rejection,
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.persist_authoring_document"
+            ) as persist,
+        ):
             applied = _apply_result(context=context, result=result, root=REPO_ROOT)
 
         success, changed, rolled_back, errors, status, stages = applied
@@ -192,6 +217,7 @@ def test_notebook_missing_semantic_evidence_does_not_publish() -> None:
         assert status == "semantic_postcondition_failed"
         assert stages["semantic_postcondition"] == "FAIL"
         assert "semantic_evidence_set_mismatch" in errors[0]
+        assert verifier_events == ["verifier_enter", "verifier_rejected_semantic"]
         persist.assert_not_called()
         assert fixture_paths.single_logfile.read_bytes() == original_bytes
 
@@ -244,7 +270,7 @@ def test_notebook_apply_rejects_unapproved_candidate_change_before_persist() -> 
         assert fixture_paths.single_logfile.read_bytes() == original_bytes
 
 
-def test_notebook_apply_persists_candidate_after_shared_postconditions_pass() -> None:
+def test_notebook_semantic_postcondition_passes_before_persistence() -> None:
     """Verified candidates continue to the existing canonical persistence path."""
     with tempfile.TemporaryDirectory(
         dir=REPO_ROOT, prefix="notebook-postcondition-pass-"
@@ -257,11 +283,30 @@ def test_notebook_apply_persists_candidate_after_shared_postconditions_pass() ->
             obligations=(_title_obligation("Verified title"),),
         )
         real_persist = mcp_service.persist_authoring_document
+        events: list[str] = []
+        real_verify = verify_document_postconditions
 
-        with patch(
-            "wellplot.agent.direct_notebook.mcp_service.persist_authoring_document",
-            wraps=real_persist,
-        ) as persist:
+        def record_verify(*args: object, **kwargs: object) -> None:
+            events.append("verifier_enter")
+            real_verify(*args, **kwargs)
+            events.append("verifier_pass")
+
+        def record_persist(*args: object, **kwargs: object) -> object:
+            events.append("persistence_enter")
+            result = real_persist(*args, **kwargs)
+            events.append("persistence_pass")
+            return result
+
+        with (
+            patch(
+                "wellplot.agent.direct_notebook.verify_document_postconditions",
+                side_effect=record_verify,
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.persist_authoring_document",
+                side_effect=record_persist,
+            ) as persist,
+        ):
             success, changed, rolled_back, errors, status, stages = _apply_result(
                 context=context,
                 result=result,
@@ -275,6 +320,13 @@ def test_notebook_apply_persists_candidate_after_shared_postconditions_pass() ->
         assert status == "persisted"
         assert stages["post_lowering_obligation"] == "PASS"
         assert stages["preservation"] == "PASS"
+        assert stages["semantic_postcondition"] == "PASS"
+        assert events == [
+            "verifier_enter",
+            "verifier_pass",
+            "persistence_enter",
+            "persistence_pass",
+        ]
         persist.assert_called_once()
         assert fixture_paths.single_logfile.read_bytes() != original_bytes
 

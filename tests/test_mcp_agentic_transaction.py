@@ -13,7 +13,10 @@ from unittest.mock import patch
 import yaml
 from tests._mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
 
-from wellplot.agent.code_mode.obligations import RequestObligation
+from wellplot.agent.code_mode.obligations import (
+    RequestObligation,
+    verify_document_postconditions,
+)
 from wellplot.agent.code_mode.source_loader import LogfileSourceLoader
 from wellplot.agent.session import AgentMetrics, AgentSessionResult, AgentWorkerEvidence
 from wellplot.authoring_executor import execute_authoring_plan
@@ -388,7 +391,7 @@ def test_mcp_apply_rejects_unapproved_candidate_change_before_persist() -> None:
         assert fixture_paths.single_logfile.read_bytes() == original_bytes
 
 
-def test_mcp_apply_persists_candidate_after_shared_postconditions_pass() -> None:
+def test_mcp_shared_verifier_passes_before_persistence() -> None:
     """Verified MCP candidates continue to canonical persistence."""
     with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="mcp-postcondition-pass-") as temp_dir:
         fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
@@ -399,11 +402,30 @@ def test_mcp_apply_persists_candidate_after_shared_postconditions_pass() -> None
             obligations=(_title_obligation("MCP transaction title"),),
         )
         real_persist = mcp_service.persist_authoring_document
+        events: list[str] = []
+        real_verify = verify_document_postconditions
 
-        with patch(
-            "wellplot.mcp.agentic.service.persist_authoring_document",
-            wraps=real_persist,
-        ) as persist:
+        def record_verify(*args: object, **kwargs: object) -> None:
+            events.append("verifier_enter")
+            real_verify(*args, **kwargs)
+            events.append("verifier_pass")
+
+        def record_persist(*args: object, **kwargs: object) -> object:
+            events.append("persistence_enter")
+            result = real_persist(*args, **kwargs)
+            events.append("persistence_pass")
+            return result
+
+        with (
+            patch(
+                "wellplot.mcp.agentic.verify_document_postconditions",
+                side_effect=record_verify,
+            ),
+            patch(
+                "wellplot.mcp.agentic.service.persist_authoring_document",
+                side_effect=record_persist,
+            ) as persist,
+        ):
             success, changed, rolled_back, errors, statuses, _section_ids = _apply_session_result(
                 context=context,
                 session_result=result,
@@ -415,5 +437,11 @@ def test_mcp_apply_persists_candidate_after_shared_postconditions_pass() -> None
         assert rolled_back is False
         assert errors == []
         assert statuses == ["persisted"]
+        assert events == [
+            "verifier_enter",
+            "verifier_pass",
+            "persistence_enter",
+            "persistence_pass",
+        ]
         persist.assert_called_once()
         assert fixture_paths.single_logfile.read_bytes() != original_bytes
