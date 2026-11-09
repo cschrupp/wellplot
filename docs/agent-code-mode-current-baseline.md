@@ -573,6 +573,29 @@ of current authority.
 
 ### Promoted
 
+- **A09-CAT-03 controlled activation accepted** at the exact qualification
+  checkpoint `75c1974999702e6f62856c10d0a94f56d0935c48`. The independently
+  accepted, fixture-scoped rule is only `Gamma Ray` → `gamma_ray` → exact
+  physical `GR` for `workspace/data/30-23a-3 8117_d.las`, SHA-256
+  `7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9`.
+  Notebook-003 and MCP-001 both passed provider-free canonical reconciliation,
+  semantic verification, persistence, and reload; MCP evidence records the
+  shared verifier returning PASS before canonical persistence. Both resolved
+  only exact GR at LAS curve index 7 (`gAPI`); `CGR` and `GRD` remain distinct
+  and excluded. Each transaction preserved the complete 20-channel source
+  binding and the approved source SHA/revision. The post-qualification focused
+  suite passed 211 tests with targeted Ruff, formatting, compilation,
+  `git diff --check`, and single-engine attestation passing. Provider/model/
+  endpoint calls and C02 access were zero; semantic qualification loaded no
+  numerical samples. The mapping is not generalized to other sources or
+  mnemonics and authorizes no conversions, transformations, or display
+  presets. Notebook-003's contradictory
+  `semantic_postcondition=NOT_REACHED` stage projection remains an open
+  reporting defect; its direct verifier and persistence evidence is preserved.
+  Historical Notebook-001/002 artifacts and A09 attempt 003's `FAIL` terminal
+  remain immutable. A09 integrated qualification remains open; A10/A12,
+  provider/live, and scientific execution are not authorized by CAT-03.
+
 - **WELLPLOT-NLP-CANONICAL-AUTHORING-ARCH-001 architecture accepted, not yet
   implemented.** The architecture decision was independently accepted at
   `c6ec436619418b3831a1c9decd7d3c15efebb74c` and Human-authorized for
@@ -801,3 +824,48 @@ of current authority.
 - **Qualification boundary:** A09 integrated qualification remains open.
   Historical attempt 003 retains its `FAIL` terminal. No provider/model/
   endpoint, C02, live, or scientific execution occurred under CAT-02I.
+
+### A09-CAT-03 Controlled Semantic Activation Accepted
+
+- **Status:** `A09_CAT_03_CONTROLLED_ACTIVATION_ACCEPTED`; CAT-03 is closed.
+- **Accepted execution checkpoint:**
+  `75c1974999702e6f62856c10d0a94f56d0935c48`.
+- **Accepted evidence:** Notebook-003 namespace
+  `workspace/evaluations/a09-cat03-q1-20261108-notebook-003`; MCP-001 archive
+  SHA-256
+  `e2139df5d64962f4f36a8d4be6ef5ce3004a35185e45a93639e6d25e90b1ed05`.
+- **Finalized deployment trust:** approved repository release record
+  `a0eca857f797ab6514e1fd5933229a71fe287f71`, catalog artifact SHA-256
+  `8a7cccaaa19eeeb6ada7ab794bf4361f14968730c5edb29a23daffd5e4abd414`,
+  canonical content SHA-256
+  `bbe9e40439c263c3471b0532bdfb59f4b66d17ba2fa4d5b0a68727dba619b49d`, and
+  approval-manifest SHA-256
+  `1da34bd238652694376de33d5baf3dbfe894e816e519979b2a7f4dd0ebf52f9a`.
+- **Qualification evidence:** Notebook-003 and MCP-001 were independently
+  accepted as positive provider-free transactions. Both used the canonical
+  authoring path from host-derived expectations through reconciliation,
+  shared semantic postconditions, persistence, and reload. MCP-001 explicitly
+  captured verifier PASS before canonical persistence. Both retained one
+  coherent source binding containing the complete 20-channel LAS inventory;
+  the approved source content SHA and revision remained unchanged.
+- **Only approved semantic scope:** `Gamma Ray` → family `gamma_ray` → exact
+  scalar/addressable physical mnemonic `GR`, `gAPI`, curve index 7, for
+  `workspace/data/30-23a-3 8117_d.las` with SHA-256
+  `7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9`.
+  `CGR`, `GRD`, other gamma-related mnemonics, bare `GR` as a semantic term,
+  wildcard mappings, transformations, conversions, and display presets remain
+  excluded.
+- **Validation and boundaries:** the focused eight-module suite passed 211
+  tests after qualification. Targeted Ruff, formatting, Python compilation,
+  `git diff --check`, and single-engine attestation passed. Provider/model/
+  endpoint calls, C02 access, and numerical sample loading were zero. This
+  accepts only the approved fixture-scoped rule; broader catalog expansion
+  requires separate domain approval. The Notebook-003 adapter stage projection
+  `semantic_postcondition=NOT_REACHED` remains an open reporting defect despite
+  direct verifier PASS evidence; do not rewrite that evidence. Notebook-001,
+  Notebook-002, and historical A09 attempt 003 remain immutable, with attempt
+  003 retaining `FAIL`. A09 integrated qualification remains open. This
+  acceptance does not authorize A10/A12, provider/live, or scientific work.
+  This supersedes then-current CAT-01/CAT-02 activation restrictions only for
+  this accepted qualification scope; it is not broad catalog activation or
+  production promotion.

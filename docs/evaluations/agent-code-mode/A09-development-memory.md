@@ -661,3 +661,40 @@ release loader can now verify the package authority. This does not authorize
 positive Notebook/MCP transactions: deployment trust is finalized, positive
 qualification awaits separate authorization, CAT-03 controlled activation is
 not accepted, and A09 integrated qualification remains open.
+
+## A09-CAT-03 — Controlled Activation Accepted (2026-11-09)
+
+Independent final review accepted CAT-03 as
+`A09_CAT_03_CONTROLLED_ACTIVATION_ACCEPTED`; CAT-03 is closed. The execution
+checkpoint was `75c1974999702e6f62856c10d0a94f56d0935c48`. Notebook-003 and
+MCP-001 are accepted provider-free positive qualification evidence. Notebook
+used the canonical DirectNotebook transaction boundary; MCP used
+`GraphAuthoringMcpOperations.revise()`. Both ran canonical reconciliation,
+shared semantic postconditions, canonical persistence, and reload. MCP-001's
+captured event order is verifier enter → verifier PASS → persistence enter →
+persistence PASS.
+
+The sole accepted rule is `Gamma Ray` → family `gamma_ray` → exact physical
+`GR`, scalar, `gAPI`, addressable, for
+`workspace/data/30-23a-3 8117_d.las`, SHA-256
+`7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9`. Both
+transactions resolved LAS curve index 7 and persisted/reloaded only the exact
+GR binding. `CGR` and `GRD` remained separate and unselected. Each transaction
+retained one coherent source binding with the complete 20-channel projection;
+the source SHA and filesystem revision remained unchanged. This validates the
+R2 source-cardinality correction in both adapter transactions.
+
+The post-qualification focused eight-module suite passed 211 tests. Targeted
+Ruff, format, Python compilation, `git diff --check`, and single-engine
+attestation passed. Provider/model/endpoint calls and C02 access were zero;
+semantic qualification did not load numerical samples.
+
+Scope remains fixture-specific. No other source, gamma-related mnemonic,
+family, wildcard, transformation, conversion, or display preset is approved.
+Notebook-003's `semantic_postcondition=NOT_REACHED` adapter stage projection is
+an open reporting defect despite direct evidence of verifier PASS before
+persistence; preserve the Notebook evidence unchanged and track the corrective
+separately. Historical Notebook-001 and Notebook-002 remain immutable, as does
+A09 attempt 003's `FAIL` terminal. A09 integrated qualification remains open.
+CAT-03 acceptance does not authorize A10/A12, provider/live, or scientific
+execution.

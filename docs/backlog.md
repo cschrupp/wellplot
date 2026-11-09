@@ -437,11 +437,34 @@ integrated qualification remains open. See
 Focused provider-free tests cover approved path/hash eligibility, wrong or
 replaced bytes at the approved path, identical bytes at an unapproved path,
 pre-publication source drift, no-hash legacy behavior, and a canonical
-in-memory reconcile/execute/shared-verifier transaction. This is not a
-positive notebook/MCP persistence qualification and does not close A09
-integrated qualification. Independent review of the candidate is pending;
-do not promote the active baseline, run provider/model or scientific work, or
-claim production readiness before that review.
+in-memory reconcile/execute/shared-verifier transaction. At this candidate
+stage, positive notebook/MCP persistence qualification and A09 integrated
+qualification remained open; subsequent CAT-03 acceptance is recorded below.
+
+### CAT-03 controlled activation accepted
+
+Independent final review accepted CAT-03 as
+`A09_CAT_03_CONTROLLED_ACTIVATION_ACCEPTED` at execution checkpoint
+`75c1974999702e6f62856c10d0a94f56d0935c48`. Notebook-003 and MCP-001 both
+passed the provider-free canonical transaction using only the approved
+fixture-scoped rule `Gamma Ray` → `gamma_ray` → exact `GR` for
+`workspace/data/30-23a-3 8117_d.las` (SHA-256
+`7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9`). Both
+reloaded to the exact GR binding; `CGR` and `GRD` were not selected. Each
+transaction retained the complete 20-channel source binding and unchanged
+source digest/revision. MCP evidence explicitly records shared-verifier PASS
+before persistence. The post-qualification focused suite passed 211 tests;
+targeted tooling and single-engine attestation passed. Provider/model/endpoint
+calls and C02 access were zero, and semantic qualification loaded no numerical
+samples.
+
+Do not broaden this rule to other sources, gamma-related mnemonics, or semantic
+families without separate domain approval. Notebook-003's
+`semantic_postcondition=NOT_REACHED` stage projection remains an open reporting
+defect; preserve the original evidence. Notebook-001/002 and historical A09
+attempt 003 remain immutable, with attempt 003 retaining `FAIL`. A09 integrated
+qualification remains open. CAT-03 acceptance does not authorize A10/A12,
+provider/live execution, or scientific work.
 
 ### CAT-02I implementation candidate (2026-11-07)
 
