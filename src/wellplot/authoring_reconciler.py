@@ -66,6 +66,8 @@ from .semantic_catalog import (
     SemanticChannelCatalog,
     SemanticPublicationContract,
     SemanticResolutionEvidence,
+    SemanticSourceChannel,
+    canonical_physical_identity,
     load_deployed_catalog_release,
     sha256_file,
 )
@@ -1376,10 +1378,25 @@ def reconcile_authoring(
                 ],
             )
         if semantic_publication_contract is not None:
-            semantic_publication_contract = _bind_catalog_source_map(
-                semantic_publication_contract,
-                available_channels,
-            )
+            try:
+                semantic_publication_contract = _bind_catalog_source_map(
+                    semantic_publication_contract,
+                    available_channels,
+                )
+            except ValueError as error:
+                return AuthoringReconciliationPlan(
+                    ready=False,
+                    issues=[
+                        AuthoringReconciliationIssue(
+                            path="semantic_catalog.source_bindings",
+                            code=str(error),
+                            message=(
+                                "Inspected channel candidates do not form a coherent "
+                                "source binding."
+                            ),
+                        )
+                    ],
+                )
 
     resolution = (
         desired
@@ -1819,7 +1836,7 @@ def _bind_catalog_source_map(
     contract: SemanticPublicationContract,
     available_channels: Mapping[str, AuthoringChannelInventoryInput] | None,
 ) -> SemanticPublicationContract:
-    """Enrich host source bindings from the same candidates used to resolve."""
+    """Enrich each host source binding from its coherent channel candidate group."""
     if available_channels is None:
         return contract
     candidates: list[AuthoringChannelCandidate] = []
@@ -1840,19 +1857,87 @@ def _bind_catalog_source_map(
             if candidate.source_candidate_id == binding.candidate_id
             and candidate.source_handle == binding.source_handle
         ]
-        if len(matches) == 1:
-            candidate = matches[0]
-            bindings.append(
-                binding.model_copy(
-                    update={
-                        "source_path": candidate.source_path,
-                        "source_content_sha256": candidate.source_content_sha256,
-                    }
-                )
+        if not matches:
+            raise ValueError("semantic_source_binding_incoherent")
+
+        source_identities = {
+            (
+                _normalized_source_binding_path(candidate.source_path),
+                candidate.source_content_sha256,
+                candidate.source_revision,
+                candidate.inspection_snapshot_id,
             )
-        else:
-            bindings.append(binding)
+            for candidate in matches
+        }
+        if len(source_identities) != 1:
+            raise ValueError("semantic_source_binding_incoherent")
+
+        source_path, source_content_sha256, source_revision, snapshot_id = next(
+            iter(source_identities)
+        )
+        if (
+            source_revision != binding.source_revision
+            or snapshot_id != binding.inspection_snapshot_id
+            or source_path != _normalized_source_binding_path(binding.source_path)
+            or (
+                binding.source_content_sha256 is not None
+                and binding.source_content_sha256 != source_content_sha256
+            )
+            or _source_channel_projection(matches) != _semantic_source_projection(binding.channels)
+        ):
+            raise ValueError("semantic_source_binding_incoherent")
+
+        bindings.append(
+            binding.model_copy(
+                update={
+                    "source_path": source_path,
+                    "source_content_sha256": source_content_sha256,
+                }
+            )
+        )
     return contract.model_copy(update={"source_bindings": tuple(bindings)})
+
+
+def _normalized_source_binding_path(value: str | None) -> str | None:
+    """Normalize one host-owned path before comparing source-level identity."""
+    if value is None:
+        return None
+    return str(Path(value).expanduser().resolve(strict=False))
+
+
+def _source_channel_projection(
+    candidates: Sequence[AuthoringChannelCandidate],
+) -> set[tuple[str, str, str | None, str, str]]:
+    """Return distinct physical channel records for one coherent source group."""
+    try:
+        return {
+            (
+                candidate.mnemonic,
+                candidate.kind,
+                candidate.unit,
+                canonical_physical_identity(candidate.physical_identity),
+                candidate.addressability,
+            )
+            for candidate in candidates
+        }
+    except ValueError:
+        raise ValueError("semantic_source_binding_incoherent") from None
+
+
+def _semantic_source_projection(
+    channels: Sequence[SemanticSourceChannel],
+) -> set[tuple[str, str, str | None, str, str]]:
+    """Return distinct physical channel records in the host source snapshot."""
+    return {
+        (
+            channel.mnemonic,
+            channel.kind,
+            channel.unit,
+            channel.physical_identity_json,
+            channel.addressability,
+        )
+        for channel in channels
+    }
 
 
 def _same_source_scope(candidate_path: str, scope: str) -> bool:

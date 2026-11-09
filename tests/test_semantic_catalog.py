@@ -26,7 +26,11 @@ from wellplot.authoring_context import (
     resolve_authoring_context,
 )
 from wellplot.authoring_executor import execute_authoring_plan
-from wellplot.authoring_reconciler import _apply_scoped_source_digests, reconcile_authoring
+from wellplot.authoring_reconciler import (
+    _apply_scoped_source_digests,
+    _bind_catalog_source_map,
+    reconcile_authoring,
+)
 from wellplot.authoring_service import AuthoringService
 from wellplot.file_revision import file_revision_token
 from wellplot.model.authoring import AuthoringDocumentSpec, AuthoringScale
@@ -1761,3 +1765,243 @@ def test_pinned_content_bound_rule_reaches_canonical_in_memory_transaction(
         semantic_evidence=plan.semantic_resolutions,
     )
     assert service.document.sections[0].tracks[0].bindings[0].channel == "GR"
+
+
+def _multi_channel_source_candidates(
+    source: Path,
+    *,
+    source_content_sha256: str | None = None,
+) -> tuple[AuthoringChannelCandidate, ...]:
+    """Build one realistic multi-channel LAS source projection."""
+    channel_rows = (
+        ("GR", 7, "gAPI"),
+        ("CGR", 3, "gAPI"),
+        ("GRD", 8, "gAPI"),
+        ("RHOB", 11, "g/cm3"),
+    )
+    revision = file_revision_token(source)
+    return tuple(
+        AuthoringChannelCandidate(
+            mnemonic=mnemonic,
+            kind="scalar",
+            unit=unit,
+            source_path=str(source),
+            source_content_sha256=source_content_sha256,
+            physical_identity={"format": "LAS", "curve_index": curve_index},
+            addressability="ADDRESSABLE",
+            source_candidate_id="candidate-1",
+            source_handle="source-1",
+            inspection_snapshot_id="snapshot-1",
+            source_revision=revision,
+        )
+        for mnemonic, curve_index, unit in channel_rows
+    )
+
+
+def _multi_channel_publication_contract(
+    source: Path,
+    catalog: SemanticChannelCatalog,
+    candidates: tuple[AuthoringChannelCandidate, ...],
+) -> SemanticPublicationContract:
+    """Bind a Gamma Ray request to the complete inspected source inventory."""
+    revision = candidates[0].source_revision
+    assert revision is not None
+    expected = ExpectedSemanticBinding(
+        request_kind="SEMANTIC_FAMILY",
+        requirement_id="requirement-cat03-gamma-ray",
+        request_sha256="a" * 64,
+        scope_key="existing:main",
+        track_scope="curves",
+        binding_slot="curves.binding.1",
+        requested_term="Gamma Ray",
+        source_candidate_id="candidate-1",
+        source_handle="source-1",
+        inspection_snapshot_id="snapshot-1",
+        source_revision=revision,
+        task_index=0,
+        section_id="main",
+        track_id="track-1",
+        binding_id="binding-1",
+    )
+    source_binding = SemanticSourceBinding(
+        scope_key=expected.scope_key,
+        candidate_id=expected.source_candidate_id,
+        source_handle=expected.source_handle,
+        inspection_snapshot_id=expected.inspection_snapshot_id,
+        source_revision=expected.source_revision,
+        source_path=str(source),
+        channels=tuple(
+            SemanticSourceChannel(
+                mnemonic=candidate.mnemonic,
+                kind=candidate.kind,
+                unit=candidate.unit,
+                physical_identity_json=json.dumps(
+                    candidate.physical_identity,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                addressability=candidate.addressability,
+            )
+            for candidate in candidates
+        ),
+    )
+    return SemanticPublicationContract(
+        expected_bindings=(expected,),
+        source_bindings=(source_binding,),
+        trusted_release=_trusted_release(catalog),
+    )
+
+
+def test_multichannel_source_binding_enriches_and_verifies_exact_gr(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Many channels from one source enrich one binding and verify exact GR."""
+    import wellplot.authoring_reconciler as reconciler_module
+    import wellplot.semantic_catalog as semantic_catalog_module
+
+    source = tmp_path / "approved-multichannel.las"
+    source.write_bytes(b"approved multi-channel LAS source")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    catalog = _content_bound_gamma_catalog(source, digest)
+    release = _trusted_release(catalog)
+    monkeypatch.setattr(reconciler_module, "load_deployed_catalog_release", lambda: release)
+    monkeypatch.setattr(semantic_catalog_module, "load_deployed_catalog_release", lambda: release)
+
+    candidates = _multi_channel_source_candidates(source)
+    contract = _multi_channel_publication_contract(source, catalog, candidates)
+    before = AuthoringDocumentSpec(
+        name="cat03-multichannel",
+        title="Before",
+        sections=[
+            {
+                "id": "main",
+                "title": "Main",
+                "tracks": [
+                    {
+                        "id": "track-1",
+                        "title": "Curves",
+                        "kind": "normal",
+                        "width_mm": 20,
+                        "bindings": [],
+                    }
+                ],
+            }
+        ],
+    )
+
+    plan = reconcile_authoring(
+        _intent("Gamma Ray"),
+        existing=before,
+        available_channels={"main": candidates},
+        semantic_catalog=catalog,
+        semantic_publication_contract=contract,
+    )
+
+    assert plan.ready is True
+    assert len(plan.operations) == 1
+    assert len(plan.semantic_resolutions) == 1
+    evidence = plan.semantic_resolutions[0]
+    assert evidence.physical_mnemonic == "GR"
+    assert evidence.physical_identity_json == '{"curve_index":7,"format":"LAS"}'
+    enriched_contract = plan.semantic_publication_contract
+    assert enriched_contract is not None
+    assert len(enriched_contract.source_bindings) == 1
+    assert enriched_contract.source_bindings[0].source_path == str(source.resolve())
+    assert enriched_contract.source_bindings[0].source_content_sha256 == digest
+
+    service = AuthoringService(before)
+    execution = execute_authoring_plan(service, plan)
+    assert execution.success is True
+    verify_document_postconditions(
+        before,
+        service.document,
+        (),
+        plan.operations,
+        semantic_contract=enriched_contract,
+        semantic_evidence=plan.semantic_resolutions,
+    )
+    binding = service.document.sections[0].tracks[0].bindings[0]
+    assert binding.channel == "GR"
+    assert binding.channel not in {"CGR", "GRD"}
+
+
+@pytest.mark.parametrize(
+    "conflict",
+    (
+        "source_path",
+        "source_content_sha256",
+        "source_revision",
+        "inspection_snapshot_id",
+        "candidate_handle",
+    ),
+)
+def test_multichannel_source_binding_rejects_incoherent_candidate_groups(
+    conflict: str,
+    tmp_path: Path,
+) -> None:
+    """Source binding conflicts fail identically regardless of channel order."""
+    source = tmp_path / "approved-multichannel.las"
+    source.write_bytes(b"approved multi-channel LAS source")
+    candidates = list(_multi_channel_source_candidates(source, source_content_sha256="a" * 64))
+    contract = _multi_channel_publication_contract(
+        source,
+        _content_bound_gamma_catalog(source, hashlib.sha256(source.read_bytes()).hexdigest()),
+        tuple(candidates),
+    )
+    changed = candidates[2]
+    if conflict == "source_path":
+        changed = changed.model_copy(update={"source_path": str(tmp_path / "other.las")})
+    elif conflict == "source_content_sha256":
+        changed = changed.model_copy(update={"source_content_sha256": "b" * 64})
+    elif conflict == "source_revision":
+        changed = changed.model_copy(update={"source_revision": "conflicting-revision"})
+    elif conflict == "inspection_snapshot_id":
+        changed = changed.model_copy(update={"inspection_snapshot_id": "conflicting-snapshot"})
+    else:
+        changed = changed.model_copy(
+            update={"source_candidate_id": "candidate-2", "source_handle": "source-2"}
+        )
+    candidates[2] = changed
+
+    for ordered_candidates in (tuple(candidates), tuple(reversed(candidates))):
+        with pytest.raises(ValueError, match="semantic_source_binding_incoherent"):
+            _bind_catalog_source_map(
+                contract,
+                {"main": ordered_candidates},
+            )
+
+
+def test_reconciliation_rejects_incoherent_source_binding_without_operations(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A source-binding conflict returns a blocked plan before operations exist."""
+    import wellplot.authoring_reconciler as reconciler_module
+
+    source = tmp_path / "approved-multichannel.las"
+    source.write_bytes(b"approved multi-channel LAS source")
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    catalog = _content_bound_gamma_catalog(source, digest)
+    release = _trusted_release(catalog)
+    monkeypatch.setattr(reconciler_module, "load_deployed_catalog_release", lambda: release)
+    candidates = _multi_channel_source_candidates(source)
+    contract = _multi_channel_publication_contract(source, catalog, candidates)
+    original_source = contract.source_bindings[0]
+    conflicting_source = original_source.model_copy(update={"source_content_sha256": "f" * 64})
+    conflicting_contract = SemanticPublicationContract(
+        expected_bindings=contract.expected_bindings,
+        source_bindings=(conflicting_source,),
+        trusted_release=release,
+    )
+
+    plan = reconcile_authoring(
+        _intent("Gamma Ray"),
+        available_channels={"main": candidates},
+        semantic_catalog=catalog,
+        semantic_publication_contract=conflicting_contract,
+    )
+
+    assert plan.ready is False
+    assert plan.operations == []
+    assert [issue.code for issue in plan.issues] == ["semantic_source_binding_incoherent"]
