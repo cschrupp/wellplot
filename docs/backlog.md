@@ -466,6 +466,26 @@ attempt 003 remain immutable, with attempt 003 retaining `FAIL`. A09 integrated
 qualification remains open. CAT-03 acceptance does not authorize A10/A12,
 provider/live execution, or scientific work.
 
+### A09-REPORT-01 accepted — integrated qualification ready
+
+Independent review accepted commit
+`89bb26b02d51e3e2a9d086362b91bda81f5bb4fc` as
+`A09_REPORT_01_ACCEPTED — A09_INTEGRATED_QUALIFICATION_READY`. The Notebook
+stage projection formerly remained `NOT_REACHED` after a successful shared
+verifier return; it now records `PASS` immediately after normal return from
+`verify_document_postconditions()`. Semantic rejection remains `FAIL`, while
+paths stopping before verifier invocation remain `NOT_REACHED`. Canonical
+verifier-before-persistence ordering is unchanged; MCP production behavior is
+unchanged.
+
+The focused eight-module suite passed 211 tests; targeted Ruff, format,
+compilation, diff check, and single-engine attestation passed. Notebook-003
+remains immutable with its historical contradictory stage projection, and
+historical A09 attempt 003 retains `FAIL`. CAT-03 remains accepted and closed.
+A09 integrated CBL+VDL qualification is open and ready for a separately
+authorized fresh execution. Do not reuse attempt 003's raw-PDF-byte label
+oracle. This acceptance record does not itself authorize execution.
+
 ### CAT-02I implementation candidate (2026-11-07)
 
 CAT-02I provider-free implementation is being prepared for independent review

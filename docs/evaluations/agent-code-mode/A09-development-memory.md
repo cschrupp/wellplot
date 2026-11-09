@@ -698,3 +698,28 @@ separately. Historical Notebook-001 and Notebook-002 remain immutable, as does
 A09 attempt 003's `FAIL` terminal. A09 integrated qualification remains open.
 CAT-03 acceptance does not authorize A10/A12, provider/live, or scientific
 execution.
+
+## A09-REPORT-01 — Independent Acceptance (2026-11-09)
+
+Independent review accepted commit
+`89bb26b02d51e3e2a9d086362b91bda81f5bb4fc` with disposition
+`A09_REPORT_01_ACCEPTED — A09_INTEGRATED_QUALIFICATION_READY`. The root cause
+was that a normal return from Notebook's shared
+`verify_document_postconditions()` left `semantic_postcondition` at its
+initialized `NOT_REACHED`. The adapter now records `PASS` immediately after
+normal return; semantic rejection remains `FAIL`, and exits before verifier
+invocation remain `NOT_REACHED`. Verifier-before-persistence ordering is
+unchanged; MCP production behavior is unchanged.
+
+The focused eight-module suite passed 211 tests. Targeted Ruff, formatting,
+compilation, `git diff --check`, and single-engine attestation passed. Causal
+regressions record Notebook verifier/pass/persistence order, semantic rejection
+without persistence, pre-verifier rejection, and unchanged MCP
+verifier-before-persistence ordering.
+
+CAT-03 remains accepted and closed. Notebook-003 remains immutable with its
+historical contradictory stage projection; historical A09 attempt 003 retains
+its `FAIL` terminal. A09 integrated CBL+VDL qualification remains open and is
+ready for a separately authorized fresh execution. Do not use attempt 003's
+raw-PDF-byte label oracle. This acceptance does not itself authorize execution,
+A10/A12, provider/live, or scientific work.

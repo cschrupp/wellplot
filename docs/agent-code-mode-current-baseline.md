@@ -869,3 +869,25 @@ of current authority.
   This supersedes then-current CAT-01/CAT-02 activation restrictions only for
   this accepted qualification scope; it is not broad catalog activation or
   production promotion.
+
+### A09-REPORT-01 Stage Projection Corrective Accepted
+
+- **Status:** `A09_REPORT_01_ACCEPTED — A09_INTEGRATED_QUALIFICATION_READY`.
+- **Accepted commit:** `89bb26b02d51e3e2a9d086362b91bda81f5bb4fc`.
+- **Finding and correction:** Notebook's successful shared-verifier return
+  previously left `semantic_postcondition` at initialized `NOT_REACHED`. The
+  Notebook adapter now sets it to `PASS` immediately after normal return from
+  `verify_document_postconditions()`. Semantic rejection remains `FAIL`; exits
+  before verifier invocation remain `NOT_REACHED`. Verifier-before-persistence
+  ordering is unchanged, and MCP production behavior is unchanged.
+- **Validation:** the focused eight-module suite passed 211 tests. Targeted
+  Ruff, format, compilation, `git diff --check`, and single-engine attestation
+  passed. Causal regressions verify Notebook verifier/pass/persistence order,
+  semantic rejection without persistence, pre-verifier rejection, and MCP
+  parity.
+- **Qualification boundary:** CAT-03 remains accepted and closed. Notebook-003
+  is immutable and retains its historical contradictory stage projection;
+  historical A09 attempt 003 retains `FAIL`. A09 integrated CBL+VDL
+  qualification remains open and is ready for a separately authorized fresh
+  execution. Do not repeat attempt 003's raw-PDF-byte label oracle. This record
+  does not itself authorize that execution or any A10/A12/provider/live work.
