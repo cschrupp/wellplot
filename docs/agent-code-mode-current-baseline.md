@@ -891,3 +891,45 @@ of current authority.
   qualification remains open and is ready for a separately authorized fresh
   execution. Do not repeat attempt 003's raw-PDF-byte label oracle. This record
   does not itself authorize that execution or any A10/A12/provider/live work.
+
+### A09 Integrated CBL+VDL Qualification Accepted
+
+- **Status:** `A09_INTEGRATED_CBL_VDL_QUALIFICATION_ACCEPTED / A09_CLOSED`.
+- **Attempt:** `007`, namespace
+  `workspace/evaluations/a09-canonical-integration-20261109-007`.
+- **Product checkpoint:** `d0304758155d2a9d65847f4a3a01d0d7edee3d39`;
+  branch `engineering-d5-binding-path-repair`.
+- **Frozen runner SHA-256:**
+  `d68b11719a1c1386f1eb391f79c889a9f1949219a22ecde21a60d3af86b2dce1`.
+- **Evidence archive SHA-256:**
+  `dba63f554b19e3571f75d8c47b80ca63d1b785a1dbaaae53e618061134295a21`;
+  the evidence namespace contains a per-file `SHA256SUMS` manifest.
+- **Qualification:** metadata inspection resolved the exact CBL scalar and
+  VDL raster identities; canonical context and reconciliation produced two
+  binding operations; private execution and canonical validation passed; both
+  request obligations passed the shared postcondition verifier before
+  persistence; canonical YAML persistence/reload preserved the exact
+  bindings; the existing renderer observed CBL curve and VDL raster draws,
+  PDF image/vector activity, and produced a valid four-page PDF and canonical
+  PNG preview. No PDF text/label/OCR oracle was used.
+- **Custody and boundaries:** source SHA-256
+  `a4a2e91b495172079fc47bc2e9c936f0ab60c9845bbed8e65bf56555a5e82640` and
+  source revision were unchanged. The parser child exited successfully and
+  was reaped. Provider/model/endpoint calls and C02 access were zero. No
+  scientific grading occurred. Attempts 003–006 remain immutable with their
+  historical dispositions; attempt 007 is not rerun.
+- **Regression evidence:** the focused eight-module suite passed 211 tests;
+  Ruff lint, Python compilation, `git diff --check`, and single-engine
+  attestation passed. Format checking passed for the scoped files except the
+  unchanged committed `tests/test_authoring_reconciler.py`, which Ruff reports
+  would be reformatted; the remaining 17 scoped files passed format checking.
+- **Disposition:** A09 integrated CBL+VDL qualification is accepted and
+  closed. This provider-free qualification does not authorize provider/live,
+  scientific campaign, C02, or production-promotion activity.
+- **Deferred follow-up:** `WP-NULL-01` is backlog-only. Configured source null
+  sentinels must eventually flow through canonical configuration and
+  source/context/data handling and be masked before statistics/autoscale and
+  rendering. No loader or renderer implementation is authorized by this
+  qualification. A `0–1 mV` CBL range is presentation-only when explicitly
+  requested for a test, not null handling, calibration, or a universal
+  default.

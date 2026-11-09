@@ -2,11 +2,11 @@
 
 ## Status
 
-- State: A09-PARITY-01 accepted at `a12640591abbd6ff832a988ce1e6adc7c6fcfb79`; integrated CBL+VDL qualification remains unattempted and A09 overall open
+- State: A09 integrated CBL+VDL qualification accepted at attempt 007; A09 is closed
 - Accepted security/observability checkpoint: `7ea43a6548a8bd1e5b44eb20c085a7027932e0db`
 - Accepted metadata-first design checkpoint: `daef5d171828495b2f0dfcea25ae372f0bc39af4`
-- Current work: prepare fresh provider-free integrated CBL+VDL qualification
-  in a new namespace; execution requires separate authorization
+- Current work: no A09 implementation or qualification work remains open;
+  WP-NULL-01 is deferred and requires a separate reviewed slice
 - Provider, model, and endpoint calls: `0`
 - Scientific turns: `0`
 - C02 exposure: `0`
@@ -94,6 +94,58 @@ clarified by the 2026-11-04 D2 follow-up and does not reopen D1.
 The provider-free feasibility results and evidence limits are recorded in
 `docs/evaluations/agent-code-mode/A09-resource-budget-feasibility.md`. They do
 not promote implementation or authorize endpoint/model/scientific work.
+
+## A09 Integrated Qualification Closure — Attempt 007 (2026-11-09)
+
+Attempt 007 is accepted as the provider-free integrated CBL+VDL qualification
+at product checkpoint `d0304758155d2a9d65847f4a3a01d0d7edee3d39`, using
+frozen runner SHA-256
+`d68b11719a1c1386f1eb391f79c889a9f1949219a22ecde21a60d3af86b2dce1` in
+`workspace/evaluations/a09-canonical-integration-20261109-007`. Its evidence
+archive SHA-256 is
+`dba63f554b19e3571f75d8c47b80ca63d1b785a1dbaaae53e618061134295a21`.
+
+Metadata inspection resolved the exact CBL scalar and VDL raster physical
+identities. Canonical authoring context, reconciliation, private execution,
+canonical validation, two request obligations, shared postcondition
+verification, persistence, reload, renderer, and section preview all passed.
+The verifier passed before persistence. The existing renderer observed exact
+CBL curve and VDL raster draw calls, PDF image/vector activity, and produced a
+valid PDF and PNG. No text/label/OCR oracle was used. The source SHA-256 and
+revision remained unchanged; the parser child exited 0 and was reaped.
+
+The focused eight-module suite passed 211 tests. Ruff lint, compilation,
+`git diff --check`, and single-engine attestation passed. Ruff format checking
+identified one unchanged committed formatting exception in
+`tests/test_authoring_reconciler.py`; the other 17 scoped files passed. The
+runner stderr contained only Matplotlib's nonfatal temporary-cache warning.
+Provider/model/endpoint calls and C02 access were zero, and no scientific
+grading occurred.
+
+Disposition: `A09_INTEGRATED_CBL_VDL_QUALIFICATION_ACCEPTED / A09_CLOSED`.
+Attempts 003–006 remain immutable and retain their historical outcomes.
+Attempt 007 must not be rerun. This closure does not authorize provider/live,
+scientific campaign, C02, or production-promotion activity.
+
+## Deferred Follow-up: WP-NULL-01
+
+Configured source null/sentinel handling is deferred and is not part of A09
+closure. The eventual policy belongs in canonical YAML configuration, may
+support source-specific values, and must propagate through validated config,
+host-owned request/source context, canonical loading/data representation, and
+statistics/rendering. Configured sentinels must become masked/missing values
+before statistics/autoscale and rendering, while preserving cardinality,
+array shape, valid negative samples, and all non-null values. No default
+interpolation, CBL conversion/normalization, hardcoded global sentinel, or
+renderer-specific special case is authorized. Multi-source precedence remains
+to be defined during a separately reviewed implementation slice.
+
+The accepted CBL fixture has 523 samples, including 81 exact `-999.25`
+sentinels and 442 non-sentinel values. These counts motivate a regression but
+do not define a global null value. Null masking is independent of CBL
+calibration/normalization semantics. A `0–1 mV` range is only a presentation
+instruction when explicitly selected for a test; it neither masks sentinels
+nor defines a universal CBL default.
 
 ## D2 Feasibility Result (2026-11-03)
 

@@ -535,3 +535,51 @@ authorization. A09 integrated qualification remains open and attempt 003
 retains its historical `FAIL`. No provider/model/endpoint, C02, live, or
 scientific execution occurred. CAT-02 is closed; this record does not release
 CAT-03 or change the integrated-qualification gate.
+
+### A09 integrated CBL+VDL qualification accepted — Attempt 007 (2026-11-09)
+
+Attempt 007 is accepted and closes A09 integrated qualification. It ran at
+product checkpoint `d0304758155d2a9d65847f4a3a01d0d7edee3d39` in
+`workspace/evaluations/a09-canonical-integration-20261109-007`, with frozen
+runner SHA-256
+`d68b11719a1c1386f1eb391f79c889a9f1949219a22ecde21a60d3af86b2dce1` and
+evidence archive SHA-256
+`dba63f554b19e3571f75d8c47b80ca63d1b785a1dbaaae53e618061134295a21`.
+The integrated canonical path passed from metadata inspection and exact CBL/
+VDL identity through context, reconciliation, private execution, validation,
+two shared-verifier obligations, persistence/reload, canonical rendering and
+preview. The source content and revision were unchanged. Provider/model/
+endpoint calls and C02 access were zero; no scientific grading occurred.
+The focused suite passed 211 tests. Ruff lint, compilation, diff check and
+single-engine attestation passed. Format checking passed for the other 17
+scoped files; unchanged committed `tests/test_authoring_reconciler.py` retains
+a Ruff formatting discrepancy. Attempts 003–006 remain immutable; attempt
+007 is not to be rerun. This closure does not authorize provider/live,
+scientific campaign, C02 or production-promotion work.
+
+### WP-NULL-01 — Configurable source null-value handling (deferred)
+
+**Status:** backlog / deferred after A09 integrated qualification closure. No
+implementation is authorized by the Attempt 007 acceptance.
+
+Source missing-value sentinels must eventually be declared in canonical
+WellPlot configuration, not hardcoded in a loader, channel, fixture or
+renderer. The policy may support one or multiple values and global,
+source-format, or source-specific applicability; deterministic precedence
+for documents using multiple sources must be designed and reviewed.
+
+The host-owned policy must flow through validated configuration and canonical
+source/request context into the existing loader/data path. Configured sentinel
+samples must be represented as missing/masked before statistics/autoscale and
+rendering, preserving sample/depth cardinality, array dimensions, valid
+negative values and all non-null samples. Do not interpolate by default,
+convert/normalize CBL, special-case CBL or Matplotlib, or use a display scale
+as null handling.
+
+Regression candidate: `CBL_Repeat.dlis`, CBL with 523 samples, 81 exact
+`-999.25` sentinels and 442 non-sentinel samples. These fixture facts do not
+authorize a global sentinel. Null masking is independent of unresolved CBL
+calibration/normalization. A `0–1 mV` range remains presentation-only if
+explicitly requested for a test; it is not a universal default and does not
+mask missing samples. Implement only under a separately reviewed slice after
+inspecting the canonical configuration model and context/data flow.

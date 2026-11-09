@@ -433,3 +433,39 @@ promoted by this decision. D2 feasibility remains open, and A09 implementation
 and A10 integration qualification are not authorized. Catalog mappings,
 presentation presets, resource limits, and model-token accounting remain
 unselected pending their respective feasibility and governance evidence.
+
+## A09 Integrated CBL+VDL Qualification Acceptance (2026-11-09)
+
+Accept Attempt 007 as the provider-free integrated A09 CBL+VDL qualification
+and close A09 integrated qualification. The run used product checkpoint
+`d0304758155d2a9d65847f4a3a01d0d7edee3d39`, frozen runner SHA-256
+`d68b11719a1c1386f1eb391f79c889a9f1949219a22ecde21a60d3af86b2dce1`, and
+namespace `workspace/evaluations/a09-canonical-integration-20261109-007`.
+The evidence archive SHA-256 is
+`dba63f554b19e3571f75d8c47b80ca63d1b785a1dbaaae53e618061134295a21`.
+
+The exact CBL scalar and VDL raster passed metadata resolution, canonical
+authoring/reconciliation/execution/validation, both shared postcondition
+obligations before persistence, YAML persistence and reload, existing
+renderer output, and canonical preview. Source SHA-256 and revision remained
+unchanged. Provider/model/endpoint calls and C02 access were zero; scientific
+grading was not performed. The focused eight-module suite passed 211 tests;
+Ruff lint, compilation, `git diff --check`, and single-engine attestation
+passed. Ruff format checking identified one unchanged committed formatting
+exception in `tests/test_authoring_reconciler.py`; the other scoped files
+passed. Attempts 003–006 retain their historical immutable dispositions;
+Attempt 007 is not rerun. No provider/live, scientific campaign, C02, or
+production-promotion authority follows from this provider-free acceptance.
+
+Record `WP-NULL-01` as deferred follow-up, not part of A09. Configurable
+source null/sentinel policy must ultimately be host-owned canonical
+configuration propagated through the existing context and data path, with
+configured sentinels masked before statistics/autoscale and rendering.
+Source-specific values and deterministic multi-source precedence require a
+separately reviewed implementation design. Preserve cardinality, dimensions,
+valid negative values, and non-null samples; do not interpolate by default or
+normalize CBL. The fixture's 81 `-999.25` samples among 523 CBL samples
+motivate a regression but do not authorize a global sentinel. A `0–1 mV`
+range is presentation-only when explicitly requested, not null handling,
+calibration, or a universal default. No null-handling implementation is
+authorized here.
