@@ -2202,6 +2202,8 @@ def _smoke_provider_factory(
                 return httpx.Response(500, request=request)
             if response_mode == "invalid":
                 content = '{"status":"NOT_READY"}'
+            elif response_mode == "transport_error":
+                raise httpx.ConnectError("synthetic transport failure", request=request)
             elif response_mode == "planner":
                 content = json.dumps(_planner_wire_payload())
             else:
@@ -2236,6 +2238,7 @@ def _smoke_provider_factory(
         artifact_root: Path,
         token: str,
         *,
+        max_retries_override: int | None = None,
         trace_callback: Callable[[dict[str, Any]], None] | None = None,
         compile_result_callback: Callable[[Any], None] | None = None,
         section_action_callback: Callable[[dict[str, object]], None] | None = None,
@@ -2247,6 +2250,7 @@ def _smoke_provider_factory(
             project_config=PROJECT_CONFIG,
             request_options=d5._thinking_control_options(),
             require_thinking_control=True,
+            max_retries_override=max_retries_override,
             http_client_factory=factory,
             trace_callback=trace_callback,
             compile_result_callback=compile_result_callback,
@@ -2257,6 +2261,25 @@ def _smoke_provider_factory(
         return adapter
 
     return build
+
+
+def test_canonical_adapter_retry_override_is_opt_in(tmp_path: Path) -> None:
+    """Only the explicit planner-smoke override differs from project retry policy."""
+    observed: list[int] = []
+    for index, override in enumerate((None, 0)):
+        clients: list[httpx.AsyncClient] = []
+        build = _smoke_provider_factory(clients=clients)
+        adapter = build(
+            REPO_ROOT,
+            tmp_path / f"adapter-{index}",
+            "test-only-token",
+            max_retries_override=override,
+        )
+        client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
+        observed.append(client.max_retries)
+        asyncio.run(d5._close_binding_smoke_adapter(adapter))
+
+    assert observed == [PROJECT_CONFIG.provider.max_retries, 0]
 
 
 def _planner_wire_payload() -> dict[str, object]:
@@ -2468,11 +2491,24 @@ def test_git_porcelain_capture_preserves_status_columns_and_newline(
     assert d5._git_porcelain_raw(REPO_ROOT) == raw
 
 
+@pytest.mark.parametrize(
+    ("response_mode", "expected_status"),
+    [
+        pytest.param("planner", "SMOKE_PASS", id="valid-wire-response"),
+        pytest.param(
+            "transport_error",
+            "SMOKE_PROVIDER_INCONCLUSIVE",
+            id="one-retryable-transport-failure-no-retry",
+        ),
+    ],
+)
 def test_planner_only_smoke_uses_existing_custody_and_stops_at_wire(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    response_mode: str,
+    expected_status: str,
 ) -> None:
-    """The canonical smoke path captures the wire DTO without compiling or executing it."""
+    """The canonical smoke makes one physical attempt and never enters authoring."""
     benchmark_path = REPO_ROOT / d5.A10_SEM_01_BENCHMARK
     inventory_path = REPO_ROOT / d5.A10_SEM_01_SOURCE_INVENTORY
     source_path = REPO_ROOT / d5.A10_SEM_02_SMOKE_SOURCE_PATH
@@ -2494,14 +2530,22 @@ def test_planner_only_smoke_uses_existing_custody_and_stops_at_wire(
             REPO_ROOT / "scripts/nlp_d5_live_semantic_qualification.py"
         ),
         planner_smoke_wire_schema_sha256=d5._planner_wire_schema_sha256(),
+        planner_smoke_sdk_max_retries=0,
         expected_worktree_porcelain=d5.A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN,
     )
     clients: list[httpx.AsyncClient] = []
-    provider_factory = _smoke_provider_factory(response_mode="planner", clients=clients)
+    requests: list[httpx.Request] = []
+    provider_factory = _smoke_provider_factory(
+        response_mode=response_mode,
+        requests=requests,
+        clients=clients,
+    )
+    adapters: list[object] = []
 
     def prepare_fake_readiness(**kwargs: object) -> object:
         build_provider = kwargs["provider_factory"]
         adapter = build_provider("test-only-token")
+        adapters.append(adapter)
         return SimpleNamespace(
             adapter=adapter,
             projection=SimpleNamespace(
@@ -2530,17 +2574,19 @@ def test_planner_only_smoke_uses_existing_custody_and_stops_at_wire(
         provider_factory=provider_factory,
     )
 
-    assert result["status"] == "SMOKE_PASS"
+    assert result["status"] == expected_status
     terminal = result["terminal"]
     assert terminal["mode"] == "canonical_planner_only_smoke"
     assert terminal["logical_generation_calls"] == 1
     assert terminal["provider_calls"] == 1
+    client = adapters[0].inner.session.session.compiler.dependencies.planner.backend.delegate.client
+    assert client.max_retries == 0
+    assert len(requests) == 1
     state = json.loads(
         (Path(authorization.artifact_root) / f"{authorization.campaign_id}.state.json").read_text()
     )
-    assert state["planner_result_status"] == "SCHEMA_VALIDATED_WIRE_CAPTURED"
     assert state["mode"] == "canonical_planner_only_smoke"
-    assert state["planner_result_schema_valid"] is True
+    assert state["physical_generation_attempts"] == 1
     assert state["downstream_stage_calls"] == {
         "report_worker": 0,
         "section_worker": 0,
@@ -2550,16 +2596,23 @@ def test_planner_only_smoke_uses_existing_custody_and_stops_at_wire(
         "render": 0,
         "preview": 0,
     }
-    wire = json.loads(
-        (
-            Path(authorization.artifact_root)
-            / f"{authorization.campaign_id}.planner-wire-response.jsonl"
+    if response_mode == "planner":
+        assert state["planner_result_status"] == "SCHEMA_VALIDATED_WIRE_CAPTURED"
+        assert state["planner_result_schema_valid"] is True
+        wire = json.loads(
+            (
+                Path(authorization.artifact_root)
+                / f"{authorization.campaign_id}.planner-wire-response.jsonl"
+            )
+            .read_text()
+            .splitlines()[0]
         )
-        .read_text()
-        .splitlines()[0]
-    )
-    assert wire["response_schema"] == "_PlannerWirePlan"
-    assert _PlannerWirePlan.model_validate(wire["validated_response"])
+        assert wire["response_schema"] == "_PlannerWirePlan"
+        assert _PlannerWirePlan.model_validate(wire["validated_response"])
+    else:
+        assert state["planner_result_status"] == "NOT_REACHED"
+        assert state["planner_result_schema_valid"] is False
+        assert terminal["outcome"] == "SMOKE_PROVIDER_INCONCLUSIVE"
     assert not [client for client in clients if not client.is_closed]
 
 
@@ -3825,3 +3878,28 @@ def test_smoke_ledger_rejects_second_logical_and_fourth_physical_call() -> None:
         ledger.physical_attempt(1)
     with pytest.raises(d5.D5CallCapExceeded, match="physical attempt 4"):
         ledger.physical_attempt(1)
+
+
+def test_planner_smoke_ledger_rejects_second_physical_attempt() -> None:
+    """Planner smoke rejects a retry before its request reaches HTTP transport."""
+    ledger = d5.D5SmokeCallLedger(mode=d5.SMOKE_PLANNER_KIND)
+    ledger.record_canonical_call_started(1, "planner")
+
+    assert ledger.physical_attempt(1) == 1
+    with pytest.raises(d5.D5CallCapExceeded, match="one physical attempt"):
+        ledger.physical_attempt(1)
+    assert ledger.physical_attempts == 1
+
+
+@pytest.mark.parametrize("retry_limit", [None, 1, True])
+def test_planner_smoke_authority_requires_literal_zero_retries(retry_limit: object) -> None:
+    """The authority cannot omit or weaken the planner-only no-retry setting."""
+    authorization = replace(
+        _authorization(),
+        planner_smoke_mode=d5.SMOKE_PLANNER_KIND,
+        planner_smoke_case_id=d5.A10_SEM_02_SMOKE_CASE_ID,
+        planner_smoke_sdk_max_retries=retry_limit,
+    )
+
+    with pytest.raises(d5.D5StaticPreflightError, match="pin zero SDK retries"):
+        d5._planner_smoke_case(REPO_ROOT, authorization)

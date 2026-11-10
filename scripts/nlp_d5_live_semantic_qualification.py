@@ -78,6 +78,8 @@ SMOKE_BINDING_ROLE_LIMITS = {"planner": 2, "section_worker": 2, "report_worker":
 SMOKE_BINDING_MAX_LOGICAL_CALLS = 4
 SMOKE_BINDING_MAX_PHYSICAL_ATTEMPTS_PER_CALL = 3
 SMOKE_PLANNER_ROLE_LIMITS = {"planner": 1}
+SMOKE_PLANNER_MAX_RETRIES = 0
+SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS = 1
 A10_SEM_01_ROOT = "workspace/evaluations/a10-sem-01-20261110"
 A10_SEM_01_BENCHMARK = f"{A10_SEM_01_ROOT}/benchmark.json"
 A10_SEM_01_SOURCE_INVENTORY = f"{A10_SEM_01_ROOT}/source-inventory.json"
@@ -323,6 +325,7 @@ class D5Authorization:
     planner_smoke_source_sha256: str = ""
     planner_smoke_harness_sha256: str = ""
     planner_smoke_wire_schema_sha256: str = ""
+    planner_smoke_sdk_max_retries: int | None = None
     expected_worktree_porcelain: str = ""
 
     @classmethod
@@ -414,6 +417,7 @@ class D5Authorization:
             planner_smoke_source_sha256=str(value.get("planner_smoke_source_sha256", "")),
             planner_smoke_harness_sha256=str(value.get("planner_smoke_harness_sha256", "")),
             planner_smoke_wire_schema_sha256=str(value.get("planner_smoke_wire_schema_sha256", "")),
+            planner_smoke_sdk_max_retries=value.get("planner_smoke_sdk_max_retries"),
             expected_worktree_porcelain=str(value.get("expected_worktree_porcelain", "")),
         )
 
@@ -796,6 +800,10 @@ def _planner_smoke_case(repo_root: Path, authorization: D5Authorization) -> dict
         raise D5StaticPreflightError("planner-only smoke mode is not authorized")
     if authorization.planner_smoke_case_id != A10_SEM_02_SMOKE_CASE_ID:
         raise D5StaticPreflightError("planner smoke case is not the approved B01 case")
+    if type(authorization.planner_smoke_sdk_max_retries) is not int or (
+        authorization.planner_smoke_sdk_max_retries != SMOKE_PLANNER_MAX_RETRIES
+    ):
+        raise D5StaticPreflightError("planner smoke authority must pin zero SDK retries")
     if any(not re.fullmatch(r"[0-9a-f]{64}", digest) for digest in required_digests.values()):
         raise D5StaticPreflightError("planner smoke authority is missing a pinned digest")
     if authorization.expected_worktree_porcelain != A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN:
@@ -861,6 +869,8 @@ def _planner_smoke_case(repo_root: Path, authorization: D5Authorization) -> dict
         "benchmark_sha256": authorization.planner_smoke_benchmark_sha256,
         "source_inventory_sha256": authorization.planner_smoke_source_inventory_sha256,
         "wire_schema_sha256": authorization.planner_smoke_wire_schema_sha256,
+        "sdk_max_retries": authorization.planner_smoke_sdk_max_retries,
+        "physical_attempt_limit": SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS,
     }
 
 
@@ -898,6 +908,8 @@ def _default_planner_smoke_static_checks(
             "planner_smoke_source_sha256": case["source_sha256"],
             "planner_smoke_harness_sha256": authorization.planner_smoke_harness_sha256,
             "planner_smoke_wire_schema_sha256": case["wire_schema_sha256"],
+            "planner_smoke_sdk_max_retries": case["sdk_max_retries"],
+            "planner_smoke_physical_attempt_limit": case["physical_attempt_limit"],
             "expected_worktree_porcelain_sha256": hashlib.sha256(
                 authorization.expected_worktree_porcelain.encode("utf-8")
             ).hexdigest(),
@@ -1086,12 +1098,15 @@ class D5SmokeCallLedger:
         if role is None:
             raise D5HarnessError("smoke physical attempt references unknown call")
         next_attempt = self.attempts_by_index[logical_index] + 1
-        limit = (
-            self.max_physical_attempts
-            if self.mode == "structured_ready"
-            else SMOKE_BINDING_MAX_PHYSICAL_ATTEMPTS_PER_CALL
-        )
+        if self.mode == SMOKE_PLANNER_KIND:
+            limit = SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS
+        elif self.mode == SMOKE_BINDING_KIND:
+            limit = SMOKE_BINDING_MAX_PHYSICAL_ATTEMPTS_PER_CALL
+        else:
+            limit = self.max_physical_attempts
         if next_attempt > limit:
+            if self.mode == SMOKE_PLANNER_KIND:
+                raise D5CallCapExceeded("planner-only smoke permits one physical attempt")
             raise D5CallCapExceeded("smoke physical attempt 4 rejected before delegation")
         self.attempts_by_index[logical_index] = next_attempt
         self.physical_attempts = next_attempt
@@ -3533,12 +3548,13 @@ def create_live_adapter(
     provider_name: str | None = None,
     request_options: Mapping[str, object] | None = None,
     require_thinking_control: bool = False,
+    max_retries_override: int | None = None,
     trace_callback: Callable[[Mapping[str, Any]], None] | None = None,
     compile_result_callback: Callable[[Any], None] | None = None,
     section_action_callback: Callable[[Mapping[str, object]], None] | None = None,
     section_action_capture_mode: Literal["off", "diagnostics", "validated_dto"] = "off",
 ) -> _ObservedLiveAdapter:
-    """Build the accepted canonical adapter with retry-visible HTTP transport."""
+    """Build the canonical adapter with optional harness-scoped retry control."""
     import httpx
     from openai import AsyncOpenAI
 
@@ -3551,6 +3567,11 @@ def create_live_adapter(
         raise D5StaticPreflightError("section action observer is required")
     if require_thinking_control:
         request_options = _validated_thinking_control_options(request_options)
+    max_retries = project_config.provider.max_retries
+    if max_retries_override is not None:
+        if type(max_retries_override) is not int or max_retries_override < 0:
+            raise D5StaticPreflightError("max retries override must be a non-negative integer")
+        max_retries = max_retries_override
     observer = _PhysicalAttemptObserver()
     http_client = (
         http_client_factory(observer)
@@ -3566,7 +3587,7 @@ def create_live_adapter(
         api_key=api_key,
         base_url=resolved_base_url,
         timeout=project_config.provider.timeout_seconds,
-        max_retries=project_config.provider.max_retries,
+        max_retries=max_retries,
         http_client=http_client,
     )
     backend = OpenAICompatibleBackendV2(
@@ -4175,6 +4196,7 @@ def execute_live_planner_smoke(
                 repo_root,
                 artifact_root,
                 token,
+                max_retries_override=authorization.planner_smoke_sdk_max_retries,
                 trace_callback=on_trace,
             )
         return create_live_adapter(
@@ -4184,6 +4206,7 @@ def execute_live_planner_smoke(
             project_config=project_config,
             request_options=authorization.thinking_control_options,
             require_thinking_control=True,
+            max_retries_override=authorization.planner_smoke_sdk_max_retries,
             trace_callback=on_trace,
         )
 
