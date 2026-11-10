@@ -933,3 +933,29 @@ of current authority.
   qualification. A `0–1 mV` CBL range is presentation-only when explicitly
   requested for a test, not null handling, calibration, or a universal
   default.
+
+### A10-SEM-01 Provider-Free Semantic Baseline Accepted
+
+- **Status:** `A10_SEM_01_PROVIDER_FREE_BASELINE_ACCEPTED`;
+  live planner measurement is the next critical gate.
+- **Checkpoint and evidence:** checkpoint
+  `7731d5de456aa7b42fd6d5e4ef1e0bc2421a7ea8`; frozen evaluation package
+  `workspace/evaluations/a10-sem-01-20261110/` contains 53 cases (35
+  production-grounded, 18 exploratory) and its source inventory and scored
+  provider-free host-resolution artifacts.
+- **Finding:** the deterministic host resolver produced zero wrong
+  substitutions and zero disposition mismatches across the 43 structured
+  semantic-resolution cases that exercised it. This supports the bounded
+  planner/host separation; it does not measure model capability.
+- **Unmeasured:** the production planner was not called. Language
+  understanding, request completeness, ambiguity behavior, hallucinated
+  channels, stability, and planner unsafe-binding rate remain unknown.
+- **Next gate:** qualify the exact canonical runtime under K-06/K-07, then
+  perform a separately authorized and independently accepted planner-only
+  smoke before the frozen 53-case planner benchmark. The smoke must stop after
+  schema-valid production planner output; no worker execution, authoring,
+  persistence, rendering, or scientific grading.
+- **Scope:** do not expand semantic catalog coverage before the frozen planner
+  baseline. The legacy MCP `check_channel_availability` alias interpretation
+  remains operational debt and is not semantic authority. This acceptance
+  authorizes neither provider calls nor the benchmark by itself.
