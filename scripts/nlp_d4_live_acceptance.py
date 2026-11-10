@@ -37,12 +37,7 @@ from wellplot.agent.code_mode.canonical_workers import (
     SectionSemanticActionResponse as DeliverySectionResponse,
 )
 from wellplot.agent.code_mode.planner import SemanticPlan, _PlannerWirePlan
-from wellplot.agent.code_mode.semantic_actions import (
-    AddFillAction,
-    AddTrackAction,
-    ReconstructSectionAction,
-    UpdateCurveScaleAction,
-)
+from wellplot.agent.code_mode.typed_section_worker import _ACTION_RESPONSE_MODELS
 from wellplot.agent.direct_notebook import DirectNotebookSession
 from wellplot.agent.providers.base import (
     ModelBackendProtocol,
@@ -346,16 +341,8 @@ class CountingBackend:
             _PlannerWirePlan: "planner",
             DeliveryReportResponse: "report_worker",
             DeliverySectionResponse: "section_worker",
-            ReconstructSectionAction: "section_worker",
-            AddTrackAction: "section_worker",
-            UpdateCurveScaleAction: "section_worker",
         }
-        if response_model in {
-            ReconstructSectionAction,
-            AddTrackAction,
-            UpdateCurveScaleAction,
-            AddFillAction,
-        }:
+        if response_model in _ACTION_RESPONSE_MODELS.values():
             return "section_worker"
         try:
             return roles[response_model]

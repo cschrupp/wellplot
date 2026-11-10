@@ -253,6 +253,7 @@ def test_revision_action_schema_is_discriminated_and_branch_strict() -> None:
         "reconstruct",
         "update_curve_scale",
         "add_track",
+        "add_tracks",
         "add_fill",
     }
     add_fill = schema["$defs"]["AddFillAction"]

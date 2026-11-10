@@ -17,8 +17,19 @@ from wellplot.agent.code_mode.obligations import (
     RequestObligation,
     verify_document_postconditions,
 )
+from wellplot.agent.code_mode.planner import _PlannerWirePlan
+from wellplot.agent.code_mode.semantic_actions import UpdateCurveScaleAction
 from wellplot.agent.code_mode.source_loader import LogfileSourceLoader
-from wellplot.agent.session import AgentMetrics, AgentSessionResult, AgentWorkerEvidence
+from wellplot.agent.composition import create_canonical_compile_facade
+from wellplot.agent.direct_notebook import DirectNotebookSession
+from wellplot.agent.providers.base import ProviderMetrics, StructuredGenerationResult
+from wellplot.agent.session import (
+    AgentMetrics,
+    AgentSession,
+    AgentSessionConfig,
+    AgentSessionResult,
+    AgentWorkerEvidence,
+)
 from wellplot.authoring_executor import execute_authoring_plan
 from wellplot.authoring_service import AuthoringService
 from wellplot.errors import AuthoringPublicationRecoveryError
@@ -31,6 +42,82 @@ from wellplot.mcp.agentic import (
 )
 from wellplot.model import AuthoringDocumentIntent, AuthoringDocumentSpec
 from wellplot.semantic_catalog import ExpectedSemanticBinding, SemanticPublicationContract
+
+
+class _McpSourceContextBackend:
+    """Return frozen semantic outputs while leaving host compilation canonical."""
+
+    def __init__(self) -> None:
+        self.section_source_channels: tuple[str, ...] = ()
+
+    async def generate_structured(
+        self,
+        request: object,
+        *,
+        response_model: type[object],
+    ) -> StructuredGenerationResult[object]:
+        """Supply one fixed scale plan and act only on host-issued handles."""
+        if response_model is _PlannerWirePlan:
+            value = response_model.model_validate(
+                {
+                    "version": "wellplot.semantic-plan.v2",
+                    "summary": "Set the existing GR curve scale.",
+                    "section_tasks": [
+                        {
+                            "goal": "Update the GR scale in Main Log.",
+                            "capability_ids": [
+                                "section.log_plot",
+                                "track.normal",
+                                "binding.curve",
+                            ],
+                            "existing_section_hint": "Main Log",
+                            "source_hints": ["fixture.las"],
+                            "requirements": [],
+                            "constraints": [],
+                            "scope_ref": "fixture_main",
+                            "operations": [
+                                {
+                                    "local_ref": "update_gr_scale",
+                                    "scope_ref": "fixture_main",
+                                    "verb": "SET",
+                                    "object_kind": "binding",
+                                    "target_clue": "GR",
+                                    "field_values": [
+                                        {
+                                            "field": "scale_minimum",
+                                            "state": "SET",
+                                            "value": 5.0,
+                                        }
+                                    ],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            )
+        elif response_model is UpdateCurveScaleAction:
+            payload = yaml.safe_load(request.user_prompt)
+            section_context = payload["section_context"]
+            self.section_source_channels = tuple(
+                channel["mnemonic"]
+                for source in section_context["sources"]
+                for channel in source["channels"]
+            )
+            target_handle = payload["section_work_contract"]["target_handle"]
+            value = response_model.model_validate(
+                {
+                    "action": "update_curve_scale",
+                    "target": {"handle": target_handle},
+                    "scale": {"kind": "linear", "minimum": 5.0, "maximum": 125.0},
+                }
+            )
+        else:
+            raise AssertionError(f"unexpected canonical worker model: {response_model!r}")
+
+        return StructuredGenerationResult(
+            value=value,
+            metrics=ProviderMetrics(input_tokens=1, output_tokens=1, total_tokens=2),
+        )
 
 
 def test_apply_failure_owner_keeps_deterministic_boundaries_distinct() -> None:
@@ -135,6 +222,106 @@ def test_mcp_request_context_does_not_eagerly_parse_declared_sources() -> None:
         candidate.inspection_state == "not_inspected" for candidate in context.source_candidates
     )
     assert all(candidate.expected_revision_token for candidate in context.source_candidates)
+
+
+def test_public_mcp_revision_passes_declared_source_into_canonical_context() -> None:
+    """A valid source-backed request reaches canonical section enrichment."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="mcp-source-context-") as temp_dir:
+        fixture_paths = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        backend = _McpSourceContextBackend()
+        session = AgentSession(
+            compiler=create_canonical_compile_facade(
+                backend=backend,
+                server_root=REPO_ROOT,
+            ),
+            config=AgentSessionConfig(),
+        )
+        operations = GraphAuthoringMcpOperations.create(session=session, root=REPO_ROOT)
+        request = "In Main Log, set the GR curve to a linear 5-125 scale using fixture.las."
+
+        result = asyncio.run(
+            operations.revise(
+                logfile_path=str(fixture_paths.single_logfile),
+                request=request,
+            )
+        )
+
+        assert result.success is True, result.errors
+        assert "GR" in backend.section_source_channels
+        persisted = yaml.safe_load(fixture_paths.single_logfile.read_text(encoding="utf-8"))
+        gr_binding = next(
+            item
+            for item in persisted["document"]["bindings"]["channels"]
+            if item["channel"] == "GR"
+        )
+        assert gr_binding["scale"]["kind"] == "linear"
+        assert gr_binding["scale"]["min"] == 5.0
+        assert gr_binding["scale"]["max"] == 125.0
+
+
+def test_notebook_and_mcp_revisions_persist_equivalent_canonical_documents() -> None:
+    """Current public adapters converge on the same canonical persisted state."""
+    request = "In Main Log, set the GR curve to a linear 5-125 scale using fixture.las."
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="entrypoint-parity-") as temp_dir:
+        root = Path(temp_dir)
+        notebook_fixture = create_mcp_fixture_paths(root / "notebook")
+        mcp_fixture = create_mcp_fixture_paths(root / "mcp")
+
+        notebook_session = AgentSession(
+            compiler=create_canonical_compile_facade(
+                backend=_McpSourceContextBackend(),
+                server_root=REPO_ROOT,
+            ),
+            config=AgentSessionConfig(),
+        )
+        mcp_session = AgentSession(
+            compiler=create_canonical_compile_facade(
+                backend=_McpSourceContextBackend(),
+                server_root=REPO_ROOT,
+            ),
+            config=AgentSessionConfig(),
+        )
+        notebook = DirectNotebookSession(
+            session=notebook_session,
+            provider="test",
+            model="test-model",
+            credential_source=None,
+            server_root=REPO_ROOT,
+        )
+        mcp = GraphAuthoringMcpOperations.create(session=mcp_session, root=REPO_ROOT)
+
+        notebook_result = asyncio.run(
+            notebook.revise(
+                feedback=request,
+                logfile_path=notebook_fixture.single_logfile,
+            )
+        )
+        mcp_result = asyncio.run(
+            mcp.revise(
+                logfile_path=str(mcp_fixture.single_logfile),
+                request=request,
+            )
+        )
+
+        notebook_document = yaml.safe_load(
+            notebook_fixture.single_logfile.read_text(encoding="utf-8")
+        )["document"]
+        mcp_document = yaml.safe_load(mcp_fixture.single_logfile.read_text(encoding="utf-8"))[
+            "document"
+        ]
+
+    assert notebook_result.report_facts["success"] is True
+    assert mcp_result.success is True, mcp_result.errors
+    assert notebook_document == mcp_document
+    gr_binding = next(
+        item for item in mcp_document["bindings"]["channels"] if item["channel"] == "GR"
+    )
+    assert gr_binding["scale"] == {
+        "kind": "linear",
+        "min": 5.0,
+        "max": 125.0,
+        "reverse": False,
+    }
 
 
 def test_mcp_missing_semantic_evidence_does_not_publish() -> None:

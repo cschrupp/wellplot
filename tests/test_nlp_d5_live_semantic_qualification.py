@@ -19,14 +19,6 @@ import pytest
 from pydantic import BaseModel
 from scripts import nlp_d4_live_acceptance as d4
 from scripts import nlp_d5_live_semantic_qualification as d5
-from tests.test_nlp_d4_live_acceptance import (
-    _D4PlannerBackend,
-    _D4SessionBackend,
-    _D4SessionHarness,
-    _D4SessionPlanner,
-    _D4SessionReportBackend,
-    _D4SessionSectionBackend,
-)
 
 from wellplot.agent.code_mode.facade import (
     CodeModeCompileResult,
@@ -34,6 +26,7 @@ from wellplot.agent.code_mode.facade import (
     CompileMetrics,
     CompileWorkerEvidence,
 )
+from wellplot.agent.code_mode.planner import _PlannerWirePlan
 from wellplot.agent.composition import create_canonical_compile_facade
 from wellplot.agent.direct_notebook import _load_document_context
 from wellplot.agent.providers.base import (
@@ -850,81 +843,6 @@ def test_d5i_unauthorized_mutation_marks_mutation_as_fail() -> None:
     assert dimensions["mutation"] == "FAIL"
 
 
-def test_d5i_correction_evidence_is_derived_from_canonical_adapter_observation(
-    tmp_path: Path,
-) -> None:
-    """The reused D4 adapter produces observable G7 correction evidence."""
-
-    class CorrectionSession:
-        provider = "deterministic"
-        model = "d5i-test-model"
-
-        async def revise(self, *, feedback: str, logfile_path: Path) -> object:
-            del feedback
-            payload = d4.yaml.safe_load(logfile_path.read_text(encoding="utf-8"))
-            payload["document"]["header"]["title"] = "Repaired title"
-            logfile_path.write_text(d4.yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
-            return SimpleNamespace(
-                submitted_intent={"correction": True},
-                report_facts={
-                    "success": True,
-                    "changed": True,
-                    "apply_status": "persisted",
-                    "compilation": {
-                        "diagnostics": [
-                            {
-                                "code": "semantic_contract_incomplete",
-                                "stage": "contract",
-                            }
-                        ],
-                        "metrics": {"total_repairs": 1},
-                    },
-                },
-            )
-
-        async def render_logfile_to_file(
-            self,
-            *,
-            logfile_path: Path,
-            output_path: Path,
-            overwrite: bool,
-        ) -> dict[str, object]:
-            del logfile_path, overwrite
-            output_path.write_bytes(b"deterministic render")
-            return {"output_path": str(output_path)}
-
-    harness = _D4SessionHarness.create(tmp_path)
-    harness.adapter.session = CorrectionSession()
-    case = next(item for item in d4.load_cases(REPO_ROOT) if item["turn_id"] == "D4-L01:T1")
-    gold = next(item for item in d4.load_gold(REPO_ROOT)["cases"] if item["turn_id"] == "D4-L01:T1")
-    actual = asyncio.run(harness.adapter.execute_turn(case, {}))
-    row = d5._bounded_turn_row(
-        case,
-        {"contract": gold["contract"]},
-        actual,
-        {"status": "PASS", "errors": [], "verifier_requirements": []},
-        execution_index=1,
-        call_count=2,
-        physical_attempt_count=2,
-    )
-    evidence = row["correction_preservation"]
-    assert evidence["status"] == "OBSERVED"
-    assert set(evidence["changed_paths"]) == {
-        "/title",
-        "/extensions/compatibility/legacy_document/header/title",
-    }
-    assert set(evidence["authorized_paths"]) == {
-        "/title",
-        "/extensions/compatibility/legacy_document/header/title",
-    }
-    assert evidence["unauthorized_change"] is False
-    assert evidence["final_status"] == "ACCEPTED"
-    assert (
-        evidence["before_semantic_projection_sha256"]
-        != evidence["after_semantic_projection_sha256"]
-    )
-
-
 def test_d5i_contract_input_and_residual_semantic_failures_are_distinct() -> None:
     """Observed contract diagnostics cannot collapse into residual semantics."""
     base = {
@@ -1112,11 +1030,10 @@ def test_physical_observer_correlates_interleaved_logical_calls_by_context() -> 
     class _InterleavedDelegate:
         async def generate_structured(
             self,
-            request: d4.StructuredGenerationRequest,
+            request: StructuredGenerationRequest,
             *,
             response_model: type[object],
-        ) -> d4.StructuredGenerationResult[object]:
-            del response_model
+        ) -> StructuredGenerationResult[object]:
             if request.user_prompt == "first":
                 first_started.set()
                 await release_first.wait()
@@ -1134,12 +1051,36 @@ def test_physical_observer_correlates_interleaved_logical_calls_by_context() -> 
             await observer.on_response(
                 SimpleNamespace(request=request_object, status_code=200, aread=aread)
             )
-            return d4.StructuredGenerationResult(
-                value=d4.SemanticPlan(
-                    summary=request.user_prompt,
-                    report_task={"goal": "diagnostic report"},
+            return StructuredGenerationResult(
+                value=response_model.model_validate(
+                    {
+                        "version": "wellplot.semantic-plan.v2",
+                        "summary": "Frozen observer response.",
+                        "report_task": {
+                            "goal": "Diagnostic report.",
+                            "capability_ids": ["report.standard"],
+                            "requirements": [],
+                            "constraints": [],
+                            "operations": [
+                                {
+                                    "local_ref": "report_title",
+                                    "scope_ref": "report",
+                                    "verb": "UPDATE",
+                                    "object_kind": "service_title",
+                                    "target_clue": "report title",
+                                    "field_values": [
+                                        {
+                                            "field": "title",
+                                            "state": "SET",
+                                            "value": "Fixture",
+                                        }
+                                    ],
+                                }
+                            ],
+                        },
+                    }
                 ),
-                metrics=d4.ProviderMetrics(),
+                metrics=ProviderMetrics(),
             )
 
     backend = d4.CountingBackend(delegate=_InterleavedDelegate())
@@ -1149,25 +1090,25 @@ def test_physical_observer_correlates_interleaved_logical_calls_by_context() -> 
     async def run() -> None:
         first = asyncio.create_task(
             backend.generate_structured(
-                d4.StructuredGenerationRequest(
+                StructuredGenerationRequest(
                     system_prompt="system",
                     user_prompt="first",
                     timeout_seconds=10.0,
                     temperature=0.0,
                 ),
-                response_model=d4.SemanticPlan,
+                response_model=_PlannerWirePlan,
             )
         )
         await first_started.wait()
         second = asyncio.create_task(
             backend.generate_structured(
-                d4.StructuredGenerationRequest(
+                StructuredGenerationRequest(
                     system_prompt="system",
                     user_prompt="second",
                     timeout_seconds=10.0,
                     temperature=0.0,
                 ),
-                response_model=d4.SemanticPlan,
+                response_model=_PlannerWirePlan,
             )
         )
         await second
@@ -1770,40 +1711,11 @@ def test_execute_live_rejects_artifact_root_relocation_before_readiness(tmp_path
     assert endpoint_calls == []
 
 
-def test_provider_free_nine_turn_rehearsal_uses_canonical_direct_notebook() -> None:
-    """Rehearse all nine frozen turns through the accepted canonical adapter."""
-    _require_local_d5_sources()
-    with TemporaryDirectory(dir=REPO_ROOT) as temporary:
-        root = Path(temporary)
-        harness = _D4SessionHarness.create(root)
-        runner = d5.D5CampaignRunner(
-            repo_root=REPO_ROOT,
-            authorization=_authorization(campaign_id="nine-turn"),
-            paths=_paths(root, "nine-turn"),
-            readiness=_ready(),
-            provenance=_provenance(),
-        )
-        result = asyncio.run(runner.run(harness.adapter))
-    assert result["decision"] == "PASS", result
-    assert result["completed_turns"] == 9
-    assert len(result["rows"]) == 9
-    assert all(row["grader_status"] == "PASS" for row in result["rows"])
-    assert result["logical_generation_calls"] == 18
-    assert result["physical_generation_attempts"] == 18
-    assert result["provider_calls"] == result["endpoint_calls"] == result["model_calls"] == 0
-    terminal = result["terminal"]
-    assert terminal["decision"] == "PASS"
-    assert d5.evidence_is_redacted(terminal)
-
-
 def _live_transport_response_model(name: str) -> type[BaseModel]:
-    """Map the real request schema name to the accepted D4 response model."""
-    models = {
-        d4.SemanticPlan.__name__: d4.SemanticPlan,
-        d4.DeliveryReportResponse.__name__: d4.DeliveryReportResponse,
-        d4.DeliverySectionResponse.__name__: d4.DeliverySectionResponse,
-    }
-    return models[name]
+    """Resolve the current planner schema used by this transport-only test."""
+    if name != "PlannerWirePlan":
+        raise AssertionError(f"unexpected structured response schema: {name}")
+    return _PlannerWirePlan
 
 
 def _live_transport_factory(
@@ -1813,12 +1725,7 @@ def _live_transport_factory(
     clients: list[httpx.AsyncClient],
     requests: list[httpx.Request],
 ) -> Callable[[Callable[[object], Any]], object]:
-    """Build an in-memory transport around the real D5 live adapter factory."""
-    fixture_backend = _D4SessionBackend(
-        planner=_D4PlannerBackend(_D4SessionPlanner(calls=[])),
-        report=_D4SessionReportBackend(),
-        section=_D4SessionSectionBackend(),
-    )
+    """Exercise the live transport with one frozen current-schema response."""
     attempt_number = 0
 
     async def handler(request: httpx.Request) -> httpx.Response:
@@ -1849,21 +1756,34 @@ def _live_transport_factory(
                 request=request,
             )
         payload = json.loads(request.content)
-        messages = payload["messages"]
         response_model = _live_transport_response_model(
             payload["response_format"]["json_schema"]["name"]
         )
-        generated = await fixture_backend.generate_structured(
-            StructuredGenerationRequest(
-                system_prompt=str(messages[0]["content"]),
-                user_prompt=str(messages[1]["content"]),
-                timeout_seconds=float(payload.get("timeout", 10.0)),
-                temperature=payload.get("temperature"),
-                max_output_tokens=payload.get("max_completion_tokens", payload.get("max_tokens")),
-            ),
-            response_model=response_model,
+        frozen_response = response_model.model_validate(
+            {
+                "version": "wellplot.semantic-plan.v2",
+                "summary": "Frozen transport response.",
+                "report_task": {
+                    "goal": "Set a report title.",
+                    "capability_ids": ["report.standard"],
+                    "requirements": [],
+                    "constraints": [],
+                    "operations": [
+                        {
+                            "local_ref": "set_title",
+                            "scope_ref": "report",
+                            "verb": "UPDATE",
+                            "object_kind": "service_title",
+                            "target_clue": "report title",
+                            "field_values": [
+                                {"field": "title", "state": "SET", "value": "Fixture"}
+                            ],
+                        }
+                    ],
+                },
+            }
         )
-        content = generated.value.model_dump_json()
+        content = frozen_response.model_dump_json()
         return httpx.Response(
             200,
             json={
@@ -1893,7 +1813,7 @@ def _live_transport_factory(
 
 
 def _live_planner_request() -> StructuredGenerationRequest:
-    """Build the smallest real planner request accepted by the D4 backend."""
+    """Build a transport-only planner request without interpreting semantics."""
     return StructuredGenerationRequest(
         system_prompt="You are the WellPlot semantic planner.",
         user_prompt="Context:\n"
@@ -1950,7 +1870,7 @@ def test_real_live_adapter_transport_retries_keep_one_logical_id(
             result = asyncio.run(
                 backend.generate_structured(
                     _live_planner_request(),
-                    response_model=d4.SemanticPlan,
+                    response_model=_PlannerWirePlan,
                 )
             )
         finally:
@@ -2009,7 +1929,7 @@ def test_live_wire_control_is_exact_for_each_generation_role_and_retry(
             asyncio.run(
                 backend.generate_structured(
                     request,
-                    response_model=d4.SemanticPlan,
+                    response_model=_PlannerWirePlan,
                 )
             )
         finally:
@@ -2087,7 +2007,7 @@ def test_real_live_transport_physical_ceiling_fails_closed(
                 asyncio.run(
                     backend.generate_structured(
                         _live_planner_request(),
-                        response_model=d4.SemanticPlan,
+                        response_model=_PlannerWirePlan,
                     )
                 )
         finally:

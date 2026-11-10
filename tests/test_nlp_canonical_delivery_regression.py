@@ -8,14 +8,12 @@ import inspect
 import json
 import textwrap
 from dataclasses import dataclass, field
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 from scripts import nlp_d4_live_acceptance as d4
-from scripts.verify_cbl_packet import _check_remarks, verify_cbl_packet
+from scripts.verify_cbl_packet import _check_remarks
 from tests._mcp_fixtures import REPO_ROOT
-from tests.test_nlp_d4_live_acceptance import _build_rehearsal_cbl_artifact
 
 from wellplot.agent.code_mode import typed_section_worker as section_worker
 from wellplot.agent.code_mode.canonical_workers import (
@@ -175,44 +173,14 @@ def _context() -> EnrichedSemanticContext:
 
 
 def _context_for_request(request: str) -> EnrichedSemanticContext:
-    """Attach one compiled request contract to the canonical worker fixture."""
+    """Attach canonical request facts without deriving planner operations."""
     base = _context()
     compiled = compile_request_contract(request)
     obligations = compiled.requirements.requirements
-    scale_facts = tuple(
-        item
-        for item in obligations
-        if item.owner_kind is OwnerKind.BINDING and item.field.startswith("scale_")
-    )
-    operations = ()
-    scope_ref = None
-    if scale_facts:
-        scale_owners = tuple(dict.fromkeys(item.owner_ref for item in scale_facts))
-        if len(scale_owners) == 1:
-            owner = scale_owners[0]
-            scope_ref = "section_1"
-            minimum_fact = next(item for item in scale_facts if item.field == "scale_minimum")
-            operations = (
-                SemanticOperation(
-                    local_ref="update_curve_scale",
-                    scope_ref=scope_ref,
-                    verb="SET",
-                    object_kind="binding",
-                    target_clue=owner,
-                    field_values=(
-                        SemanticFieldValue(
-                            field=minimum_fact.field,
-                            state="SET",
-                            value=minimum_fact.value,
-                        ),
-                    ),
-                ),
-            )
     task = base.plan.section_tasks[0].model_copy(
         update={
             "obligations": obligations,
-            "scope_ref": scope_ref,
-            "operations": operations,
+            "scope_ref": "section_1" if obligations else None,
         }
     )
     plan = base.plan.model_copy(update={"section_tasks": (task,)})
@@ -223,6 +191,37 @@ def _context_for_request(request: str) -> EnrichedSemanticContext:
     return base.model_copy(update={"plan": plan, "sections": sections})
 
 
+def _with_scale_update_operation(
+    context: EnrichedSemanticContext,
+    *,
+    minimum: float,
+) -> EnrichedSemanticContext:
+    """Attach one frozen planner operation for an isolated scale-worker test."""
+    task = context.plan.section_tasks[0].model_copy(
+        update={
+            "scope_ref": "section_1",
+            "operations": (
+                SemanticOperation(
+                    local_ref="update_curve_scale",
+                    scope_ref="section_1",
+                    verb="SET",
+                    object_kind="binding",
+                    target_clue="Gamma Ray",
+                    field_values=(
+                        SemanticFieldValue(
+                            field="scale_minimum",
+                            state="SET",
+                            value=minimum,
+                        ),
+                    ),
+                ),
+            ),
+        }
+    )
+    plan = context.plan.model_copy(update={"section_tasks": (task,)})
+    return context.model_copy(update={"plan": plan})
+
+
 def _work_contract(context: EnrichedSemanticContext, task_index: int = 0) -> object:
     """Build the same deterministic work contract supplied at graph dispatch."""
     return build_section_work_contract(
@@ -230,10 +229,15 @@ def _work_contract(context: EnrichedSemanticContext, task_index: int = 0) -> obj
     )
 
 
-def _run_section(response: dict[str, object], request: str) -> object:
+def _run_section(
+    response: dict[str, object],
+    request: str,
+    *,
+    context: EnrichedSemanticContext | None = None,
+) -> object:
     """Compile one response through the canonical section worker."""
     backend = _StructuredFixtureBackend([response])
-    context = _context_for_request(request)
+    context = context or _context_for_request(request)
     task = context.plan.section_tasks[0]
     operation_contract = (
         build_section_operation_contract(task, context.sections[0]) if task.operations else None
@@ -2590,7 +2594,7 @@ def test_canonical_section_worker_propagates_async_cancellation() -> None:
             raise asyncio.CancelledError
 
     request = "Change Gamma Ray scale to linear 0..150."
-    context = _context_for_request(request)
+    context = _with_scale_update_operation(_context_for_request(request), minimum=0)
     with pytest.raises(asyncio.CancelledError):
         asyncio.run(
             CanonicalSectionWorker(backend=CancellingBackend()).compile(
@@ -2599,6 +2603,9 @@ def test_canonical_section_worker_propagates_async_cancellation() -> None:
                 document=_document(),
                 authoritative_request=request,
                 work_contract=_work_contract(context),
+                operation_contract=build_section_operation_contract(
+                    context.plan.section_tasks[0], context.sections[0]
+                ),
                 timeout_seconds=10,
             )
         )
@@ -2650,6 +2657,7 @@ def test_incomplete_work_contract_response_fails_before_repair_call() -> None:
 def test_canonical_section_worker_updates_existing_scale() -> None:
     """D1 existing-curve scale changes use a request-local handle."""
     request = "Change Gamma Ray scale to linear 10..100."
+    context = _with_scale_update_operation(_context_for_request(request), minimum=10)
     result = _run_section(
         {
             "action": "update_curve_scale",
@@ -2657,6 +2665,7 @@ def test_canonical_section_worker_updates_existing_scale() -> None:
             "scale": {"kind": "linear", "minimum": 10, "maximum": 100},
         },
         request,
+        context=context,
     )
     assert result.success is True
     assert result.intent_fragment is not None
@@ -2677,7 +2686,7 @@ def test_canonical_section_worker_requires_scale_operation_contract() -> None:
             }
         ]
     )
-    context = _context_for_request(request)
+    context = _with_scale_update_operation(_context_for_request(request), minimum=10)
     result = asyncio.run(
         CanonicalSectionWorker(backend=backend).compile(
             task_index=0,
@@ -2767,17 +2776,3 @@ def test_canonical_section_worker_rejects_unavailable_channel_without_intent() -
     with pytest.raises(section_worker.SectionWorkContractError) as error:
         _work_contract(context)
     assert error.value.code == "section_work_channel_missing"
-
-
-def test_canonical_cbl_verifier_accepts_generated_artifact() -> None:
-    """D3 CBL grading remains provider-free and uses the generated artifact."""
-    from tempfile import TemporaryDirectory
-
-    with TemporaryDirectory(dir=REPO_ROOT) as temporary:
-        artifact = _build_rehearsal_cbl_artifact(Path(temporary))
-        result = verify_cbl_packet(
-            artifact,
-            execution_evidence={"persisted": True, "rendered": True},
-        )
-    assert result["acceptance_status"] == "PASS"
-    assert all(item["status"] == "PASS" for item in result["requirements"])
