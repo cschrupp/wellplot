@@ -26,7 +26,7 @@ from wellplot.agent.code_mode.facade import (
     CompileMetrics,
     CompileWorkerEvidence,
 )
-from wellplot.agent.code_mode.planner import _PlannerWirePlan
+from wellplot.agent.code_mode.planner import SemanticPlanner, _PlannerWirePlan
 from wellplot.agent.composition import create_canonical_compile_facade
 from wellplot.agent.direct_notebook import _load_document_context
 from wellplot.agent.providers.base import (
@@ -36,6 +36,8 @@ from wellplot.agent.providers.base import (
     StructuredGenerationResult,
 )
 from wellplot.agent.session import AgentSession
+from wellplot.capabilities import create_builtin_registry
+from wellplot.model.authoring import AuthoringDocumentSpec
 from wellplot.model.intent import AuthoringDocumentIntent
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -634,6 +636,57 @@ def test_cli_reports_bounded_not_ready_result(
         "started": False,
         "status": "NOT_READY",
     }
+
+
+@pytest.mark.parametrize(
+    ("flag", "expected_mode"),
+    [
+        ("--execute-smoke", "readiness"),
+        ("--execute-planner-smoke", "planner"),
+    ],
+)
+def test_cli_smoke_modes_dispatch_to_their_existing_boundaries(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    flag: str,
+    expected_mode: str,
+) -> None:
+    """Planner-only mode is isolated and does not replace the readiness smoke."""
+    authorization_path = tmp_path / "authorization.json"
+    authorization_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(d5, "_load_authorization", lambda _path: _authorization())
+    calls: list[str] = []
+
+    def readiness_smoke(**_kwargs: object) -> dict[str, object]:
+        calls.append("readiness")
+        return {"status": "READINESS_SMOKE_TEST"}
+
+    def planner_smoke(**_kwargs: object) -> dict[str, object]:
+        calls.append("planner")
+        return {"status": "PLANNER_SMOKE_TEST"}
+
+    monkeypatch.setattr(d5, "execute_live_smoke", readiness_smoke)
+    monkeypatch.setattr(d5, "execute_live_planner_smoke", planner_smoke)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "nlp_d5_live_semantic_qualification.py",
+            "--repo-root",
+            str(REPO_ROOT),
+            flag,
+            "--authorization-json",
+            str(authorization_path),
+        ],
+    )
+
+    assert d5.main() == 0
+    result = json.loads(capsys.readouterr().out)
+    assert calls == [expected_mode]
+    assert result["status"] == (
+        "READINESS_SMOKE_TEST" if expected_mode == "readiness" else "PLANNER_SMOKE_TEST"
+    )
 
 
 def test_runtime_defaults_drift_is_not_ready() -> None:
@@ -2147,9 +2200,12 @@ def _smoke_provider_factory(
             attempts += 1
             if attempts <= retry_count:
                 return httpx.Response(500, request=request)
-            content = (
-                '{"status":"NOT_READY"}' if response_mode == "invalid" else '{"status":"READY"}'
-            )
+            if response_mode == "invalid":
+                content = '{"status":"NOT_READY"}'
+            elif response_mode == "planner":
+                content = json.dumps(_planner_wire_payload())
+            else:
+                content = '{"status":"READY"}'
             return httpx.Response(
                 200,
                 request=request,
@@ -2201,6 +2257,310 @@ def _smoke_provider_factory(
         return adapter
 
     return build
+
+
+def _planner_wire_payload() -> dict[str, object]:
+    """Return one deterministic, schema-valid response for the production planner."""
+    return {
+        "version": "wellplot.semantic-plan.v2",
+        "summary": "Add the requested curve to the main log.",
+        "section_tasks": [
+            {
+                "goal": "Add the requested curve to the main log.",
+                "capability_ids": ["section.log_plot"],
+                "existing_section_hint": "Main Log",
+                "scope_ref": "main_log",
+                "source_hints": ["approved_las"],
+                "operations": [
+                    {
+                        "local_ref": "main_log_section",
+                        "scope_ref": "main_log",
+                        "verb": "ENSURE",
+                        "object_kind": "section",
+                        "semantic_ref": "main_log_section",
+                    }
+                ],
+            }
+        ],
+        "unresolved_requirements": [],
+        "unresolved_semantics": [],
+    }
+
+
+class _PlannerOnlyBackend:
+    """Fake the wire response while exercising the production SemanticPlanner."""
+
+    def __init__(self, *, payload: object, invalid: bool = False) -> None:
+        self.payload = payload
+        self.invalid = invalid
+        self.requests: list[StructuredGenerationRequest] = []
+        self.response_models: list[type[BaseModel]] = []
+        self.closed = False
+        self.delegate = self
+        self.client = self
+
+    async def generate_structured(
+        self,
+        request: StructuredGenerationRequest,
+        *,
+        response_model: type[BaseModel],
+    ) -> StructuredGenerationResult[BaseModel]:
+        self.requests.append(request)
+        self.response_models.append(response_model)
+        payload = {"invalid": True} if self.invalid else self.payload
+        value = response_model.model_validate(payload)
+        return StructuredGenerationResult(value=value, metrics=ProviderMetrics())
+
+    async def close(self) -> None:
+        self.closed = True
+
+
+def _planner_only_adapter(
+    backend: _PlannerOnlyBackend, trace_events: list[dict[str, object]]
+) -> object:
+    """Expose only the canonical adapter attributes the smoke owns."""
+
+    def trace(event: dict[str, object]) -> None:
+        trace_events.append(event)
+        if event.get("event") == "PLANNER_GENERATION_PASS":
+            raise d5._PlannerOnlyWireCaptured
+
+    planner = SemanticPlanner(
+        backend=backend,
+        registry=create_builtin_registry(),
+        trace_callback=trace,
+    )
+    session = SimpleNamespace(
+        compiler=SimpleNamespace(dependencies=SimpleNamespace(planner=planner)),
+        config=SimpleNamespace(
+            timeout_seconds=5.0,
+            planner_temperature=0.0,
+            max_output_tokens=None,
+        ),
+    )
+    return SimpleNamespace(inner=SimpleNamespace(session=SimpleNamespace(session=session)))
+
+
+def test_planner_only_smoke_calls_production_planner_and_stops() -> None:
+    """The smoke captures structured planner output and does not enter execution."""
+    payload = _planner_wire_payload()
+    _PlannerWirePlan.model_validate(payload)
+    backend = _PlannerOnlyBackend(payload=payload)
+    events: list[dict[str, object]] = []
+    adapter = _planner_only_adapter(backend, events)
+    document = AuthoringDocumentSpec.model_validate(
+        {
+            "name": "Planner-only test",
+            "sections": [
+                {
+                    "id": "main-log",
+                    "title": "Main Log",
+                    "tracks": [
+                        {
+                            "id": "main-track",
+                            "title": "Main Log",
+                            "kind": "normal",
+                            "width_mm": 30,
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+    from wellplot.agent.inspection import AuthoringInspectionFacade
+
+    result, error, cleanup_error = asyncio.run(
+        d5._run_planner_only_and_close(
+            adapter,
+            request="Plot Gamma Ray.",
+            document_summary=AuthoringInspectionFacade(document).planner_summary(),
+            source_summary={
+                "version": "cm56r3.source-summary.v1",
+                "sources": [
+                    {
+                        "labels": ["approved_las"],
+                        "channels": [
+                            {"mnemonic": "GR", "kind": "scalar", "unit": "gAPI"},
+                            {"mnemonic": "CGR", "kind": "scalar", "unit": "gAPI"},
+                            {"mnemonic": "GRD", "kind": "scalar", "unit": "gAPI"},
+                        ],
+                        "inspection_state": "inspected",
+                    }
+                ],
+            },
+        )
+    )
+
+    assert isinstance(error, d5._PlannerOnlyWireCaptured)
+    assert cleanup_error is None
+    assert result is None
+    assert backend.closed
+    assert backend.response_models == [_PlannerWirePlan]
+    assert len(backend.requests) == 1
+    captured = next(event for event in events if event.get("event") == "PLANNER_GENERATION_PASS")
+    assert captured["response_schema"] == "_PlannerWirePlan"
+    assert _PlannerWirePlan.model_validate(captured["validated_response"])
+    assert not d5._planner_smoke_downstream_events(events, {"planner": 1})
+
+
+def test_planner_only_smoke_rejects_invalid_structured_output() -> None:
+    """Schema-invalid planner output does not produce a successful smoke result."""
+    backend = _PlannerOnlyBackend(payload={"invalid": True}, invalid=True)
+    events: list[dict[str, object]] = []
+    adapter = _planner_only_adapter(backend, events)
+    document = AuthoringDocumentSpec.model_validate(
+        {
+            "name": "Planner-only test",
+            "sections": [
+                {
+                    "id": "main-log",
+                    "title": "Main Log",
+                    "tracks": [
+                        {
+                            "id": "main-track",
+                            "title": "Main Log",
+                            "kind": "normal",
+                            "width_mm": 30,
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+    from wellplot.agent.inspection import AuthoringInspectionFacade
+
+    result, error, cleanup_error = asyncio.run(
+        d5._run_planner_only_and_close(
+            adapter,
+            request="Plot Gamma Ray.",
+            document_summary=AuthoringInspectionFacade(document).planner_summary(),
+            source_summary={"version": "cm56r3.source-summary.v1", "sources": []},
+        )
+    )
+
+    assert result is None
+    assert error is not None
+    assert cleanup_error is None
+    assert backend.closed
+    assert not d5._planner_smoke_downstream_events(events, {"planner": 0})
+
+
+def test_planner_smoke_worktree_allowlist_is_exact_and_raw(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The pinned entries are accepted verbatim and any additional drift fails."""
+    expected = d5.A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN
+    observed = {"value": expected}
+    monkeypatch.setattr(d5, "_git_porcelain_raw", lambda _root: observed["value"])
+    d5._require_exact_planner_worktree(REPO_ROOT, expected)
+
+    observed["value"] = expected + "?? unexpected.txt\n"
+    with pytest.raises(d5.D5StaticPreflightError, match="exact allowlist"):
+        d5._require_exact_planner_worktree(REPO_ROOT, expected)
+
+
+def test_git_porcelain_capture_preserves_status_columns_and_newline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Raw Git porcelain is not normalized with strip or whitespace trimming."""
+    raw = " M examples/notebook.ipynb\n?? examples/families/\n"
+    monkeypatch.setattr(d5.subprocess, "check_output", lambda *_args, **_kwargs: raw)
+    assert d5._git_porcelain_raw(REPO_ROOT) == raw
+
+
+def test_planner_only_smoke_uses_existing_custody_and_stops_at_wire(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The canonical smoke path captures the wire DTO without compiling or executing it."""
+    benchmark_path = REPO_ROOT / d5.A10_SEM_01_BENCHMARK
+    inventory_path = REPO_ROOT / d5.A10_SEM_01_SOURCE_INVENTORY
+    source_path = REPO_ROOT / d5.A10_SEM_02_SMOKE_SOURCE_PATH
+    benchmark = json.loads(benchmark_path.read_text(encoding="utf-8"))
+    case = next(item for item in benchmark["cases"] if item["id"] == d5.A10_SEM_02_SMOKE_CASE_ID)
+    authorization = replace(
+        _authorization(
+            campaign_id="a10-planner-only-test",
+            artifact_root=str(tmp_path / "planner-only"),
+        ),
+        implementation_checkpoint="synthetic-checkpoint",
+        planner_smoke_mode=d5.SMOKE_PLANNER_KIND,
+        planner_smoke_case_id=d5.A10_SEM_02_SMOKE_CASE_ID,
+        planner_smoke_request_sha256=hashlib.sha256(case["request"].encode("utf-8")).hexdigest(),
+        planner_smoke_benchmark_sha256=d5._sha256_file(benchmark_path),
+        planner_smoke_source_inventory_sha256=d5._sha256_file(inventory_path),
+        planner_smoke_source_sha256=d5._sha256_file(source_path),
+        planner_smoke_harness_sha256=d5._sha256_file(
+            REPO_ROOT / "scripts/nlp_d5_live_semantic_qualification.py"
+        ),
+        planner_smoke_wire_schema_sha256=d5._planner_wire_schema_sha256(),
+        expected_worktree_porcelain=d5.A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN,
+    )
+    clients: list[httpx.AsyncClient] = []
+    provider_factory = _smoke_provider_factory(response_mode="planner", clients=clients)
+
+    def prepare_fake_readiness(**kwargs: object) -> object:
+        build_provider = kwargs["provider_factory"]
+        adapter = build_provider("test-only-token")
+        return SimpleNamespace(
+            adapter=adapter,
+            projection=SimpleNamespace(
+                as_dict=lambda: {
+                    "model_catalog": [d5.EXPECTED_MODEL],
+                    "thinking_off": True,
+                    "structured_output_contract": "json_schema",
+                }
+            ),
+            endpoint_calls=(),
+        )
+
+    monkeypatch.setattr(d5, "_require_exact_planner_worktree", lambda *_args: None)
+    monkeypatch.setattr(
+        d5,
+        "_git_porcelain_raw",
+        lambda _root: d5.A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN,
+    )
+    monkeypatch.setattr(d5, "prepare_readiness", prepare_fake_readiness)
+    result = d5.execute_live_planner_smoke(
+        repo_root=REPO_ROOT,
+        authorization=authorization,
+        artifact_root=Path(authorization.artifact_root),
+        api_key_loader=lambda: "test-only-token",
+        static_checker=lambda *_args: {"status": "PASS", "mode": "test"},
+        provider_factory=provider_factory,
+    )
+
+    assert result["status"] == "SMOKE_PASS"
+    terminal = result["terminal"]
+    assert terminal["mode"] == "canonical_planner_only_smoke"
+    assert terminal["logical_generation_calls"] == 1
+    assert terminal["provider_calls"] == 1
+    state = json.loads(
+        (Path(authorization.artifact_root) / f"{authorization.campaign_id}.state.json").read_text()
+    )
+    assert state["planner_result_status"] == "SCHEMA_VALIDATED_WIRE_CAPTURED"
+    assert state["mode"] == "canonical_planner_only_smoke"
+    assert state["planner_result_schema_valid"] is True
+    assert state["downstream_stage_calls"] == {
+        "report_worker": 0,
+        "section_worker": 0,
+        "reconciliation": 0,
+        "execution": 0,
+        "persistence": 0,
+        "render": 0,
+        "preview": 0,
+    }
+    wire = json.loads(
+        (
+            Path(authorization.artifact_root)
+            / f"{authorization.campaign_id}.planner-wire-response.jsonl"
+        )
+        .read_text()
+        .splitlines()[0]
+    )
+    assert wire["response_schema"] == "_PlannerWirePlan"
+    assert _PlannerWirePlan.model_validate(wire["validated_response"])
+    assert not [client for client in clients if not client.is_closed]
 
 
 @pytest.mark.parametrize(
