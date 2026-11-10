@@ -178,11 +178,49 @@ def _context_for_request(request: str) -> EnrichedSemanticContext:
     """Attach one compiled request contract to the canonical worker fixture."""
     base = _context()
     compiled = compile_request_contract(request)
+    obligations = compiled.requirements.requirements
+    scale_facts = tuple(
+        item
+        for item in obligations
+        if item.owner_kind is OwnerKind.BINDING and item.field.startswith("scale_")
+    )
+    operations = ()
+    scope_ref = None
+    if scale_facts:
+        scale_owners = tuple(dict.fromkeys(item.owner_ref for item in scale_facts))
+        if len(scale_owners) == 1:
+            owner = scale_owners[0]
+            scope_ref = "section_1"
+            minimum_fact = next(item for item in scale_facts if item.field == "scale_minimum")
+            operations = (
+                SemanticOperation(
+                    local_ref="update_curve_scale",
+                    scope_ref=scope_ref,
+                    verb="SET",
+                    object_kind="binding",
+                    target_clue=owner,
+                    field_values=(
+                        SemanticFieldValue(
+                            field=minimum_fact.field,
+                            state="SET",
+                            value=minimum_fact.value,
+                        ),
+                    ),
+                ),
+            )
     task = base.plan.section_tasks[0].model_copy(
-        update={"obligations": compiled.requirements.requirements}
+        update={
+            "obligations": obligations,
+            "scope_ref": scope_ref,
+            "operations": operations,
+        }
     )
     plan = base.plan.model_copy(update={"section_tasks": (task,)})
-    return base.model_copy(update={"plan": plan})
+    sections = tuple(
+        section.model_copy(update={"snapshot_id": "snapshot-canonical-worker"})
+        for section in base.sections
+    )
+    return base.model_copy(update={"plan": plan, "sections": sections})
 
 
 def _work_contract(context: EnrichedSemanticContext, task_index: int = 0) -> object:
@@ -196,6 +234,10 @@ def _run_section(response: dict[str, object], request: str) -> object:
     """Compile one response through the canonical section worker."""
     backend = _StructuredFixtureBackend([response])
     context = _context_for_request(request)
+    task = context.plan.section_tasks[0]
+    operation_contract = (
+        build_section_operation_contract(task, context.sections[0]) if task.operations else None
+    )
     return asyncio.run(
         CanonicalSectionWorker(backend=backend).compile(
             task_index=0,
@@ -203,6 +245,7 @@ def _run_section(response: dict[str, object], request: str) -> object:
             document=_document(),
             authoritative_request=request,
             work_contract=_work_contract(context),
+            operation_contract=operation_contract,
             timeout_seconds=10,
         )
     )
@@ -2620,6 +2663,35 @@ def test_canonical_section_worker_updates_existing_scale() -> None:
     binding = result.intent_fragment.curve_bindings[0]
     assert binding.binding_id == "main.gr.GR"
     assert binding.scale.minimum == 10
+
+
+def test_canonical_section_worker_requires_scale_operation_contract() -> None:
+    """Direct worker calls cannot bypass host compilation of scale operations."""
+    request = "Change Gamma Ray scale to linear 10..100."
+    backend = _StructuredFixtureBackend(
+        [
+            {
+                "action": "update_curve_scale",
+                "target": {"handle": "curve-1"},
+                "scale": {"kind": "linear", "minimum": 10, "maximum": 100},
+            }
+        ]
+    )
+    context = _context_for_request(request)
+    result = asyncio.run(
+        CanonicalSectionWorker(backend=backend).compile(
+            task_index=0,
+            context=context,
+            document=_document(),
+            authoritative_request=request,
+            work_contract=_work_contract(context),
+            timeout_seconds=10,
+        )
+    )
+
+    assert result.success is False
+    assert result.diagnostics[0].code == "worker_operation_contract_missing"
+    assert backend.requests == []
 
 
 def test_canonical_section_worker_creates_grounded_track_and_curve() -> None:

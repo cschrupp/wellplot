@@ -25,6 +25,7 @@ from wellplot.agent.code_mode.semantic_actions import (
     BaselineSplitFill,
     ExistingCurveSelector,
     SectionSemanticAction,
+    UpdateCurveScaleAction,
     lower_section_action,
 )
 from wellplot.agent.code_mode.typed_section_worker import (
@@ -100,6 +101,46 @@ def _contract(
         obligations=compilation.requirements.requirements,
     )
     return build_section_work_contract(task, context or _context())
+
+
+def _scale_update_contract_inputs(
+    request: str = "Change Gamma Ray scale to linear 5..125.",
+    *,
+    target_clue: str = "Gamma Ray",
+    proposed_minimum: float | None = None,
+) -> tuple[SectionTask, ResolvedSectionContext, SectionWorkContract]:
+    """Build a host-compiled scale operation proposal for one existing binding."""
+    compilation = compile_request_contract(request)
+    obligations = compilation.requirements.requirements
+    scale_facts = tuple(
+        item
+        for item in obligations
+        if item.owner_kind.value == "binding" and item.field.startswith("scale_")
+    )
+    minimum_fact = next(item for item in scale_facts if item.field == "scale_minimum")
+    minimum_value = minimum_fact.value if proposed_minimum is None else proposed_minimum
+    task = SectionTask(
+        goal="Update the requested existing curve scale.",
+        capability_ids=("section.log_plot", "binding.curve"),
+        existing_section_hint="Main Log",
+        scope_ref="main_log",
+        operations=(
+            {
+                "local_ref": "update_gamma_ray_scale",
+                "scope_ref": "main_log",
+                "verb": "SET",
+                "object_kind": "binding",
+                "target_clue": target_clue,
+                "field_values": [
+                    {"field": "scale_minimum", "state": "SET", "value": minimum_value}
+                ],
+            },
+        ),
+        obligations=obligations,
+    )
+    context = _context().model_copy(update={"snapshot_id": "snapshot-scale-update"})
+    work_contract = build_section_work_contract(task, context)
+    return task, context, work_contract
 
 
 def _smoke_request() -> str:
@@ -805,6 +846,127 @@ def test_action_selection_is_deterministic_for_add_scale_and_fill() -> None:
     assert scale.required_scale.maximum == 125
     assert fill.required_action == "add_fill"
     assert fill.target_handle == "curve-1"
+
+
+def test_scale_update_operation_contract_preserves_binding_and_reconciles() -> None:
+    """A requested scale update stays bound to the existing curve end to end."""
+    task, context, work_contract = _scale_update_contract_inputs()
+    operation_contract = build_section_operation_contract(task, context)
+
+    assert work_contract.required_action == "update_curve_scale"
+    assert len(operation_contract.operations) == 1
+    operation = operation_contract.operations[0]
+    assert operation.operation_type == "UPDATE_CURVE_SCALE"
+    assert operation.target_handle == work_contract.target_handle == "curve-1"
+    assert operation.requested_scale == work_contract.required_scale
+    assert set(operation.requirement_ids) == {
+        item.requirement_id
+        for item in task.obligations
+        if item.owner_kind.value == "binding" and item.field.startswith("scale_")
+    }
+
+    action = UpdateCurveScaleAction.model_validate(
+        {
+            "action": "update_curve_scale",
+            "target": {"handle": "curve-1"},
+            "scale": {"kind": "linear", "minimum": 5, "maximum": 125},
+        }
+    )
+    validate_section_action_contract(action, work_contract, operation_contract)
+    mismatched_entry = operation.model_copy(update={"target_handle": "curve-2"})
+    mismatched_contract = operation_contract.model_copy(update={"operations": (mismatched_entry,)})
+    with pytest.raises(SectionWorkContractError) as mismatch:
+        validate_section_action_contract(action, work_contract, mismatched_contract)
+    assert mismatch.value.code == "worker_operation_contract_target_mismatch"
+
+    document = AuthoringDocumentSpec.model_validate(
+        {
+            "name": "scale-operation-contract",
+            "sections": [
+                {
+                    "id": "main",
+                    "title": "Main Log",
+                    "data_source": {
+                        "source_path": "fixture.las",
+                        "source_format": "las",
+                    },
+                    "tracks": [
+                        {
+                            "id": "host-track-id",
+                            "kind": "normal",
+                            "title": "Gamma Ray",
+                            "width_mm": 25,
+                            "bindings": [
+                                {
+                                    "kind": "curve",
+                                    "binding_id": "host-binding-id",
+                                    "channel": "GR",
+                                    "label": "Gamma Ray",
+                                    "scale": {
+                                        "kind": "linear",
+                                        "minimum": 0,
+                                        "maximum": 150,
+                                    },
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+
+    intent = lower_section_action(action, context=context, document=document)
+    update = intent.curve_bindings[0]
+    assert (update.section_id, update.track_id, update.binding_id) == (
+        "main",
+        "host-track-id",
+        "host-binding-id",
+    )
+    plan = reconcile_authoring(
+        intent,
+        existing=document,
+        available_channels={"main": ["GR"]},
+    )
+    assert plan.ready is True, plan.issues
+    result = AuthoringExecutor(AuthoringService(document)).execute(plan)
+    assert result.success, result.errors
+    persisted_binding = result.document.sections[0].tracks[0].bindings[0]
+    assert persisted_binding.scale.minimum == 5
+    assert persisted_binding.scale.maximum == 125
+
+
+def test_scale_update_operation_contract_rejects_missing_existing_binding() -> None:
+    """A scale operation cannot be admitted without its snapshot-bound target."""
+    task, context, _work_contract = _scale_update_contract_inputs()
+    context_without_binding = context.model_copy(update={"existing_curves": ()})
+
+    with pytest.raises(SectionWorkContractError) as error:
+        build_section_operation_contract(task, context_without_binding)
+
+    assert error.value.code == "section_work_target_missing"
+
+
+def test_scale_update_operation_contract_rejects_conflicting_scale_payload() -> None:
+    """Planner scale fields must exactly match the request-authoritative values."""
+    task, context, _work_contract = _scale_update_contract_inputs(proposed_minimum=6)
+
+    with pytest.raises(SectionWorkContractError) as error:
+        build_section_operation_contract(task, context)
+
+    assert error.value.code == "section_operation_field_mismatch"
+
+
+def test_scale_update_operation_contract_rejects_invalid_scale_bounds() -> None:
+    """The section operation contract applies the existing semantic scale rules."""
+    task, context, _work_contract = _scale_update_contract_inputs(
+        "Change Gamma Ray scale to linear 5..5."
+    )
+
+    with pytest.raises(SectionWorkContractError) as error:
+        build_section_operation_contract(task, context)
+
+    assert error.value.code == "section_operation_scale_invalid"
 
 
 def test_normalized_track_handle_collision_fails_closed() -> None:

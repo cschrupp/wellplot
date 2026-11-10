@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ...authoring_context import AuthoringChannelCandidate, source_bound_request_mnemonic
 from ...model.intent import AuthoringDocumentIntent
@@ -22,6 +22,7 @@ from .planner import (
     SectionTask,
     SemanticOperation,
 )
+from .section_semantics import SemanticScale
 
 
 class SectionWorkContractError(ValueError):
@@ -188,9 +189,10 @@ class WorkerOperationContractEntry(BaseModel):
 
     operation_id: str = Field(min_length=1)
     operation_ref: str = Field(min_length=1)
-    operation_type: Literal["ADD_TRACK"]
+    operation_type: Literal["ADD_TRACK", "UPDATE_CURVE_SCALE"]
     scope_ref: str = Field(min_length=1)
     target_handle: str | None = None
+    requested_scale: SectionWorkScale | None = None
     parent_operation_id: str | None = None
     condition_predicate: str | None = None
     condition_result: Literal[
@@ -203,6 +205,18 @@ class WorkerOperationContractEntry(BaseModel):
     condition_evidence: str | None = None
     condition_channel_clue: str | None = None
     requirement_ids: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def validate_operation_payload(self) -> WorkerOperationContractEntry:
+        """Keep operation-specific target and scale evidence structurally complete."""
+        if self.operation_type == "UPDATE_CURVE_SCALE":
+            if self.target_handle is None or self.requested_scale is None:
+                raise ValueError("Scale-update operations require a binding target and scale.")
+            if not self.requirement_ids:
+                raise ValueError("Scale-update operations require request evidence.")
+        elif self.requested_scale is not None:
+            raise ValueError("Only scale-update operations may carry a requested scale.")
+        return self
 
 
 class SectionOperationContract(BaseModel):
@@ -836,6 +850,23 @@ def build_section_operation_contract(
             if item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK}
         )
     )
+    scale_fields = {"scale_kind", "scale_minimum", "scale_maximum", "scale_reverse"}
+    scale_only = bool(obligations) and all(
+        (item.owner_kind is OwnerKind.BINDING and item.field in scale_fields)
+        or (item.owner_kind is OwnerKind.SECTION and item.field == "target")
+        for item in obligations
+    )
+    scale_facts = tuple(
+        item
+        for item in obligations
+        if scale_only and item.owner_kind is OwnerKind.BINDING and item.field in scale_fields
+    )
+    scale_owners = tuple(dict.fromkeys(item.owner_ref for item in scale_facts))
+    if scale_owners and (len(scale_owners) != 1 or track_owners):
+        raise SectionWorkContractError(
+            "section_operation_combination_unsupported",
+            "Scale updates must target one existing binding without track operations.",
+        )
 
     def field_matches(left: object, right: object) -> bool:
         if isinstance(left, str) and isinstance(right, str):
@@ -878,13 +909,9 @@ def build_section_operation_contract(
         for item in task.operations
         if item.semantic_ref is not None
     }
-    track_owner_by_semantic_ref = {
-        item.semantic_ref: track_owner(item)
-        for item in task.operations
-        if item.object_kind == "track" and item.semantic_ref is not None
-    }
     entries: list[WorkerOperationContractEntry] = []
     assigned_track_owners: set[str] = set()
+    assigned_scale_owners: set[str] = set()
     for operation in task.operations:
         if operation.scope_ref != task.scope_ref:
             raise SectionWorkContractError(
@@ -892,27 +919,79 @@ def build_section_operation_contract(
                 "Operation inventory crosses its declared section scope.",
             )
 
-        owner: str | None = None
-        if operation.object_kind in {"track", "binding"}:
-            owner = (
-                track_owner_by_semantic_ref.get(operation.parent_ref)
-                if operation.object_kind == "binding" and operation.parent_ref is not None
-                else track_owner(operation)
-            )
-            if operation.object_kind == "track":
-                if owner is None:
-                    raise SectionWorkContractError(
-                        "section_operation_target_unresolved",
-                        "Track operation does not resolve to one request-owned track.",
-                    )
-                if owner in assigned_track_owners:
-                    raise SectionWorkContractError(
-                        "section_operation_duplicate_target",
-                        "Multiple operations target the same request-owned track.",
-                    )
-                assigned_track_owners.add(owner)
-
         operation_type = _section_operation_type(operation)
+        owner: str | None = None
+        requested_scale: SectionWorkScale | None = None
+        target_handle: str | None = None
+        if operation_type == "UPDATE_CURVE_SCALE":
+            if not scale_owners:
+                raise SectionWorkContractError(
+                    "section_operation_unsupported",
+                    "Binding updates are supported only for request-authorized scale changes.",
+                )
+            matching_owners = [
+                candidate
+                for candidate in scale_owners
+                if operation.target_clue is not None
+                and _work_handle(candidate) == _work_handle(operation.target_clue)
+            ]
+            if len(matching_owners) != 1:
+                raise SectionWorkContractError(
+                    "section_operation_target_unresolved",
+                    "Scale update does not resolve to one request-owned binding.",
+                )
+            owner = matching_owners[0]
+            if owner in assigned_scale_owners:
+                raise SectionWorkContractError(
+                    "section_operation_duplicate_target",
+                    "Multiple operations target the same request-owned binding.",
+                )
+            assigned_scale_owners.add(owner)
+            facts = [item for item in scale_facts if item.owner_ref == owner]
+            proposal_fields = [item.field for item in operation.field_values]
+            expected_fields = {item.field for item in facts}
+            if (
+                not proposal_fields
+                or len(proposal_fields) != len(set(proposal_fields))
+                or not set(proposal_fields).issubset(expected_fields)
+            ):
+                raise SectionWorkContractError(
+                    "section_operation_field_coverage_incomplete",
+                    "Scale operation fields do not exactly cover request-authorized scale facts.",
+                )
+            requested_scale = _scale_from_items(facts)
+            if (
+                requested_scale is None
+                or requested_scale.minimum is None
+                or requested_scale.maximum is None
+            ):
+                raise SectionWorkContractError(
+                    "section_operation_scale_invalid",
+                    "Scale operation lacks explicit numeric bounds.",
+                )
+            try:
+                SemanticScale.model_validate(requested_scale.model_dump(exclude_none=True))
+            except ValueError:
+                raise SectionWorkContractError(
+                    "section_operation_scale_invalid",
+                    "Scale operation contains invalid presentation scale values.",
+                ) from None
+            target_handle = _existing_curve_handle(owner, section_context)
+        elif operation.object_kind == "track":
+            owner = track_owner(operation)
+            if owner is None:
+                raise SectionWorkContractError(
+                    "section_operation_target_unresolved",
+                    "Track operation does not resolve to one request-owned track.",
+                )
+            if owner in assigned_track_owners:
+                raise SectionWorkContractError(
+                    "section_operation_duplicate_target",
+                    "Multiple operations target the same request-owned track.",
+                )
+            assigned_track_owners.add(owner)
+            target_handle = _work_handle(owner)
+
         facts = [
             item
             for item in obligations
@@ -942,7 +1021,8 @@ def build_section_operation_contract(
             operation_ref=operation.local_ref,
             operation_type=operation_type,
             scope_ref=task.scope_ref,
-            target_handle=_work_handle(owner) if owner is not None else None,
+            target_handle=target_handle,
+            requested_scale=requested_scale,
             parent_operation_id=(
                 semantic_operation_ids.get(operation.parent_ref)
                 if operation.parent_ref is not None
@@ -963,6 +1043,11 @@ def build_section_operation_contract(
         raise SectionWorkContractError(
             "section_operation_coverage_incomplete",
             "Operation inventory does not cover every request-owned track exactly once.",
+        )
+    if assigned_scale_owners != set(scale_owners):
+        raise SectionWorkContractError(
+            "section_operation_coverage_incomplete",
+            "Operation inventory does not cover every request-owned scale update exactly once.",
         )
     ordering: list[tuple[str, str, str]] = []
     for item in task.operations:
@@ -1173,14 +1258,18 @@ def build_report_operation_contract(
     )
 
 
-def _section_operation_type(operation: SemanticOperation) -> Literal["ADD_TRACK"]:
-    """Accept only the additive operation currently consumed by this worker."""
-    if operation.verb != "CREATE" or operation.object_kind != "track":
-        raise SectionWorkContractError(
-            "section_operation_unsupported",
-            "The current section operation contract supports only track additions.",
-        )
-    return "ADD_TRACK"
+def _section_operation_type(
+    operation: SemanticOperation,
+) -> Literal["ADD_TRACK", "UPDATE_CURVE_SCALE"]:
+    """Accept only canonical track-add and existing-curve scale operations."""
+    if operation.verb == "CREATE" and operation.object_kind == "track":
+        return "ADD_TRACK"
+    if operation.verb == "SET" and operation.object_kind == "binding":
+        return "UPDATE_CURVE_SCALE"
+    raise SectionWorkContractError(
+        "section_operation_unsupported",
+        "The section operation contract does not support this operation kind.",
+    )
 
 
 def validate_section_action_contract(
@@ -1268,6 +1357,30 @@ def validate_section_action_contract(
                 "Track patches do not preserve the authorized operation order.",
             )
     elif contract.required_action == "update_curve_scale":
+        if operation_contract is None:
+            raise SectionWorkContractError(
+                "worker_operation_contract_missing",
+                "Scale updates require a host-compiled operation contract.",
+            )
+        if (
+            operation_contract.snapshot_id != contract.snapshot_id
+            or len(operation_contract.operations) != 1
+            or operation_contract.omitted_operations
+        ):
+            raise SectionWorkContractError(
+                "worker_operation_contract_identity_mismatch",
+                "Scale operation contract is empty, multiple, omitted, or stale.",
+            )
+        operation = operation_contract.operations[0]
+        if (
+            operation.operation_type != "UPDATE_CURVE_SCALE"
+            or operation.target_handle != contract.target_handle
+            or operation.requested_scale != contract.required_scale
+        ):
+            raise SectionWorkContractError(
+                "worker_operation_contract_target_mismatch",
+                "Scale operation contract differs from the required binding or scale.",
+            )
         if action.target.handle != contract.target_handle or not _scale_matches(
             action.scale, contract.required_scale
         ):

@@ -391,10 +391,14 @@ class CanonicalSectionWorker:
         """Generate exactly one action and lower it without document mutation."""
         section_context = ResolvedSectionContext.model_validate(context.sections[task_index])
         task = SectionTask.model_validate(context.plan.section_tasks[task_index])
-        if work_contract.required_action == "add_tracks" and operation_contract is None:
+        if (
+            work_contract.required_action in {"add_tracks", "update_curve_scale"}
+            and operation_contract is None
+        ):
             return _canonical_failure(
                 "worker_operation_contract_missing",
-                "Sparse track additions require a host-compiled operation contract.",
+                "Sparse track additions and scale updates require a host-compiled "
+                "operation contract.",
                 normalization="PASS",
                 worker_obligation="FAIL",
             )
