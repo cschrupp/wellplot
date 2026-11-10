@@ -483,6 +483,65 @@ def _existing_curve_handle(
     return f"curve-{matches[0] + 1}"
 
 
+def _exact_existing_curve_handle(
+    target: str,
+    context: ResolvedSectionContext,
+) -> str:
+    """Resolve one scale target by exact identity in the bound document snapshot."""
+    identity = " ".join(target.casefold().split())
+    matches = [
+        index
+        for index, curve in enumerate(context.existing_curves)
+        if identity
+        in {
+            " ".join(value.casefold().split())
+            for value in (
+                curve.binding_id,
+                curve.track_id,
+                curve.track_title,
+                curve.channel,
+                curve.label or "",
+            )
+            if value
+        }
+    ]
+    if len(matches) != 1:
+        code = "section_work_target_missing" if not matches else "section_work_target_ambiguous"
+        raise SectionWorkContractError(code, "Existing curve target is not uniquely grounded.")
+    return f"curve-{matches[0] + 1}"
+
+
+def _scale_target_identity(
+    obligations: tuple[RequestObligation, ...],
+    scale_owners: tuple[str, ...],
+) -> str:
+    """Keep request-owned scale evidence distinct from its target identity."""
+    target_facts = tuple(
+        item
+        for item in obligations
+        if item.owner_kind is OwnerKind.BINDING and item.field == "target"
+    )
+    if target_facts:
+        if any(item.state is not ObligationState.SET for item in target_facts):
+            raise SectionWorkContractError(
+                "section_operation_target_unresolved",
+                "Scale target evidence is unresolved or conflicting.",
+            )
+        values = tuple(dict.fromkeys(str(item.value) for item in target_facts))
+        if len(values) != 1:
+            raise SectionWorkContractError(
+                "section_operation_target_ambiguous",
+                "Scale target evidence identifies multiple bindings.",
+            )
+        return values[0]
+    if len(scale_owners) == 1 and scale_owners[0].casefold() != "request":
+        return scale_owners[0]
+    raise SectionWorkContractError(
+        "section_operation_target_unresolved",
+        "Scale request has no independently grounded binding target.",
+    )
+
+
 def build_section_work_contract(
     task: SectionTask,
     section_context: ResolvedSectionContext,
@@ -672,6 +731,7 @@ def build_section_work_contract(
             item.owner_kind is OwnerKind.BINDING
             and item.field in {"scale_kind", "scale_minimum", "scale_maximum", "scale_reverse"}
         )
+        or (item.owner_kind is OwnerKind.BINDING and item.field == "target")
         or (item.owner_kind is OwnerKind.SECTION and item.field == "target")
         for item in obligations
     )
@@ -726,7 +786,8 @@ def build_section_work_contract(
             raise SectionWorkContractError(
                 "section_work_target_ambiguous", "Scale update must identify one existing curve."
             )
-        target_handle = _existing_curve_handle(owner_names[0], section_context)
+        target_identity = _scale_target_identity(tuple(obligations), owner_names)
+        target_handle = _exact_existing_curve_handle(target_identity, section_context)
         required_scale = _scale_from_items(list(obligations))
         if (
             required_scale is None
@@ -853,6 +914,7 @@ def build_section_operation_contract(
     scale_fields = {"scale_kind", "scale_minimum", "scale_maximum", "scale_reverse"}
     scale_only = bool(obligations) and all(
         (item.owner_kind is OwnerKind.BINDING and item.field in scale_fields)
+        or (item.owner_kind is OwnerKind.BINDING and item.field == "target")
         or (item.owner_kind is OwnerKind.SECTION and item.field == "target")
         for item in obligations
     )
@@ -912,6 +974,7 @@ def build_section_operation_contract(
     entries: list[WorkerOperationContractEntry] = []
     assigned_track_owners: set[str] = set()
     assigned_scale_owners: set[str] = set()
+    assigned_scale_targets: set[str] = set()
     for operation in task.operations:
         if operation.scope_ref != task.scope_ref:
             raise SectionWorkContractError(
@@ -929,24 +992,25 @@ def build_section_operation_contract(
                     "section_operation_unsupported",
                     "Binding updates are supported only for request-authorized scale changes.",
                 )
-            matching_owners = [
-                candidate
-                for candidate in scale_owners
+            target_identity = _scale_target_identity(obligations, scale_owners)
+            operation_target = (
+                " ".join(operation.target_clue.casefold().split())
                 if operation.target_clue is not None
-                and _work_handle(candidate) == _work_handle(operation.target_clue)
-            ]
-            if len(matching_owners) != 1:
+                else None
+            )
+            if operation_target != " ".join(target_identity.casefold().split()):
                 raise SectionWorkContractError(
                     "section_operation_target_unresolved",
-                    "Scale update does not resolve to one request-owned binding.",
+                    "Scale operation target differs from request-bound target evidence.",
                 )
-            owner = matching_owners[0]
-            if owner in assigned_scale_owners:
+            owner = scale_owners[0]
+            if owner in assigned_scale_owners or target_identity in assigned_scale_targets:
                 raise SectionWorkContractError(
                     "section_operation_duplicate_target",
-                    "Multiple operations target the same request-owned binding.",
+                    "Multiple operations target the same request-authorized binding.",
                 )
             assigned_scale_owners.add(owner)
+            assigned_scale_targets.add(target_identity)
             facts = [item for item in scale_facts if item.owner_ref == owner]
             proposal_fields = [item.field for item in operation.field_values]
             expected_fields = {item.field for item in facts}
@@ -976,7 +1040,7 @@ def build_section_operation_contract(
                     "section_operation_scale_invalid",
                     "Scale operation contains invalid presentation scale values.",
                 ) from None
-            target_handle = _existing_curve_handle(owner, section_context)
+            target_handle = _exact_existing_curve_handle(target_identity, section_context)
         elif operation.object_kind == "track":
             owner = track_owner(operation)
             if owner is None:
@@ -1016,6 +1080,16 @@ def build_section_operation_contract(
                 "section_operation_condition_unauthorized",
                 "The request contract does not authorize conditional operation omission.",
             )
+        requirement_ids = [item.requirement_id for item in facts if item.requirement_id]
+        if operation_type == "UPDATE_CURVE_SCALE":
+            requirement_ids.extend(
+                item.requirement_id
+                for item in obligations
+                if item.owner_kind is OwnerKind.BINDING
+                and item.field == "target"
+                and item.value == target_identity
+                and item.requirement_id
+            )
         entry = WorkerOperationContractEntry(
             operation_id=operation_ids[operation.local_ref],
             operation_ref=operation.local_ref,
@@ -1032,9 +1106,7 @@ def build_section_operation_contract(
                 operation.condition.predicate if operation.condition is not None else None
             ),
             condition_result="UNCONDITIONAL",
-            requirement_ids=tuple(
-                dict.fromkeys(item.requirement_id for item in facts if item.requirement_id)
-            ),
+            requirement_ids=tuple(dict.fromkeys(requirement_ids)),
         )
         entries.append(entry)
 

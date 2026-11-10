@@ -17,6 +17,7 @@ from wellplot.agent.code_mode.enrichment import (
     SourceContext,
 )
 from wellplot.agent.code_mode.obligations import (
+    ObligationState,
     compile_request_contract,
 )
 from wellplot.agent.code_mode.planner import OperationCondition, SectionTask
@@ -141,6 +142,147 @@ def _scale_update_contract_inputs(
     context = _context().model_copy(update={"snapshot_id": "snapshot-scale-update"})
     work_contract = build_section_work_contract(task, context)
     return task, context, work_contract
+
+
+def _request_owned_scale_inputs(
+    *,
+    request: str = "In Main Log, set the Gamma Ray curve to a linear 5–125 scale.",
+    target_clue: str = "Gamma Ray",
+) -> tuple[SectionTask, ResolvedSectionContext]:
+    """Build a scale contract where request coverage and target have separate owners."""
+    obligations = compile_request_contract(request).requirements.requirements
+    minimum = next(item for item in obligations if item.field == "scale_minimum")
+    task = SectionTask(
+        goal="Update the requested existing curve scale.",
+        capability_ids=("section.log_plot", "binding.curve"),
+        existing_section_hint="Main Log",
+        scope_ref="main_log",
+        requirements=(request,),
+        obligations=obligations,
+        operations=(
+            {
+                "local_ref": "update_curve_scale",
+                "scope_ref": "main_log",
+                "verb": "SET",
+                "object_kind": "binding",
+                "target_clue": target_clue,
+                "field_values": [
+                    {"field": "scale_minimum", "state": "SET", "value": minimum.value}
+                ],
+            },
+        ),
+    )
+    context = _context().model_copy(update={"snapshot_id": "snapshot-request-owned-scale"})
+    return task, context
+
+
+def test_request_owned_scale_facts_resolve_separate_grounded_binding_target() -> None:
+    """A generic request owner authorizes values, not the canonical target lookup."""
+    task, context = _request_owned_scale_inputs()
+    scale_facts = [item for item in task.obligations if item.field.startswith("scale_")]
+    target_fact = next(
+        item
+        for item in task.obligations
+        if item.owner_kind.value == "binding" and item.field == "target"
+    )
+
+    assert {item.owner_ref for item in scale_facts} == {"request"}
+    assert target_fact.owner_ref == target_fact.value == "Gamma Ray"
+    assert target_fact.request_sha256 == scale_facts[0].request_sha256
+    assert target_fact.span_sha256
+
+    work_contract = build_section_work_contract(task, context)
+    operation_contract = build_section_operation_contract(task, context)
+    operation = operation_contract.operations[0]
+
+    assert work_contract.required_action == "update_curve_scale"
+    assert operation.operation_type == "UPDATE_CURVE_SCALE"
+    assert operation.target_handle == work_contract.target_handle == "curve-1"
+    assert context.existing_curves[0].binding_id == "host-binding-id"
+    assert operation.requested_scale.minimum == 5
+    assert operation.requested_scale.maximum == 125
+    assert set(operation.requirement_ids) == {
+        *[item.requirement_id for item in scale_facts],
+        target_fact.requirement_id,
+    }
+
+
+def test_scale_request_cannot_authorize_a_different_existing_binding() -> None:
+    """A second available curve is not authorized by generic scale obligations."""
+    task, context = _request_owned_scale_inputs()
+    second_curve = context.existing_curves[0].model_copy(
+        update={
+            "track_id": "neutron-track",
+            "track_title": "Neutron Porosity",
+            "binding_id": "neutron-binding",
+            "channel": "NPHI",
+            "label": "Neutron Porosity",
+        }
+    )
+    context = context.model_copy(
+        update={"existing_curves": (*context.existing_curves, second_curve)}
+    )
+    wrong_operation = task.operations[0].model_copy(update={"target_clue": "Neutron Porosity"})
+    wrong_task = task.model_copy(update={"operations": (wrong_operation,)})
+
+    with pytest.raises(SectionWorkContractError) as error:
+        build_section_operation_contract(wrong_task, context)
+
+    assert error.value.code == "section_operation_target_unresolved"
+
+
+def test_scale_request_fails_closed_for_missing_or_ambiguous_target() -> None:
+    """Target resolution requires exactly one matching snapshot binding."""
+    task, context = _request_owned_scale_inputs()
+    with pytest.raises(SectionWorkContractError) as missing:
+        build_section_operation_contract(
+            task,
+            context.model_copy(update={"existing_curves": ()}),
+        )
+    assert missing.value.code == "section_work_target_missing"
+
+    duplicate_curve = context.existing_curves[0].model_copy(
+        update={"binding_id": "duplicate-binding"}
+    )
+    with pytest.raises(SectionWorkContractError) as ambiguous:
+        build_section_operation_contract(
+            task,
+            context.model_copy(
+                update={"existing_curves": (*context.existing_curves, duplicate_curve)}
+            ),
+        )
+    assert ambiguous.value.code == "section_work_target_ambiguous"
+
+
+def test_conflicting_or_unresolved_scale_target_evidence_is_rejected() -> None:
+    """Valid scale values cannot compensate for invalid binding-target evidence."""
+    task, context = _request_owned_scale_inputs()
+    target_fact = next(
+        item
+        for item in task.obligations
+        if item.owner_kind.value == "binding" and item.field == "target"
+    )
+    conflicting_target = target_fact.model_copy(
+        update={"owner_ref": "Neutron Porosity", "value": "Neutron Porosity"}
+    )
+    conflicting_task = task.model_copy(
+        update={"obligations": (*task.obligations, conflicting_target)}
+    )
+    with pytest.raises(SectionWorkContractError) as ambiguous:
+        build_section_operation_contract(conflicting_task, context)
+    assert ambiguous.value.code == "section_operation_target_ambiguous"
+
+    unresolved_target = target_fact.model_copy(update={"state": ObligationState.UNRESOLVED})
+    unresolved_task = task.model_copy(
+        update={
+            "obligations": tuple(
+                unresolved_target if item is target_fact else item for item in task.obligations
+            )
+        }
+    )
+    with pytest.raises(SectionWorkContractError) as unresolved:
+        build_section_operation_contract(unresolved_task, context)
+    assert unresolved.value.code == "section_operation_requirements_unresolved"
 
 
 def _smoke_request() -> str:
@@ -862,7 +1004,8 @@ def test_scale_update_operation_contract_preserves_binding_and_reconciles() -> N
     assert set(operation.requirement_ids) == {
         item.requirement_id
         for item in task.obligations
-        if item.owner_kind.value == "binding" and item.field.startswith("scale_")
+        if item.owner_kind.value == "binding"
+        and (item.field.startswith("scale_") or item.field == "target")
     }
 
     action = UpdateCurveScaleAction.model_validate(

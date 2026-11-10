@@ -510,6 +510,12 @@ _SCALE_CLAUSE_RE = re.compile(
     r"(?P<maximum>-?[0-9]+(?:\.[0-9]+)?)",
     re.IGNORECASE,
 )
+_SCALE_TARGET_RE = re.compile(
+    r"\b(?:change|set)\s+(?:the\s+)?"
+    r"(?P<target>[A-Za-z][A-Za-z0-9 _-]*?)\s+(?:curve|binding)\s+"
+    r"(?:scale\s+)?(?:to|with)\s+(?:a\s+)?(?:linear|log(?:arithmic)?)\b",
+    re.IGNORECASE,
+)
 _SCALE_PREFIX_RANGE_RE = re.compile(
     r"\b(?:with|using|to)\s+(?:a\s+)?(?P<kind>linear|log(?:arithmic)?)\s+"
     r"(?P<minimum>-?[0-9]+(?:\.[0-9]+)?)\s*"
@@ -649,6 +655,8 @@ _INDEPENDENT_ANCHOR_PATTERNS = (
             re.I,
         ),
     ),
+    ("target", "target", _SCALE_RE),
+    ("target", "target", _SCALE_TARGET_RE),
     (
         "explicit",
         "title",
@@ -819,6 +827,7 @@ def _patterns() -> tuple[tuple[str, re.Pattern[str]], ...]:
         ("explicit", _SOURCE_RE),
         ("explicit", _SCALE_RE),
         ("explicit", _SCALE_CLAUSE_RE),
+        ("target", _SCALE_TARGET_RE),
         ("explicit", _SCALE_PREFIX_RANGE_RE),
         ("explicit", _FILL_COLOR_RE),
         ("explicit", _FILL_ALPHA_RE),
@@ -1085,6 +1094,23 @@ def extract_supported_obligations(request: str) -> tuple[RequestObligation, ...]
                     owner_ref=target,
                     field="target",
                     value=target,
+                )
+            )
+    for pattern in (_SCALE_RE, _SCALE_TARGET_RE):
+        for match in pattern.finditer(request):
+            target = match.groupdict().get("target") or match.groupdict().get("owner")
+            if not target or target.strip().casefold() == "request":
+                continue
+            obligations.append(
+                _make_obligation(
+                    request=request,
+                    request_sha256=request_sha256,
+                    match=match,
+                    kind=ObligationKind.TARGET_REFERENCE,
+                    owner_kind=OwnerKind.BINDING,
+                    owner_ref=target.strip(),
+                    field="target",
+                    value=target.strip(),
                 )
             )
     targeted_channel_spans: set[tuple[int, int]] = set()
@@ -2329,6 +2355,10 @@ def _validate_existing_curve_scale_obligations(
         owner = item.owner_ref.casefold()
         if owner != "request" and owner not in identities:
             raise ValueError("Requested binding identity is unresolved or ambiguous.")
+        if item.field == "target":
+            if str(item.value).casefold() not in identities:
+                raise ValueError("Requested binding target was not satisfied.")
+            continue
         if item.field in scale_values:
             actual = scale_values[item.field]
         elif item.field == "channel":

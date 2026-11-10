@@ -469,7 +469,9 @@ def test_scope_matrix_recognizes_comma_form_section_target() -> None:
 
     assert [scope.selector_text for scope in compilation.requirements.scopes.scopes] == ["Main Log"]
     target_values = [
-        item.value for item in compilation.requirements.requirements if item.field == "target"
+        item.value
+        for item in compilation.requirements.requirements
+        if item.owner_kind.value == "section" and item.field == "target"
     ]
     assert target_values == ["Main Log"]
 
