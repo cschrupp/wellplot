@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
 import errno
 import hashlib
 import importlib.metadata
@@ -114,6 +115,8 @@ SMOKE_BINDING_REQUEST = (
 SMOKE_BINDING_REQUEST_SHA256 = "b60330264cf1037fec80a533bd0a7b96fdee70aa52101693a8da5c962b9914e7"
 MAX_ENDPOINT_RESPONSE_BYTES = 1_048_576
 MAX_SECTION_ACTION_EVIDENCE_BYTES = 65_536
+MAX_PLANNER_DIAGNOSTIC_RECORD_BYTES = 1_048_576
+MAX_PLANNER_DIAGNOSTIC_FILE_BYTES = 6 * MAX_PLANNER_DIAGNOSTIC_RECORD_BYTES
 THINKING_CONTROL_MECHANISM = "chat_template_kwargs.enable_thinking"
 THINKING_CONTROL_OPTIONS_SHA256 = "220b99e47feb82851cab428f86b8fe977ae7c605400d421a91e99d4a35ec9c26"
 FROZEN_TURN_IDS = (
@@ -1005,6 +1008,11 @@ class EvidencePaths:
         return self.root / f"{self.campaign_id}.planner-wire-response.jsonl"
 
     @property
+    def planner_wire_diagnostics(self) -> Path:
+        """Return private raw planner request/response diagnostics."""
+        return self.root / f"{self.campaign_id}.planner-wire-diagnostics.jsonl"
+
+    @property
     def request_compilation(self) -> Path:
         """Return the deterministic host request compilation projection."""
         return self.root / f"{self.campaign_id}.request-compilation.json"
@@ -1055,6 +1063,7 @@ class EvidencePaths:
             self.model_io,
             self.compile_result,
             self.planner_wire,
+            self.planner_wire_diagnostics,
             self.request_compilation,
             self.planner_context,
             self.section_actions,
@@ -1244,6 +1253,8 @@ class D5SmokeCustody:
                     "eventual_schema_valid": False,
                     "correction_success": False,
                     "final_structured_output_status": "NOT_REACHED",
+                    "planner_wire_diagnostic_capture_status": "READY",
+                    "planner_wire_diagnostic_records": 0,
                 }
             )
         if not evidence_is_redacted(state):
@@ -1261,6 +1272,8 @@ class D5SmokeCustody:
             exclusive=True,
         )
         paths.model_io.touch(exist_ok=False)
+        if ledger.mode == SMOKE_PLANNER_KIND:
+            _write_private_exclusive(paths.planner_wire_diagnostics, b"")
         return cls(
             paths=paths,
             authorization=authorization,
@@ -1607,6 +1620,47 @@ class D5SmokeCustody:
         with self.paths.model_io.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(bounded, sort_keys=True, separators=(",", ":")) + "\n")
 
+    def record_planner_wire_diagnostic(self, row: Mapping[str, Any]) -> None:
+        """Persist exact planner wire evidence in a private bounded artifact."""
+        if self.state.get("smoke_kind") != SMOKE_PLANNER_KIND:
+            raise D5HarnessError("planner wire diagnostics require planner smoke custody")
+        encoded = json.dumps(row, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode(
+            "utf-8"
+        )
+        record = encoded + b"\n"
+        if len(record) > MAX_PLANNER_DIAGNOSTIC_RECORD_BYTES:
+            self._fail_planner_wire_diagnostics("RECORD_LIMIT_EXCEEDED")
+            raise D5HarnessError("planner wire diagnostic record limit exceeded")
+        flags = os.O_WRONLY | os.O_APPEND | getattr(os, "O_NOFOLLOW", 0)
+        fd = os.open(self.paths.planner_wire_diagnostics, flags)
+        try:
+            info = os.fstat(fd)
+            if (
+                not stat.S_ISREG(info.st_mode)
+                or stat.S_IMODE(info.st_mode) != 0o600
+                or info.st_uid != os.geteuid()
+            ):
+                self._fail_planner_wire_diagnostics("PRIVATE_FILE_CHECK_FAILED")
+                raise D5HarnessError("planner wire diagnostic file is not private")
+            if info.st_size + len(record) > MAX_PLANNER_DIAGNOSTIC_FILE_BYTES:
+                self._fail_planner_wire_diagnostics("FILE_LIMIT_EXCEEDED")
+                raise D5HarnessError("planner wire diagnostic file limit exceeded")
+            with os.fdopen(fd, "ab", closefd=False) as handle:
+                handle.write(record)
+                handle.flush()
+                os.fsync(handle.fileno())
+        finally:
+            os.close(fd)
+        self.state["planner_wire_diagnostic_records"] = (
+            int(self.state.get("planner_wire_diagnostic_records", 0)) + 1
+        )
+        _atomic_json(self.paths.state, self.state)
+
+    def _fail_planner_wire_diagnostics(self, reason: str) -> None:
+        self.state["planner_wire_diagnostic_capture_status"] = "INCOMPLETE"
+        self.state["planner_wire_diagnostic_failure"] = reason
+        _atomic_json(self.paths.state, self.state)
+
     def record_bounded_model_io(self, row: Mapping[str, Any]) -> None:
         """Persist request/response hashes and metadata without raw payloads."""
         allowed = {
@@ -1835,6 +1889,11 @@ class D5SmokeCustody:
             if not callable(binder):
                 raise D5HarnessError("canonical binding-smoke observer is unavailable")
             binder(callback)
+        if smoke_kind == SMOKE_PLANNER_KIND:
+            planner_binder = getattr(adapter, "bind_planner_diagnostic", None)
+            if not callable(planner_binder):
+                raise D5HarnessError("canonical planner diagnostic observer is unavailable")
+            planner_binder(self.record_planner_wire_diagnostic)
         set_active_turn = getattr(adapter, "set_active_turn", None)
         if not callable(set_active_turn):
             raise D5HarnessError("canonical binding-smoke observer is unavailable")
@@ -1965,6 +2024,7 @@ class D5SmokeCustody:
                 for path in (
                     self.paths.compile_result,
                     self.paths.planner_wire,
+                    self.paths.planner_wire_diagnostics,
                     self.paths.request_compilation,
                     self.paths.planner_context,
                     self.paths.section_actions,
@@ -3337,6 +3397,7 @@ class _PhysicalAttemptObserver:
         self.active_logical_index: int | None = None
         self.callback: Callable[[int], None] | None = None
         self.model_io_callback: Callable[[dict[str, Any]], None] | None = None
+        self.planner_diagnostic_callback: Callable[[dict[str, Any]], None] | None = None
         self.worker_diagnostic_callback: Callable[[dict[str, Any]], None] | None = None
         self.active_turn_id: str | None = None
         self.active_role: str | None = None
@@ -3369,8 +3430,6 @@ class _PhysicalAttemptObserver:
         role = logical_context.get("generation_role")
         model = logical_context.get("model")
         attempt = self._attempts.get(logical_index, 0) + 1
-        self.callback(logical_index)
-        self._attempts[logical_index] = attempt
         body = bytes(getattr(request, "content", b""))
         self._pending_responses[id(request)] = {
             "event": "physical_request",
@@ -3380,9 +3439,24 @@ class _PhysicalAttemptObserver:
             "model": model,
             "physical_attempt": attempt,
             "request_sha256": hashlib.sha256(body).hexdigest(),
+            "request_body_base64": base64.b64encode(body).decode("ascii"),
             "request_body": body.decode("utf-8", errors="replace"),
             "request_json": _json_body(body),
         }
+        if self.planner_diagnostic_callback is not None:
+            self.planner_diagnostic_callback(
+                {
+                    "event": "physical_request",
+                    "generation_purpose": _planner_generation_purpose(logical_index),
+                    "logical_call_index": logical_index,
+                    "physical_attempt": attempt,
+                    "request_sha256": hashlib.sha256(body).hexdigest(),
+                    "request_body_base64": base64.b64encode(body).decode("ascii"),
+                    "request_json": _json_body(body),
+                }
+            )
+        self.callback(logical_index)
+        self._attempts[logical_index] = attempt
         if self.model_io_callback is not None:
             self.model_io_callback(dict(self._pending_responses[id(request)]))
 
@@ -3397,17 +3471,43 @@ class _PhysicalAttemptObserver:
         response_row = {
             key: value
             for key, value in pending.items()
-            if key not in {"event", "request_body", "request_json"}
+            if key not in {"event", "request_body", "request_body_base64", "request_json"}
         }
         response_row.update(
             {
                 "event": "physical_response",
                 "http_status": getattr(response, "status_code", None),
                 "response_sha256": hashlib.sha256(body).hexdigest(),
+                "response_body_base64": base64.b64encode(body).decode("ascii"),
                 "response_body": body.decode("utf-8", errors="replace"),
                 "response_json": _json_body(body),
             }
         )
+        if self.planner_diagnostic_callback is not None:
+            response_json = _json_body(body)
+            assistant_content = None
+            if isinstance(response_json, Mapping):
+                choices = response_json.get("choices")
+                if isinstance(choices, list) and choices:
+                    first_choice = choices[0]
+                    if isinstance(first_choice, Mapping):
+                        message = first_choice.get("message")
+                        if isinstance(message, Mapping):
+                            assistant_content = message.get("content")
+            self.planner_diagnostic_callback(
+                {
+                    "event": "physical_response",
+                    "generation_purpose": _planner_generation_purpose(
+                        int(response_row["logical_call_index"])
+                    ),
+                    "logical_call_index": response_row["logical_call_index"],
+                    "physical_attempt": response_row["physical_attempt"],
+                    "http_status": response_row["http_status"],
+                    "response_sha256": response_row["response_sha256"],
+                    "response_body_base64": base64.b64encode(body).decode("ascii"),
+                    "assistant_content": assistant_content,
+                }
+            )
         if self.model_io_callback is not None:
             self.model_io_callback(response_row)
 
@@ -3461,6 +3561,10 @@ class _PhysicalAttemptObserver:
         """Bind append-only model-I/O custody."""
         self.model_io_callback = callback
 
+    def bind_planner_diagnostic(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Bind private planner-only raw request/response custody."""
+        self.planner_diagnostic_callback = callback
+
     def bind_worker_diagnostic(self, callback: Callable[[dict[str, Any]], None]) -> None:
         """Bind canonical graph exception diagnostics to campaign custody."""
         self.worker_diagnostic_callback = callback
@@ -3487,18 +3591,26 @@ class _PhysicalAttemptObserver:
             to_json = getattr(validation_shape, "to_json", None)
             if callable(to_json):
                 validation_shape = to_json()
-            self.model_io_callback(
-                {
-                    "event": "logical_call_result",
-                    "logical_call_index": event.get("index"),
-                    "role": event.get("generation_role"),
-                    "model": event.get("model"),
-                    "engine_outcome": event.get("outcome"),
-                    "failure_category": event.get("failure_category"),
-                    "response_reason": response_reason,
-                    "validation_shape": validation_shape,
-                }
-            )
+            row = {
+                "event": "logical_call_result",
+                "logical_call_index": event.get("index"),
+                "role": event.get("generation_role"),
+                "model": event.get("model"),
+                "engine_outcome": event.get("outcome"),
+                "failure_category": event.get("failure_category"),
+                "response_reason": response_reason,
+                "validation_shape": validation_shape,
+            }
+            if self.planner_diagnostic_callback is not None:
+                self.planner_diagnostic_callback(
+                    {
+                        **row,
+                        "generation_purpose": _planner_generation_purpose(
+                            int(event.get("index", 0))
+                        ),
+                    }
+                )
+            self.model_io_callback(row)
 
 
 def _json_body(body: bytes) -> object:
@@ -3572,6 +3684,10 @@ class _ObservedLiveAdapter:
     def bind_model_io(self, callback: Callable[[dict[str, Any]], None]) -> None:
         """Bind exact transport body capture to campaign custody."""
         self.observer.bind_model_io(callback)
+
+    def bind_planner_diagnostic(self, callback: Callable[[dict[str, Any]], None]) -> None:
+        """Bind private raw planner wire capture to smoke custody."""
+        self.observer.bind_planner_diagnostic(callback)
 
     async def execute_smoke(self, custody: D5SmokeCustody) -> SmokeReadyResponse:
         """Issue one smoke call through the adapter's existing provider backend."""

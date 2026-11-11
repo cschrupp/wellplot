@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import json
 import sys
@@ -2768,6 +2769,61 @@ def test_planner_only_smoke_uses_existing_custody_and_stops_at_wire(
         "render": 0,
         "preview": 0,
     }
+    if case_id == "B01":
+        diagnostic_path = (
+            Path(authorization.artifact_root)
+            / f"{authorization.campaign_id}.planner-wire-diagnostics.jsonl"
+        )
+        assert diagnostic_path.stat().st_mode & 0o777 == 0o600
+        assert (
+            terminal["observability_artifacts"][diagnostic_path.name]
+            == hashlib.sha256(diagnostic_path.read_bytes()).hexdigest()
+        )
+        diagnostics = [
+            json.loads(line) for line in diagnostic_path.read_text(encoding="utf-8").splitlines()
+        ]
+        assert state["planner_wire_diagnostic_capture_status"] == "READY"
+        assert state["planner_wire_diagnostic_records"] == len(diagnostics)
+        wire_requests = [row for row in diagnostics if row["event"] == "physical_request"]
+        wire_responses = [row for row in diagnostics if row["event"] == "physical_response"]
+        logical_results = [row for row in diagnostics if row["event"] == "logical_call_result"]
+        assert len(wire_requests) == len(requests) == expected_physical_requests
+        assert len(wire_responses) == (
+            0 if response_mode == "transport_error" else expected_physical_requests
+        )
+        assert len(logical_results) == expected_generation_calls
+        for index, (capture, request) in enumerate(zip(wire_requests, requests, strict=True)):
+            exact_body = request.content
+            assert base64.b64decode(capture["request_body_base64"]) == exact_body
+            assert capture["request_sha256"] == hashlib.sha256(exact_body).hexdigest()
+            request_json = json.loads(exact_body)
+            assert capture["request_json"] == request_json
+            assert isinstance(request_json["messages"], list)
+            assert request_json["response_format"]["type"] == "json_schema"
+            assert request_json["response_format"]["json_schema"]["schema"]
+            assert capture["generation_purpose"] == (
+                "INITIAL_GENERATION" if index == 0 else "STRUCTURED_OUTPUT_CORRECTION"
+            )
+        if response_mode == "invalid_json_then_planner":
+            expected_responses = ["{", json.dumps(_planner_wire_payload())]
+        elif response_mode == "schema_invalid_then_planner":
+            expected_responses = [
+                '{"not_a_planner_plan":true}',
+                json.dumps(_planner_wire_payload()),
+            ]
+        elif response_mode == "invalid_json":
+            expected_responses = ["{", "{"]
+        elif response_mode == "transport_error":
+            expected_responses = []
+        else:
+            expected_responses = [json.dumps(_planner_wire_payload())]
+        assert [row["assistant_content"] for row in wire_responses] == expected_responses
+        if expected_generation_calls == 2:
+            assert logical_results[0]["response_reason"] in {"invalid_json", "schema_validation"}
+            if logical_results[0]["response_reason"] == "schema_validation":
+                assert logical_results[0]["validation_shape"]
+            correction_message = wire_requests[1]["request_json"]["messages"][-1]["content"]
+            assert ("Schema correction context:" in correction_message) is schema_correction_prompt
     if response_mode in {
         "planner",
         "invalid_json_then_planner",
