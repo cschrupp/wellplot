@@ -87,6 +87,11 @@ A10_SEM_02_SMOKE_CASE_ID = "B01"
 A10_SEM_02_SMOKE_SOURCE_KEY = "approved_las"
 A10_SEM_02_SMOKE_SOURCE_PATH = "workspace/data/30-23a-3 8117_d.las"
 A10_SEM_02_SMOKE_SOURCE_SHA256 = "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9"
+A10_SEM_02_SOURCE_PATH_BY_KEY = {
+    "approved_las": A10_SEM_02_SMOKE_SOURCE_PATH,
+    "cbl_repeat_dlis": "workspace/data/CBL_Repeat.dlis",
+    "cbl_main_dlis": "workspace/data/CBL_Main.dlis",
+}
 A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN = (
     " M examples/notebooks/user/agent_cbl_log_example_from_prompt.ipynb\n"
     " M examples/notebooks/user/agent_las_step_by_step.ipynb\n"
@@ -786,8 +791,13 @@ def _planner_wire_schema_sha256() -> str:
     return _sha256_json(_PlannerWirePlan.model_json_schema())
 
 
-def _planner_smoke_case(repo_root: Path, authorization: D5Authorization) -> dict[str, Any]:
-    """Validate the authority-pinned B01 request and approved source inventory."""
+def _planner_smoke_case(
+    repo_root: Path,
+    authorization: D5Authorization,
+    *,
+    case_id: str | None = None,
+) -> dict[str, Any]:
+    """Resolve one authority-pinned case from the immutable SEM-01 inputs."""
     required_digests = {
         "benchmark": authorization.planner_smoke_benchmark_sha256,
         "source inventory": authorization.planner_smoke_source_inventory_sha256,
@@ -798,8 +808,9 @@ def _planner_smoke_case(repo_root: Path, authorization: D5Authorization) -> dict
     }
     if authorization.planner_smoke_mode != SMOKE_PLANNER_KIND:
         raise D5StaticPreflightError("planner-only smoke mode is not authorized")
-    if authorization.planner_smoke_case_id != A10_SEM_02_SMOKE_CASE_ID:
-        raise D5StaticPreflightError("planner smoke case is not the approved B01 case")
+    selected_case_id = authorization.planner_smoke_case_id if case_id is None else case_id
+    if not selected_case_id or selected_case_id != authorization.planner_smoke_case_id:
+        raise D5StaticPreflightError("selected planner case does not match its authority")
     if type(authorization.planner_smoke_sdk_max_retries) is not int or (
         authorization.planner_smoke_sdk_max_retries != SMOKE_PLANNER_MAX_RETRIES
     ):
@@ -822,24 +833,25 @@ def _planner_smoke_case(repo_root: Path, authorization: D5Authorization) -> dict
     if not isinstance(cases, list):
         raise D5StaticPreflightError("frozen benchmark case set is invalid")
     matches = [
-        case
-        for case in cases
-        if isinstance(case, Mapping) and case.get("id") == authorization.planner_smoke_case_id
+        case for case in cases if isinstance(case, Mapping) and case.get("id") == selected_case_id
     ]
     if len(matches) != 1:
-        raise D5StaticPreflightError("frozen planner smoke case is not unique")
+        raise D5StaticPreflightError("frozen planner case is missing or not unique")
     case = dict(matches[0])
     request = case.get("request")
+    source_key = case.get("source")
+    if not isinstance(source_key, str):
+        raise D5StaticPreflightError("frozen planner case has no source reference")
+    relative_source_path = A10_SEM_02_SOURCE_PATH_BY_KEY.get(source_key)
+    if relative_source_path is None:
+        raise D5StaticPreflightError("frozen planner case names an unknown source")
     if (
-        case.get("gold") != "P"
-        or case.get("source") != A10_SEM_02_SMOKE_SOURCE_KEY
-        or case.get("expected") != "SAFE_CORRECT_GR"
-        or case.get("structured_channel") != "Gamma Ray"
-        or not isinstance(request, str)
+        not isinstance(request, str)
+        or not request.strip()
         or hashlib.sha256(request.encode("utf-8")).hexdigest()
         != authorization.planner_smoke_request_sha256
     ):
-        raise D5StaticPreflightError("frozen planner smoke request differs from authority")
+        raise D5StaticPreflightError("frozen planner case request differs from authority")
 
     inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
     sources = inventory.get("sources")
@@ -848,23 +860,33 @@ def _planner_smoke_case(repo_root: Path, authorization: D5Authorization) -> dict
     source_rows = [
         source
         for source in sources
-        if isinstance(source, Mapping) and source.get("path") == A10_SEM_02_SMOKE_SOURCE_PATH
+        if isinstance(source, Mapping) and source.get("path") == relative_source_path
     ]
+    if len(source_rows) != 1:
+        raise D5StaticPreflightError("frozen planner source is missing or not unique")
+    source_row = source_rows[0]
+    source_sha256 = source_row.get("sha256")
+    source_format = source_row.get("format")
     if (
-        len(source_rows) != 1
-        or source_rows[0].get("sha256") != authorization.planner_smoke_source_sha256
+        not isinstance(source_sha256, str)
+        or source_sha256 != authorization.planner_smoke_source_sha256
+        or source_format not in {"LAS", "DLIS"}
     ):
-        raise D5StaticPreflightError("approved planner smoke source differs from authority")
-    source_path = repo_root / A10_SEM_02_SMOKE_SOURCE_PATH
+        raise D5StaticPreflightError("planner source identity differs from authority")
+    source_path = (repo_root / relative_source_path).resolve()
+    if not source_path.is_relative_to(repo_root.resolve()):
+        raise D5StaticPreflightError("frozen planner source escapes the repository")
     _assert_hash(source_path, authorization.planner_smoke_source_sha256, "source")
     _assert_hash(Path(__file__).resolve(), authorization.planner_smoke_harness_sha256, "harness")
     if _planner_wire_schema_sha256() != authorization.planner_smoke_wire_schema_sha256:
         raise D5StaticPreflightError("production planner wire schema differs from authority")
     return {
-        "case_id": authorization.planner_smoke_case_id,
+        "case_id": selected_case_id,
         "request": request,
         "request_sha256": authorization.planner_smoke_request_sha256,
-        "source_path": A10_SEM_02_SMOKE_SOURCE_PATH,
+        "source_key": source_key,
+        "source_path": relative_source_path,
+        "source_format": source_format.lower(),
         "source_sha256": authorization.planner_smoke_source_sha256,
         "benchmark_sha256": authorization.planner_smoke_benchmark_sha256,
         "source_inventory_sha256": authorization.planner_smoke_source_inventory_sha256,
@@ -878,6 +900,8 @@ def _default_planner_smoke_static_checks(
     repo_root: Path,
     authorization: D5Authorization,
     artifact_paths: EvidencePaths,
+    *,
+    case_id: str | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Validate the exact A10 smoke authority before readiness or provider setup."""
     canonical_root = Path("/home/user/projects/well_log_os").resolve()
@@ -889,7 +913,7 @@ def _default_planner_smoke_static_checks(
         raise D5StaticPreflightError("planner-only smoke mode is not authorized")
     if authorization.expected_worktree_porcelain != A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN:
         raise D5StaticPreflightError("planner smoke worktree allowlist is not the reviewed state")
-    case = _planner_smoke_case(repo_root, authorization)
+    case = _planner_smoke_case(repo_root, authorization, case_id=case_id)
     static = _default_smoke_static_checks(
         repo_root,
         authorization,
@@ -4004,7 +4028,10 @@ def _build_planner_smoke_inputs(
     source_path = repo_root / str(case["source_path"])
     source_sha_before = _sha256_file(source_path)
     revision_before = file_revision_token(source_path)
-    loaded = LogfileSourceLoader(runtime_root=repo_root).load(source_path, "las")
+    loaded = LogfileSourceLoader(runtime_root=repo_root).load(
+        source_path,
+        str(case["source_format"]),
+    )
     source_sha_after = _sha256_file(source_path)
     revision_after = file_revision_token(source_path)
     if (
@@ -4015,11 +4042,11 @@ def _build_planner_smoke_inputs(
         raise D5HarnessError("planner smoke source changed during metadata inspection")
 
     source = AgentSourceConfig(
-        candidate_id=A10_SEM_02_SMOKE_SOURCE_KEY,
+        candidate_id=str(case["source_key"]),
         root_id="server",
         path=str(source_path),
-        labels=(A10_SEM_02_SMOKE_SOURCE_KEY,),
-        trusted_format="las",
+        labels=(str(case["source_key"]),),
+        trusted_format=str(case["source_format"]),
         inspection_state="inspected",
         channels=loaded.channels,
         expected_revision_token=revision_after,
@@ -4060,10 +4087,10 @@ def _build_planner_smoke_inputs(
         "source_channel_count": len(loaded.channels),
         "numeric_sample_apis_invoked": False,
         "source_asset_identity": {
-            "asset_id": A10_SEM_02_SMOKE_SOURCE_KEY,
+            "asset_id": str(case["source_key"]),
             "relative_path": str(case["source_path"]),
             "path_basename": source_path.name,
-            "format": "las",
+            "format": str(case["source_format"]),
             "size_bytes": source_path.stat().st_size,
             "sha256": source_sha_before,
         },
@@ -4146,8 +4173,9 @@ def execute_live_planner_smoke(
     api_key_loader: Callable[[], str] | None = None,
     static_checker: Callable[[Path, D5Authorization, EvidencePaths], dict[str, Any]] | None = None,
     provider_factory: Callable[..., object] | None = None,
+    case_id: str | None = None,
 ) -> dict[str, Any]:
-    """Run the canonical planner once and stop before every authoring stage."""
+    """Run one frozen benchmark case through the canonical planner-only boundary."""
     if artifact_root.resolve() != _authorized_artifact_root(repo_root, authorization):
         raise D5StaticPreflightError("artifact root is not authorized")
     project_config = load_project_config(repo_root)
@@ -4156,9 +4184,14 @@ def execute_live_planner_smoke(
         raise D5StaticPreflightError("project configuration fingerprint mismatch")
     paths = EvidencePaths(artifact_root, authorization.campaign_id)
     if static_checker is None:
-        static, case = _default_planner_smoke_static_checks(repo_root, authorization, paths)
+        static, case = _default_planner_smoke_static_checks(
+            repo_root,
+            authorization,
+            paths,
+            case_id=case_id,
+        )
     else:
-        case = _planner_smoke_case(repo_root, authorization)
+        case = _planner_smoke_case(repo_root, authorization, case_id=case_id)
         _require_exact_planner_worktree(repo_root, authorization.expected_worktree_porcelain)
         static = static_checker(repo_root, authorization, paths)
     try:
@@ -4267,7 +4300,6 @@ def execute_live_planner_smoke(
             "planner_entrypoint": "wellplot.agent.code_mode.planner.SemanticPlanner.plan",
             "planner_result_status": "NOT_REACHED",
             "planner_result_schema_valid": False,
-            "semantic_concept_for_later_review": "Gamma Ray",
             "numeric_sample_apis_invoked": context["numeric_sample_apis_invoked"],
             "source_sha256_before": context["source_sha256_before"],
             "source_sha256_after_inspection": context["source_sha256_after_inspection"],
@@ -5547,7 +5579,13 @@ def main() -> int:
     parser.add_argument("--population", choices=("d4", "final"), default="d4")
     parser.add_argument("--artifact-root", type=Path)
     parser.add_argument("--authorization-json", type=Path, required=True)
+    parser.add_argument(
+        "--planner-case-id",
+        help="select a case pinned by the planner-only authorization",
+    )
     args = parser.parse_args()
+    if args.planner_case_id is not None and not args.execute_planner_smoke:
+        parser.error("--planner-case-id requires --execute-planner-smoke")
     repo_root = args.repo_root.resolve()
     authorization = _load_authorization(args.authorization_json.resolve())
     artifact_root = (
@@ -5578,6 +5616,7 @@ def main() -> int:
             repo_root=repo_root,
             authorization=authorization,
             artifact_root=artifact_root,
+            case_id=args.planner_case_id,
         )
     else:
         try:

@@ -2202,6 +2202,8 @@ def _smoke_provider_factory(
                 return httpx.Response(500, request=request)
             if response_mode == "invalid":
                 content = '{"status":"NOT_READY"}'
+            elif response_mode == "invalid_planner":
+                content = '{"not_a_planner_plan":true}'
             elif response_mode == "transport_error":
                 raise httpx.ConnectError("synthetic transport failure", request=request)
             elif response_mode == "planner":
@@ -2491,6 +2493,69 @@ def test_git_porcelain_capture_preserves_status_columns_and_newline(
     assert d5._git_porcelain_raw(REPO_ROOT) == raw
 
 
+def _planner_case_authorization(
+    tmp_path: Path,
+    case_id: str,
+) -> d5.D5Authorization:
+    """Pin one frozen benchmark case and its inventory-backed source for tests."""
+    benchmark_path = REPO_ROOT / d5.A10_SEM_01_BENCHMARK
+    inventory_path = REPO_ROOT / d5.A10_SEM_01_SOURCE_INVENTORY
+    benchmark = json.loads(benchmark_path.read_text(encoding="utf-8"))
+    case = next(item for item in benchmark["cases"] if item["id"] == case_id)
+    source_key = case["source"]
+    source_path = d5.A10_SEM_02_SOURCE_PATH_BY_KEY[source_key]
+    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    source_row = next(row for row in inventory["sources"] if row["path"] == source_path)
+    campaign_id = f"planner-only-{case_id.lower()}"
+    return replace(
+        _authorization(
+            campaign_id=campaign_id,
+            artifact_root=str(tmp_path / campaign_id),
+        ),
+        implementation_checkpoint="synthetic-checkpoint",
+        planner_smoke_mode=d5.SMOKE_PLANNER_KIND,
+        planner_smoke_case_id=case_id,
+        planner_smoke_request_sha256=hashlib.sha256(case["request"].encode("utf-8")).hexdigest(),
+        planner_smoke_benchmark_sha256=d5._sha256_file(benchmark_path),
+        planner_smoke_source_inventory_sha256=d5._sha256_file(inventory_path),
+        planner_smoke_source_sha256=source_row["sha256"],
+        planner_smoke_harness_sha256=d5._sha256_file(
+            REPO_ROOT / "scripts/nlp_d5_live_semantic_qualification.py"
+        ),
+        planner_smoke_wire_schema_sha256=d5._planner_wire_schema_sha256(),
+        planner_smoke_sdk_max_retries=0,
+        expected_worktree_porcelain=d5.A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN,
+    )
+
+
+def test_planner_smoke_selects_only_authorized_frozen_case() -> None:
+    """The case selector reads the exact frozen request and source, never gold."""
+    _require_local_d5_sources()
+    authorization = _planner_case_authorization(Path("/tmp"), "A04")
+    selected = d5._planner_smoke_case(REPO_ROOT, authorization, case_id="A04")
+
+    assert selected["request"] == "Plot the physical CBL channel."
+    assert selected["source_key"] == "cbl_repeat_dlis"
+    assert selected["source_path"] == "workspace/data/CBL_Repeat.dlis"
+    assert selected["source_format"] == "dlis"
+    assert "gold" not in selected
+    assert "expected" not in selected
+    with pytest.raises(d5.D5StaticPreflightError, match="does not match its authority"):
+        d5._planner_smoke_case(REPO_ROOT, authorization, case_id="B01")
+
+
+def test_planner_smoke_unknown_case_and_benchmark_drift_fail_closed() -> None:
+    """Unknown IDs and changed frozen benchmark bytes are rejected pre-call."""
+    authorization = _planner_case_authorization(Path("/tmp"), "B01")
+    unknown = replace(authorization, planner_smoke_case_id="UNKNOWN")
+    with pytest.raises(d5.D5StaticPreflightError, match="missing or not unique"):
+        d5._planner_smoke_case(REPO_ROOT, unknown)
+
+    drifted = replace(authorization, planner_smoke_benchmark_sha256="0" * 64)
+    with pytest.raises(d5.D5StaticPreflightError, match="benchmark custody drifted"):
+        d5._planner_smoke_case(REPO_ROOT, drifted)
+
+
 @pytest.mark.parametrize(
     ("response_mode", "expected_status"),
     [
@@ -2500,6 +2565,18 @@ def test_git_porcelain_capture_preserves_status_columns_and_newline(
             "SMOKE_PROVIDER_INCONCLUSIVE",
             id="one-retryable-transport-failure-no-retry",
         ),
+        pytest.param(
+            "invalid_planner",
+            "SMOKE_CONTRACT_FAIL",
+            id="malformed-planner-wire-fails-closed",
+        ),
+    ],
+)
+@pytest.mark.parametrize(
+    ("case_id", "source_key"),
+    [
+        pytest.param("B01", "approved_las", id="b01-approved-las"),
+        pytest.param("A04", "cbl_repeat_dlis", id="other-frozen-dlis-case"),
     ],
 )
 def test_planner_only_smoke_uses_existing_custody_and_stops_at_wire(
@@ -2507,32 +2584,14 @@ def test_planner_only_smoke_uses_existing_custody_and_stops_at_wire(
     monkeypatch: pytest.MonkeyPatch,
     response_mode: str,
     expected_status: str,
+    case_id: str,
+    source_key: str,
 ) -> None:
-    """The canonical smoke makes one physical attempt and never enters authoring."""
-    benchmark_path = REPO_ROOT / d5.A10_SEM_01_BENCHMARK
-    inventory_path = REPO_ROOT / d5.A10_SEM_01_SOURCE_INVENTORY
-    source_path = REPO_ROOT / d5.A10_SEM_02_SMOKE_SOURCE_PATH
-    benchmark = json.loads(benchmark_path.read_text(encoding="utf-8"))
-    case = next(item for item in benchmark["cases"] if item["id"] == d5.A10_SEM_02_SMOKE_CASE_ID)
-    authorization = replace(
-        _authorization(
-            campaign_id="a10-planner-only-test",
-            artifact_root=str(tmp_path / "planner-only"),
-        ),
-        implementation_checkpoint="synthetic-checkpoint",
-        planner_smoke_mode=d5.SMOKE_PLANNER_KIND,
-        planner_smoke_case_id=d5.A10_SEM_02_SMOKE_CASE_ID,
-        planner_smoke_request_sha256=hashlib.sha256(case["request"].encode("utf-8")).hexdigest(),
-        planner_smoke_benchmark_sha256=d5._sha256_file(benchmark_path),
-        planner_smoke_source_inventory_sha256=d5._sha256_file(inventory_path),
-        planner_smoke_source_sha256=d5._sha256_file(source_path),
-        planner_smoke_harness_sha256=d5._sha256_file(
-            REPO_ROOT / "scripts/nlp_d5_live_semantic_qualification.py"
-        ),
-        planner_smoke_wire_schema_sha256=d5._planner_wire_schema_sha256(),
-        planner_smoke_sdk_max_retries=0,
-        expected_worktree_porcelain=d5.A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN,
-    )
+    """Each frozen case uses one planner attempt and never enters authoring."""
+    _require_local_d5_sources()
+    authorization = _planner_case_authorization(tmp_path, case_id)
+    benchmark = json.loads((REPO_ROOT / d5.A10_SEM_01_BENCHMARK).read_text(encoding="utf-8"))
+    case = next(item for item in benchmark["cases"] if item["id"] == case_id)
     clients: list[httpx.AsyncClient] = []
     requests: list[httpx.Request] = []
     provider_factory = _smoke_provider_factory(
@@ -2572,6 +2631,7 @@ def test_planner_only_smoke_uses_existing_custody_and_stops_at_wire(
         api_key_loader=lambda: "test-only-token",
         static_checker=lambda *_args: {"status": "PASS", "mode": "test"},
         provider_factory=provider_factory,
+        case_id=case_id,
     )
 
     assert result["status"] == expected_status
@@ -2582,11 +2642,18 @@ def test_planner_only_smoke_uses_existing_custody_and_stops_at_wire(
     client = adapters[0].inner.session.session.compiler.dependencies.planner.backend.delegate.client
     assert client.max_retries == 0
     assert len(requests) == 1
+    request_body = requests[0].content.decode("utf-8")
+    assert case["request"] in request_body
+    assert source_key in request_body
+    assert case["expected"] not in request_body
+    assert '"gold"' not in request_body
     state = json.loads(
         (Path(authorization.artifact_root) / f"{authorization.campaign_id}.state.json").read_text()
     )
     assert state["mode"] == "canonical_planner_only_smoke"
     assert state["physical_generation_attempts"] == 1
+    assert state["planner_smoke_case_id"] == case_id
+    assert state["numeric_sample_apis_invoked"] is False
     assert state["downstream_stage_calls"] == {
         "report_worker": 0,
         "section_worker": 0,
@@ -2609,10 +2676,14 @@ def test_planner_only_smoke_uses_existing_custody_and_stops_at_wire(
         )
         assert wire["response_schema"] == "_PlannerWirePlan"
         assert _PlannerWirePlan.model_validate(wire["validated_response"])
-    else:
+    elif response_mode == "transport_error":
         assert state["planner_result_status"] == "NOT_REACHED"
         assert state["planner_result_schema_valid"] is False
         assert terminal["outcome"] == "SMOKE_PROVIDER_INCONCLUSIVE"
+    else:
+        assert state["planner_result_status"] == "NOT_REACHED"
+        assert state["planner_result_schema_valid"] is False
+        assert terminal["outcome"] == "SMOKE_CONTRACT_FAIL"
     assert not [client for client in clients if not client.is_closed]
 
 
