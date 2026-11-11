@@ -2204,6 +2204,16 @@ def _smoke_provider_factory(
                 content = '{"status":"NOT_READY"}'
             elif response_mode == "invalid_planner":
                 content = '{"not_a_planner_plan":true}'
+            elif response_mode == "invalid_json":
+                content = "{"
+            elif response_mode == "invalid_json_then_planner":
+                content = "{" if attempts == 1 else json.dumps(_planner_wire_payload())
+            elif response_mode == "schema_invalid_then_planner":
+                content = (
+                    '{"not_a_planner_plan":true}'
+                    if attempts == 1
+                    else json.dumps(_planner_wire_payload())
+                )
             elif response_mode == "transport_error":
                 raise httpx.ConnectError("synthetic transport failure", request=request)
             elif response_mode == "planner":
@@ -2557,18 +2567,77 @@ def test_planner_smoke_unknown_case_and_benchmark_drift_fail_closed() -> None:
 
 
 @pytest.mark.parametrize(
-    ("response_mode", "expected_status"),
+    (
+        "response_mode",
+        "expected_status",
+        "expected_generation_calls",
+        "expected_physical_requests",
+        "first_pass_schema_valid",
+        "eventual_schema_valid",
+        "correction_success",
+        "final_structured_status",
+        "schema_correction_prompt",
+    ),
     [
-        pytest.param("planner", "SMOKE_PASS", id="valid-wire-response"),
+        pytest.param(
+            "planner",
+            "SMOKE_PASS",
+            1,
+            1,
+            True,
+            True,
+            False,
+            "VALID_FIRST_PASS",
+            False,
+            id="valid-wire-response",
+        ),
+        pytest.param(
+            "invalid_json_then_planner",
+            "SMOKE_PASS",
+            2,
+            2,
+            False,
+            True,
+            True,
+            "VALID_AFTER_CORRECTION",
+            False,
+            id="native-invalid-json-correction-recovers",
+        ),
+        pytest.param(
+            "schema_invalid_then_planner",
+            "SMOKE_PASS",
+            2,
+            2,
+            False,
+            True,
+            True,
+            "VALID_AFTER_CORRECTION",
+            True,
+            id="native-schema-correction-recovers",
+        ),
+        pytest.param(
+            "invalid_json",
+            "SMOKE_CONTRACT_FAIL",
+            2,
+            2,
+            False,
+            False,
+            False,
+            "INVALID_AFTER_CORRECTION",
+            False,
+            id="native-correction-exhausted",
+        ),
         pytest.param(
             "transport_error",
             "SMOKE_PROVIDER_INCONCLUSIVE",
+            1,
+            1,
+            None,
+            False,
+            False,
+            "TRANSPORT_OR_PROVIDER_FAILURE",
+            False,
             id="one-retryable-transport-failure-no-retry",
-        ),
-        pytest.param(
-            "invalid_planner",
-            "SMOKE_CONTRACT_FAIL",
-            id="malformed-planner-wire-fails-closed",
         ),
     ],
 )
@@ -2584,10 +2653,17 @@ def test_planner_only_smoke_uses_existing_custody_and_stops_at_wire(
     monkeypatch: pytest.MonkeyPatch,
     response_mode: str,
     expected_status: str,
+    expected_generation_calls: int,
+    expected_physical_requests: int,
+    first_pass_schema_valid: bool | None,
+    eventual_schema_valid: bool,
+    correction_success: bool,
+    final_structured_status: str,
+    schema_correction_prompt: bool,
     case_id: str,
     source_key: str,
 ) -> None:
-    """Each frozen case uses one planner attempt and never enters authoring."""
+    """Native planner correction is bounded, recorded, and never enters authoring."""
     _require_local_d5_sources()
     authorization = _planner_case_authorization(tmp_path, case_id)
     benchmark = json.loads((REPO_ROOT / d5.A10_SEM_01_BENCHMARK).read_text(encoding="utf-8"))
@@ -2637,23 +2713,52 @@ def test_planner_only_smoke_uses_existing_custody_and_stops_at_wire(
     assert result["status"] == expected_status
     terminal = result["terminal"]
     assert terminal["mode"] == "canonical_planner_only_smoke"
-    assert terminal["logical_generation_calls"] == 1
-    assert terminal["provider_calls"] == 1
+    assert terminal["logical_planner_invocations"] == 1
+    assert terminal["logical_generation_calls"] == expected_generation_calls
+    assert terminal["provider_calls"] == expected_generation_calls
+    assert terminal["physical_generation_attempts"] == expected_physical_requests
+    assert terminal["transport_retries"] == 0
     client = adapters[0].inner.session.session.compiler.dependencies.planner.backend.delegate.client
     assert client.max_retries == 0
-    assert len(requests) == 1
-    request_body = requests[0].content.decode("utf-8")
-    assert case["request"] in request_body
-    assert source_key in request_body
-    assert case["expected"] not in request_body
-    assert '"gold"' not in request_body
+    assert len(requests) == expected_physical_requests
+    for request in requests:
+        request_body = request.content.decode("utf-8")
+        assert case["request"] in request_body
+        assert source_key in request_body
+        assert case["expected"] not in request_body
+        assert '"gold"' not in request_body
     state = json.loads(
         (Path(authorization.artifact_root) / f"{authorization.campaign_id}.state.json").read_text()
     )
     assert state["mode"] == "canonical_planner_only_smoke"
-    assert state["physical_generation_attempts"] == 1
+    assert state["physical_generation_attempts"] == expected_physical_requests
     assert state["planner_smoke_case_id"] == case_id
     assert state["numeric_sample_apis_invoked"] is False
+    assert state["logical_planner_invocations"] == 1
+    correction_used = expected_generation_calls == 2
+    assert state["initial_generation_requests"] == 1
+    assert state["correction_generation_requests"] == int(correction_used)
+    assert state["initial_physical_generation_requests"] == 1
+    assert state["correction_physical_generation_requests"] == int(correction_used)
+    assert state["correction_path_entered"] is correction_used
+    assert state["first_pass_schema_valid"] is first_pass_schema_valid
+    assert state["eventual_schema_valid"] is eventual_schema_valid
+    assert state["correction_success"] is correction_success
+    assert state["transport_retries"] == 0
+    assert state["final_structured_output_status"] == final_structured_status
+    journal = [
+        json.loads(line)
+        for line in (
+            Path(authorization.artifact_root) / f"{authorization.campaign_id}.journal.jsonl"
+        )
+        .read_text()
+        .splitlines()
+    ]
+    attempts = [row for row in journal if row["event"] == "smoke_physical_attempt"]
+    expected_purposes = ["INITIAL_GENERATION"]
+    if correction_used:
+        expected_purposes.append("STRUCTURED_OUTPUT_CORRECTION")
+    assert [row["generation_purpose"] for row in attempts] == expected_purposes
     assert state["downstream_stage_calls"] == {
         "report_worker": 0,
         "section_worker": 0,
@@ -2663,7 +2768,11 @@ def test_planner_only_smoke_uses_existing_custody_and_stops_at_wire(
         "render": 0,
         "preview": 0,
     }
-    if response_mode == "planner":
+    if response_mode in {
+        "planner",
+        "invalid_json_then_planner",
+        "schema_invalid_then_planner",
+    }:
         assert state["planner_result_status"] == "SCHEMA_VALIDATED_WIRE_CAPTURED"
         assert state["planner_result_schema_valid"] is True
         wire = json.loads(
@@ -2675,7 +2784,12 @@ def test_planner_only_smoke_uses_existing_custody_and_stops_at_wire(
             .splitlines()[0]
         )
         assert wire["response_schema"] == "_PlannerWirePlan"
+        correction_used = response_mode != "planner"
+        assert wire["attempt"] == (2 if correction_used else 1)
         assert _PlannerWirePlan.model_validate(wire["validated_response"])
+        if correction_used:
+            request_text = requests[1].content.decode("utf-8")
+            assert ("Schema correction context:" in request_text) is schema_correction_prompt
     elif response_mode == "transport_error":
         assert state["planner_result_status"] == "NOT_REACHED"
         assert state["planner_result_schema_valid"] is False
@@ -3951,15 +4065,20 @@ def test_smoke_ledger_rejects_second_logical_and_fourth_physical_call() -> None:
         ledger.physical_attempt(1)
 
 
-def test_planner_smoke_ledger_rejects_second_physical_attempt() -> None:
-    """Planner smoke rejects a retry before its request reaches HTTP transport."""
+def test_planner_smoke_ledger_allows_one_bounded_correction_but_no_transport_retry() -> None:
+    """One native correction gets a generation slot; SDK transport retry does not."""
     ledger = d5.D5SmokeCallLedger(mode=d5.SMOKE_PLANNER_KIND)
     ledger.record_canonical_call_started(1, "planner")
 
     assert ledger.physical_attempt(1) == 1
-    with pytest.raises(d5.D5CallCapExceeded, match="one physical attempt"):
+    with pytest.raises(d5.D5CallCapExceeded, match="forbids transport retries"):
         ledger.physical_attempt(1)
-    assert ledger.physical_attempts == 1
+    ledger.record_canonical_call_started(2, "planner")
+    assert ledger.physical_attempt(2) == 1
+    with pytest.raises(d5.D5CallCapExceeded, match="correction budget exhausted"):
+        ledger.record_canonical_call_started(3, "planner")
+    assert ledger.logical_calls == 2
+    assert ledger.physical_attempts == 2
 
 
 @pytest.mark.parametrize("retry_limit", [None, 1, True])

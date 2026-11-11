@@ -40,7 +40,11 @@ from wellplot.agent.code_mode.obligations import (
     RequestCompilationResult,
     compile_request_contract,
 )
-from wellplot.agent.providers.base import ProviderRequestError, StructuredGenerationRequest
+from wellplot.agent.providers.base import (
+    ProviderFailureCategory,
+    ProviderRequestError,
+    StructuredGenerationRequest,
+)
 from wellplot.project_config import ProjectConfig, load_project_config
 
 D5_EXPERIMENT_VERSION = "WELLPLOT-NLP-D5-5I"
@@ -77,9 +81,11 @@ SMOKE_MAX_PHYSICAL_ATTEMPTS = 3
 SMOKE_BINDING_ROLE_LIMITS = {"planner": 2, "section_worker": 2, "report_worker": 0}
 SMOKE_BINDING_MAX_LOGICAL_CALLS = 4
 SMOKE_BINDING_MAX_PHYSICAL_ATTEMPTS_PER_CALL = 3
-SMOKE_PLANNER_ROLE_LIMITS = {"planner": 1}
+SMOKE_PLANNER_ROLE_LIMITS = {"planner": MAX_PLANNER_LOGICAL_CALLS}
 SMOKE_PLANNER_MAX_RETRIES = 0
-SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS = 1
+# The production planner permits one invalid-response correction after the initial call.
+SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS = MAX_PLANNER_LOGICAL_CALLS
+SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS_PER_REQUEST = 1
 A10_SEM_01_ROOT = "workspace/evaluations/a10-sem-01-20261110"
 A10_SEM_01_BENCHMARK = f"{A10_SEM_01_ROOT}/benchmark.json"
 A10_SEM_01_SOURCE_INVENTORY = f"{A10_SEM_01_ROOT}/source-inventory.json"
@@ -791,6 +797,15 @@ def _planner_wire_schema_sha256() -> str:
     return _sha256_json(_PlannerWirePlan.model_json_schema())
 
 
+def _planner_generation_purpose(logical_index: int) -> str:
+    """Classify the bounded initial or native correction generation request."""
+    if logical_index == 1:
+        return "INITIAL_GENERATION"
+    if logical_index == 2:
+        return "STRUCTURED_OUTPUT_CORRECTION"
+    raise D5HarnessError("planner generation exceeded its production correction policy")
+
+
 def _planner_smoke_case(
     repo_root: Path,
     authorization: D5Authorization,
@@ -1102,6 +1117,10 @@ class D5SmokeCallLedger:
         if role not in role_limits:
             raise D5CallCapExceeded("binding smoke generation role is not authorized")
         if self.logical_calls >= self.max_logical_calls:
+            if self.mode == SMOKE_PLANNER_KIND:
+                raise D5CallCapExceeded(
+                    "planner-only correction budget exhausted before provider delegation"
+                )
             raise D5CallCapExceeded("binding smoke logical call 5 rejected before delegation")
         role_count = self.calls_by_role.get(role, 0)
         if role_count >= role_limits[role]:
@@ -1123,14 +1142,14 @@ class D5SmokeCallLedger:
             raise D5HarnessError("smoke physical attempt references unknown call")
         next_attempt = self.attempts_by_index[logical_index] + 1
         if self.mode == SMOKE_PLANNER_KIND:
-            limit = SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS
+            limit = SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS_PER_REQUEST
         elif self.mode == SMOKE_BINDING_KIND:
             limit = SMOKE_BINDING_MAX_PHYSICAL_ATTEMPTS_PER_CALL
         else:
             limit = self.max_physical_attempts
         if next_attempt > limit:
             if self.mode == SMOKE_PLANNER_KIND:
-                raise D5CallCapExceeded("planner-only smoke permits one physical attempt")
+                raise D5CallCapExceeded("planner-only smoke forbids transport retries")
             raise D5CallCapExceeded("smoke physical attempt 4 rejected before delegation")
         self.attempts_by_index[logical_index] = next_attempt
         self.physical_attempts = next_attempt
@@ -1211,6 +1230,22 @@ class D5SmokeCustody:
             if authorization.section_action_capture_mode != "off":
                 state["section_action_capture_mode"] = authorization.section_action_capture_mode
                 state["validated_dto_retention_days"] = 30
+        if ledger.mode == SMOKE_PLANNER_KIND:
+            state.update(
+                {
+                    "logical_planner_invocations": 0,
+                    "initial_generation_requests": 0,
+                    "correction_generation_requests": 0,
+                    "initial_physical_generation_requests": 0,
+                    "correction_physical_generation_requests": 0,
+                    "transport_retries": 0,
+                    "correction_path_entered": False,
+                    "first_pass_schema_valid": None,
+                    "eventual_schema_valid": False,
+                    "correction_success": False,
+                    "final_structured_output_status": "NOT_REACHED",
+                }
+            )
         if not evidence_is_redacted(state):
             raise D5HarnessError("smoke state redaction failure")
         _atomic_json(paths.state, state, exclusive=True)
@@ -1594,6 +1629,10 @@ class D5SmokeCustody:
         }
         bounded = {key: row[key] for key in allowed if key in row}
         smoke_kind = self.state.get("smoke_kind")
+        if smoke_kind == SMOKE_PLANNER_KIND:
+            logical_index = bounded.get("logical_call_index")
+            if isinstance(logical_index, int) and not isinstance(logical_index, bool):
+                bounded["generation_purpose"] = _planner_generation_purpose(logical_index)
         turn_id = (
             SMOKE_PLANNER_TURN_ID
             if smoke_kind == SMOKE_PLANNER_KIND
@@ -1679,6 +1718,19 @@ class D5SmokeCustody:
         if binding_event:
             row["generation_role"] = self.ledger.roles_by_index[logical_index]
             self.state["physical_generation_attempts"] = self.ledger.physical_attempts
+            if self.ledger.mode == SMOKE_PLANNER_KIND:
+                purpose = _planner_generation_purpose(logical_index)
+                row["generation_purpose"] = purpose
+                counter = (
+                    "initial_physical_generation_requests"
+                    if logical_index == 1
+                    else "correction_physical_generation_requests"
+                )
+                self.state[counter] = int(self.state.get(counter, 0)) + 1
+                if attempt > 1:
+                    self.state["transport_retries"] = (
+                        int(self.state.get("transport_retries", 0)) + 1
+                    )
             _atomic_json(self.paths.state, self.state)
         _append_jsonl(
             self.paths.journal,
@@ -1695,20 +1747,27 @@ class D5SmokeCustody:
         self.ledger.record_canonical_call_started(index, role)
         self.state["logical_generation_calls"] = self.ledger.logical_calls
         self.state["logical_calls_by_role"] = dict(self.ledger.calls_by_role)
+        generation_purpose = None
+        if self.ledger.mode == SMOKE_PLANNER_KIND:
+            generation_purpose = _planner_generation_purpose(index)
+            counter = (
+                "initial_generation_requests" if index == 1 else "correction_generation_requests"
+            )
+            self.state[counter] = int(self.state.get(counter, 0)) + 1
         _atomic_json(self.paths.state, self.state)
-        _append_jsonl(
-            self.paths.journal,
-            {
-                "event": "logical_call_started",
-                "mode": smoke_kind,
-                "campaign_id": self.paths.campaign_id,
-                "authorization_id": self.authorization.authorization_id,
-                "logical_call_index": index,
-                "generation_role": role,
-                "provider": event.get("provider"),
-                "model": event.get("model"),
-            },
-        )
+        row = {
+            "event": "logical_call_started",
+            "mode": smoke_kind,
+            "campaign_id": self.paths.campaign_id,
+            "authorization_id": self.authorization.authorization_id,
+            "logical_call_index": index,
+            "generation_role": role,
+            "provider": event.get("provider"),
+            "model": event.get("model"),
+        }
+        if generation_purpose is not None:
+            row["generation_purpose"] = generation_purpose
+        _append_jsonl(self.paths.journal, row)
 
     def record_binding_call_completed(self, event: Mapping[str, Any]) -> None:
         """Record bounded completion metadata for one admitted canonical call."""
@@ -1724,6 +1783,11 @@ class D5SmokeCustody:
                 "authorization_id": self.authorization.authorization_id,
                 "logical_call_index": index,
                 "generation_role": role,
+                **(
+                    {"generation_purpose": _planner_generation_purpose(index)}
+                    if self.ledger.mode == SMOKE_PLANNER_KIND
+                    else {}
+                ),
                 "outcome": event.get("outcome"),
                 "failure_category": event.get("failure_category"),
             },
@@ -1743,6 +1807,11 @@ class D5SmokeCustody:
                 "authorization_id": self.authorization.authorization_id,
                 "logical_call_index": index,
                 "generation_role": role,
+                **(
+                    {"generation_purpose": _planner_generation_purpose(index)}
+                    if self.ledger.mode == SMOKE_PLANNER_KIND
+                    else {}
+                ),
                 "termination_kind": event.get("termination_kind"),
                 "exception_type": event.get("exception_type"),
                 "exception_module": event.get("exception_module"),
@@ -1842,6 +1911,24 @@ class D5SmokeCustody:
         )
         if self.ledger.mode in {SMOKE_BINDING_KIND, SMOKE_PLANNER_KIND}:
             state["logical_calls_by_role"] = dict(self.ledger.calls_by_role)
+        if self.ledger.mode == SMOKE_PLANNER_KIND:
+            reliability_fields = (
+                "logical_planner_invocations",
+                "initial_generation_requests",
+                "correction_generation_requests",
+                "initial_physical_generation_requests",
+                "correction_physical_generation_requests",
+                "transport_retries",
+                "correction_path_entered",
+                "first_pass_schema_valid",
+                "eventual_schema_valid",
+                "correction_success",
+                "final_structured_output_status",
+            )
+            terminal_fields = {
+                field_name: state.get(field_name) for field_name in reliability_fields
+            }
+            state.update(terminal_fields)
         _atomic_json(self.paths.state, state)
         journal_terminal = {
             "event": "smoke_terminal",
@@ -1891,6 +1978,8 @@ class D5SmokeCustody:
         }
         if self.ledger.mode in {SMOKE_BINDING_KIND, SMOKE_PLANNER_KIND}:
             terminal["logical_calls_by_role"] = dict(self.ledger.calls_by_role)
+        if self.ledger.mode == SMOKE_PLANNER_KIND:
+            terminal.update(terminal_fields)
         _atomic_json(self.paths.terminal, terminal, exclusive=True)
         summary = dict(terminal)
         summary["terminal_sha256"] = _sha256_file(self.paths.terminal)
@@ -4164,6 +4253,78 @@ def _planner_smoke_downstream_events(
     return events
 
 
+def _planner_output_reliability(
+    trace_events: Sequence[Mapping[str, Any]],
+    ledger: D5SmokeCallLedger,
+) -> dict[str, Any]:
+    """Separate one planner invocation from its initial/correction requests."""
+    named_events = [str(event.get("event", "")) for event in trace_events]
+    attempts = {
+        attempt
+        for event in trace_events
+        if event.get("event") == "PLANNER_GENERATION_ENTER"
+        and (attempt := event.get("attempt")) in {1, 2}
+    }
+    successful_attempts = {
+        attempt
+        for event in trace_events
+        if event.get("event") == "PLANNER_GENERATION_PASS"
+        and (attempt := event.get("attempt")) in {1, 2}
+    }
+    failed_events = [
+        event for event in trace_events if event.get("event") == "PLANNER_GENERATION_FAIL"
+    ]
+    initial_failure = next(
+        (event for event in failed_events if event.get("attempt") == 1),
+        None,
+    )
+    initial_schema_valid: bool | None = None
+    if 1 in successful_attempts:
+        initial_schema_valid = True
+    elif initial_failure is not None and initial_failure.get("category") == "invalid_response":
+        initial_schema_valid = False
+
+    initial_calls = int(1 in ledger.roles_by_index)
+    correction_calls = int(2 in ledger.roles_by_index)
+    initial_physical = ledger.attempts_by_index.get(1, 0)
+    correction_physical = ledger.attempts_by_index.get(2, 0)
+    transport_retries = sum(
+        max(attempt_count - 1, 0) for attempt_count in ledger.attempts_by_index.values()
+    )
+    eventual_schema_valid = bool(successful_attempts)
+    correction_entered = 2 in attempts
+    correction_success = 2 in successful_attempts
+
+    if 1 in successful_attempts:
+        final_status = "VALID_FIRST_PASS"
+    elif correction_success:
+        final_status = "VALID_AFTER_CORRECTION"
+    elif correction_entered and correction_calls == 0:
+        final_status = "CORRECTION_BLOCKED_BEFORE_PROVIDER"
+    elif correction_calls and any(event.get("attempt") == 2 for event in failed_events):
+        final_status = "INVALID_AFTER_CORRECTION"
+    elif any("REQUEST" in event for event in named_events) and not attempts:
+        final_status = "PLANNER_FAILURE_BEFORE_GENERATION"
+    elif any(event.get("category") != "invalid_response" for event in failed_events):
+        final_status = "TRANSPORT_OR_PROVIDER_FAILURE"
+    else:
+        final_status = "NOT_REACHED"
+
+    return {
+        "logical_planner_invocations": int("REQUEST_COMPILATION_ENTER" in named_events),
+        "initial_generation_requests": initial_calls,
+        "correction_generation_requests": correction_calls,
+        "initial_physical_generation_requests": initial_physical,
+        "correction_physical_generation_requests": correction_physical,
+        "transport_retries": transport_retries,
+        "correction_path_entered": correction_entered,
+        "first_pass_schema_valid": initial_schema_valid,
+        "eventual_schema_valid": eventual_schema_valid,
+        "correction_success": correction_success,
+        "final_structured_output_status": final_status,
+    }
+
+
 def execute_live_planner_smoke(
     *,
     repo_root: Path,
@@ -4330,6 +4491,9 @@ def execute_live_planner_smoke(
             source_summary=context["source_summary"],
         )
     )
+    reliability = _planner_output_reliability(trace_events, custody.ledger)
+    custody.state.update(reliability)
+    _atomic_json(paths.state, custody.state)
     if cleanup_error is not None:
         custody.record_unexpected_host_exception(
             cleanup_error,
@@ -4349,7 +4513,10 @@ def execute_live_planner_smoke(
             event_name="PLANNER_SMOKE_EXCEPTION",
         )
         outcome = (
-            "SMOKE_PROVIDER_INCONCLUSIVE"
+            "SMOKE_CONTRACT_FAIL"
+            if isinstance(execution_error, ProviderRequestError)
+            and execution_error.category is ProviderFailureCategory.INVALID_RESPONSE
+            else "SMOKE_PROVIDER_INCONCLUSIVE"
             if isinstance(execution_error, ProviderRequestError)
             else "SMOKE_CONTRACT_FAIL"
         )
