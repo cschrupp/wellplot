@@ -3,7 +3,8 @@
 This module owns only the D5-4 orchestration and evidence boundary. It reuses
 the accepted D4 cases, custody helpers, deterministic graders, and canonical
 Direct Notebook adapter; it never creates a provider or performs network I/O
-unless a future, separately authorized live runner supplies those operations.
+except when an explicit, separately authorized smoke mode supplies bounded
+non-scientific provider operations through the canonical adapter.
 """
 
 from __future__ import annotations
@@ -31,7 +32,8 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
-from pydantic import BaseModel
+from jsonschema import Draft202012Validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from scripts import d5_5_final_population as final_population
 from scripts import nlp_d4_live_acceptance as d4
@@ -75,6 +77,8 @@ SMOKE_BINDING_KIND = "binding_compile"
 SMOKE_BINDING_TURN_ID = "D5-5J-BINDING-SMOKE-002"
 SMOKE_PLANNER_KIND = "planner_only"
 SMOKE_PLANNER_TURN_ID = "A10-SEM-02-PLANNER-SMOKE"
+SMOKE_SCHEMA_PROBE_KIND = "schema_behavior_probe"
+SMOKE_SCHEMA_PROBE_TURN_ID = "A10-SEM-ADAPT-01-SCHEMA-PROBE"
 SMOKE_SYSTEM_PROMPT = "Return the smoke readiness object using the supplied JSON Schema."
 SMOKE_USER_PROMPT = "Return exactly one JSON object with status READY and no other fields."
 SMOKE_MAX_LOGICAL_CALLS = 1
@@ -83,6 +87,7 @@ SMOKE_BINDING_ROLE_LIMITS = {"planner": 2, "section_worker": 2, "report_worker":
 SMOKE_BINDING_MAX_LOGICAL_CALLS = 4
 SMOKE_BINDING_MAX_PHYSICAL_ATTEMPTS_PER_CALL = 3
 SMOKE_PLANNER_ROLE_LIMITS = {"planner": MAX_PLANNER_LOGICAL_CALLS}
+SCHEMA_PROBE_MAX_LOGICAL_CALLS = 10
 SMOKE_PLANNER_MAX_RETRIES = 0
 # The production planner permits one invalid-response correction after the initial call.
 SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS = MAX_PLANNER_LOGICAL_CALLS
@@ -285,6 +290,234 @@ class SmokeReadyResponse(BaseModel):
     """Minimal structured response used only by the canonical smoke mode."""
 
     status: Literal["READY"]
+
+
+class _ProbeMinItemsConstrained(BaseModel):
+    items: list[int] = Field(json_schema_extra={"minItems": 1})
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class _ProbeMinItemsControl(BaseModel):
+    items: list[int]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class _ProbePatternConstrained(BaseModel):
+    code: str = Field(json_schema_extra={"pattern": "^A[0-9]+$"})
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class _ProbePatternControl(BaseModel):
+    code: str
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class _ProbeAnyOfConstrained(BaseModel):
+    left: bool
+    right: bool
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "anyOf": [
+                {"properties": {"left": {"const": True}}},
+                {"properties": {"right": {"const": True}}},
+            ]
+        },
+    )
+
+
+class _ProbeAnyOfControl(BaseModel):
+    left: bool
+    right: bool
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class _ProbeAllOfConstrained(BaseModel):
+    count: int
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "allOf": [
+                {
+                    "properties": {"count": {"minimum": 3}},
+                    "required": ["count"],
+                }
+            ]
+        },
+    )
+
+
+class _ProbeAllOfControl(BaseModel):
+    count: int
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class _ProbeNotConstrained(BaseModel):
+    flag: bool
+
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={
+            "not": {
+                "properties": {"flag": {"const": True}},
+                "required": ["flag"],
+            }
+        },
+    )
+
+
+class _ProbeNotControl(BaseModel):
+    flag: bool
+
+    model_config = ConfigDict(extra="forbid")
+
+
+@dataclass(frozen=True, slots=True)
+class SchemaBehaviorProbe:
+    """One neutral requested value paired with constrained and control schemas."""
+
+    feature: str
+    prompt_value: Mapping[str, object]
+    constrained_model: type[BaseModel]
+    control_model: type[BaseModel]
+
+
+@dataclass(frozen=True, slots=True)
+class SchemaProbeObservation:
+    """Sanitized local assessment of one constrained/control probe pair."""
+
+    classification: str
+    constrained_matches_request: bool
+    constrained_schema_valid: bool | None
+    constrained_pydantic_valid: bool | None
+    control_matches_request: bool
+    control_schema_valid: bool | None
+    control_pydantic_valid: bool | None
+    constrained_validation_errors: tuple[str, ...]
+
+
+def _schema_probe_prompt(value: Mapping[str, object]) -> str:
+    """Build a neutral exact-output request shared by a probe and its control."""
+    exact_json = json.dumps(value, sort_keys=True, separators=(",", ":"))
+    return f"Return exactly this JSON object and nothing else: {exact_json}"
+
+
+def _schema_probe_local_validation(
+    raw_content: object,
+    response_model: type[BaseModel],
+) -> tuple[dict[str, object] | None, tuple[str, ...], bool | None]:
+    """Parse output and validate its exact schema without provider involvement."""
+    if not isinstance(raw_content, str):
+        return None, ("assistant_content_not_string",), None
+    try:
+        payload = json.loads(raw_content)
+    except json.JSONDecodeError:
+        return None, ("assistant_content_invalid_json",), None
+    if not isinstance(payload, dict):
+        return None, ("assistant_content_not_object",), None
+    schema = response_model.model_json_schema()
+    errors = tuple(
+        sorted(
+            ".".join(str(part) for part in error.absolute_path) + ":" + error.validator
+            for error in Draft202012Validator(schema).iter_errors(payload)
+        )
+    )
+    try:
+        response_model.model_validate(payload)
+        pydantic_valid = True
+    except ValidationError:
+        pydantic_valid = False
+    return payload, errors, pydantic_valid
+
+
+def _classify_schema_probe_pair(
+    probe: SchemaBehaviorProbe,
+    *,
+    constrained_content: object,
+    constrained_http_status: int | None,
+    control_content: object | None,
+    control_http_status: int | None,
+) -> SchemaProbeObservation:
+    """Classify only the tested schema feature, using the paired control."""
+    if constrained_http_status in {400, 422}:
+        return SchemaProbeObservation(
+            "BACKEND_REJECTS_SCHEMA", False, None, None, False, None, None, ()
+        )
+
+    constrained_value, validation_errors, pydantic_valid = _schema_probe_local_validation(
+        constrained_content, probe.constrained_model
+    )
+    control_value, control_validation_errors, control_pydantic_valid = (
+        _schema_probe_local_validation(control_content, probe.control_model)
+        if control_content is not None
+        else (None, ("control_not_reached",), None)
+    )
+    constrained_matches = constrained_value == dict(probe.prompt_value)
+    control_matches = control_value == dict(probe.prompt_value)
+    schema_valid = constrained_value is not None and not validation_errors
+    control_schema_valid = control_value is not None and not control_validation_errors
+
+    if constrained_matches and not schema_valid and control_matches:
+        classification = "NOT_ENFORCED_BY_DEPLOYED_DECODER"
+    elif schema_valid and control_matches:
+        classification = "ENFORCED_BY_DEPLOYED_DECODER"
+    else:
+        classification = "INCONCLUSIVE_MODEL_BEHAVIOR"
+
+    return SchemaProbeObservation(
+        classification=classification,
+        constrained_matches_request=constrained_matches,
+        constrained_schema_valid=None if constrained_value is None else schema_valid,
+        constrained_pydantic_valid=pydantic_valid,
+        control_matches_request=control_matches,
+        control_schema_valid=None if control_value is None else control_schema_valid,
+        control_pydantic_valid=control_pydantic_valid,
+        constrained_validation_errors=validation_errors,
+    )
+
+
+def _schema_behavior_probes() -> tuple[SchemaBehaviorProbe, ...]:
+    """Return five isolated constraint/control pairs with neutral outputs."""
+    return (
+        SchemaBehaviorProbe(
+            "minItems",
+            {"items": []},
+            _ProbeMinItemsConstrained,
+            _ProbeMinItemsControl,
+        ),
+        SchemaBehaviorProbe(
+            "pattern",
+            {"code": "bad"},
+            _ProbePatternConstrained,
+            _ProbePatternControl,
+        ),
+        SchemaBehaviorProbe(
+            "root_anyOf",
+            {"left": False, "right": False},
+            _ProbeAnyOfConstrained,
+            _ProbeAnyOfControl,
+        ),
+        SchemaBehaviorProbe(
+            "root_allOf",
+            {"count": 1},
+            _ProbeAllOfConstrained,
+            _ProbeAllOfControl,
+        ),
+        SchemaBehaviorProbe(
+            "not",
+            {"flag": True},
+            _ProbeNotConstrained,
+            _ProbeNotControl,
+        ),
+    )
 
 
 def _smoke_schema_sha256() -> str:
@@ -738,6 +971,9 @@ def _default_smoke_static_checks(
     if expected_worktree_porcelain is None:
         if _git(repo_root, "status", "--porcelain"):
             raise D5StaticPreflightError("working tree is not clean")
+    elif mode == "canonical_schema_behavior_probe":
+        if _git_porcelain_raw(repo_root) != expected_worktree_porcelain:
+            raise D5StaticPreflightError("working tree differs from schema-probe authorization")
     else:
         _require_exact_planner_worktree(repo_root, expected_worktree_porcelain)
     project_config = load_project_config(repo_root)
@@ -766,9 +1002,12 @@ def _default_smoke_static_checks(
         raise D5StaticPreflightError("smoke path is not bound to authorization")
     if not authorization.authorization_id or not authorization.campaign_id:
         raise D5StaticPreflightError("authorization/campaign identity is missing")
-    if expected_schema_sha256 != (
-        SMOKE_SCHEMA_SHA256 if mode == "canonical_live_smoke" else _planner_wire_schema_sha256()
-    ):
+    expected_mode_schema = {
+        "canonical_live_smoke": SMOKE_SCHEMA_SHA256,
+        "canonical_planner_only_smoke": _planner_wire_schema_sha256(),
+        "canonical_schema_behavior_probe": _schema_probe_bundle_sha256(),
+    }.get(mode)
+    if expected_mode_schema is None or expected_schema_sha256 != expected_mode_schema:
         raise D5StaticPreflightError("smoke schema fingerprint drifted")
     for path in artifact_paths.all_paths():
         if path.exists():
@@ -798,6 +1037,58 @@ def _planner_wire_schema_sha256() -> str:
     from wellplot.agent.code_mode.planner import _PlannerWirePlan
 
     return _sha256_json(_PlannerWirePlan.model_json_schema())
+
+
+def _schema_probe_bundle_sha256() -> str:
+    """Hash the exact ordered synthetic schemas and requested invalid values."""
+    return _sha256_json(
+        [
+            {
+                "feature": probe.feature,
+                "prompt_value": dict(probe.prompt_value),
+                "constrained_schema": probe.constrained_model.model_json_schema(),
+                "control_schema": probe.control_model.model_json_schema(),
+            }
+            for probe in _schema_behavior_probes()
+        ]
+    )
+
+
+def _default_schema_probe_static_checks(
+    repo_root: Path,
+    authorization: D5Authorization,
+    artifact_paths: EvidencePaths,
+) -> dict[str, Any]:
+    """Preflight the exact synthetic probe bundle in the canonical checkout."""
+    canonical_root = Path("/home/user/projects/well_log_os").resolve()
+    if Path.cwd().resolve() != canonical_root or repo_root.resolve() != canonical_root:
+        raise D5StaticPreflightError("schema probe is not running in the canonical checkout")
+    if Path(_git(repo_root, "rev-parse", "--show-toplevel")).resolve() != canonical_root:
+        raise D5StaticPreflightError("schema probe Git top-level is not canonical")
+    if artifact_paths.root.exists():
+        raise D5StaticPreflightError("schema probe evidence namespace already exists")
+    if authorization.planner_smoke_mode != SMOKE_SCHEMA_PROBE_KIND:
+        raise D5StaticPreflightError("authorization is not for schema behavior probing")
+    if type(authorization.planner_smoke_sdk_max_retries) is not int:
+        raise D5StaticPreflightError("schema probe must pin an SDK retry count")
+    if authorization.planner_smoke_sdk_max_retries != 0:
+        raise D5StaticPreflightError("schema probe requires zero SDK retries")
+    if authorization.planner_smoke_harness_sha256 != _sha256_file(Path(__file__).resolve()):
+        raise D5StaticPreflightError("schema probe harness digest mismatch")
+    if authorization.planner_smoke_wire_schema_sha256 != _schema_probe_bundle_sha256():
+        raise D5StaticPreflightError("schema probe schema bundle digest mismatch")
+    current_umask = os.umask(0)
+    os.umask(current_umask)
+    if current_umask & 0o077 != 0o077:
+        raise D5StaticPreflightError("schema probe requires umask 077 for raw-I/O custody")
+    return _default_smoke_static_checks(
+        repo_root,
+        authorization,
+        artifact_paths,
+        expected_worktree_porcelain=authorization.expected_worktree_porcelain,
+        expected_schema_sha256=_schema_probe_bundle_sha256(),
+        mode="canonical_schema_behavior_probe",
+    )
 
 
 def _planner_generation_purpose(logical_index: int) -> str:
@@ -1079,7 +1370,9 @@ class EvidencePaths:
 class D5SmokeCallLedger:
     """Bound smoke calls and physical attempts under the canonical call roles."""
 
-    mode: Literal["structured_ready", "binding_compile", "planner_only"] = "structured_ready"
+    mode: Literal[
+        "structured_ready", "binding_compile", "planner_only", "schema_behavior_probe"
+    ] = "structured_ready"
     max_logical_calls: int = SMOKE_MAX_LOGICAL_CALLS
     max_physical_attempts: int = SMOKE_MAX_PHYSICAL_ATTEMPTS
     logical_calls: int = 0
@@ -1096,19 +1389,27 @@ class D5SmokeCallLedger:
                 if self.mode == SMOKE_PLANNER_KIND
                 else SMOKE_BINDING_MAX_LOGICAL_CALLS
             )
+        elif self.mode == SMOKE_SCHEMA_PROBE_KIND:
+            self.max_logical_calls = SCHEMA_PROBE_MAX_LOGICAL_CALLS
+            self.max_physical_attempts = SCHEMA_PROBE_MAX_LOGICAL_CALLS
         elif self.mode != "structured_ready":
             raise D5HarnessError("unknown smoke accounting mode")
 
     def reserve(self) -> int:
         """Reserve the READY smoke call before provider delegation."""
-        if self.mode != "structured_ready":
+        if self.mode not in {"structured_ready", SMOKE_SCHEMA_PROBE_KIND}:
             raise D5HarnessError("binding smoke calls require canonical role events")
         next_index = self.logical_calls + 1
         if next_index > self.max_logical_calls:
-            raise D5CallCapExceeded("smoke logical call 2 rejected before delegation")
+            if self.mode == SMOKE_SCHEMA_PROBE_KIND:
+                raise D5CallCapExceeded("schema probe call ceiling rejected before delegation")
+            if self.mode == "structured_ready":
+                raise D5CallCapExceeded("smoke logical call 2 rejected before delegation")
+            raise D5CallCapExceeded("smoke logical call ceiling rejected before delegation")
         self.logical_calls = next_index
-        self.roles_by_index[next_index] = SMOKE_ROLE
-        self.calls_by_role[SMOKE_ROLE] = 1
+        role = "schema_probe" if self.mode == SMOKE_SCHEMA_PROBE_KIND else SMOKE_ROLE
+        self.roles_by_index[next_index] = role
+        self.calls_by_role[role] = self.calls_by_role.get(role, 0) + 1
         self.attempts_by_index[next_index] = 0
         return next_index
 
@@ -1154,6 +1455,8 @@ class D5SmokeCallLedger:
             limit = SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS_PER_REQUEST
         elif self.mode == SMOKE_BINDING_KIND:
             limit = SMOKE_BINDING_MAX_PHYSICAL_ATTEMPTS_PER_CALL
+        elif self.mode == SMOKE_SCHEMA_PROBE_KIND:
+            limit = 1
         else:
             limit = self.max_physical_attempts
         if next_attempt > limit:
@@ -1162,7 +1465,11 @@ class D5SmokeCallLedger:
             raise D5CallCapExceeded("smoke physical attempt 4 rejected before delegation")
         self.attempts_by_index[logical_index] = next_attempt
         self.physical_attempts = next_attempt
-        if self.mode in {SMOKE_BINDING_KIND, SMOKE_PLANNER_KIND}:
+        if self.mode in {
+            SMOKE_BINDING_KIND,
+            SMOKE_PLANNER_KIND,
+            SMOKE_SCHEMA_PROBE_KIND,
+        }:
             self.physical_attempts = sum(self.attempts_by_index.values())
         return next_attempt
 
@@ -1191,7 +1498,9 @@ class D5SmokeCustody:
         binding_input_preflighted: bool = False,
     ) -> D5SmokeCustody:
         """Create smoke custody only after static checks and readiness pass."""
-        if authorization.section_action_capture_mode != "off":
+        if authorization.section_action_capture_mode != "off" or (
+            smoke_kind == SMOKE_SCHEMA_PROBE_KIND
+        ):
             _prepare_private_campaign_root(paths.root)
         ensure_fresh_namespace(
             paths,
@@ -1204,12 +1513,14 @@ class D5SmokeCustody:
         safe_asset_identities = _sanitize_source_asset_identities(source_asset_identities)
         ledger_mode = (
             smoke_kind
-            if smoke_kind in {SMOKE_BINDING_KIND, SMOKE_PLANNER_KIND}
+            if smoke_kind in {SMOKE_BINDING_KIND, SMOKE_PLANNER_KIND, SMOKE_SCHEMA_PROBE_KIND}
             else "structured_ready"
         )
         custody_mode = (
             "canonical_planner_only_smoke"
             if smoke_kind == SMOKE_PLANNER_KIND
+            else "canonical_backend_schema_probe"
+            if smoke_kind == SMOKE_SCHEMA_PROBE_KIND
             else "canonical_live_smoke"
         )
         ledger = D5SmokeCallLedger(mode=ledger_mode)
@@ -1234,7 +1545,7 @@ class D5SmokeCustody:
             "static_preflight": dict(static_preflight),
             "source_asset_identities": safe_asset_identities,
         }
-        if ledger.mode in {SMOKE_BINDING_KIND, SMOKE_PLANNER_KIND}:
+        if ledger.mode in {SMOKE_BINDING_KIND, SMOKE_PLANNER_KIND, SMOKE_SCHEMA_PROBE_KIND}:
             state["logical_calls_by_role"] = {}
             if authorization.section_action_capture_mode != "off":
                 state["section_action_capture_mode"] = authorization.section_action_capture_mode
@@ -1257,6 +1568,15 @@ class D5SmokeCustody:
                     "planner_wire_diagnostic_records": 0,
                 }
             )
+        if ledger.mode == SMOKE_SCHEMA_PROBE_KIND:
+            state.update(
+                {
+                    "schema_probe_max_logical_calls": SCHEMA_PROBE_MAX_LOGICAL_CALLS,
+                    "schema_probe_results": [],
+                    "planner_wire_diagnostic_capture_status": "READY",
+                    "planner_wire_diagnostic_records": 0,
+                }
+            )
         if not evidence_is_redacted(state):
             raise D5HarnessError("smoke state redaction failure")
         _atomic_json(paths.state, state, exclusive=True)
@@ -1272,7 +1592,7 @@ class D5SmokeCustody:
             exclusive=True,
         )
         paths.model_io.touch(exist_ok=False)
-        if ledger.mode == SMOKE_PLANNER_KIND:
+        if ledger.mode in {SMOKE_PLANNER_KIND, SMOKE_SCHEMA_PROBE_KIND}:
             _write_private_exclusive(paths.planner_wire_diagnostics, b"")
         return cls(
             paths=paths,
@@ -1309,6 +1629,8 @@ class D5SmokeCustody:
             "mode": (
                 "canonical_planner_only_smoke"
                 if smoke_kind == SMOKE_PLANNER_KIND
+                else "canonical_backend_schema_probe"
+                if smoke_kind == SMOKE_SCHEMA_PROBE_KIND
                 else "canonical_live_smoke"
             ),
             "campaign_id": paths.campaign_id,
@@ -1612,7 +1934,11 @@ class D5SmokeCustody:
             {
                 "campaign_id": self.paths.campaign_id,
                 "authorization_id": self.authorization.authorization_id,
-                "turn_id": SMOKE_TURN_ID,
+                "turn_id": (
+                    SMOKE_SCHEMA_PROBE_TURN_ID
+                    if self.state.get("smoke_kind") == SMOKE_SCHEMA_PROBE_KIND
+                    else SMOKE_TURN_ID
+                ),
             }
         )
         if not evidence_is_redacted(bounded):
@@ -1622,8 +1948,11 @@ class D5SmokeCustody:
 
     def record_planner_wire_diagnostic(self, row: Mapping[str, Any]) -> None:
         """Persist exact planner wire evidence in a private bounded artifact."""
-        if self.state.get("smoke_kind") != SMOKE_PLANNER_KIND:
-            raise D5HarnessError("planner wire diagnostics require planner smoke custody")
+        if self.state.get("smoke_kind") not in {
+            SMOKE_PLANNER_KIND,
+            SMOKE_SCHEMA_PROBE_KIND,
+        }:
+            raise D5HarnessError("raw structured-wire diagnostics require smoke custody")
         encoded = json.dumps(row, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode(
             "utf-8"
         )
@@ -1761,7 +2090,11 @@ class D5SmokeCustody:
     def record_attempt(self, logical_index: int) -> None:
         """Persist one physical attempt after the observer accepts it."""
         attempt = self.ledger.physical_attempt(logical_index)
-        binding_event = self.ledger.mode in {SMOKE_BINDING_KIND, SMOKE_PLANNER_KIND}
+        binding_event = self.ledger.mode in {
+            SMOKE_BINDING_KIND,
+            SMOKE_PLANNER_KIND,
+            SMOKE_SCHEMA_PROBE_KIND,
+        }
         row = {
             "event": "smoke_physical_attempt",
             "campaign_id": self.paths.campaign_id,
@@ -1785,6 +2118,8 @@ class D5SmokeCustody:
                     self.state["transport_retries"] = (
                         int(self.state.get("transport_retries", 0)) + 1
                     )
+            elif self.ledger.mode == SMOKE_SCHEMA_PROBE_KIND and attempt > 1:
+                raise D5CallCapExceeded("schema probe forbids SDK transport retries")
             _atomic_json(self.paths.state, self.state)
         _append_jsonl(
             self.paths.journal,
@@ -1968,7 +2303,11 @@ class D5SmokeCustody:
                 "model_calls": self.ledger.logical_calls,
             }
         )
-        if self.ledger.mode in {SMOKE_BINDING_KIND, SMOKE_PLANNER_KIND}:
+        if self.ledger.mode in {
+            SMOKE_BINDING_KIND,
+            SMOKE_PLANNER_KIND,
+            SMOKE_SCHEMA_PROBE_KIND,
+        }:
             state["logical_calls_by_role"] = dict(self.ledger.calls_by_role)
         if self.ledger.mode == SMOKE_PLANNER_KIND:
             reliability_fields = (
@@ -1998,7 +2337,11 @@ class D5SmokeCustody:
             "logical_generation_calls": self.ledger.logical_calls,
             "physical_generation_attempts": self.ledger.physical_attempts,
         }
-        if self.ledger.mode in {SMOKE_BINDING_KIND, SMOKE_PLANNER_KIND}:
+        if self.ledger.mode in {
+            SMOKE_BINDING_KIND,
+            SMOKE_PLANNER_KIND,
+            SMOKE_SCHEMA_PROBE_KIND,
+        }:
             journal_terminal["logical_calls_by_role"] = dict(self.ledger.calls_by_role)
         _append_jsonl(self.paths.journal, journal_terminal)
         terminal = {
@@ -2036,7 +2379,11 @@ class D5SmokeCustody:
                 if path.is_file()
             },
         }
-        if self.ledger.mode in {SMOKE_BINDING_KIND, SMOKE_PLANNER_KIND}:
+        if self.ledger.mode in {
+            SMOKE_BINDING_KIND,
+            SMOKE_PLANNER_KIND,
+            SMOKE_SCHEMA_PROBE_KIND,
+        }:
             terminal["logical_calls_by_role"] = dict(self.ledger.calls_by_role)
         if self.ledger.mode == SMOKE_PLANNER_KIND:
             terminal.update(terminal_fields)
@@ -3402,6 +3749,8 @@ class _PhysicalAttemptObserver:
         self.active_turn_id: str | None = None
         self.active_role: str | None = None
         self.active_model: str | None = None
+        self.active_generation_purpose: str | None = None
+        self.last_response: dict[str, Any] | None = None
         self._attempts: dict[int, int] = {}
         self._pending_responses: dict[int, dict[str, Any]] = {}
 
@@ -3423,6 +3772,7 @@ class _PhysicalAttemptObserver:
                 "index": self.active_logical_index,
                 "generation_role": self.active_role,
                 "model": self.active_model,
+                "generation_purpose": self.active_generation_purpose,
             }
         if self.callback is None:
             raise D5HarnessError("generation attempt has no active logical call")
@@ -3447,7 +3797,9 @@ class _PhysicalAttemptObserver:
             self.planner_diagnostic_callback(
                 {
                     "event": "physical_request",
-                    "generation_purpose": _planner_generation_purpose(logical_index),
+                    "generation_purpose": logical_context.get("generation_purpose")
+                    or self.active_generation_purpose
+                    or _planner_generation_purpose(logical_index),
                     "logical_call_index": logical_index,
                     "physical_attempt": attempt,
                     "request_sha256": hashlib.sha256(body).hexdigest(),
@@ -3483,23 +3835,28 @@ class _PhysicalAttemptObserver:
                 "response_json": _json_body(body),
             }
         )
+        response_json = _json_body(body)
+        assistant_content = None
+        if isinstance(response_json, Mapping):
+            choices = response_json.get("choices")
+            if isinstance(choices, list) and choices:
+                first_choice = choices[0]
+                if isinstance(first_choice, Mapping):
+                    message = first_choice.get("message")
+                    if isinstance(message, Mapping):
+                        assistant_content = message.get("content")
+        self.last_response = {
+            "http_status": response_row["http_status"],
+            "response_sha256": response_row["response_sha256"],
+            "assistant_content": assistant_content,
+        }
         if self.planner_diagnostic_callback is not None:
-            response_json = _json_body(body)
-            assistant_content = None
-            if isinstance(response_json, Mapping):
-                choices = response_json.get("choices")
-                if isinstance(choices, list) and choices:
-                    first_choice = choices[0]
-                    if isinstance(first_choice, Mapping):
-                        message = first_choice.get("message")
-                        if isinstance(message, Mapping):
-                            assistant_content = message.get("content")
             self.planner_diagnostic_callback(
                 {
                     "event": "physical_response",
-                    "generation_purpose": _planner_generation_purpose(
-                        int(response_row["logical_call_index"])
-                    ),
+                    "generation_purpose": response_row.get("generation_purpose")
+                    or self.active_generation_purpose
+                    or _planner_generation_purpose(int(response_row["logical_call_index"])),
                     "logical_call_index": response_row["logical_call_index"],
                     "physical_attempt": response_row["physical_attempt"],
                     "http_status": response_row["http_status"],
@@ -3579,6 +3936,11 @@ class _PhysicalAttemptObserver:
         self.active_logical_index = int(event["index"])
         self.active_role = str(event.get("generation_role", ""))
         self.active_model = str(event.get("model", ""))
+        self.active_generation_purpose = (
+            str(event["generation_purpose"])
+            if event.get("generation_purpose") is not None
+            else None
+        )
         self._attempts[self.active_logical_index] = 0
 
     def logical_call_completed(self, event: Mapping[str, Any]) -> None:
@@ -3605,9 +3967,9 @@ class _PhysicalAttemptObserver:
                 self.planner_diagnostic_callback(
                     {
                         **row,
-                        "generation_purpose": _planner_generation_purpose(
-                            int(event.get("index", 0))
-                        ),
+                        "generation_purpose": event.get("generation_purpose")
+                        or self.active_generation_purpose
+                        or _planner_generation_purpose(int(event.get("index", 0))),
                     }
                 )
             self.model_io_callback(row)
@@ -4704,6 +5066,295 @@ def execute_live_planner_smoke(
         "status": "SMOKE_PASS",
         "terminal": terminal,
         "readiness": readiness.projection.as_dict(),
+    }
+
+
+def execute_live_schema_behavior_probe(
+    *,
+    repo_root: Path,
+    authorization: D5Authorization,
+    artifact_root: Path,
+    endpoint_get: Callable[[str, str], object] = _credential_bearing_json_get,
+    api_key_loader: Callable[[], str] | None = None,
+) -> dict[str, Any]:
+    """Probe isolated synthetic schemas through the canonical live adapter."""
+    if artifact_root.resolve() != _authorized_artifact_root(repo_root, authorization):
+        raise D5StaticPreflightError("artifact root is not authorized")
+    project_config = load_project_config(repo_root)
+    _validate_project_config(project_config)
+    if authorization.project_config_fingerprint_sha256 != project_config.fingerprint_sha256:
+        raise D5StaticPreflightError("project configuration fingerprint mismatch")
+    paths = EvidencePaths(artifact_root, authorization.campaign_id)
+    static = _default_schema_probe_static_checks(repo_root, authorization, paths)
+
+    def build_provider(token: str) -> object:
+        return create_live_adapter(
+            repo_root=repo_root,
+            artifact_root=artifact_root,
+            api_key=token,
+            project_config=project_config,
+            request_options=authorization.thinking_control_options,
+            require_thinking_control=True,
+            max_retries_override=0,
+        )
+
+    try:
+        readiness = prepare_readiness(
+            authorization=authorization,
+            project_config=project_config,
+            api_key_loader=api_key_loader or (lambda: d4.load_d4_api_key(repo_root)),
+            endpoint_get=endpoint_get,
+            static_preflight=static,
+            provider_factory=build_provider,
+        )
+    except D5ReadinessError as error:
+        custody = D5SmokeCustody.pre_smoke_failure(
+            paths,
+            authorization=authorization,
+            static_preflight=static,
+            endpoint_calls=error.endpoint_calls,
+            reason=error.reason,
+            smoke_kind=SMOKE_SCHEMA_PROBE_KIND,
+        )
+        terminal = custody.finish("SMOKE_NOT_READY", reason=error.reason)
+        return {"status": "SMOKE_NOT_READY", "terminal": terminal}
+
+    adapter = readiness.adapter
+    if not isinstance(adapter, _ObservedLiveAdapter):
+        custody = D5SmokeCustody.pre_smoke_failure(
+            paths,
+            authorization=authorization,
+            static_preflight=static,
+            endpoint_calls=len(readiness.endpoint_calls),
+            reason="canonical_adapter_unavailable",
+            smoke_kind=SMOKE_SCHEMA_PROBE_KIND,
+        )
+        terminal = custody.finish("SMOKE_HARNESS_FAIL", reason="canonical_adapter_unavailable")
+        return {"status": "SMOKE_HARNESS_FAIL", "terminal": terminal}
+
+    custody = D5SmokeCustody.start(
+        paths,
+        authorization=authorization,
+        static_preflight=static,
+        readiness=readiness.projection,
+        endpoint_calls=len(readiness.endpoint_calls),
+        smoke_kind=SMOKE_SCHEMA_PROBE_KIND,
+    )
+    custody.record_readiness(readiness.projection)
+    adapter.bind_model_io(custody.record_model_io)
+    adapter.bind_physical_attempt(custody.record_attempt)
+    adapter.bind_planner_diagnostic(custody.record_planner_wire_diagnostic)
+    adapter.set_active_turn(SMOKE_SCHEMA_PROBE_TURN_ID)
+
+    delegate = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate
+    observer = adapter.observer
+    observations: list[dict[str, Any]] = []
+    terminal_outcome = "SMOKE_PASS"
+    terminal_reason = "all_schema_features_classified"
+
+    async def generate_one(
+        probe: SchemaBehaviorProbe,
+        *,
+        response_model: type[BaseModel],
+        purpose: str,
+    ) -> tuple[int | None, str | None]:
+        logical_index = custody.ledger.reserve()
+        if logical_index > SCHEMA_PROBE_MAX_LOGICAL_CALLS:
+            raise D5CallCapExceeded("schema probe call ceiling exceeded")
+        custody.state["logical_generation_calls"] = custody.ledger.logical_calls
+        custody.state["logical_calls_by_role"] = dict(custody.ledger.calls_by_role)
+        _atomic_json(paths.state, custody.state)
+        _append_jsonl(
+            paths.journal,
+            {
+                "event": "logical_call_started",
+                "mode": SMOKE_SCHEMA_PROBE_KIND,
+                "campaign_id": paths.campaign_id,
+                "authorization_id": authorization.authorization_id,
+                "logical_call_index": logical_index,
+                "generation_role": "schema_probe",
+                "generation_purpose": purpose,
+                "provider": authorization.provider,
+                "model": authorization.model,
+            },
+        )
+        observer.last_response = None
+        observer.logical_call_started(
+            {
+                "index": logical_index,
+                "generation_role": "schema_probe",
+                "model": getattr(delegate, "model", authorization.model),
+                "generation_purpose": purpose,
+            }
+        )
+        request = StructuredGenerationRequest(
+            system_prompt=(
+                "You return one JSON object that matches the supplied schema. "
+                "Do not explain or add fields."
+            ),
+            user_prompt=_schema_probe_prompt(probe.prompt_value),
+            timeout_seconds=20.0,
+            temperature=0.0,
+            max_output_tokens=128,
+        )
+        try:
+            await delegate.generate_structured(request, response_model=response_model)
+            outcome = "success"
+            failure_category = None
+        except Exception as error:
+            outcome = "failure"
+            failure_category = (
+                error.category.value
+                if isinstance(error, ProviderRequestError)
+                else type(error).__name__
+            )
+
+        response = observer.last_response or {}
+        observer.logical_call_completed(
+            {
+                "index": logical_index,
+                "generation_role": "schema_probe",
+                "model": getattr(delegate, "model", authorization.model),
+                "generation_purpose": purpose,
+                "outcome": outcome,
+                "failure_category": failure_category,
+            }
+        )
+        _append_jsonl(
+            paths.journal,
+            {
+                "event": "logical_call_completed",
+                "mode": SMOKE_SCHEMA_PROBE_KIND,
+                "campaign_id": paths.campaign_id,
+                "authorization_id": authorization.authorization_id,
+                "logical_call_index": logical_index,
+                "generation_role": "schema_probe",
+                "generation_purpose": purpose,
+                "outcome": outcome,
+                "failure_category": failure_category,
+            },
+        )
+        return response.get("http_status"), failure_category
+
+    async def run_matrix() -> None:
+        nonlocal terminal_outcome, terminal_reason
+        try:
+            for probe in _schema_behavior_probes():
+                constrained_status, constrained_error = await generate_one(
+                    probe,
+                    response_model=probe.constrained_model,
+                    purpose=f"{probe.feature}:constrained",
+                )
+                constrained_content = (observer.last_response or {}).get("assistant_content")
+                if constrained_status is None or (
+                    constrained_status != 200 and constrained_status not in {400, 422}
+                ):
+                    observations.append(
+                        {
+                            "feature": probe.feature,
+                            "classification": "INCONCLUSIVE_MODEL_BEHAVIOR",
+                            "constrained_http_status": constrained_status,
+                            "constrained_generation_error": constrained_error,
+                            "control_status": "NOT_RUN_CONSTRAINED_CALL_FAILED",
+                            "requested_invalid_output_sha256": _sha256_json(
+                                dict(probe.prompt_value)
+                            ),
+                            "constrained_schema_valid": None,
+                            "constrained_pydantic_valid": None,
+                            "control_matches_request": False,
+                            "control_schema_valid": None,
+                            "control_pydantic_valid": None,
+                            "local_validation_errors": [],
+                        }
+                    )
+                    custody.state["schema_probe_results"] = observations
+                    _atomic_json(paths.state, custody.state)
+                    terminal_outcome = "SMOKE_PROVIDER_INCONCLUSIVE"
+                    terminal_reason = "constrained_call_failed"
+                    break
+                if constrained_status in {400, 422}:
+                    observation = _classify_schema_probe_pair(
+                        probe,
+                        constrained_content=constrained_content,
+                        constrained_http_status=constrained_status,
+                        control_content=None,
+                        control_http_status=None,
+                    )
+                    observations.append(
+                        {
+                            "feature": probe.feature,
+                            "classification": observation.classification,
+                            "constrained_http_status": constrained_status,
+                            "constrained_generation_error": constrained_error,
+                            "control_status": "NOT_RUN_SCHEMA_REJECTED",
+                            "requested_invalid_output_sha256": _sha256_json(
+                                dict(probe.prompt_value)
+                            ),
+                            "constrained_schema_valid": None,
+                            "constrained_pydantic_valid": None,
+                            "control_matches_request": False,
+                            "control_schema_valid": None,
+                            "control_pydantic_valid": None,
+                            "local_validation_errors": [],
+                        }
+                    )
+                    custody.state["schema_probe_results"] = observations
+                    _atomic_json(paths.state, custody.state)
+                    continue
+
+                control_status, control_error = await generate_one(
+                    probe,
+                    response_model=probe.control_model,
+                    purpose=f"{probe.feature}:control",
+                )
+                control_content = (observer.last_response or {}).get("assistant_content")
+                observation = _classify_schema_probe_pair(
+                    probe,
+                    constrained_content=constrained_content,
+                    constrained_http_status=constrained_status,
+                    control_content=control_content,
+                    control_http_status=control_status,
+                )
+                observations.append(
+                    {
+                        "feature": probe.feature,
+                        "classification": observation.classification,
+                        "constrained_http_status": constrained_status,
+                        "control_http_status": control_status,
+                        "constrained_generation_error": constrained_error,
+                        "control_generation_error": control_error,
+                        "requested_invalid_output_sha256": _sha256_json(dict(probe.prompt_value)),
+                        "constrained_matches_request": observation.constrained_matches_request,
+                        "constrained_schema_valid": observation.constrained_schema_valid,
+                        "constrained_pydantic_valid": observation.constrained_pydantic_valid,
+                        "control_matches_request": observation.control_matches_request,
+                        "control_schema_valid": observation.control_schema_valid,
+                        "control_pydantic_valid": observation.control_pydantic_valid,
+                        "local_validation_errors": list(observation.constrained_validation_errors),
+                    }
+                )
+                custody.state["schema_probe_results"] = observations
+                _atomic_json(paths.state, custody.state)
+                if control_error is not None and control_status not in {400, 422}:
+                    terminal_outcome = "SMOKE_PROVIDER_INCONCLUSIVE"
+                    terminal_reason = "control_call_failed"
+                    break
+        except Exception as error:
+            terminal_outcome = "SMOKE_HARNESS_FAIL"
+            terminal_reason = f"schema_probe_harness_failed:{type(error).__name__}"
+        finally:
+            try:
+                await _close_binding_smoke_adapter(adapter)
+            except Exception as error:
+                terminal_outcome = "SMOKE_HARNESS_FAIL"
+                terminal_reason = f"adapter_close_failed:{type(error).__name__}"
+
+    asyncio.run(run_matrix())
+    terminal = custody.finish(terminal_outcome, reason=terminal_reason)
+    return {
+        "status": terminal_outcome,
+        "schema_probe_results": observations,
+        "terminal": terminal,
     }
 
 
@@ -5858,6 +6509,7 @@ def main() -> int:
     modes.add_argument("--provider-free-preflight", action="store_true")
     modes.add_argument("--execute-smoke", action="store_true")
     modes.add_argument("--execute-planner-smoke", action="store_true")
+    modes.add_argument("--execute-schema-behavior-probe", action="store_true")
     modes.add_argument("--execute-live", action="store_true")
     parser.add_argument("--population", choices=("d4", "final"), default="d4")
     parser.add_argument("--artifact-root", type=Path)
@@ -5900,6 +6552,12 @@ def main() -> int:
             authorization=authorization,
             artifact_root=artifact_root,
             case_id=args.planner_case_id,
+        )
+    elif args.execute_schema_behavior_probe:
+        result = execute_live_schema_behavior_probe(
+            repo_root=repo_root,
+            authorization=authorization,
+            artifact_root=artifact_root,
         )
     else:
         try:
