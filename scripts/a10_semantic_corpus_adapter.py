@@ -114,10 +114,34 @@ class ScoreResult:
     operation_observations: tuple[OperationObservation, ...]
     operation_target_comparison: str
     source_identity_comparison: str
+    first_divergence: str
+    historical_divergence: str
 
 
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+_FIRST_DIVERGENCE_ORDER = (
+    ("transport", "PROVIDER_OR_STRUCTURED", "TRANSPORT"),
+    ("structured_decode", "PROVIDER_OR_STRUCTURED", "STRUCTURED_DECODE"),
+    ("provider_schema", "PROVIDER_OR_STRUCTURED", "PROVIDER_SCHEMA"),
+    ("pydantic_validation", "PLANNER_STRUCTURAL", "PYDANTIC_VALIDATION"),
+    ("planner_semantic", "SEMANTIC", "PLANNER_SEMANTIC"),
+    ("host_resolution", "TARGET_GROUNDING", "HOST_RESOLUTION"),
+    ("host_safety", "HOST_SAFETY", "HOST_SAFETY"),
+)
+
+
+def classify_first_divergence(boundaries: dict[str, str]) -> tuple[str, str]:
+    """Return earliest failed stage and its established D5 taxonomy mapping."""
+    for boundary, historical, detail in _FIRST_DIVERGENCE_ORDER:
+        outcome = boundaries.get(boundary, "PASS")
+        if outcome not in {"PASS", "FAIL"}:
+            raise ValueError(f"invalid {boundary} boundary outcome")
+        if outcome == "FAIL":
+            return detail, historical
+    return "NO_DIVERGENCE", "NONE"
 
 
 def _canonical_json_sha256(value: object) -> str:
@@ -346,6 +370,8 @@ def score_plan(case: AdaptedCase, plan: _PlannerWirePlan | None) -> ScoreResult:
             operation_observations=(),
             operation_target_comparison="NO_PLAN",
             source_identity_comparison="UNSCORABLE_NO_HISTORICAL_SOURCE_GOLD",
+            first_divergence="PLANNER_TERMINAL_FAILURE",
+            historical_divergence="PROVIDER_OR_STRUCTURED",
         )
 
     findings: list[str] = []
@@ -395,4 +421,6 @@ def score_plan(case: AdaptedCase, plan: _PlannerWirePlan | None) -> ScoreResult:
         operation_observations=operations,
         operation_target_comparison="UNSCORABLE_NO_HISTORICAL_OPERATION_GOLD",
         source_identity_comparison="UNSCORABLE_NO_HISTORICAL_SOURCE_GOLD",
+        first_divergence=("NO_DIVERGENCE" if not findings else "PLANNER_SEMANTIC"),
+        historical_divergence="NONE" if not findings else "SEMANTIC",
     )

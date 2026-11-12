@@ -128,6 +128,54 @@ def test_b01_holdout_is_matched_by_exact_request_bytes() -> None:
     assert result["fresh_holdout_count"] == 52
 
 
+@pytest.mark.parametrize(
+    ("boundary", "detail", "historical"),
+    [
+        ("transport", "TRANSPORT", "PROVIDER_OR_STRUCTURED"),
+        ("structured_decode", "STRUCTURED_DECODE", "PROVIDER_OR_STRUCTURED"),
+        ("provider_schema", "PROVIDER_SCHEMA", "PROVIDER_OR_STRUCTURED"),
+        ("pydantic_validation", "PYDANTIC_VALIDATION", "PLANNER_STRUCTURAL"),
+        ("planner_semantic", "PLANNER_SEMANTIC", "SEMANTIC"),
+        ("host_resolution", "HOST_RESOLUTION", "TARGET_GROUNDING"),
+        ("host_safety", "HOST_SAFETY", "HOST_SAFETY"),
+        (None, "NO_DIVERGENCE", "NONE"),
+    ],
+)
+def test_first_divergence_uses_earliest_observed_stage(
+    boundary: str | None, detail: str, historical: str
+) -> None:
+    """Observed stage failures map to the existing D5 taxonomy in order."""
+    boundaries = {
+        name: ("FAIL" if name == boundary else "PASS")
+        for name in (
+            "transport",
+            "structured_decode",
+            "provider_schema",
+            "pydantic_validation",
+            "planner_semantic",
+            "host_resolution",
+            "host_safety",
+        )
+    }
+
+    assert adapter.classify_first_divergence(boundaries) == (detail, historical)
+
+
+def test_first_divergence_does_not_report_downstream_failures() -> None:
+    """The earliest failed boundary wins over later failed stages."""
+    assert adapter.classify_first_divergence(
+        {
+            "transport": "PASS",
+            "structured_decode": "PASS",
+            "provider_schema": "FAIL",
+            "pydantic_validation": "FAIL",
+            "planner_semantic": "FAIL",
+            "host_resolution": "FAIL",
+            "host_safety": "FAIL",
+        }
+    ) == ("PROVIDER_SCHEMA", "PROVIDER_OR_STRUCTURED")
+
+
 def test_historical_gold_capabilities_still_exist_in_builtin_registry() -> None:
     """Every historical capability expectation remains in the production registry."""
     index = adapter.load_corpus_index(REPO_ROOT)

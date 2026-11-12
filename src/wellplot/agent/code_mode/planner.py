@@ -37,11 +37,11 @@ CompilationMode = Literal["reconstruct", "revise"]
 MAX_SEMANTIC_OPERATIONS = 20
 
 _SCHEMA_CORRECTION_INSTRUCTION = (
-    "Retry the SemanticPlan because the previous response was valid JSON but did not "
-    "conform to the supplied structured response model. Return exactly one object "
-    "matching the supplied response schema. Do not add undeclared fields. Use the "
-    "required field types and satisfy all required non-empty fields. Do not describe "
-    "the correction or include prose outside the structured response."
+    "Repair the supplied SemanticPlan candidate using the original request and "
+    "the listed validation violations. Preserve already-valid requested work and "
+    "change only what is needed to satisfy those violations. Do not create "
+    "unrelated report or section work, add undeclared fields, or include prose. "
+    "Return only one object matching the supplied structured response model."
 )
 
 
@@ -1545,8 +1545,18 @@ def _schema_correction_request(
     )
 
 
-def _schema_failure_diagnostic(error: Exception) -> dict[str, str]:
-    """Return bounded structural feedback without exposing provider payloads."""
+def _schema_failure_diagnostic(error: Exception) -> dict[str, object]:
+    """Return bounded schema-known paths and constraint guidance."""
+    descriptions = {
+        "missing": "provide the required field",
+        "too_short": "provide the required minimum number of items or characters",
+        "too_long": "stay within the maximum number of items or characters",
+        "string_pattern_mismatch": "match the declared field pattern",
+        "literal_error": "use one of the declared literal values",
+        "enum": "use one of the declared enum values",
+        "extra_forbidden": "remove fields not declared by the response model",
+        "value_error": "satisfy the model's cross-field constraint",
+    }
     if isinstance(error, StructuredResponseProviderError):
         shape = error.validation_shape
         if shape is not None and any(
@@ -1555,14 +1565,42 @@ def _schema_failure_diagnostic(error: Exception) -> dict[str, str]:
         ):
             return {
                 "code": "missing_executable_work_unit",
-                "message": (
-                    "SemanticPlan requires a non-null report_task or at least one "
-                    "section_tasks item."
-                ),
+                "issues": [
+                    {
+                        "location": ["$root"],
+                        "error_type": "value_error",
+                        "constraint": ("provide a non-null report_task or non-empty section_tasks"),
+                    }
+                ],
+                "truncated": shape.truncated,
+                "previous_invalid_candidate": "unavailable_at_existing_provider_error_boundary",
+            }
+        if shape is not None:
+            issues = sorted(shape.issues, key=lambda issue: (issue.location, issue.error_type))
+            return {
+                "code": "schema_validation",
+                "issues": [
+                    {
+                        "location": list(issue.location),
+                        "error_type": issue.error_type,
+                        "constraint": descriptions.get(
+                            issue.error_type,
+                            "satisfy the declared response-schema constraint",
+                        ),
+                    }
+                    for issue in issues
+                ],
+                "issue_count": shape.issue_count,
+                "truncated": shape.truncated,
+                "previous_invalid_candidate": "unavailable_at_existing_provider_error_boundary",
             }
     return {
         "code": "schema_validation",
-        "message": "Return one object that satisfies the structured response model.",
+        "issues": [],
+        "issue_count": 0,
+        "truncated": False,
+        "constraint": "return one object that satisfies the structured response model",
+        "previous_invalid_candidate": "unavailable_at_existing_provider_error_boundary",
     }
 
 
@@ -1858,8 +1896,11 @@ def _require_nonempty_items(values: tuple[str, ...]) -> None:
 
 _PLANNER_SYSTEM_PROMPT = """You are the semantic planning stage of Wellplot Code Mode v2.
 Return version `wellplot.semantic-plan.v2`. Propose typed request-local semantic
-operations inside the existing report_task and one SectionTask per requested
-section scope. An operation is semantic intent, never a canonical CRUD command.
+operations in the task that owns the requested work. Report-only requests use
+report_task only. Section-only requests use one or more SectionTasks and set
+report_task to null. Mixed requests use both only when report-wide and section
+work are materially requested. Never create placeholder work units. An
+operation is semantic intent, never a canonical CRUD command.
 Use local_ref, semantic_ref, parent_ref, natural-language target clues,
 registered verbs/object kinds, and explicit typed field_values. Do not emit
 canonical document IDs, component trees, source paths, source formats, header
@@ -1867,11 +1908,10 @@ slot IDs, data-source objects, SDK calls, mutation steps, or host execution
 dependencies. Do not emit request hashes, span hashes, byte offsets, or other
 provenance; the host derives those facts from the authoritative request.
 
-The response must contain at least one executable work unit: a non-null
-report_task or a non-empty section_tasks array. A summary alone is never an
-executable plan. Every report_task and SectionTask must contain at least one
-typed semantic operation. For a section edit, include one SectionTask with the required
-existing_section_hint key, including an explicit null only when reconstruction
+The response must contain at least one executable work unit. A summary alone is
+never an executable plan. Every emitted report_task and SectionTask must contain
+at least one typed semantic operation. For a section edit, include the required
+existing_section_hint key, including explicit null only when reconstruction
 has no existing target.
 
 SectionTask cardinality follows the requested section scopes, not the number of
@@ -1925,9 +1965,6 @@ unresolved domain ambiguity in unresolved_semantics with its scope and candidate
 clues. Conditions must state which evidence kind is needed to evaluate them.
 An inspected source proving absence is distinct from a source that is
 uninspected or unavailable.
-
-Report-only requests must use report_task with an empty section_tasks collection;
-do not invent a dummy section task.
 
 In revise mode, include only materially changed or newly requested semantic
 work. Omitted report or section areas are preserved by later deterministic

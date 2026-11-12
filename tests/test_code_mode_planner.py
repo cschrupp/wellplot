@@ -1914,7 +1914,11 @@ def test_schema_validation_uses_a_bounded_schema_correction_request() -> None:
     assert retry_context["context"] == initial_context
     assert retry_context["diagnostic"] == {
         "code": "schema_validation",
-        "message": "Return one object that satisfies the structured response model.",
+        "issues": [],
+        "issue_count": 0,
+        "truncated": False,
+        "constraint": "return one object that satisfies the structured response model",
+        "previous_invalid_candidate": "unavailable_at_existing_provider_error_boundary",
     }
     assert backend.response_models == [_PlannerWirePlan, _PlannerWirePlan]
 
@@ -1946,6 +1950,41 @@ def test_schema_correction_reports_missing_work_unit_without_answer_injection() 
     assert "report_task" in retry_prompt
     assert "section_tasks" in retry_prompt
     assert '"scale_minimum"' not in retry_prompt
+
+
+def test_schema_correction_contains_bounded_validation_location_and_type() -> None:
+    """Schema feedback carries sanitized field paths and bounded constraints."""
+    failure = StructuredResponseProviderError(
+        "Invalid structured output.",
+        response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
+        validation_shape=ProviderSchemaValidationShape(
+            issue_count=1,
+            issues=(ProviderSchemaValidationIssue("too_short", ("report_task", "operations")),),
+            truncated=False,
+        ),
+    )
+
+    diagnostic = planner_module._schema_failure_diagnostic(failure)
+
+    assert diagnostic["issues"] == [
+        {
+            "location": ["report_task", "operations"],
+            "error_type": "too_short",
+            "constraint": "provide the required minimum number of items or characters",
+        }
+    ]
+
+
+def test_planner_prompt_states_exclusive_work_ownership() -> None:
+    """The system contract distinguishes report-only, section-only, and mixed work."""
+    prompt = planner_module._PLANNER_SYSTEM_PROMPT
+
+    assert "Report-only requests use" in prompt
+    assert "Section-only requests use" in prompt
+    assert "Mixed requests use both only when" in prompt
+    assert "placeholder work units" in prompt
+    assert "inside the existing report_task" not in prompt
+    assert prompt.count("Report-only requests") == 1
 
 
 def test_schema_correction_helper_has_no_previous_response_arguments() -> None:
