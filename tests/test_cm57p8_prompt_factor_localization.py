@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from pydantic import BaseModel
 from scripts import cm57p8_prompt_factor_localization as p8
 
-from wellplot.agent.code_mode.planner import SectionTask, SemanticPlan
+from wellplot.agent.code_mode.planner import SectionTask, SemanticPlan, _PlannerWirePlan
 from wellplot.agent.providers.base import (
     ProviderMetrics,
     StructuredGenerationRequest,
@@ -578,3 +580,262 @@ def test_historical_planner_drift_still_fails_closed(
 
     with pytest.raises(RuntimeError, match="CM-57P8 frozen artifact drifted"):
         p8.prelive_report()
+
+
+def test_p8_revision_preflight_qualifies_two_fresh_planner_processes() -> None:
+    """Both committed planner blobs load canonically with the same wire schema."""
+    report = p8.p8_revision_preflight()
+
+    identities = report["isolated_arm_identity_processes"]
+    assert report["provider_calls"] == 0
+    assert report["holdout_access"] == "NOT_ACCESSED"
+    assert identities["P-current"]["pid"] != identities["C1"]["pid"]
+    assert identities["P-current"]["planner_module"] == "wellplot.agent.code_mode.planner"
+    assert identities["C1"]["planner_module"] == "wellplot.agent.code_mode.planner"
+    assert identities["P-current"]["planner_sha256"] == p8.P8_EXPECTED_PLANNER_SHA256["P-current"]
+    assert identities["C1"]["planner_sha256"] == p8.P8_EXPECTED_PLANNER_SHA256["C1"]
+    assert identities["P-current"]["wire_schema_sha256"] == identities["C1"]["wire_schema_sha256"]
+    assert identities["P-current"]["prompt_sha256"] == p8.P8_EXPECTED_PROMPT_SHA256["P-current"]
+    assert identities["C1"]["prompt_sha256"] == p8.P8_EXPECTED_PROMPT_SHA256["C1"]
+
+
+def test_p8_preflight_freezes_exact_12_by_2_pairs_without_holdout_access(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Canary planning enumerates 24 unique pairs and never opens B01 holdout."""
+    from scripts import a10_semantic_corpus_adapter as adapter
+
+    read_fixtures: list[str] = []
+    original = adapter._load_fixture
+
+    def recording_load(root: Path, spec: adapter.CorpusSpec) -> list[dict[str, object]]:
+        read_fixtures.append(spec.fixture)
+        return original(root, spec)
+
+    monkeypatch.setattr(adapter, "_load_fixture", recording_load)
+    pairs = adapter.p8_pair_population(p8.REPO_ROOT)
+
+    assert len(pairs) == 24
+    assert len(set(pairs)) == 24
+    assert len({case_id for case_id, _ in pairs}) == 12
+    assert {arm for _, arm in pairs} == {"P-current", "C1"}
+    assert adapter.HOLDOUT_FIXTURE not in read_fixtures
+
+
+@pytest.mark.parametrize(
+    ("logical_calls", "physical_calls", "valid"),
+    [(0, 0, True), (2, 2, True), (3, 2, False), (1, 3, False)],
+)
+def test_p8_child_call_budget_is_fail_closed(
+    logical_calls: int,
+    physical_calls: int,
+    valid: bool,
+) -> None:
+    """An arm allows one initial call and one native correction only."""
+    child = {"call_count": logical_calls, "physical_attempt_count": physical_calls}
+    if valid:
+        p8._validate_p8_child_budget(child)
+    else:
+        with pytest.raises(RuntimeError, match="budget"):
+            p8._validate_p8_child_budget(child)
+
+
+def test_p8_arm_command_is_case_scoped_and_selects_revision_before_import(
+    tmp_path: Path,
+) -> None:
+    """Each invocation is a new script process with one case/arm custody path."""
+    custody = tmp_path / "case-a" / "C1" / "model-io.jsonl"
+
+    command, env = p8._p8_child_command("case-a", "C1", custody)
+
+    assert command[0] == p8.sys.executable
+    assert command[1] == str(Path(p8.__file__).resolve())
+    assert command[command.index("--p8-child-case") + 1] == "case-a"
+    assert command[command.index("--p8-arm") + 1] == "C1"
+    assert command[command.index("--p8-raw-io") + 1] == str(custody)
+    assert env[p8.P8_REVISION_ARM_ENV] == "C1"
+    assert "PromptFactorBackend" not in command
+
+
+def test_retired_four_arm_live_route_cannot_construct_a_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The accepted two-arm comparison is the only exposed P8 live mode."""
+    monkeypatch.setattr(
+        p8,
+        "_run_live",
+        lambda *_args, **_kwargs: pytest.fail("retired four-arm live path was reached"),
+    )
+
+    with pytest.raises(SystemExit, match="prompt-factor live mode is retired"):
+        p8.main(["--live-authorized", "--authorized-checkpoint", "0" * 40])
+
+
+def test_p8_scorer_receives_only_completed_child_wire_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The historical scorer is invoked after a child result exists."""
+    from scripts import a10_semantic_corpus_adapter as adapter
+
+    case = adapter.load_corpus_index(p8.REPO_ROOT).canary_cases[0]
+    child = {
+        "wire_plan": {
+            "version": "wellplot.semantic-plan.v2",
+            "summary": "Synthetic P8 scoring fixture",
+            "report_task": None,
+            "section_tasks": [
+                {
+                    "goal": "Section",
+                    "capability_ids": ["track.depth"],
+                    "existing_section_hint": None,
+                    "scope_ref": "section-a",
+                    "operations": [
+                        {
+                            "local_ref": "section",
+                            "scope_ref": "section-a",
+                            "verb": "CREATE",
+                            "object_kind": "section",
+                            "semantic_ref": "section-object",
+                        }
+                    ],
+                }
+            ],
+            "unresolved_requirements": [],
+            "unresolved_semantics": [],
+        },
+        "terminal": {"kind": "success"},
+        "raw_io_relative_path": "case/C1/model-io.jsonl",
+    }
+    seen: list[object] = []
+    original = adapter.score_plan
+
+    def record_score(received_case: object, plan: object) -> object:
+        seen.append(plan)
+        return original(received_case, plan)
+
+    monkeypatch.setattr(adapter, "score_plan", record_score)
+    p8._score_p8_child(case, child)
+
+    assert len(seen) == 1
+    assert seen[0].__class__.__name__ == "_PlannerWirePlan"
+
+
+def test_p8_coordinator_runs_24_isolated_children_then_scores(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Every pair completes in its own child before downstream historical scoring."""
+    from scripts import a10_semantic_corpus_adapter as adapter
+
+    index = adapter.load_corpus_index(p8.REPO_ROOT)
+    pairs = tuple((case.case_id, arm) for case in index.canary_cases for arm in ("P-current", "C1"))
+    identity_reports = {
+        arm: {
+            "arm": arm,
+            "revision": p8.P8_ARM_REVISIONS[arm],
+            "planner_sha256": p8.P8_EXPECTED_PLANNER_SHA256[arm],
+            "planner_module": "wellplot.agent.code_mode.planner",
+            "module_origin": "test-frozen-origin",
+            "wire_schema_sha256": p8.P8_EXPECTED_SCHEMA_SHA256,
+            "prompt_sha256": p8.P8_EXPECTED_PROMPT_SHA256[arm],
+            "pid": 1 if arm == "P-current" else 2,
+        }
+        for arm in ("P-current", "C1")
+    }
+    monkeypatch.setattr(p8, "_verify_p8_revision_arms", lambda: identity_reports)
+    monkeypatch.setattr(adapter, "verify_planner_revision_closure", lambda _root: {"ok": True})
+    monkeypatch.setattr(adapter, "load_corpus_index", lambda _root: index)
+    monkeypatch.setattr(adapter, "p8_pair_population", lambda _root: pairs)
+    monkeypatch.setattr(p8, "_p8_credential_available", lambda: True)
+    config_fingerprint = p8._p8_project_config().fingerprint_sha256
+
+    section_plan = {
+        "version": "wellplot.semantic-plan.v2",
+        "summary": "Synthetic paired score input",
+        "report_task": None,
+        "section_tasks": [
+            {
+                "goal": "Section",
+                "capability_ids": ["track.depth"],
+                "existing_section_hint": None,
+                "scope_ref": "section-a",
+                "operations": [
+                    {
+                        "local_ref": "section",
+                        "scope_ref": "section-a",
+                        "verb": "CREATE",
+                        "object_kind": "section",
+                        "semantic_ref": "section-object",
+                    }
+                ],
+            }
+        ],
+        "unresolved_requirements": [],
+        "unresolved_semantics": [],
+    }
+    wire_plan = _PlannerWirePlan.model_validate(section_plan).model_dump(mode="json")
+    completed_pairs: set[tuple[str, str]] = set()
+    score_events: list[str] = []
+    process_counter = 100
+
+    def fake_child(command: list[str], **_kwargs: object) -> SimpleNamespace:
+        nonlocal process_counter
+        case_id = command[command.index("--p8-child-case") + 1]
+        arm = command[command.index("--p8-arm") + 1]
+        raw_io_path = Path(command[command.index("--p8-raw-io") + 1])
+        raw_io_path.write_text('{"event":"synthetic"}\n', encoding="utf-8")
+        raw_io_path.chmod(0o600)
+        process_counter += 1
+        child = {
+            "case_id": case_id,
+            "arm": arm,
+            "request_sha256": next(
+                case.request_sha256 for case in index.canary_cases if case.case_id == case_id
+            ),
+            "planner_identity": {**identity_reports[arm], "pid": process_counter},
+            "project_config_fingerprint_sha256": config_fingerprint,
+            "call_count": 1,
+            "physical_attempt_count": 1,
+            "wire_plan": wire_plan,
+            "wire_plans": [wire_plan],
+            "terminal": {"kind": "success"},
+            "raw_io_relative_path": str(raw_io_path.relative_to(p8.REPO_ROOT)),
+        }
+        completed_pairs.add((case_id, arm))
+        return SimpleNamespace(returncode=0, stdout=json.dumps(child), stderr="")
+
+    monkeypatch.setattr(p8.subprocess, "run", fake_child)
+    monkeypatch.setattr(
+        p8.subprocess,
+        "check_output",
+        lambda *_args, **_kwargs: str(p8.REPO_ROOT).encode(),
+    )
+    real_score = adapter.score_plan
+
+    def assert_downstream_score(case: object, plan: object) -> object:
+        assert any(case_id == case.case_id for case_id, _arm in completed_pairs)
+        score_events.append(case.case_id)
+        return real_score(case, plan)
+
+    monkeypatch.setattr(adapter, "score_plan", assert_downstream_score)
+
+    evaluation_parent = p8.REPO_ROOT / "workspace/evaluations" / f".p8-test-{uuid4().hex}"
+    output_dir = evaluation_parent / "result"
+    evaluation_parent.mkdir(mode=0o700)
+    try:
+        summary = p8._run_p8_revision_comparison(
+            SimpleNamespace(
+                p8_output_dir=str(output_dir),
+            )
+        )
+        assert summary["population"] == {
+            "cases": 12,
+            "arms": ["P-current", "C1"],
+            "planner_invocations": 24,
+        }
+        assert len(completed_pairs) == 24
+        assert len(set(summary["case_child_pids"])) == 24
+        assert len(score_events) == 48
+        assert (output_dir / "SHA256SUMS").is_file()
+        assert summary["holdout_access"] == "NOT_ACCESSED"
+    finally:
+        shutil.rmtree(evaluation_parent)

@@ -1,9 +1,7 @@
-"""CM-57P8 provider-free prompt-factor localization harness.
+"""CM-57P8 historical harness and A10-SEM-C1 revision comparison.
 
-P8 isolates the report-boundary and section-composition prompt factors while
-running the production SemanticPlanner and production response schema. The
-default command performs deterministic validation only; live execution is
-explicitly gated for a later authorization.
+The active P8 comparison runs the exact P-current and C1 planner revisions in
+fresh processes. The former four-arm prompt-substitution live mode is retired.
 """
 
 from __future__ import annotations
@@ -11,11 +9,16 @@ from __future__ import annotations
 import argparse
 import asyncio
 import hashlib
+import importlib
+import importlib.machinery
+import importlib.metadata
+import importlib.util
 import json
 import os
 import re
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal
@@ -25,6 +28,62 @@ from pydantic import BaseModel, ValidationError
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+
+P8_REVISION_ARM_ENV = "WELLPLOT_P8_REVISION_ARM"
+P8_COMPARE_ARMS = ("P-current", "C1")
+P8_NATIVE_CALL_CAP = 2
+P8_ARM_REVISIONS = {
+    "P-current": "1b9ead3c4acdf70dea0bce6475150f6219421988",
+    "C1": "3a2cfbe3e9d61acdde2a072828e2256f59abcc4b",
+}
+P8_EXPECTED_PLANNER_SHA256 = {
+    "P-current": "390bdeae3c6b8d60742123813410c430fff9417c5748e54c97e3ec2bba4c9186",
+    "C1": "eab757657a035eed1416536db443bab776e4f77fa9c60f26cb08e68524621824",
+}
+P8_EXPECTED_SCHEMA_SHA256 = "b6b05fec2caabbc62708d17b1d752d8888e6cf7e2b91b4b67889eb583b080cbb"
+P8_EXPECTED_PROMPT_SHA256 = {
+    "P-current": "8b680726fb3d10bc7e7243cc1aa56cb0677d706884416132b8310019a4e84981",
+    "C1": "4bb8005845dc8bd78ea5797e8887f35ea5afe085dace71ffcf31de0f1d2b9483",
+}
+P8_PLANNER_PATH = "src/wellplot/agent/code_mode/planner.py"
+
+
+def _bootstrap_p8_planner_arm() -> None:
+    """Install the selected committed planner before importing planner consumers."""
+    arm = os.environ.get(P8_REVISION_ARM_ENV)
+    if arm is None:
+        return
+    if arm not in P8_ARM_REVISIONS:
+        raise RuntimeError("Unknown P8 planner revision arm.")
+
+    revision = P8_ARM_REVISIONS[arm]
+    source = subprocess.run(
+        ["git", "show", f"{revision}:{P8_PLANNER_PATH}"],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+    ).stdout
+    source_sha256 = hashlib.sha256(source).hexdigest()
+    if source_sha256 != P8_EXPECTED_PLANNER_SHA256[arm]:
+        raise RuntimeError("P8 planner blob does not match its frozen arm identity.")
+
+    if arm == "P-current":
+        importlib.import_module("wellplot.agent.code_mode")
+        module_name = "wellplot.agent.code_mode.planner"
+        spec = importlib.machinery.ModuleSpec(
+            module_name,
+            loader=None,
+            origin=f"git:{revision}:{P8_PLANNER_PATH}",
+        )
+        module = importlib.util.module_from_spec(spec)
+        module.__p8_source_sha256__ = source_sha256
+        sys.modules[module_name] = module
+        exec(compile(source, spec.origin, "exec"), module.__dict__)
+
+
+_bootstrap_p8_planner_arm()
+
 
 from scripts import cm57p4_prompt_interaction_bisect as p4  # noqa: E402
 from scripts import cm57p5_fresh_holdout as p5  # noqa: E402
@@ -43,6 +102,7 @@ from wellplot.agent.providers.base import (  # noqa: E402
     StructuredGenerationResult,
 )
 from wellplot.capabilities import CapabilityRegistry, create_builtin_registry  # noqa: E402
+from wellplot.project_config import ProjectConfig, load_project_config  # noqa: E402
 
 MANIFEST_PATH = REPO_ROOT / "tests/fixtures/typed_worker/cm57p8_prompt_factor_cases.json"
 P7_CASE_PATH = REPO_ROOT / "tests/fixtures/typed_worker/cm57p7_fresh_promotion.json"
@@ -946,6 +1006,410 @@ def _provider_configuration(args: argparse.Namespace) -> ModelBackendProtocol:
     )
 
 
+def _p8_planner_identity(arm: str) -> dict[str, object]:
+    """Verify the imported canonical planner and its unchanged wire schema."""
+    if arm not in P8_COMPARE_ARMS:
+        raise RuntimeError("Invalid P8 planner arm.")
+    planner_module = importlib.import_module("wellplot.agent.code_mode.planner")
+    if arm == "P-current":
+        source_sha256 = getattr(planner_module, "__p8_source_sha256__", None)
+        module_origin = getattr(planner_module.__spec__, "origin", None)
+    else:
+        source_path = Path(planner_module.__file__).resolve()
+        source_sha256 = artifact_sha256(source_path)
+        module_origin = str(source_path)
+    if source_sha256 != P8_EXPECTED_PLANNER_SHA256[arm]:
+        raise RuntimeError("Imported P8 planner differs from the frozen arm.")
+
+    from wellplot.agent.code_mode.planner import _PLANNER_SYSTEM_PROMPT, _PlannerWirePlan
+
+    schema_sha256 = sha256_text(canonical_json(_PlannerWirePlan.model_json_schema()))
+    if schema_sha256 != P8_EXPECTED_SCHEMA_SHA256:
+        raise RuntimeError("P8 planner wire schema differs between frozen arms.")
+    prompt_sha256 = sha256_text(_PLANNER_SYSTEM_PROMPT)
+    if prompt_sha256 != P8_EXPECTED_PROMPT_SHA256[arm]:
+        raise RuntimeError("P8 planner prompt differs from its frozen arm identity.")
+    return {
+        "arm": arm,
+        "revision": P8_ARM_REVISIONS[arm],
+        "planner_sha256": source_sha256,
+        "planner_module": "wellplot.agent.code_mode.planner",
+        "module_origin": module_origin,
+        "wire_schema_sha256": schema_sha256,
+        "prompt_sha256": prompt_sha256,
+        "python_executable": sys.executable,
+        "python_version": sys.version.split()[0],
+        "pydantic_version": importlib.metadata.version("pydantic"),
+        "openai_version": importlib.metadata.version("openai"),
+        "httpx_version": importlib.metadata.version("httpx"),
+        "pid": os.getpid(),
+    }
+
+
+def _p8_project_config() -> ProjectConfig:
+    """Load and enforce the one canonical non-secret provider configuration."""
+    config = load_project_config(REPO_ROOT)
+    if (
+        config.provider.name != "openai_compat"
+        or config.provider.model != FROZEN_MODEL
+        or config.provider.timeout_seconds != TIMEOUT_SECONDS
+        or config.runtime.structured_output != "json_schema"
+    ):
+        raise RuntimeError("Canonical project provider configuration differs from frozen P8.")
+    return config
+
+
+def _append_private_json_line(path: Path, record: dict[str, object]) -> None:
+    """Append one raw-I/O custody record to a new private file."""
+    encoded = (json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    try:
+        _write_all(descriptor, encoded)
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+@dataclass
+class RevisionCaptureBackend(ModelBackendProtocol):
+    """Capture wire candidates and reuse the canonical physical-attempt observer."""
+
+    delegate: ModelBackendProtocol
+    observer: object
+    raw_io_path: Path
+    call_records: list[dict[str, object]]
+    wire_plans: list[dict[str, object]]
+    physical_attempts: int = 0
+
+    def __post_init__(self) -> None:
+        """Bind the existing observer callbacks to this arm's private custody file."""
+        self.observer.bind_model_io(
+            lambda record: _append_private_json_line(self.raw_io_path, record)
+        )
+        self.observer.bind_physical_attempt(self._physical_attempt)
+
+    def _physical_attempt(self, _logical_index: int) -> None:
+        self.physical_attempts += 1
+
+    async def generate_structured(
+        self,
+        request: StructuredGenerationRequest,
+        *,
+        response_model: type[BaseModel],
+    ) -> StructuredGenerationResult[BaseModel]:
+        """Forward one canonical request and retain typed output before lowering."""
+        call_index = len(self.call_records) + 1
+        if call_index == 1:
+            call_kind = "INITIAL"
+        elif "Schema correction context:" in request.user_prompt:
+            call_kind = "SCHEMA_CORRECTION"
+        else:
+            call_kind = "SEMANTIC_CORRECTION"
+        self.observer.logical_call_started(
+            {
+                "index": call_index,
+                "generation_role": "planner",
+                "generation_purpose": call_kind.casefold(),
+                "model": getattr(self.delegate, "model", FROZEN_MODEL),
+            }
+        )
+        try:
+            result = await self.delegate.generate_structured(
+                request,
+                response_model=response_model,
+            )
+        except ProviderRequestError as error:
+            validation_shape = getattr(error, "validation_shape", None)
+            response_reason = getattr(error, "response_reason", None)
+            if hasattr(response_reason, "value"):
+                response_reason = response_reason.value
+            self.observer.logical_call_completed(
+                {
+                    "index": call_index,
+                    "generation_role": "planner",
+                    "generation_purpose": call_kind.casefold(),
+                    "model": getattr(self.delegate, "model", FROZEN_MODEL),
+                    "outcome": "failure",
+                    "failure_category": error.category.value,
+                    "response_reason": response_reason,
+                    "validation_shape": validation_shape,
+                }
+            )
+            self.call_records.append(
+                {
+                    "call_index": call_index,
+                    "call_kind": call_kind,
+                    "outcome": "provider_failure",
+                    "category": error.category.value,
+                    "response_reason": response_reason,
+                    "validation_shape": (
+                        validation_shape.to_json()
+                        if callable(getattr(validation_shape, "to_json", None))
+                        else None
+                    ),
+                }
+            )
+            raise
+        self.observer.logical_call_completed(
+            {
+                "index": call_index,
+                "generation_role": "planner",
+                "generation_purpose": call_kind.casefold(),
+                "model": getattr(self.delegate, "model", FROZEN_MODEL),
+                "outcome": "success",
+            }
+        )
+        value = result.value
+        if response_model.__name__ != "_PlannerWirePlan":
+            raise RuntimeError("P8 response model is not the canonical _PlannerWirePlan.")
+        self.wire_plans.append(value.model_dump(mode="json"))
+        self.call_records.append(
+            {
+                "call_index": call_index,
+                "call_kind": call_kind,
+                "outcome": "structured_success",
+                "response_model": response_model.__name__,
+            }
+        )
+        return result
+
+    async def generate_program(self, request: object) -> object:
+        """Reject any attempt to enter a worker during planner evaluation."""
+        raise AssertionError(f"P8 planner evaluation cannot generate programs: {request!r}")
+
+
+def _p8_case_by_id(case_id: str) -> dict[str, object]:
+    """Load one frozen P7-backed request without exposing P8 gold to the child."""
+    matches = [case for case in load_manifest() if case.get("case_id") == case_id]
+    if len(matches) != 1:
+        raise RuntimeError("P8 case identity is absent or duplicated in the frozen manifest.")
+    return matches[0]
+
+
+async def _run_p8_child(args: argparse.Namespace) -> dict[str, object]:
+    """Run exactly one case in a fresh process using its committed planner arm."""
+    arm = args.p8_arm
+    if arm not in P8_COMPARE_ARMS or os.environ.get(P8_REVISION_ARM_ENV) != arm:
+        raise RuntimeError("P8 child arm does not match its pre-import revision selection.")
+    identity = _p8_planner_identity(arm)
+    case = _p8_case_by_id(args.p8_child_case)
+    raw_io_path = Path(args.p8_raw_io).resolve()
+    raw_io_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if raw_io_path.exists():
+        raise RuntimeError("P8 raw-I/O custody path already exists.")
+    raw_io_path.touch(mode=0o600, exist_ok=False)
+
+    from scripts import nlp_d5_live_semantic_qualification as d5
+
+    observer = d5._PhysicalAttemptObserver()
+    observer.set_active_turn(f"{args.p8_child_case}:{arm}")
+    observer.callback = lambda _logical_index: None
+    import httpx
+    from openai import AsyncOpenAI
+
+    project_config = _p8_project_config()
+    api_key = _read_p8_api_key()
+    http_client = httpx.AsyncClient(
+        event_hooks={"request": [observer.on_request], "response": [observer.on_response]}
+    )
+    client = AsyncOpenAI(
+        api_key=api_key,
+        base_url=project_config.openai_compat_base_url,
+        timeout=project_config.provider.timeout_seconds,
+        max_retries=0,
+        http_client=http_client,
+    )
+    from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
+
+    delegate = OpenAICompatibleBackendV2(
+        model=project_config.provider.model,
+        client=client,
+        structured_output=project_config.runtime.structured_output,
+        max_tokens_parameter=MAX_TOKENS_PARAMETER,
+    )
+    backend = RevisionCaptureBackend(
+        delegate=delegate,
+        observer=observer,
+        raw_io_path=raw_io_path,
+        call_records=[],
+        wire_plans=[],
+    )
+    from wellplot.agent.code_mode.planner import PlannerSemanticFailure, SemanticPlanner
+    from wellplot.agent.providers.base import ProviderRequestError
+    from wellplot.capabilities import create_builtin_registry
+
+    trace: list[dict[str, object]] = []
+
+    def capture_trace(event: dict[str, object]) -> None:
+        trace.append(
+            {
+                key: event.get(key)
+                for key in ("event", "attempt", "code", "response_schema")
+                if key in event
+            }
+        )
+
+    planner = SemanticPlanner(
+        backend=backend,
+        registry=create_builtin_registry(),
+        trace_callback=capture_trace,
+    )
+    started = time.monotonic()
+    terminal: dict[str, object] = {"kind": "success"}
+    try:
+        plan = await planner.plan(
+            request=str(case["request"]),
+            mode="reconstruct",
+            current_document_summary={},
+            source_summary=FIXED_SOURCE_SUMMARY,
+            timeout_seconds=TIMEOUT_SECONDS,
+            temperature=PLANNER_TEMPERATURE,
+            max_output_tokens=MAX_OUTPUT_TOKENS,
+        )
+        terminal["planner_returned"] = plan is not None
+    except PlannerSemanticFailure as error:
+        terminal = {"kind": "planner_semantic_failure", "code": error.code}
+    except ProviderRequestError as error:
+        terminal = {
+            "kind": "provider_failure",
+            "category": error.category.value,
+            "response_reason": getattr(error, "response_reason", None),
+        }
+    finally:
+        await client.close()
+
+    if len(backend.call_records) > P8_NATIVE_CALL_CAP:
+        raise RuntimeError("Canonical planner exceeded the two-call correction budget.")
+    if backend.physical_attempts > P8_NATIVE_CALL_CAP:
+        raise RuntimeError("P8 provider transport exceeded the bounded physical-attempt budget.")
+    return {
+        "case_id": args.p8_child_case,
+        "arm": arm,
+        "request_sha256": sha256_text(str(case["request"])),
+        "planner_identity": identity,
+        "project_config_fingerprint_sha256": project_config.fingerprint_sha256,
+        "wire_schema_sha256": P8_EXPECTED_SCHEMA_SHA256,
+        "call_records": backend.call_records,
+        "call_count": len(backend.call_records),
+        "physical_attempt_count": backend.physical_attempts,
+        "wire_plan": backend.wire_plans[-1] if backend.wire_plans else None,
+        "wire_plan_count": len(backend.wire_plans),
+        "wire_plans": backend.wire_plans,
+        "terminal": terminal,
+        "planner_trace": trace,
+        "raw_io_relative_path": str(Path(args.p8_raw_io).relative_to(REPO_ROOT)),
+        "elapsed_seconds": time.monotonic() - started,
+    }
+
+
+def _read_p8_api_key() -> str:
+    """Read the canonical machine-local credential without disclosing it."""
+    path = REPO_ROOT / "LLAMA_CPP_API_KEY.txt"
+    if not path.is_file() or not os.access(path, os.R_OK):
+        raise RuntimeError("The canonical local P8 credential is unavailable.")
+    api_key = path.read_text(encoding="utf-8").strip()
+    if not api_key:
+        raise RuntimeError("The canonical local P8 credential is empty.")
+    return api_key
+
+
+def _p8_credential_available() -> bool:
+    """Check canonical credential readability without reading or revealing its value."""
+    path = REPO_ROOT / "LLAMA_CPP_API_KEY.txt"
+    return path.is_file() and os.access(path, os.R_OK) and path.stat().st_size > 0
+
+
+def _run_identity_probe(arm: str) -> dict[str, object]:
+    """Return canonical planner identity in this fresh verification process."""
+    if os.environ.get(P8_REVISION_ARM_ENV) != arm:
+        raise RuntimeError("P8 identity probe environment does not match requested arm.")
+    return _p8_planner_identity(arm)
+
+
+def _score_p8_child(
+    case: object,
+    child: dict[str, object],
+) -> dict[str, object]:
+    """Score a completed child result downstream with the accepted adapter."""
+    from scripts import a10_semantic_corpus_adapter as adapter
+    from wellplot.agent.code_mode.planner import _PlannerWirePlan
+
+    raw_plan = child.get("wire_plan")
+    plan = _PlannerWirePlan.model_validate(raw_plan) if isinstance(raw_plan, dict) else None
+    score = adapter.score_plan(case, plan)
+    raw_plans = child.get("wire_plans", [])
+    candidate_scores = [
+        adapter.score_plan(case, _PlannerWirePlan.model_validate(raw_candidate))
+        for raw_candidate in raw_plans
+        if isinstance(raw_candidate, dict)
+    ]
+    terminal = child.get("terminal")
+    terminal_kind = terminal.get("kind") if isinstance(terminal, dict) else None
+    response_reason = terminal.get("response_reason") if isinstance(terminal, dict) else None
+    provider_category = terminal.get("category") if isinstance(terminal, dict) else None
+    call_records = child.get("call_records", [])
+    first_provider_failure = next(
+        (
+            call
+            for call in call_records
+            if isinstance(call, dict) and call.get("outcome") == "provider_failure"
+        ),
+        None,
+    )
+    first_reason = (
+        first_provider_failure.get("response_reason")
+        if isinstance(first_provider_failure, dict)
+        else response_reason
+    )
+    first_category = (
+        first_provider_failure.get("category")
+        if isinstance(first_provider_failure, dict)
+        else provider_category
+    )
+    boundaries = {
+        "transport": "FAIL"
+        if first_provider_failure is not None
+        and first_category not in {"invalid_response", "validation"}
+        else "PASS",
+        "structured_decode": "FAIL"
+        if first_reason in {"invalid_json", "unusable_choice", "missing_content"}
+        else "PASS",
+        "provider_schema": "PASS",
+        "pydantic_validation": "FAIL" if first_reason == "schema_validation" else "PASS",
+        "planner_semantic": "FAIL"
+        if terminal_kind == "planner_semantic_failure"
+        or any(
+            str(event.get("event", "")).endswith("_FAIL")
+            and str(event.get("event", "")) != "PLANNER_GENERATION_FAIL"
+            for event in child.get("planner_trace", [])
+            if isinstance(event, dict)
+        )
+        or (candidate_scores and not candidate_scores[0].passed)
+        or not score.passed
+        else "PASS",
+        "host_resolution": "PASS",
+        "host_safety": "PASS",
+    }
+    detail, historical = adapter.classify_first_divergence(boundaries)
+    return {
+        "passed": score.passed and terminal_kind == "success",
+        "disposition": score.disposition,
+        "findings": list(score.findings),
+        "candidate_score_passes": [candidate_score.passed for candidate_score in candidate_scores],
+        "first_divergence": detail,
+        "historical_first_divergence": historical,
+        "operation_target_comparison": score.operation_target_comparison,
+        "source_identity_comparison": score.source_identity_comparison,
+        "operation_observations": [
+            observation.__dict__ for observation in score.operation_observations
+        ],
+        "terminal": terminal,
+        "boundaries": boundaries,
+        "raw_io_relative_path": child["raw_io_relative_path"],
+        "calls": call_records,
+    }
+
+
 async def _run_live(args: argparse.Namespace, checkpoint: str) -> None:
     """Run the future 24-row matrix once and flush every completed row."""
     if OUTPUT_PATH.exists() and OUTPUT_PATH.stat().st_size:
@@ -970,6 +1434,315 @@ async def _run_live(args: argparse.Namespace, checkpoint: str) -> None:
                 handle.write(json.dumps(row, sort_keys=True, ensure_ascii=False) + "\n")
                 handle.flush()
     print(json.dumps(summarize_population(rows, cases, authorized_checkpoint=checkpoint), indent=2))
+
+
+def _p8_child_command(
+    case_id: str,
+    arm: str,
+    raw_io_path: Path,
+) -> tuple[list[str], dict[str, str]]:
+    """Build one fresh-interpreter invocation for a single immutable pair."""
+    command = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--p8-child-case",
+        case_id,
+        "--p8-arm",
+        arm,
+        "--p8-raw-io",
+        str(raw_io_path),
+    ]
+    child_env = dict(os.environ)
+    child_env[P8_REVISION_ARM_ENV] = arm
+    return command, child_env
+
+
+def _write_private_json(path: Path, value: object) -> None:
+    """Create one private JSON evidence file without overwriting prior evidence."""
+    payload = (json.dumps(value, sort_keys=True, indent=2, ensure_ascii=False) + "\n").encode()
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        _write_all(descriptor, payload)
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _write_all(descriptor: int, payload: bytes) -> None:
+    """Write a private evidence payload completely, handling short OS writes."""
+    remaining = memoryview(payload)
+    while remaining:
+        written = os.write(descriptor, remaining)
+        if written <= 0:
+            raise OSError("short evidence write")
+        remaining = remaining[written:]
+
+
+def _verify_p8_revision_arms() -> dict[str, object]:
+    """Verify each planner arm in a separate child before any inference."""
+    reports: dict[str, dict[str, object]] = {}
+    for arm in P8_COMPARE_ARMS:
+        env = dict(os.environ)
+        env[P8_REVISION_ARM_ENV] = arm
+        completed = subprocess.run(
+            [sys.executable, str(Path(__file__).resolve()), "--p8-verify-arm", arm],
+            cwd=REPO_ROOT,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        reports[arm] = json.loads(completed.stdout)
+    if reports["P-current"]["pid"] == reports["C1"]["pid"]:
+        raise RuntimeError("P8 revision verification reused an interpreter process.")
+    if reports["P-current"]["wire_schema_sha256"] != reports["C1"]["wire_schema_sha256"]:
+        raise RuntimeError("P8 wire schema differs across the immutable planner arms.")
+    return reports
+
+
+def p8_revision_preflight() -> dict[str, object]:
+    """Qualify the frozen 12-by-2 plan without provider construction or holdout reads."""
+    from scripts import a10_semantic_corpus_adapter as adapter
+
+    closure = adapter.verify_planner_revision_closure(REPO_ROOT)
+    identities = _verify_p8_revision_arms()
+    project_config = _p8_project_config()
+    pairs = adapter.p8_pair_population(REPO_ROOT)
+    if len(pairs) != 24 or len({case_id for case_id, _ in pairs}) != 12:
+        raise RuntimeError("P8 preflight did not produce the exact canary population.")
+    if any(arm not in P8_COMPARE_ARMS for _, arm in pairs):
+        raise RuntimeError("P8 preflight included an unapproved arm.")
+    return {
+        "status": "P8_PROVIDER_FREE_PREFLIGHT_PASS",
+        "provider_calls": 0,
+        "model_calls": 0,
+        "holdout_access": "NOT_ACCESSED",
+        "population": {
+            "case_count": 12,
+            "arm_count": 2,
+            "planner_invocations": len(pairs),
+            "pairs": [{"case_id": case_id, "arm": arm} for case_id, arm in pairs],
+        },
+        "planner_revision_closure": closure,
+        "isolated_arm_identity_processes": identities,
+        "wire_schema_sha256": P8_EXPECTED_SCHEMA_SHA256,
+        "project_config": {
+            "fingerprint_sha256": project_config.fingerprint_sha256,
+            "provider": project_config.provider.name,
+            "model": project_config.provider.model,
+            "server_origin": project_config.server_origin,
+            "timeout_seconds": project_config.provider.timeout_seconds,
+            "configured_max_retries": project_config.provider.max_retries,
+            "effective_sdk_retries": 0,
+            "structured_output": project_config.runtime.structured_output,
+        },
+        "canonical_credential_file_readable": _p8_credential_available(),
+        "native_call_cap_per_invocation": 2,
+        "physical_call_cap_total": 48,
+        "raw_io_custody": "one_private_model-io.jsonl_per_case_and_arm",
+        "scoring": "downstream_parent_after_child_exit",
+    }
+
+
+def _validate_p8_child_budget(child: dict[str, object]) -> None:
+    """Reject a child result that exceeds the one-initial/one-correction bound."""
+    if int(child.get("call_count", 0)) > 2:
+        raise RuntimeError("P8 arm exceeded its native one-correction call budget.")
+    if int(child.get("physical_attempt_count", 0)) > 2:
+        raise RuntimeError("P8 arm exceeded its physical-attempt budget.")
+
+
+def _run_p8_revision_comparison(args: argparse.Namespace) -> dict[str, object]:
+    """Run the bounded 12-case paired comparison through fresh canonical processes."""
+    from scripts import a10_semantic_corpus_adapter as adapter
+
+    output_dir = Path(args.p8_output_dir).resolve()
+    if not output_dir.is_relative_to(REPO_ROOT) or output_dir.exists():
+        raise RuntimeError("P8 output namespace must be new and inside the canonical checkout.")
+    if (
+        Path.cwd().resolve() != REPO_ROOT
+        or Path(
+            subprocess.check_output(["git", "rev-parse", "--show-toplevel"], cwd=REPO_ROOT)
+            .decode()
+            .strip()
+        ).resolve()
+        != REPO_ROOT
+    ):
+        raise RuntimeError("P8 execution must run from the canonical repository root.")
+
+    if not _p8_credential_available():
+        raise RuntimeError("Canonical P8 credential preflight failed before namespace admission.")
+
+    closure = adapter.verify_planner_revision_closure(REPO_ROOT)
+    identity_reports = _verify_p8_revision_arms()
+    project_config = _p8_project_config()
+    index = adapter.load_corpus_index(REPO_ROOT)
+    cases = index.canary_cases
+    pairs = adapter.p8_pair_population(REPO_ROOT)
+    if len(pairs) != 24 or len(cases) != 12:
+        raise RuntimeError("P8 paired population is not exactly 12 cases by 2 arms.")
+    case_map = {case.case_id: case for case in cases}
+    output_dir.mkdir(parents=True, mode=0o700)
+    os.chmod(output_dir, 0o700)
+
+    pair_results: dict[str, dict[str, object]] = {case.case_id: {} for case in cases}
+    child_pids: list[int] = []
+    physical_attempts = 0
+    for case_id, arm in pairs:
+        pair_dir = output_dir / case_id / arm
+        pair_dir.mkdir(parents=True, mode=0o700)
+        os.chmod(pair_dir.parent, 0o700)
+        os.chmod(pair_dir, 0o700)
+        raw_io_path = pair_dir / "model-io.jsonl"
+        command, child_env = _p8_child_command(case_id, arm, raw_io_path)
+        completed = subprocess.run(
+            command,
+            cwd=REPO_ROOT,
+            env=child_env,
+            capture_output=True,
+            text=True,
+            timeout=2 * TIMEOUT_SECONDS + 30,
+            check=False,
+        )
+        if completed.returncode != 0:
+            _write_private_json(
+                pair_dir / "process-failure.json",
+                {
+                    "case_id": case_id,
+                    "arm": arm,
+                    "returncode": completed.returncode,
+                    "stderr": completed.stderr,
+                    "stdout_sha256": sha256_text(completed.stdout),
+                },
+            )
+            raise RuntimeError(f"P8 child failed before producing a result: {case_id}/{arm}")
+        child = json.loads(completed.stdout)
+        if child.get("case_id") != case_id or child.get("arm") != arm:
+            raise RuntimeError("P8 child result identity differs from its invocation.")
+        if child.get("request_sha256") != case_map[case_id].request_sha256:
+            raise RuntimeError("P8 child request bytes differ from the frozen canary.")
+        if child.get("project_config_fingerprint_sha256") != project_config.fingerprint_sha256:
+            raise RuntimeError("P8 child project configuration drifted during the matrix.")
+        planner_identity = child.get("planner_identity")
+        if not isinstance(planner_identity, dict) or planner_identity.get("pid") in child_pids:
+            raise RuntimeError("P8 case/arm did not receive a fresh interpreter.")
+        child_pids.append(int(planner_identity["pid"]))
+        physical_attempts += int(child.get("physical_attempt_count", 0))
+        _validate_p8_child_budget(child)
+        if not raw_io_path.is_file() or raw_io_path.stat().st_size == 0:
+            raise RuntimeError("P8 arm has no case-scoped raw-I/O custody artifact.")
+        if raw_io_path.stat().st_mode & 0o077:
+            raise RuntimeError("P8 raw-I/O custody permissions are broader than 0600.")
+        expected_identity = identity_reports[arm]
+        for key, value in expected_identity.items():
+            if key != "pid" and planner_identity.get(key) != value:
+                raise RuntimeError("P8 child loaded a planner different from its frozen arm.")
+        if planner_identity.get("planner_sha256") != P8_EXPECTED_PLANNER_SHA256[arm]:
+            raise RuntimeError("P8 child planner hash differs from the frozen arm.")
+        scored = _score_p8_child(case_map[case_id], child)
+        _write_private_json(pair_dir / "arm-result.json", {**child, "score": scored})
+        pair_results[case_id][arm] = scored
+
+    if len(set(child_pids)) != 24:
+        raise RuntimeError("P8 matrix reused a child interpreter.")
+    paired_rows: list[dict[str, object]] = []
+    for case in cases:
+        p_result = pair_results[case.case_id]["P-current"]
+        c_result = pair_results[case.case_id]["C1"]
+        p_pass = bool(p_result["passed"])
+        c_pass = bool(c_result["passed"])
+        p_failure = str(p_result["first_divergence"])
+        c_failure = str(c_result["first_divergence"])
+        if c_pass and not p_pass:
+            delta = "C1_IMPROVEMENT"
+        elif p_pass and not c_pass:
+            delta = "C1_REGRESSION"
+        elif p_pass and c_pass:
+            delta = "SAFE_MATCH"
+        elif p_failure == c_failure:
+            delta = "SAME_FAILURE_CLASS"
+        else:
+            delta = "C1_FAILURE_CLASS_CHANGE"
+        paired_rows.append(
+            {
+                "case_id": case.case_id,
+                "role": case.protected_role,
+                "source_fixture": case.source_fixture,
+                "source_checkpoint": case.source_checkpoint,
+                "source_blob_sha256": case.source_blob_sha256,
+                "request_sha256": case.request_sha256,
+                "P-current": p_result,
+                "C1": c_result,
+                "paired_disposition": delta,
+            }
+        )
+
+    infrastructure_failure = any(
+        result.get("first_divergence") == "TRANSPORT"
+        for row in paired_rows
+        for result in (row["P-current"], row["C1"])
+    )
+    c1_regressions = [
+        row["case_id"] for row in paired_rows if row["paired_disposition"] == "C1_REGRESSION"
+    ]
+    failure_class_changes = [
+        row["case_id"]
+        for row in paired_rows
+        if row["paired_disposition"] == "C1_FAILURE_CLASS_CHANGE"
+    ]
+    terminal = (
+        "A10_SEM_C1_P8_HARNESS_FAIL"
+        if infrastructure_failure
+        else "A10_SEM_C1_CANARY_FAIL"
+        if c1_regressions or failure_class_changes
+        else "A10_SEM_C1_P8_PASS - HISTORICAL_DEVELOPMENT_EVALUATION_AUTHORIZED"
+    )
+    summary = {
+        "terminal": terminal,
+        "population": {"cases": 12, "arms": list(P8_COMPARE_ARMS), "planner_invocations": 24},
+        "planner_revision_closure": closure,
+        "identity_probe_processes": identity_reports,
+        "case_child_pids": child_pids,
+        "provider_calls_max": 48,
+        "provider_calls_observed": physical_attempts,
+        "native_calls_per_invocation_max": P8_NATIVE_CALL_CAP,
+        "execution_controls": {
+            "model": FROZEN_MODEL,
+            "temperature": PLANNER_TEMPERATURE,
+            "max_output_tokens": MAX_OUTPUT_TOKENS,
+            "timeout_seconds_per_call": TIMEOUT_SECONDS,
+            "sdk_retries": 0,
+        },
+        "project_config_fingerprint_sha256": project_config.fingerprint_sha256,
+        "source_summary_sha256": sha256_text(canonical_json(FIXED_SOURCE_SUMMARY)),
+        "prompt_sha256_by_arm": dict(P8_EXPECTED_PROMPT_SHA256),
+        "wire_schema_sha256": P8_EXPECTED_SCHEMA_SHA256,
+        "c1_regression_case_ids": c1_regressions,
+        "c1_failure_class_change_case_ids": failure_class_changes,
+        "holdout_access": "NOT_ACCESSED",
+        "production_adoption": "NOT_AUTHORIZED",
+        "paired_results": paired_rows,
+    }
+    _write_private_json(output_dir / "paired-results.json", paired_rows)
+    _write_private_json(output_dir / "summary.json", summary)
+    hashes = []
+    for path in sorted(output_dir.rglob("*")):
+        if path.is_file() and path.name != "SHA256SUMS":
+            digest = artifact_sha256(path)
+            hashes.append(f"{digest}  {path.relative_to(output_dir).as_posix()}")
+    _write_private_bytes(output_dir / "SHA256SUMS", ("\n".join(hashes) + "\n").encode())
+    return summary
+
+
+def _write_private_bytes(path: Path, payload: bytes) -> None:
+    """Create a private immutable evidence artifact."""
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        _write_all(descriptor, payload)
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def prelive_report() -> dict[str, object]:
@@ -1000,6 +1773,13 @@ def _parser() -> argparse.ArgumentParser:
     """Build the provider-free default and explicitly gated live CLI."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live-authorized", action="store_true")
+    parser.add_argument("--p8-compare-authorized", action="store_true")
+    parser.add_argument("--p8-preflight", action="store_true")
+    parser.add_argument("--p8-output-dir")
+    parser.add_argument("--p8-child-case")
+    parser.add_argument("--p8-arm", choices=P8_COMPARE_ARMS)
+    parser.add_argument("--p8-raw-io")
+    parser.add_argument("--p8-verify-arm", choices=P8_COMPARE_ARMS)
     parser.add_argument("--authorized-checkpoint")
     parser.add_argument("--base-url")
     parser.add_argument("--api-key-file")
@@ -1010,13 +1790,28 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     """Run provider-free validation unless explicit live flags are supplied."""
     args = _parser().parse_args(argv)
-    if not args.live_authorized:
-        print(json.dumps(prelive_report(), indent=2, sort_keys=True))
+    if args.p8_verify_arm:
+        print(json.dumps(_run_identity_probe(args.p8_verify_arm), sort_keys=True))
         return 0
-    if not args.authorized_checkpoint or not args.base_url:
-        raise SystemExit("Live CM-57P8 requires --authorized-checkpoint and --base-url.")
-    asyncio.run(_run_live(args, args.authorized_checkpoint))
-    return 0
+    if args.p8_preflight:
+        print(json.dumps(p8_revision_preflight(), indent=2, sort_keys=True))
+        return 0
+    if args.p8_child_case:
+        if not args.p8_arm or not args.p8_raw_io:
+            raise SystemExit("P8 child requires case, arm and raw-I/O path.")
+        print(json.dumps(asyncio.run(_run_p8_child(args)), sort_keys=True, ensure_ascii=False))
+        return 0
+    if args.p8_compare_authorized:
+        if not args.p8_output_dir:
+            raise SystemExit("P8 comparison requires --p8-output-dir.")
+        print(json.dumps(_run_p8_revision_comparison(args), indent=2, sort_keys=True))
+        return 0
+    if args.live_authorized:
+        raise SystemExit("The historical CM-57P8 prompt-factor live mode is retired.")
+    if not args.live_authorized:
+        print(json.dumps(p8_revision_preflight(), indent=2, sort_keys=True))
+        return 0
+    raise SystemExit("Unsupported CM-57P8 invocation.")
 
 
 if __name__ == "__main__":

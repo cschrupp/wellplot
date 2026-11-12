@@ -128,6 +128,15 @@ def test_b01_holdout_is_matched_by_exact_request_bytes() -> None:
     assert result["fresh_holdout_count"] == 52
 
 
+def test_p8_frozen_revision_production_closure_is_planner_only() -> None:
+    """The immutable P-current/C1 revisions differ only at planner.py in src."""
+    result = adapter.verify_planner_revision_closure(REPO_ROOT)
+
+    assert result["changed_production_paths"] == [adapter.PLANNER_PATH]
+    assert result["arms"]["P-current"]["blob"] == "6213f258ec0aab794febc1708072c85b533b25d9"
+    assert result["arms"]["C1"]["blob"] == "0a322161ab81b7df2c9fcc6e907ed13b6433a062"
+
+
 @pytest.mark.parametrize(
     ("boundary", "detail", "historical"),
     [

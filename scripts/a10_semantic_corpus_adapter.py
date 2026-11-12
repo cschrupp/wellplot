@@ -59,6 +59,65 @@ P7_RAW_SHA256 = "4aebee0d2734cb272c6ae002aec277e58427dd5dce44e38e5fdf1a14a4dccd1
 P8_FIXTURE = "tests/fixtures/typed_worker/cm57p8_prompt_factor_cases.json"
 P8_RAW_SHA256 = "32ed1e0de1ca8e6ec7c771b50a7ab8ffcc7675503c7951ccd8b6bf401318bb5a"
 HOLDOUT_FIXTURE = "workspace/evaluations/a10-sem-01-20261110/benchmark.json"
+P_CURRENT_REVISION = "1b9ead3c4a"
+C1_REVISION = "3a2cfbe3e9"
+P_CURRENT_SHA = "1b9ead3c4acdf70dea0bce6475150f6219421988"
+C1_SHA = "3a2cfbe3e9d61acdde2a072828e2256f59abcc4b"
+PLANNER_PATH = "src/wellplot/agent/code_mode/planner.py"
+PRODUCTION_ROOT = "src/wellplot/"
+P8_ARMS = ("P-current", "C1")
+
+
+def verify_planner_revision_closure(repo_root: Path) -> dict[str, Any]:
+    """Prove the two frozen revisions differ only in planner runtime code."""
+    root = repo_root.resolve()
+    changed = subprocess.run(
+        ["git", "diff", "--name-only", P_CURRENT_REVISION, C1_REVISION, "--", PRODUCTION_ROOT],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    if changed != [PLANNER_PATH]:
+        raise CorpusIntegrityError(f"Planner production revision closure differs: {changed!r}")
+    identities: dict[str, dict[str, str]] = {}
+    for arm, revision in (("P-current", P_CURRENT_SHA), ("C1", C1_SHA)):
+        blob = subprocess.run(
+            ["git", "rev-parse", f"{revision}:{PLANNER_PATH}"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        source = subprocess.run(
+            ["git", "show", f"{revision}:{PLANNER_PATH}"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+        ).stdout
+        identities[arm] = {
+            "revision": subprocess.run(
+                ["git", "rev-parse", revision],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip(),
+            "blob": blob,
+            "sha256": _sha256(source),
+        }
+    return {"changed_production_paths": changed, "arms": identities}
+
+
+def p8_pair_population(repo_root: Path) -> tuple[tuple[str, str], ...]:
+    """Return the exact case/arm population, excluding all holdout cases."""
+    canaries = load_corpus_index(repo_root).canary_cases
+    pairs = tuple((case.case_id, arm) for case in canaries for arm in P8_ARMS)
+    if len(canaries) != 12 or len(pairs) != 24:
+        raise CorpusIntegrityError("P8 requires exactly 12 canaries and 24 case/arm pairs")
+    if len({case_id for case_id, _ in pairs}) != 12:
+        raise CorpusIntegrityError("P8 canary case identities are not unique")
+    return pairs
 
 
 class CorpusIntegrityError(ValueError):
