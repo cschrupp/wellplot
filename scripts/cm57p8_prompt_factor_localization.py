@@ -50,6 +50,13 @@ P8_PLANNER_PATH = "src/wellplot/agent/code_mode/planner.py"
 P8_SMOKE_CASE_ID = "B01"
 P8_SMOKE_REQUEST = "Plot Gamma Ray."
 P8_SMOKE_REQUEST_SHA256 = "404a98eb0f9e40014aaf8312e53aea8a3267ea076963bff7420f1827196d7517"
+P8_SMOKE_CASE_STATUS = "EXPOSED_DIAGNOSTIC_CASE"
+P8_HISTORICAL_NON_GATING_TEST_FAILURES = (
+    "test_manifest_and_frozen_contract_hashes_pass",
+    "test_factor_prompts_change_only_the_frozen_system_suffix",
+    "test_p8_does_not_use_nonempty_report_or_invariant_schema",
+    "test_prelive_report_constructs_no_provider",
+)
 P8_RAW_IO_RECORD_LIMIT = 1_048_576
 P8_RAW_IO_FILE_LIMIT = 6 * P8_RAW_IO_RECORD_LIMIT
 
@@ -1091,24 +1098,11 @@ def _p8_smoke_inputs() -> dict[str, object]:
     """Load the approved B01 request and metadata-only source context."""
     from scripts import nlp_d5_live_semantic_qualification as d5
 
-    benchmark_path = REPO_ROOT / d5.A10_SEM_01_BENCHMARK
-    benchmark = json.loads(benchmark_path.read_text(encoding="utf-8"))
-    cases = benchmark.get("cases")
-    if not isinstance(cases, list):
-        raise RuntimeError("P8 smoke benchmark case inventory is invalid.")
-    matches = [
-        case for case in cases if isinstance(case, dict) and case.get("id") == P8_SMOKE_CASE_ID
-    ]
-    if len(matches) != 1:
-        raise RuntimeError("P8 smoke B01 case is missing or duplicated.")
-    source_case = matches[0]
-    request = source_case.get("request")
     if (
-        request != P8_SMOKE_REQUEST
-        or sha256_text(str(request)) != P8_SMOKE_REQUEST_SHA256
-        or source_case.get("source") != "approved_las"
+        sha256_text(P8_SMOKE_REQUEST) != P8_SMOKE_REQUEST_SHA256
+        or d5.A10_SEM_02_SMOKE_CASE_ID != P8_SMOKE_CASE_ID
     ):
-        raise RuntimeError("P8 smoke request or approved source identity drifted.")
+        raise RuntimeError("P8 smoke request or exposed diagnostic identity drifted.")
 
     case = {
         "case_id": P8_SMOKE_CASE_ID,
@@ -1123,7 +1117,8 @@ def _p8_smoke_inputs() -> dict[str, object]:
         raise RuntimeError("P8 smoke context unexpectedly loaded numerical samples.")
     return {
         "case": case,
-        "benchmark_sha256": artifact_sha256(benchmark_path),
+        "case_status": P8_SMOKE_CASE_STATUS,
+        "fresh_holdout_cases_accessed": 0,
         "document_summary": context["document_summary"],
         "source_summary": context["source_summary"],
         "document_summary_sha256": sha256_text(canonical_json(context["document_summary"])),
@@ -1391,7 +1386,8 @@ async def _run_p8_child(args: argparse.Namespace) -> dict[str, object]:
         "elapsed_seconds": time.monotonic() - started,
         "smoke": (
             {
-                "benchmark_sha256": smoke_inputs["benchmark_sha256"],
+                "case_status": smoke_inputs["case_status"],
+                "fresh_holdout_cases_accessed": smoke_inputs["fresh_holdout_cases_accessed"],
                 "source_asset_identity": smoke_inputs["source_asset_identity"],
                 "source_sha256_before": smoke_inputs["source_sha256_before"],
                 "source_sha256_after_inspection": smoke_inputs["source_sha256_after_inspection"],
@@ -1699,6 +1695,7 @@ def _run_p8_b01_smoke(args: argparse.Namespace) -> dict[str, object]:
             "branch": _git_output("branch", "--show-current").decode().strip(),
             "request": P8_SMOKE_REQUEST,
             "request_sha256": P8_SMOKE_REQUEST_SHA256,
+            "case_status": P8_SMOKE_CASE_STATUS,
             "source_asset_identity": smoke_inputs["source_asset_identity"],
             "source_sha256_before": smoke_inputs["source_sha256_before"],
             "source_sha256_after_inspection": smoke_inputs["source_sha256_after_inspection"],
@@ -1718,7 +1715,12 @@ def _run_p8_b01_smoke(args: argparse.Namespace) -> dict[str, object]:
             "native_call_cap_per_arm": P8_NATIVE_CALL_CAP,
             "physical_generation_cap_total": 4,
             "holdout_access": "NOT_ACCESSED",
+            "fresh_holdout_cases_accessed": 0,
             "semantic_scoring": "NOT_PERFORMED",
+            "historical_non_gating_test_failures": {
+                "test_ids": list(P8_HISTORICAL_NON_GATING_TEST_FAILURES),
+                "classification": "STALE_FROZEN_HASH_EXPECTATIONS_RETIRED_CM_57P8_MODE",
+            },
         },
     )
 
@@ -1910,6 +1912,7 @@ def _run_p8_b01_smoke(args: argparse.Namespace) -> dict[str, object]:
         "checkpoint": current_checkout_sha(),
         "request": P8_SMOKE_REQUEST,
         "request_sha256": P8_SMOKE_REQUEST_SHA256,
+        "case_status": P8_SMOKE_CASE_STATUS,
         "arms": arm_results,
         "logical_planner_invocations_started": logical_invocations_started,
         "physical_generations": physical_generation_count,
@@ -1921,7 +1924,12 @@ def _run_p8_b01_smoke(args: argparse.Namespace) -> dict[str, object]:
         },
         "source_identity_after_smoke": {},
         "holdout_access": "NOT_ACCESSED",
+        "fresh_holdout_cases_accessed": 0,
         "semantic_scoring": "NOT_PERFORMED",
+        "historical_non_gating_test_failures": {
+            "test_ids": list(P8_HISTORICAL_NON_GATING_TEST_FAILURES),
+            "classification": "STALE_FROZEN_HASH_EXPECTATIONS_RETIRED_CM_57P8_MODE",
+        },
         "downstream_stage_calls": {
             "report_worker": 0,
             "section_worker": 0,
@@ -2052,8 +2060,8 @@ def p8_smoke_preflight() -> dict[str, object]:
         "provider_calls": 0,
         "model_calls": 0,
         "case_id": P8_SMOKE_CASE_ID,
+        "case_status": P8_SMOKE_CASE_STATUS,
         "request_sha256": P8_SMOKE_REQUEST_SHA256,
-        "benchmark_sha256": smoke_inputs["benchmark_sha256"],
         "source_asset_identity": smoke_inputs["source_asset_identity"],
         "source_revision_before": smoke_inputs["source_revision_before"],
         "source_revision_after_inspection": smoke_inputs["source_revision_after_inspection"],
@@ -2080,7 +2088,12 @@ def p8_smoke_preflight() -> dict[str, object]:
         "physical_generation_cap_total": 4,
         "downstream_stages": "FORBIDDEN",
         "holdout_access": "NOT_ACCESSED",
+        "fresh_holdout_cases_accessed": 0,
         "semantic_scoring": "NOT_PERFORMED",
+        "historical_non_gating_test_failures": {
+            "test_ids": list(P8_HISTORICAL_NON_GATING_TEST_FAILURES),
+            "classification": "STALE_FROZEN_HASH_EXPECTATIONS_RETIRED_CM_57P8_MODE",
+        },
     }
 
 

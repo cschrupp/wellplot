@@ -605,6 +605,7 @@ def test_p8_b01_smoke_preflight_uses_approved_las_without_provider_calls() -> No
 
     assert report["status"] == "P8_B01_SMOKE_PROVIDER_FREE_PREFLIGHT_PASS"
     assert report["case_id"] == "B01"
+    assert report["case_status"] == "EXPOSED_DIAGNOSTIC_CASE"
     assert report["request_sha256"] == p8.P8_SMOKE_REQUEST_SHA256
     assert report["source_asset_identity"]["sha256"] == (
         "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9"
@@ -613,9 +614,37 @@ def test_p8_b01_smoke_preflight_uses_approved_las_without_provider_calls() -> No
     assert report["provider_calls"] == 0
     assert report["model_calls"] == 0
     assert report["holdout_access"] == "NOT_ACCESSED"
+    assert report["fresh_holdout_cases_accessed"] == 0
+    assert "benchmark_sha256" not in report
     assert report["logical_invocations"] == 2
     assert report["physical_generation_cap_total"] == 4
     assert report["semantic_scoring"] == "NOT_PERFORMED"
+
+
+def test_p8_b01_smoke_inputs_never_open_frozen_benchmark(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The exposed diagnostic smoke path must not inspect the holdout benchmark."""
+    from scripts import nlp_d5_live_semantic_qualification as d5
+
+    benchmark_path = (p8.REPO_ROOT / d5.A10_SEM_01_BENCHMARK).resolve()
+    original_read_text = Path.read_text
+    attempted_paths: list[Path] = []
+
+    def guarded_read_text(path: Path, *args: object, **kwargs: object) -> str:
+        if path.resolve() == benchmark_path:
+            attempted_paths.append(path)
+            raise AssertionError("B01 smoke must not read the frozen benchmark")
+        return original_read_text(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", guarded_read_text)
+    inputs = p8._p8_smoke_inputs()
+
+    assert attempted_paths == []
+    assert inputs["case_status"] == "EXPOSED_DIAGNOSTIC_CASE"
+    assert inputs["case"]["request"] == "Plot Gamma Ray."
+    assert inputs["fresh_holdout_cases_accessed"] == 0
+    assert "benchmark_sha256" not in inputs
 
 
 def test_p8_smoke_trace_stops_only_after_schema_valid_wire() -> None:
