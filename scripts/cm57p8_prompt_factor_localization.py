@@ -1165,7 +1165,7 @@ class RevisionCaptureBackend(ModelBackendProtocol):
         self.observer.bind_model_io(
             lambda record: _append_private_json_line(self.raw_io_path, record)
         )
-        self.observer.bind_physical_attempt(self._physical_attempt)
+        self.observer.callback = self._physical_attempt
 
     def _physical_attempt(self, _logical_index: int) -> None:
         self.physical_attempts += 1
@@ -2412,8 +2412,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.p8_smoke_authorized:
         if not args.p8_smoke_output_dir or not args.authorized_checkpoint:
             raise SystemExit("P8 smoke requires a fresh namespace and authorized checkpoint.")
-        print(json.dumps(_run_p8_b01_smoke(args), indent=2, sort_keys=True))
-        return 0
+        result = _run_p8_b01_smoke(args)
+        print(json.dumps(result, indent=2, sort_keys=True))
+        return (
+            0
+            if result.get("terminal")
+            == "A10_SEM_C1_P8_SMOKE_PASS — INDEPENDENT_ACCEPTANCE_REQUIRED"
+            else 2
+        )
     if args.p8_child_case:
         if not args.p8_arm or not args.p8_raw_io:
             raise SystemExit("P8 child requires case, arm and raw-I/O path.")

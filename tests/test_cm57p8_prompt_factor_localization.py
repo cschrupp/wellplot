@@ -809,6 +809,85 @@ def test_p8_raw_io_capture_enforces_record_and_file_limits(
         p8._append_private_json_line(path, {"long": "record"})
 
 
+def test_revision_capture_backend_uses_observer_callback_contract(
+    tmp_path: Path,
+) -> None:
+    """The real D5 observer records one attempt and preserves logical custody."""
+    from scripts import nlp_d5_live_semantic_qualification as d5
+
+    observer = d5._PhysicalAttemptObserver()
+    observer.set_active_turn("B01:C1")
+    raw_io_path = tmp_path / "model-io.jsonl"
+    backend = p8.RevisionCaptureBackend(
+        delegate=SimpleNamespace(model=p8.FROZEN_MODEL),
+        observer=observer,
+        raw_io_path=raw_io_path,
+        call_records=[],
+        wire_plans=[],
+    )
+    assert observer.callback == backend._physical_attempt
+
+    observer.logical_call_started(
+        {
+            "index": 1,
+            "generation_role": "planner",
+            "generation_purpose": "initial",
+            "model": p8.FROZEN_MODEL,
+        }
+    )
+    request = SimpleNamespace(
+        url=SimpleNamespace(path="/v1/chat/completions"),
+        content=b'{"messages": []}',
+    )
+    asyncio.run(observer.on_request(request))
+    observer.logical_call_completed(
+        {
+            "index": 1,
+            "generation_role": "planner",
+            "generation_purpose": "initial",
+            "model": p8.FROZEN_MODEL,
+            "outcome": "success",
+        }
+    )
+
+    records = [json.loads(line) for line in raw_io_path.read_text().splitlines()]
+    assert backend.physical_attempts == 1
+    assert [row["event"] for row in records] == ["physical_request", "logical_call_result"]
+    assert records[0]["turn_id"] == "B01:C1"
+    assert records[0]["logical_call_index"] == records[1]["logical_call_index"] == 1
+
+
+@pytest.mark.parametrize(
+    ("terminal", "expected_exit_code"),
+    (
+        ("A10_SEM_C1_P8_SMOKE_PASS — INDEPENDENT_ACCEPTANCE_REQUIRED", 0),
+        ("A10_SEM_C1_P8_SMOKE_FAIL — P8_NOT_AUTHORIZED", 2),
+        ("A10_SEM_C1_P8_SMOKE_INCONCLUSIVE — ENVIRONMENT_OR_HARNESS", 2),
+    ),
+)
+def test_p8_smoke_cli_exit_code_matches_sealed_terminal(
+    terminal: str,
+    expected_exit_code: int,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Only the exact sealed smoke PASS is successful to shell automation."""
+    monkeypatch.setattr(p8, "_run_p8_b01_smoke", lambda _args: {"terminal": terminal})
+
+    exit_code = p8.main(
+        [
+            "--p8-smoke-authorized",
+            "--p8-smoke-output-dir",
+            "/tmp/synthetic-smoke-output",
+            "--authorized-checkpoint",
+            "0" * 40,
+        ]
+    )
+
+    assert exit_code == expected_exit_code
+    assert json.loads(capsys.readouterr().out)["terminal"] == terminal
+
+
 def test_p8_preflight_freezes_exact_12_by_2_pairs_without_holdout_access(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
