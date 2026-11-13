@@ -47,6 +47,11 @@ P8_EXPECTED_PROMPT_SHA256 = {
     "C1": "4bb8005845dc8bd78ea5797e8887f35ea5afe085dace71ffcf31de0f1d2b9483",
 }
 P8_PLANNER_PATH = "src/wellplot/agent/code_mode/planner.py"
+P8_SMOKE_CASE_ID = "B01"
+P8_SMOKE_REQUEST = "Plot Gamma Ray."
+P8_SMOKE_REQUEST_SHA256 = "404a98eb0f9e40014aaf8312e53aea8a3267ea076963bff7420f1827196d7517"
+P8_RAW_IO_RECORD_LIMIT = 1_048_576
+P8_RAW_IO_FILE_LIMIT = 6 * P8_RAW_IO_RECORD_LIMIT
 
 
 def _bootstrap_p8_planner_arm() -> None:
@@ -103,6 +108,29 @@ from wellplot.agent.providers.base import (  # noqa: E402
 )
 from wellplot.capabilities import CapabilityRegistry, create_builtin_registry  # noqa: E402
 from wellplot.project_config import ProjectConfig, load_project_config  # noqa: E402
+
+
+class _P8SchemaValidWireCaptured(Exception):
+    """Stop smoke execution immediately after production wire validation."""
+
+
+def _capture_planner_trace(
+    event: dict[str, object],
+    trace: list[dict[str, object]],
+    *,
+    stop_after_schema_valid_wire: bool,
+) -> None:
+    """Retain bounded planner events and stop the smoke at the wire boundary."""
+    trace.append(
+        {
+            key: event.get(key)
+            for key in ("event", "attempt", "code", "response_schema")
+            if key in event
+        }
+    )
+    if stop_after_schema_valid_wire and event.get("event") == "PLANNER_GENERATION_PASS":
+        raise _P8SchemaValidWireCaptured
+
 
 MANIFEST_PATH = REPO_ROOT / "tests/fixtures/typed_worker/cm57p8_prompt_factor_cases.json"
 P7_CASE_PATH = REPO_ROOT / "tests/fixtures/typed_worker/cm57p7_fresh_promotion.json"
@@ -1059,9 +1087,65 @@ def _p8_project_config() -> ProjectConfig:
     return config
 
 
+def _p8_smoke_inputs() -> dict[str, object]:
+    """Load the approved B01 request and metadata-only source context."""
+    from scripts import nlp_d5_live_semantic_qualification as d5
+
+    benchmark_path = REPO_ROOT / d5.A10_SEM_01_BENCHMARK
+    benchmark = json.loads(benchmark_path.read_text(encoding="utf-8"))
+    cases = benchmark.get("cases")
+    if not isinstance(cases, list):
+        raise RuntimeError("P8 smoke benchmark case inventory is invalid.")
+    matches = [
+        case for case in cases if isinstance(case, dict) and case.get("id") == P8_SMOKE_CASE_ID
+    ]
+    if len(matches) != 1:
+        raise RuntimeError("P8 smoke B01 case is missing or duplicated.")
+    source_case = matches[0]
+    request = source_case.get("request")
+    if (
+        request != P8_SMOKE_REQUEST
+        or sha256_text(str(request)) != P8_SMOKE_REQUEST_SHA256
+        or source_case.get("source") != "approved_las"
+    ):
+        raise RuntimeError("P8 smoke request or approved source identity drifted.")
+
+    case = {
+        "case_id": P8_SMOKE_CASE_ID,
+        "request": P8_SMOKE_REQUEST,
+        "source_key": d5.A10_SEM_02_SMOKE_SOURCE_KEY,
+        "source_path": d5.A10_SEM_02_SMOKE_SOURCE_PATH,
+        "source_format": "las",
+        "source_sha256": d5.A10_SEM_02_SMOKE_SOURCE_SHA256,
+    }
+    context = d5._build_planner_smoke_inputs(REPO_ROOT, case)
+    if context.get("numeric_sample_apis_invoked") is not False:
+        raise RuntimeError("P8 smoke context unexpectedly loaded numerical samples.")
+    return {
+        "case": case,
+        "benchmark_sha256": artifact_sha256(benchmark_path),
+        "document_summary": context["document_summary"],
+        "source_summary": context["source_summary"],
+        "document_summary_sha256": sha256_text(canonical_json(context["document_summary"])),
+        "source_summary_sha256": sha256_text(canonical_json(context["source_summary"])),
+        "source_asset_identity": context["source_asset_identity"],
+        "source_sha256_before": context["source_sha256_before"],
+        "source_sha256_after_inspection": context["source_sha256_after_inspection"],
+        "source_revision_before": context["source_revision_before"],
+        "source_revision_after_inspection": context["source_revision_after_inspection"],
+        "source_channel_count": context["source_channel_count"],
+        "numeric_sample_apis_invoked": False,
+    }
+
+
 def _append_private_json_line(path: Path, record: dict[str, object]) -> None:
     """Append one raw-I/O custody record to a new private file."""
     encoded = (json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n").encode("utf-8")
+    if len(encoded) > P8_RAW_IO_RECORD_LIMIT:
+        raise RuntimeError("P8 raw-I/O record exceeds its private custody limit.")
+    current_size = path.stat().st_size if path.exists() else 0
+    if current_size + len(encoded) > P8_RAW_IO_FILE_LIMIT:
+        raise RuntimeError("P8 raw-I/O artifact exceeds its private custody limit.")
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
     try:
         _write_all(descriptor, encoded)
@@ -1192,7 +1276,9 @@ async def _run_p8_child(args: argparse.Namespace) -> dict[str, object]:
     if arm not in P8_COMPARE_ARMS or os.environ.get(P8_REVISION_ARM_ENV) != arm:
         raise RuntimeError("P8 child arm does not match its pre-import revision selection.")
     identity = _p8_planner_identity(arm)
-    case = _p8_case_by_id(args.p8_child_case)
+    smoke_mode = bool(args.p8_smoke_child_b01)
+    smoke_inputs = _p8_smoke_inputs() if smoke_mode else None
+    case = smoke_inputs["case"] if smoke_inputs else _p8_case_by_id(args.p8_child_case)
     raw_io_path = Path(args.p8_raw_io).resolve()
     raw_io_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     if raw_io_path.exists():
@@ -1202,7 +1288,7 @@ async def _run_p8_child(args: argparse.Namespace) -> dict[str, object]:
     from scripts import nlp_d5_live_semantic_qualification as d5
 
     observer = d5._PhysicalAttemptObserver()
-    observer.set_active_turn(f"{args.p8_child_case}:{arm}")
+    observer.set_active_turn(f"{case['case_id']}:{arm}")
     observer.callback = lambda _logical_index: None
     import httpx
     from openai import AsyncOpenAI
@@ -1241,12 +1327,10 @@ async def _run_p8_child(args: argparse.Namespace) -> dict[str, object]:
     trace: list[dict[str, object]] = []
 
     def capture_trace(event: dict[str, object]) -> None:
-        trace.append(
-            {
-                key: event.get(key)
-                for key in ("event", "attempt", "code", "response_schema")
-                if key in event
-            }
+        _capture_planner_trace(
+            event,
+            trace,
+            stop_after_schema_valid_wire=smoke_mode,
         )
 
     planner = SemanticPlanner(
@@ -1259,14 +1343,18 @@ async def _run_p8_child(args: argparse.Namespace) -> dict[str, object]:
     try:
         plan = await planner.plan(
             request=str(case["request"]),
-            mode="reconstruct",
-            current_document_summary={},
-            source_summary=FIXED_SOURCE_SUMMARY,
+            mode="revise" if smoke_mode else "reconstruct",
+            current_document_summary=(smoke_inputs["document_summary"] if smoke_inputs else {}),
+            source_summary=(
+                smoke_inputs["source_summary"] if smoke_inputs else FIXED_SOURCE_SUMMARY
+            ),
             timeout_seconds=TIMEOUT_SECONDS,
             temperature=PLANNER_TEMPERATURE,
             max_output_tokens=MAX_OUTPUT_TOKENS,
         )
         terminal["planner_returned"] = plan is not None
+    except _P8SchemaValidWireCaptured:
+        terminal = {"kind": "schema_valid_wire_captured"}
     except PlannerSemanticFailure as error:
         terminal = {"kind": "planner_semantic_failure", "code": error.code}
     except ProviderRequestError as error:
@@ -1283,10 +1371,12 @@ async def _run_p8_child(args: argparse.Namespace) -> dict[str, object]:
     if backend.physical_attempts > P8_NATIVE_CALL_CAP:
         raise RuntimeError("P8 provider transport exceeded the bounded physical-attempt budget.")
     return {
-        "case_id": args.p8_child_case,
+        "case_id": str(case["case_id"]),
         "arm": arm,
         "request_sha256": sha256_text(str(case["request"])),
         "planner_identity": identity,
+        "provider_client_constructed": True,
+        "structured_backend_constructed": True,
         "project_config_fingerprint_sha256": project_config.fingerprint_sha256,
         "wire_schema_sha256": P8_EXPECTED_SCHEMA_SHA256,
         "call_records": backend.call_records,
@@ -1299,6 +1389,34 @@ async def _run_p8_child(args: argparse.Namespace) -> dict[str, object]:
         "planner_trace": trace,
         "raw_io_relative_path": str(Path(args.p8_raw_io).relative_to(REPO_ROOT)),
         "elapsed_seconds": time.monotonic() - started,
+        "smoke": (
+            {
+                "benchmark_sha256": smoke_inputs["benchmark_sha256"],
+                "source_asset_identity": smoke_inputs["source_asset_identity"],
+                "source_sha256_before": smoke_inputs["source_sha256_before"],
+                "source_sha256_after_inspection": smoke_inputs["source_sha256_after_inspection"],
+                "source_revision_before": smoke_inputs["source_revision_before"],
+                "source_revision_after_inspection": smoke_inputs[
+                    "source_revision_after_inspection"
+                ],
+                "source_channel_count": smoke_inputs["source_channel_count"],
+                "document_summary_sha256": smoke_inputs["document_summary_sha256"],
+                "source_summary_sha256": smoke_inputs["source_summary_sha256"],
+                "numeric_sample_apis_invoked": False,
+                "downstream_stage_calls": {
+                    "report_worker": 0,
+                    "section_worker": 0,
+                    "reconciliation": 0,
+                    "execution": 0,
+                    "persistence": 0,
+                    "rendering": 0,
+                    "preview": 0,
+                    "scientific_grading": 0,
+                },
+            }
+            if smoke_inputs
+            else None
+        ),
     }
 
 
@@ -1457,6 +1575,382 @@ def _p8_child_command(
     return command, child_env
 
 
+def _p8_smoke_child_command(arm: str, raw_io_path: Path) -> tuple[list[str], dict[str, str]]:
+    """Build one B01 smoke child invocation in a fresh canonical interpreter."""
+    command = [
+        sys.executable,
+        str(Path(__file__).resolve()),
+        "--p8-smoke-child-b01",
+        "--p8-arm",
+        arm,
+        "--p8-raw-io",
+        str(raw_io_path),
+    ]
+    child_env = dict(os.environ)
+    child_env[P8_REVISION_ARM_ENV] = arm
+    child_env["WELLPLOT_P8_SMOKE_CHILD"] = "B01"
+    return command, child_env
+
+
+def _p8_smoke_downstream_zero(child: dict[str, object]) -> bool:
+    """Require the planner-only smoke to stop before every downstream stage."""
+    smoke = child.get("smoke")
+    if not isinstance(smoke, dict):
+        return False
+    calls = smoke.get("downstream_stage_calls")
+    return (
+        isinstance(calls, dict)
+        and set(calls)
+        == {
+            "report_worker",
+            "section_worker",
+            "reconciliation",
+            "execution",
+            "persistence",
+            "rendering",
+            "preview",
+            "scientific_grading",
+        }
+        and all(value == 0 for value in calls.values())
+        and smoke.get("numeric_sample_apis_invoked") is False
+    )
+
+
+def _p8_raw_io_events(path: Path) -> list[dict[str, object]]:
+    """Read complete request/response custody records from one arm artifact."""
+    if not path.is_file():
+        return []
+    events: list[dict[str, object]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            value = json.loads(line)
+            if not isinstance(value, dict):
+                raise RuntimeError("P8 raw-I/O custody record is not an object.")
+            events.append(value)
+    return events
+
+
+def _seal_p8_smoke_namespace(output_dir: Path) -> None:
+    """Write the immutable digest manifest for the completed smoke record."""
+    hashes = []
+    for path in sorted(output_dir.rglob("*")):
+        if path.is_file() and path.name != "SHA256SUMS":
+            hashes.append(f"{artifact_sha256(path)}  {path.relative_to(output_dir).as_posix()}")
+    _write_private_bytes(output_dir / "SHA256SUMS", ("\n".join(hashes) + "\n").encode())
+
+
+def _run_p8_b01_smoke(args: argparse.Namespace) -> dict[str, object]:
+    """Run one B01 planner-only smoke in each immutable P8 planner arm."""
+    from scripts import a10_semantic_corpus_adapter as adapter
+    from scripts import nlp_d5_live_semantic_qualification as d5
+    from wellplot.file_revision import file_revision_token
+
+    canonical_root = Path("/home/user/projects/well_log_os").resolve()
+    if (
+        Path.cwd().resolve() != canonical_root
+        or REPO_ROOT.resolve() != canonical_root
+        or Path(
+            subprocess.check_output(["git", "rev-parse", "--show-toplevel"], cwd=canonical_root)
+            .decode()
+            .strip()
+        ).resolve()
+        != canonical_root
+    ):
+        raise RuntimeError("P8 smoke must run from the canonical checkout.")
+    if current_checkout_sha() != args.authorized_checkpoint:
+        raise RuntimeError("P8 smoke checkpoint differs from explicit smoke authority.")
+    if _git_output("branch", "--show-current").decode().strip() != (
+        "engineering-d5-binding-path-repair"
+    ):
+        raise RuntimeError("P8 smoke branch differs from the authorized branch.")
+    d5._require_exact_planner_worktree(
+        canonical_root,
+        d5.A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN,
+    )
+
+    output_dir = Path(args.p8_smoke_output_dir).resolve()
+    evaluations_root = (canonical_root / "workspace/evaluations").resolve()
+    if not output_dir.is_relative_to(evaluations_root) or output_dir.exists():
+        raise RuntimeError("P8 smoke namespace must be fresh under workspace/evaluations.")
+
+    smoke_inputs = _p8_smoke_inputs()
+    source_path = canonical_root / d5.A10_SEM_02_SMOKE_SOURCE_PATH
+    source_revision_at_admission = file_revision_token(source_path)
+    source_sha_at_admission = artifact_sha256(source_path)
+    if (
+        source_revision_at_admission != smoke_inputs["source_revision_after_inspection"]
+        or source_sha_at_admission != d5.A10_SEM_02_SMOKE_SOURCE_SHA256
+    ):
+        raise RuntimeError("P8 smoke source changed after metadata preflight.")
+    project_config = _p8_project_config()
+    api_key = _read_p8_api_key()
+    closure = adapter.verify_planner_revision_closure(canonical_root)
+    identity_reports = _verify_p8_revision_arms()
+    preflight = p8_smoke_preflight()
+    if preflight["request_sha256"] != P8_SMOKE_REQUEST_SHA256:
+        raise RuntimeError("P8 smoke B01 request did not pass its frozen identity check.")
+
+    output_dir.mkdir(parents=True, mode=0o700)
+    os.chmod(output_dir, 0o700)
+    _write_private_json(
+        output_dir / "smoke-preflight.json",
+        {
+            "checkpoint": current_checkout_sha(),
+            "branch": _git_output("branch", "--show-current").decode().strip(),
+            "request": P8_SMOKE_REQUEST,
+            "request_sha256": P8_SMOKE_REQUEST_SHA256,
+            "source_asset_identity": smoke_inputs["source_asset_identity"],
+            "source_sha256_before": smoke_inputs["source_sha256_before"],
+            "source_sha256_after_inspection": smoke_inputs["source_sha256_after_inspection"],
+            "source_revision_before": smoke_inputs["source_revision_before"],
+            "source_revision_after_inspection": smoke_inputs["source_revision_after_inspection"],
+            "source_revision_at_admission": source_revision_at_admission,
+            "source_sha256_at_admission": source_sha_at_admission,
+            "source_channel_count": smoke_inputs["source_channel_count"],
+            "document_summary_sha256": smoke_inputs["document_summary_sha256"],
+            "source_summary_sha256": smoke_inputs["source_summary_sha256"],
+            "numeric_sample_apis_invoked": False,
+            "planner_revision_closure": closure,
+            "arm_identity_processes": identity_reports,
+            "wire_schema_sha256": P8_EXPECTED_SCHEMA_SHA256,
+            "project_config_fingerprint_sha256": project_config.fingerprint_sha256,
+            "logical_invocations": 2,
+            "native_call_cap_per_arm": P8_NATIVE_CALL_CAP,
+            "physical_generation_cap_total": 4,
+            "holdout_access": "NOT_ACCESSED",
+            "semantic_scoring": "NOT_PERFORMED",
+        },
+    )
+
+    try:
+        readiness = _p8_live_readiness(project_config, api_key)
+    except Exception as error:
+        failure = {
+            "terminal": "A10_SEM_C1_P8_SMOKE_INCONCLUSIVE — ENVIRONMENT_OR_HARNESS",
+            "classification": "READINESS_FAILED",
+            "exception_type": type(error).__name__,
+            "provider_calls": 0,
+            "model_calls": 0,
+            "generation_calls": 0,
+        }
+        _write_private_json(output_dir / "readiness-failure.json", failure)
+        _seal_p8_smoke_namespace(output_dir)
+        return failure
+    _write_private_json(output_dir / "readiness.json", readiness)
+
+    arm_results: dict[str, dict[str, object]] = {}
+    physical_generation_count = 0
+    logical_invocations_started = 0
+    harness_failure = False
+    arm_failure = False
+    for arm in P8_COMPARE_ARMS:
+        arm_dir = output_dir / "B01" / arm
+        arm_dir.mkdir(parents=True, mode=0o700)
+        os.chmod(arm_dir.parent, 0o700)
+        os.chmod(arm_dir, 0o700)
+        raw_io_path = arm_dir / "model-io.jsonl"
+        command, child_env = _p8_smoke_child_command(arm, raw_io_path)
+        logical_invocations_started += 1
+        try:
+            completed = subprocess.run(
+                command,
+                cwd=canonical_root,
+                env=child_env,
+                capture_output=True,
+                text=True,
+                timeout=2 * TIMEOUT_SECONDS + 30,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            raw_events = _p8_raw_io_events(raw_io_path)
+            observed_requests = sum(
+                event.get("event") == "physical_request" for event in raw_events
+            )
+            physical_generation_count += observed_requests
+            source_identity_after_child = {
+                "sha256": artifact_sha256(source_path),
+                "revision": file_revision_token(source_path),
+            }
+            _write_private_json(
+                arm_dir / "process-failure.json",
+                {
+                    "arm": arm,
+                    "failure": "child_timeout",
+                    "timeout_seconds": 2 * TIMEOUT_SECONDS + 30,
+                    "stdout_sha256": sha256_text(error.stdout or ""),
+                    "stderr_sha256": sha256_text(error.stderr or ""),
+                    "source_identity_after_child": source_identity_after_child,
+                },
+            )
+            harness_failure = True
+            arm_results[arm] = {
+                "status": "INCONCLUSIVE_CHILD_TIMEOUT",
+                "provider_calls": observed_requests,
+                "source_identity_after_child": source_identity_after_child,
+            }
+            continue
+
+        raw_events = _p8_raw_io_events(raw_io_path)
+        request_events = [event for event in raw_events if event.get("event") == "physical_request"]
+        response_events = [
+            event for event in raw_events if event.get("event") == "physical_response"
+        ]
+        physical_generation_count += len(request_events)
+        source_identity_after_child = {
+            "sha256": artifact_sha256(source_path),
+            "revision": file_revision_token(source_path),
+        }
+        source_unchanged = (
+            source_identity_after_child["sha256"] == d5.A10_SEM_02_SMOKE_SOURCE_SHA256
+            and source_identity_after_child["revision"] == source_revision_at_admission
+        )
+        if completed.returncode != 0:
+            _write_private_json(
+                arm_dir / "process-failure.json",
+                {
+                    "arm": arm,
+                    "returncode": completed.returncode,
+                    "stderr": completed.stderr,
+                    "stdout_sha256": sha256_text(completed.stdout),
+                    "source_identity_after_child": source_identity_after_child,
+                },
+            )
+            harness_failure = True
+            arm_results[arm] = {
+                "status": "CHILD_PROCESS_FAILURE",
+                "provider_calls": len(request_events),
+                "source_identity_after_child": source_identity_after_child,
+            }
+            continue
+
+        child = json.loads(completed.stdout)
+        if child.get("case_id") != P8_SMOKE_CASE_ID or child.get("arm") != arm:
+            harness_failure = True
+            arm_results[arm] = {"status": "CHILD_IDENTITY_MISMATCH"}
+            continue
+        identity = child.get("planner_identity")
+        if not isinstance(identity, dict):
+            harness_failure = True
+            arm_results[arm] = {"status": "PLANNER_IDENTITY_MISSING"}
+            continue
+        expected_identity = identity_reports[arm]
+        if any(
+            identity.get(key) != value for key, value in expected_identity.items() if key != "pid"
+        ):
+            harness_failure = True
+            arm_results[arm] = {"status": "PLANNER_IDENTITY_MISMATCH"}
+            continue
+        wire_plans = child.get("wire_plans", [])
+        logical_calls = int(child.get("call_count", 0))
+        observed_physical_calls = int(child.get("physical_attempt_count", 0))
+        call_cap_ok = (
+            logical_calls <= P8_NATIVE_CALL_CAP
+            and observed_physical_calls <= P8_NATIVE_CALL_CAP
+            and len(request_events) <= P8_NATIVE_CALL_CAP
+        )
+        successful = (
+            child.get("terminal", {}).get("kind") == "schema_valid_wire_captured"
+            and child.get("request_sha256") == P8_SMOKE_REQUEST_SHA256
+            and child.get("smoke", {}).get("document_summary_sha256")
+            == smoke_inputs["document_summary_sha256"]
+            and child.get("smoke", {}).get("source_summary_sha256")
+            == smoke_inputs["source_summary_sha256"]
+            and 1 <= logical_calls <= P8_NATIVE_CALL_CAP
+            and 1 <= observed_physical_calls <= P8_NATIVE_CALL_CAP
+            and observed_physical_calls == len(request_events)
+            and len(response_events) == len(request_events)
+            and isinstance(wire_plans, list)
+            and bool(wire_plans)
+            and _p8_smoke_downstream_zero(child)
+            and raw_io_path.stat().st_mode & 0o077 == 0
+            and source_unchanged
+        )
+        arm_result = {
+            **child,
+            "schema_valid_wire_output": bool(wire_plans),
+            "logical_planner_invocations": 1,
+            "provider_calls": len(request_events),
+            "response_count": len(response_events),
+            "source_identity_after_child": source_identity_after_child,
+            "smoke_pass": successful,
+        }
+        _write_private_json(arm_dir / "arm-result.json", arm_result)
+        arm_results[arm] = {
+            "status": (
+                "INCONCLUSIVE_CALL_CAP"
+                if not call_cap_ok
+                else "INCONCLUSIVE_SOURCE_CUSTODY"
+                if not source_unchanged
+                else "PASS"
+                if successful
+                else "FAIL"
+            ),
+            "process_id": identity["pid"],
+            "logical_planner_invocations": 1,
+            "provider_calls": len(request_events),
+            "source_identity_after_child": source_identity_after_child,
+            "wire_schema_sha256": child.get("wire_schema_sha256"),
+            "prompt_sha256": identity.get("prompt_sha256"),
+            "raw_io_relative_path": child.get("raw_io_relative_path"),
+            "downstream_stage_calls": child.get("smoke", {}).get("downstream_stage_calls"),
+        }
+        if not call_cap_ok or not source_unchanged:
+            harness_failure = True
+        elif not successful:
+            arm_failure = True
+
+    summary = {
+        "terminal": (
+            "A10_SEM_C1_P8_SMOKE_INCONCLUSIVE — ENVIRONMENT_OR_HARNESS"
+            if harness_failure
+            else "A10_SEM_C1_P8_SMOKE_FAIL — P8_NOT_AUTHORIZED"
+            if arm_failure
+            else "A10_SEM_C1_P8_SMOKE_PASS — INDEPENDENT_ACCEPTANCE_REQUIRED"
+        ),
+        "checkpoint": current_checkout_sha(),
+        "request": P8_SMOKE_REQUEST,
+        "request_sha256": P8_SMOKE_REQUEST_SHA256,
+        "arms": arm_results,
+        "logical_planner_invocations_started": logical_invocations_started,
+        "physical_generations": physical_generation_count,
+        "physical_generation_limit": 4,
+        "provider_calls": physical_generation_count,
+        "source_identity_at_admission": {
+            "sha256": source_sha_at_admission,
+            "revision": source_revision_at_admission,
+        },
+        "source_identity_after_smoke": {},
+        "holdout_access": "NOT_ACCESSED",
+        "semantic_scoring": "NOT_PERFORMED",
+        "downstream_stage_calls": {
+            "report_worker": 0,
+            "section_worker": 0,
+            "reconciliation": 0,
+            "execution": 0,
+            "persistence": 0,
+            "rendering": 0,
+            "preview": 0,
+            "scientific_grading": 0,
+        },
+    }
+    source_identity_after_smoke = {
+        "sha256": artifact_sha256(source_path),
+        "revision": file_revision_token(source_path),
+    }
+    summary["source_identity_after_smoke"] = source_identity_after_smoke
+    if (
+        source_identity_after_smoke["sha256"] != d5.A10_SEM_02_SMOKE_SOURCE_SHA256
+        or source_identity_after_smoke["revision"] != source_revision_at_admission
+    ):
+        summary["terminal"] = "A10_SEM_C1_P8_SMOKE_INCONCLUSIVE — ENVIRONMENT_OR_HARNESS"
+    if physical_generation_count > 4:
+        summary["terminal"] = "A10_SEM_C1_P8_SMOKE_INCONCLUSIVE — ENVIRONMENT_OR_HARNESS"
+        summary["call_cap_violation"] = True
+    _write_private_json(output_dir / "smoke-summary.json", summary)
+    _seal_p8_smoke_namespace(output_dir)
+    return summary
+
+
 def _write_private_json(path: Path, value: object) -> None:
     """Create one private JSON evidence file without overwriting prior evidence."""
     payload = (json.dumps(value, sort_keys=True, indent=2, ensure_ascii=False) + "\n").encode()
@@ -1543,6 +2037,98 @@ def p8_revision_preflight() -> dict[str, object]:
         "raw_io_custody": "one_private_model-io.jsonl_per_case_and_arm",
         "scoring": "downstream_parent_after_child_exit",
     }
+
+
+def p8_smoke_preflight() -> dict[str, object]:
+    """Qualify B01 smoke inputs and both arms without constructing a provider."""
+    from scripts import a10_semantic_corpus_adapter as adapter
+
+    smoke_inputs = _p8_smoke_inputs()
+    closure = adapter.verify_planner_revision_closure(REPO_ROOT)
+    identities = _verify_p8_revision_arms()
+    project_config = _p8_project_config()
+    return {
+        "status": "P8_B01_SMOKE_PROVIDER_FREE_PREFLIGHT_PASS",
+        "provider_calls": 0,
+        "model_calls": 0,
+        "case_id": P8_SMOKE_CASE_ID,
+        "request_sha256": P8_SMOKE_REQUEST_SHA256,
+        "benchmark_sha256": smoke_inputs["benchmark_sha256"],
+        "source_asset_identity": smoke_inputs["source_asset_identity"],
+        "source_revision_before": smoke_inputs["source_revision_before"],
+        "source_revision_after_inspection": smoke_inputs["source_revision_after_inspection"],
+        "source_channel_count": smoke_inputs["source_channel_count"],
+        "document_summary_sha256": smoke_inputs["document_summary_sha256"],
+        "source_summary_sha256": smoke_inputs["source_summary_sha256"],
+        "numeric_sample_apis_invoked": False,
+        "planner_revision_closure": closure,
+        "isolated_arm_identity_processes": identities,
+        "wire_schema_sha256": P8_EXPECTED_SCHEMA_SHA256,
+        "project_config": {
+            "fingerprint_sha256": project_config.fingerprint_sha256,
+            "provider": project_config.provider.name,
+            "model": project_config.provider.model,
+            "server_origin": project_config.server_origin,
+            "timeout_seconds": project_config.provider.timeout_seconds,
+            "configured_max_retries": project_config.provider.max_retries,
+            "effective_sdk_retries": 0,
+            "structured_output": project_config.runtime.structured_output,
+        },
+        "canonical_credential_file_readable": _p8_credential_available(),
+        "logical_invocations": 2,
+        "native_call_cap_per_arm": P8_NATIVE_CALL_CAP,
+        "physical_generation_cap_total": 4,
+        "downstream_stages": "FORBIDDEN",
+        "holdout_access": "NOT_ACCESSED",
+        "semantic_scoring": "NOT_PERFORMED",
+    }
+
+
+def _p8_live_readiness(project_config: ProjectConfig, api_key: str) -> dict[str, object]:
+    """Perform bounded authenticated GET readiness checks without generation."""
+    import httpx
+
+    endpoints = (
+        ("/v1/models", project_config.model_catalog_url),
+        ("/props", project_config.props_url),
+    )
+    results: dict[str, object] = {}
+    with httpx.Client(timeout=10.0, headers={"Authorization": f"Bearer {api_key}"}) as client:
+        for name, url in endpoints:
+            with client.stream("GET", url) as response:
+                response.raise_for_status()
+                chunks: list[bytes] = []
+                total_bytes = 0
+                for chunk in response.iter_bytes():
+                    total_bytes += len(chunk)
+                    if total_bytes > 1_048_576:
+                        raise RuntimeError(f"P8 smoke readiness response too large: {name}")
+                    chunks.append(chunk)
+                payload = json.loads(b"".join(chunks))
+                if name == "/v1/models":
+                    data = payload.get("data") if isinstance(payload, dict) else None
+                    model_ids = [
+                        item.get("id")
+                        for item in data or []
+                        if isinstance(item, dict) and isinstance(item.get("id"), str)
+                    ]
+                    if FROZEN_MODEL not in model_ids:
+                        raise RuntimeError("P8 smoke readiness model identity mismatch.")
+                    results[name] = {"http_status": response.status_code, "model_ids": model_ids}
+                else:
+                    alias = payload.get("model_alias") if isinstance(payload, dict) else None
+                    if alias != FROZEN_MODEL:
+                        raise RuntimeError("P8 smoke runtime model alias mismatch.")
+                    results[name] = {
+                        "http_status": response.status_code,
+                        "model_alias": alias,
+                        "context_tokens": payload.get("default_generation_settings", {}).get(
+                            "n_ctx"
+                        ),
+                        "total_slots": payload.get("total_slots"),
+                        "is_sleeping": payload.get("is_sleeping"),
+                    }
+    return results
 
 
 def _validate_p8_child_budget(child: dict[str, object]) -> None:
@@ -1775,6 +2361,10 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--live-authorized", action="store_true")
     parser.add_argument("--p8-compare-authorized", action="store_true")
     parser.add_argument("--p8-preflight", action="store_true")
+    parser.add_argument("--p8-smoke-preflight", action="store_true")
+    parser.add_argument("--p8-smoke-authorized", action="store_true")
+    parser.add_argument("--p8-smoke-output-dir")
+    parser.add_argument("--p8-smoke-child-b01", action="store_true")
     parser.add_argument("--p8-output-dir")
     parser.add_argument("--p8-child-case")
     parser.add_argument("--p8-arm", choices=P8_COMPARE_ARMS)
@@ -1795,6 +2385,21 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.p8_preflight:
         print(json.dumps(p8_revision_preflight(), indent=2, sort_keys=True))
+        return 0
+    if args.p8_smoke_preflight:
+        print(json.dumps(p8_smoke_preflight(), indent=2, sort_keys=True))
+        return 0
+    if args.p8_smoke_child_b01:
+        if os.environ.get("WELLPLOT_P8_SMOKE_CHILD") != "B01":
+            raise SystemExit("B01 smoke child can only be launched by its coordinator.")
+        if not args.p8_arm or not args.p8_raw_io:
+            raise SystemExit("B01 smoke child requires arm and raw-I/O custody path.")
+        print(json.dumps(asyncio.run(_run_p8_child(args)), sort_keys=True, ensure_ascii=False))
+        return 0
+    if args.p8_smoke_authorized:
+        if not args.p8_smoke_output_dir or not args.authorized_checkpoint:
+            raise SystemExit("P8 smoke requires a fresh namespace and authorized checkpoint.")
+        print(json.dumps(_run_p8_b01_smoke(args), indent=2, sort_keys=True))
         return 0
     if args.p8_child_case:
         if not args.p8_arm or not args.p8_raw_io:

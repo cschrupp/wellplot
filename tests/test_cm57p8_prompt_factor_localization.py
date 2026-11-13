@@ -599,6 +599,187 @@ def test_p8_revision_preflight_qualifies_two_fresh_planner_processes() -> None:
     assert identities["C1"]["prompt_sha256"] == p8.P8_EXPECTED_PROMPT_SHA256["C1"]
 
 
+def test_p8_b01_smoke_preflight_uses_approved_las_without_provider_calls() -> None:
+    """The smoke case is B01, source-bound, and metadata-only before inference."""
+    report = p8.p8_smoke_preflight()
+
+    assert report["status"] == "P8_B01_SMOKE_PROVIDER_FREE_PREFLIGHT_PASS"
+    assert report["case_id"] == "B01"
+    assert report["request_sha256"] == p8.P8_SMOKE_REQUEST_SHA256
+    assert report["source_asset_identity"]["sha256"] == (
+        "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9"
+    )
+    assert report["numeric_sample_apis_invoked"] is False
+    assert report["provider_calls"] == 0
+    assert report["model_calls"] == 0
+    assert report["holdout_access"] == "NOT_ACCESSED"
+    assert report["logical_invocations"] == 2
+    assert report["physical_generation_cap_total"] == 4
+    assert report["semantic_scoring"] == "NOT_PERFORMED"
+
+
+def test_p8_smoke_trace_stops_only_after_schema_valid_wire() -> None:
+    """The smoke stop sentinel is raised at production wire validation only."""
+    trace: list[dict[str, object]] = []
+    p8._capture_planner_trace(
+        {"event": "PLANNER_GENERATION_ENTER", "attempt": 1},
+        trace,
+        stop_after_schema_valid_wire=True,
+    )
+    with pytest.raises(p8._P8SchemaValidWireCaptured):
+        p8._capture_planner_trace(
+            {
+                "event": "PLANNER_GENERATION_PASS",
+                "attempt": 1,
+                "response_schema": "_PlannerWirePlan",
+            },
+            trace,
+            stop_after_schema_valid_wire=True,
+        )
+
+    assert [event["event"] for event in trace] == [
+        "PLANNER_GENERATION_ENTER",
+        "PLANNER_GENERATION_PASS",
+    ]
+    assert trace[-1]["response_schema"] == "_PlannerWirePlan"
+
+
+def test_p8_smoke_downstream_counter_contract_fails_closed() -> None:
+    """A smoke result is valid only when every downstream count stays zero."""
+    child = {
+        "smoke": {
+            "numeric_sample_apis_invoked": False,
+            "downstream_stage_calls": dict.fromkeys(
+                (
+                    "report_worker",
+                    "section_worker",
+                    "reconciliation",
+                    "execution",
+                    "persistence",
+                    "rendering",
+                    "preview",
+                    "scientific_grading",
+                ),
+                0,
+            ),
+        }
+    }
+    assert p8._p8_smoke_downstream_zero(child)
+    child["smoke"]["downstream_stage_calls"]["persistence"] = 1
+    assert not p8._p8_smoke_downstream_zero(child)
+
+
+def test_p8_smoke_child_command_selects_one_arm_and_guards_internal_entry(
+    tmp_path: Path,
+) -> None:
+    """The B01 child uses a fresh process and its own arm-scoped raw-I/O path."""
+    raw_io = tmp_path / "B01" / "C1" / "model-io.jsonl"
+    command, env = p8._p8_smoke_child_command("C1", raw_io)
+
+    assert command[0] == p8.sys.executable
+    assert command[1] == str(Path(p8.__file__).resolve())
+    assert "--p8-smoke-child-b01" in command
+    assert command[command.index("--p8-arm") + 1] == "C1"
+    assert command[command.index("--p8-raw-io") + 1] == str(raw_io)
+    assert env[p8.P8_REVISION_ARM_ENV] == "C1"
+    assert env["WELLPLOT_P8_SMOKE_CHILD"] == "B01"
+
+
+def test_p8_smoke_readiness_checks_exact_model_without_generation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Readiness accepts the frozen model from both non-generative endpoints."""
+    import httpx
+
+    class FakeResponse:
+        status_code = 200
+
+        def __init__(self, payload: dict[str, object]) -> None:
+            self.payload = json.dumps(payload).encode()
+
+        def __enter__(self) -> FakeResponse:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def raise_for_status(self) -> None:
+            return None
+
+        def iter_bytes(self) -> list[bytes]:
+            return [self.payload]
+
+    class FakeClient:
+        def __init__(self, *, timeout: float, headers: dict[str, str]) -> None:
+            assert timeout == 10.0
+            assert headers == {"Authorization": "Bearer synthetic-secret"}
+
+        def __enter__(self) -> FakeClient:
+            return self
+
+        def __exit__(self, *_args: object) -> None:
+            return None
+
+        def stream(self, method: str, url: str) -> FakeResponse:
+            assert method == "GET"
+            if url.endswith("/v1/models"):
+                return FakeResponse({"data": [{"id": p8.FROZEN_MODEL, "object": "model"}]})
+            return FakeResponse(
+                {
+                    "model_alias": p8.FROZEN_MODEL,
+                    "default_generation_settings": {"n_ctx": 65536},
+                    "total_slots": 1,
+                    "is_sleeping": False,
+                }
+            )
+
+    monkeypatch.setattr(httpx, "Client", FakeClient)
+    result = p8._p8_live_readiness(p8._p8_project_config(), "synthetic-secret")
+
+    assert result["/v1/models"]["model_ids"] == [p8.FROZEN_MODEL]
+    assert result["/props"]["model_alias"] == p8.FROZEN_MODEL
+    assert result["/props"]["context_tokens"] == 65536
+
+
+def test_p8_smoke_child_cannot_be_invoked_without_coordinator_flag(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The internal B01 child CLI refuses direct invocation without its guard."""
+    monkeypatch.delenv("WELLPLOT_P8_SMOKE_CHILD", raising=False)
+
+    with pytest.raises(SystemExit, match="only be launched by its coordinator"):
+        p8.main(
+            [
+                "--p8-smoke-child-b01",
+                "--p8-arm",
+                "C1",
+                "--p8-raw-io",
+                str(tmp_path / "model-io.jsonl"),
+            ]
+        )
+
+
+def test_p8_raw_io_capture_enforces_record_and_file_limits(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Raw provider bodies remain private and bounded per record and arm."""
+    path = tmp_path / "private" / "model-io.jsonl"
+    path.parent.mkdir(mode=0o700)
+    monkeypatch.setattr(p8, "P8_RAW_IO_RECORD_LIMIT", 64)
+    monkeypatch.setattr(p8, "P8_RAW_IO_FILE_LIMIT", 12)
+
+    p8._append_private_json_line(path, {"ok": 1})
+    assert path.stat().st_mode & 0o077 == 0
+    with pytest.raises(RuntimeError, match="artifact exceeds its private custody limit"):
+        p8._append_private_json_line(path, {"ok": 2})
+
+    monkeypatch.setattr(p8, "P8_RAW_IO_RECORD_LIMIT", 5)
+    with pytest.raises(RuntimeError, match="record exceeds its private custody limit"):
+        p8._append_private_json_line(path, {"long": "record"})
+
+
 def test_p8_preflight_freezes_exact_12_by_2_pairs_without_holdout_access(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
