@@ -32,6 +32,11 @@ if str(REPO_ROOT) not in sys.path:
 
 P8_REVISION_ARM_ENV = "WELLPLOT_P8_REVISION_ARM"
 P8_COMPARE_ARMS = ("P-current", "C1")
+P8_SMOKE_COMPARE_ARMS = ("P-current", "C1D")
+P8_CHILD_ARMS = ("P-current", "C1", "C1D")
+P8_SMOKE_C1D_CHECKPOINT_ENV = "WELLPLOT_P8_C1D_CHECKPOINT"
+P8_SMOKE_C1D_PLANNER_SHA_ENV = "WELLPLOT_P8_C1D_PLANNER_SHA256"
+P8_SMOKE_C1D_DIAGNOSTICS_SHA_ENV = "WELLPLOT_P8_C1D_DIAGNOSTICS_SHA256"
 P8_NATIVE_CALL_CAP = 2
 P8_ARM_REVISIONS = {
     "P-current": "1b9ead3c4acdf70dea0bce6475150f6219421988",
@@ -65,6 +70,52 @@ def _bootstrap_p8_planner_arm() -> None:
     """Install the selected committed planner before importing planner consumers."""
     arm = os.environ.get(P8_REVISION_ARM_ENV)
     if arm is None:
+        return
+    if arm == "C1D":
+        checkpoint = os.environ.get(P8_SMOKE_C1D_CHECKPOINT_ENV, "")
+        expected_sha256 = os.environ.get(P8_SMOKE_C1D_PLANNER_SHA_ENV, "")
+        expected_diagnostics_sha256 = os.environ.get(P8_SMOKE_C1D_DIAGNOSTICS_SHA_ENV, "")
+        if (
+            not re.fullmatch(r"[0-9a-f]{40}", checkpoint)
+            or not re.fullmatch(r"[0-9a-f]{64}", expected_sha256)
+            or not re.fullmatch(r"[0-9a-f]{64}", expected_diagnostics_sha256)
+        ):
+            raise RuntimeError("C1D smoke identity is missing or malformed.")
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+        source = subprocess.run(
+            ["git", "show", f"{checkpoint}:{P8_PLANNER_PATH}"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        diagnostics = subprocess.run(
+            [
+                "git",
+                "show",
+                f"{checkpoint}:src/wellplot/agent/providers/response_diagnostics.py",
+            ],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        if (
+            head != checkpoint
+            or hashlib.sha256(source).hexdigest() != expected_sha256
+            or hashlib.sha256((REPO_ROOT / P8_PLANNER_PATH).read_bytes()).hexdigest()
+            != expected_sha256
+            or hashlib.sha256(diagnostics).hexdigest() != expected_diagnostics_sha256
+            or hashlib.sha256(
+                (REPO_ROOT / "src/wellplot/agent/providers/response_diagnostics.py").read_bytes()
+            ).hexdigest()
+            != expected_diagnostics_sha256
+        ):
+            raise RuntimeError("C1D planner does not match the authorized checkout identity.")
         return
     if arm not in P8_ARM_REVISIONS:
         raise RuntimeError("Unknown P8 planner revision arm.")
@@ -1081,6 +1132,64 @@ def _p8_planner_identity(arm: str) -> dict[str, object]:
     }
 
 
+def _p8_smoke_planner_identity(arm: str) -> dict[str, object]:
+    """Verify the isolated historical arm or exact committed C1D smoke arm."""
+    if arm == "P-current":
+        identity = _p8_planner_identity(arm)
+        identity["response_diagnostics_sha256"] = artifact_sha256(
+            REPO_ROOT / "src/wellplot/agent/providers/response_diagnostics.py"
+        )
+        return identity
+    if arm != "C1D":
+        raise RuntimeError("Invalid B01 smoke planner arm.")
+
+    checkpoint = os.environ.get(P8_SMOKE_C1D_CHECKPOINT_ENV, "")
+    expected_sha256 = os.environ.get(P8_SMOKE_C1D_PLANNER_SHA_ENV, "")
+    expected_diagnostics_sha256 = os.environ.get(P8_SMOKE_C1D_DIAGNOSTICS_SHA_ENV, "")
+    if (
+        os.environ.get(P8_REVISION_ARM_ENV) != arm
+        or CHECKPOINT_RE.fullmatch(checkpoint) is None
+        or current_checkout_sha() != checkpoint
+        or not re.fullmatch(r"[0-9a-f]{64}", expected_sha256)
+        or not re.fullmatch(r"[0-9a-f]{64}", expected_diagnostics_sha256)
+    ):
+        raise RuntimeError("C1D smoke planner identity is not bound to the authorized checkout.")
+
+    planner_module = importlib.import_module("wellplot.agent.code_mode.planner")
+    source_path = Path(planner_module.__file__).resolve()
+    source_sha256 = artifact_sha256(source_path)
+    diagnostics_sha256 = artifact_sha256(
+        REPO_ROOT / "src/wellplot/agent/providers/response_diagnostics.py"
+    )
+    from wellplot.agent.code_mode.planner import _PLANNER_SYSTEM_PROMPT, _PlannerWirePlan
+
+    schema_sha256 = sha256_text(canonical_json(_PlannerWirePlan.model_json_schema()))
+    prompt_sha256 = sha256_text(_PLANNER_SYSTEM_PROMPT)
+    if (
+        source_sha256 != expected_sha256
+        or diagnostics_sha256 != expected_diagnostics_sha256
+        or schema_sha256 != P8_EXPECTED_SCHEMA_SHA256
+        or prompt_sha256 != P8_EXPECTED_PROMPT_SHA256["C1"]
+    ):
+        raise RuntimeError("C1D planner differs from its reviewed smoke identity.")
+    return {
+        "arm": arm,
+        "revision": checkpoint,
+        "planner_sha256": source_sha256,
+        "response_diagnostics_sha256": diagnostics_sha256,
+        "planner_module": "wellplot.agent.code_mode.planner",
+        "module_origin": str(source_path),
+        "wire_schema_sha256": schema_sha256,
+        "prompt_sha256": prompt_sha256,
+        "python_executable": sys.executable,
+        "python_version": sys.version.split()[0],
+        "pydantic_version": importlib.metadata.version("pydantic"),
+        "openai_version": importlib.metadata.version("openai"),
+        "httpx_version": importlib.metadata.version("httpx"),
+        "pid": os.getpid(),
+    }
+
+
 def _p8_project_config() -> ProjectConfig:
     """Load and enforce the one canonical non-secret provider configuration."""
     config = load_project_config(REPO_ROOT)
@@ -1268,10 +1377,11 @@ def _p8_case_by_id(case_id: str) -> dict[str, object]:
 async def _run_p8_child(args: argparse.Namespace) -> dict[str, object]:
     """Run exactly one case in a fresh process using its committed planner arm."""
     arm = args.p8_arm
-    if arm not in P8_COMPARE_ARMS or os.environ.get(P8_REVISION_ARM_ENV) != arm:
-        raise RuntimeError("P8 child arm does not match its pre-import revision selection.")
-    identity = _p8_planner_identity(arm)
     smoke_mode = bool(args.p8_smoke_child_b01)
+    allowed_arms = P8_SMOKE_COMPARE_ARMS if smoke_mode else P8_COMPARE_ARMS
+    if arm not in allowed_arms or os.environ.get(P8_REVISION_ARM_ENV) != arm:
+        raise RuntimeError("P8 child arm does not match its pre-import revision selection.")
+    identity = _p8_smoke_planner_identity(arm) if smoke_mode else _p8_planner_identity(arm)
     smoke_inputs = _p8_smoke_inputs() if smoke_mode else None
     case = smoke_inputs["case"] if smoke_inputs else _p8_case_by_id(args.p8_child_case)
     raw_io_path = Path(args.p8_raw_io).resolve()
@@ -1440,6 +1550,13 @@ def _run_identity_probe(arm: str) -> dict[str, object]:
     return _p8_planner_identity(arm)
 
 
+def _run_smoke_identity_probe(arm: str) -> dict[str, object]:
+    """Return one provider-free P-current/C1D identity in a fresh process."""
+    if os.environ.get(P8_REVISION_ARM_ENV) != arm or arm not in P8_SMOKE_COMPARE_ARMS:
+        raise RuntimeError("B01 smoke identity probe environment does not match its arm.")
+    return _p8_smoke_planner_identity(arm)
+
+
 def _score_p8_child(
     case: object,
     child: dict[str, object],
@@ -1571,8 +1688,17 @@ def _p8_child_command(
     return command, child_env
 
 
-def _p8_smoke_child_command(arm: str, raw_io_path: Path) -> tuple[list[str], dict[str, str]]:
+def _p8_smoke_child_command(
+    arm: str,
+    raw_io_path: Path,
+    *,
+    checkpoint: str | None = None,
+    planner_sha256: str | None = None,
+    diagnostics_sha256: str | None = None,
+) -> tuple[list[str], dict[str, str]]:
     """Build one B01 smoke child invocation in a fresh canonical interpreter."""
+    if arm not in P8_SMOKE_COMPARE_ARMS:
+        raise ValueError("Unknown B01 smoke arm.")
     command = [
         sys.executable,
         str(Path(__file__).resolve()),
@@ -1585,6 +1711,19 @@ def _p8_smoke_child_command(arm: str, raw_io_path: Path) -> tuple[list[str], dic
     child_env = dict(os.environ)
     child_env[P8_REVISION_ARM_ENV] = arm
     child_env["WELLPLOT_P8_SMOKE_CHILD"] = "B01"
+    if arm == "C1D":
+        if (
+            checkpoint is None
+            or CHECKPOINT_RE.fullmatch(checkpoint) is None
+            or planner_sha256 is None
+            or not re.fullmatch(r"[0-9a-f]{64}", planner_sha256)
+            or diagnostics_sha256 is None
+            or not re.fullmatch(r"[0-9a-f]{64}", diagnostics_sha256)
+        ):
+            raise ValueError("C1D child requires a checkpoint-bound planner SHA-256.")
+        child_env[P8_SMOKE_C1D_CHECKPOINT_ENV] = checkpoint
+        child_env[P8_SMOKE_C1D_PLANNER_SHA_ENV] = planner_sha256
+        child_env[P8_SMOKE_C1D_DIAGNOSTICS_SHA_ENV] = diagnostics_sha256
     return command, child_env
 
 
@@ -1636,8 +1775,7 @@ def _seal_p8_smoke_namespace(output_dir: Path) -> None:
 
 
 def _run_p8_b01_smoke(args: argparse.Namespace) -> dict[str, object]:
-    """Run one B01 planner-only smoke in each immutable P8 planner arm."""
-    from scripts import a10_semantic_corpus_adapter as adapter
+    """Run one B01 planner-only smoke in each verified P-current/C1D arm."""
     from scripts import nlp_d5_live_semantic_qualification as d5
     from wellplot.file_revision import file_revision_token
 
@@ -1680,8 +1818,9 @@ def _run_p8_b01_smoke(args: argparse.Namespace) -> dict[str, object]:
         raise RuntimeError("P8 smoke source changed after metadata preflight.")
     project_config = _p8_project_config()
     api_key = _read_p8_api_key()
-    closure = adapter.verify_planner_revision_closure(canonical_root)
-    identity_reports = _verify_p8_revision_arms()
+    arm_preflight = _verify_p8_smoke_arms(args.authorized_checkpoint)
+    closure = arm_preflight["closure"]
+    identity_reports = arm_preflight["identities"]
     preflight = p8_smoke_preflight()
     if preflight["request_sha256"] != P8_SMOKE_REQUEST_SHA256:
         raise RuntimeError("P8 smoke B01 request did not pass its frozen identity check.")
@@ -1745,13 +1884,19 @@ def _run_p8_b01_smoke(args: argparse.Namespace) -> dict[str, object]:
     logical_invocations_started = 0
     harness_failure = False
     arm_failure = False
-    for arm in P8_COMPARE_ARMS:
+    for arm in P8_SMOKE_COMPARE_ARMS:
         arm_dir = output_dir / "B01" / arm
         arm_dir.mkdir(parents=True, mode=0o700)
         os.chmod(arm_dir.parent, 0o700)
         os.chmod(arm_dir, 0o700)
         raw_io_path = arm_dir / "model-io.jsonl"
-        command, child_env = _p8_smoke_child_command(arm, raw_io_path)
+        command, child_env = _p8_smoke_child_command(
+            arm,
+            raw_io_path,
+            checkpoint=args.authorized_checkpoint,
+            planner_sha256=identity_reports["C1D"]["planner_sha256"],
+            diagnostics_sha256=identity_reports["C1D"]["response_diagnostics_sha256"],
+        )
         logical_invocations_started += 1
         try:
             completed = subprocess.run(
@@ -2003,6 +2148,129 @@ def _verify_p8_revision_arms() -> dict[str, object]:
     return reports
 
 
+def _p8_smoke_revision_closure(checkpoint: str) -> dict[str, object]:
+    """Bind smoke arms to P-current and the committed two-file C1D delta."""
+    if CHECKPOINT_RE.fullmatch(checkpoint) is None or current_checkout_sha() != checkpoint:
+        raise RuntimeError("C1D smoke checkpoint differs from the current checkout.")
+    changed = subprocess.run(
+        [
+            "git",
+            "diff",
+            "--name-only",
+            P8_ARM_REVISIONS["P-current"],
+            checkpoint,
+            "--",
+            "src/wellplot/",
+        ],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    expected_paths = sorted(
+        (
+            P8_PLANNER_PATH,
+            "src/wellplot/agent/providers/response_diagnostics.py",
+        )
+    )
+    if changed != expected_paths:
+        raise RuntimeError(f"C1D smoke production closure differs: {changed!r}")
+
+    production_artifacts: dict[str, dict[str, str]] = {}
+    for relative_path in changed:
+        source = subprocess.run(
+            ["git", "show", f"{checkpoint}:{relative_path}"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        worktree_path = REPO_ROOT / relative_path
+        source_sha256 = hashlib.sha256(source).hexdigest()
+        if hashlib.sha256(worktree_path.read_bytes()).hexdigest() != source_sha256:
+            raise RuntimeError(f"C1D smoke worktree differs from committed {relative_path}.")
+        production_artifacts[relative_path] = {
+            "blob": subprocess.run(
+                ["git", "rev-parse", f"{checkpoint}:{relative_path}"],
+                cwd=REPO_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip(),
+            "sha256": source_sha256,
+        }
+
+    identities: dict[str, dict[str, str]] = {}
+    for arm, revision in (
+        ("P-current", P8_ARM_REVISIONS["P-current"]),
+        ("C1D", checkpoint),
+    ):
+        source = subprocess.run(
+            ["git", "show", f"{revision}:{P8_PLANNER_PATH}"],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        identities[arm] = {
+            "revision": revision,
+            "blob": subprocess.run(
+                ["git", "rev-parse", f"{revision}:{P8_PLANNER_PATH}"],
+                cwd=REPO_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip(),
+            "sha256": hashlib.sha256(source).hexdigest(),
+        }
+    return {
+        "changed_production_paths": changed,
+        "production_artifacts": production_artifacts,
+        "arms": identities,
+    }
+
+
+def _verify_p8_smoke_arms(checkpoint: str) -> dict[str, object]:
+    """Verify fresh P-current/C1D smoke processes before provider construction."""
+    closure = _p8_smoke_revision_closure(checkpoint)
+    c1d_sha256 = closure["arms"]["C1D"]["sha256"]
+    diagnostics_sha256 = closure["production_artifacts"][
+        "src/wellplot/agent/providers/response_diagnostics.py"
+    ]["sha256"]
+    reports: dict[str, dict[str, object]] = {}
+    for arm in P8_SMOKE_COMPARE_ARMS:
+        env = dict(os.environ)
+        env[P8_REVISION_ARM_ENV] = arm
+        command = [
+            sys.executable,
+            str(Path(__file__).resolve()),
+            "--p8-smoke-verify-arm",
+            arm,
+        ]
+        if arm == "C1D":
+            env[P8_SMOKE_C1D_CHECKPOINT_ENV] = checkpoint
+            env[P8_SMOKE_C1D_PLANNER_SHA_ENV] = str(c1d_sha256)
+            env[P8_SMOKE_C1D_DIAGNOSTICS_SHA_ENV] = diagnostics_sha256
+        completed = subprocess.run(
+            command,
+            cwd=REPO_ROOT,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        reports[arm] = json.loads(completed.stdout)
+    if reports["P-current"]["pid"] == reports["C1D"]["pid"]:
+        raise RuntimeError("B01 smoke arm verification reused an interpreter process.")
+    if reports["P-current"]["wire_schema_sha256"] != reports["C1D"]["wire_schema_sha256"]:
+        raise RuntimeError("B01 smoke wire schema differs between P-current and C1D.")
+    if (
+        reports["P-current"]["response_diagnostics_sha256"]
+        != reports["C1D"]["response_diagnostics_sha256"]
+    ):
+        raise RuntimeError("B01 smoke arms do not share the verified response diagnostics.")
+    return {"closure": closure, "identities": reports}
+
+
 def p8_revision_preflight() -> dict[str, object]:
     """Qualify the frozen 12-by-2 plan without provider construction or holdout reads."""
     from scripts import a10_semantic_corpus_adapter as adapter
@@ -2048,12 +2316,10 @@ def p8_revision_preflight() -> dict[str, object]:
 
 
 def p8_smoke_preflight() -> dict[str, object]:
-    """Qualify B01 smoke inputs and both arms without constructing a provider."""
-    from scripts import a10_semantic_corpus_adapter as adapter
-
+    """Qualify B01 smoke inputs and P-current/C1D arms without a provider."""
+    checkpoint = current_checkout_sha()
     smoke_inputs = _p8_smoke_inputs()
-    closure = adapter.verify_planner_revision_closure(REPO_ROOT)
-    identities = _verify_p8_revision_arms()
+    arm_preflight = _verify_p8_smoke_arms(checkpoint)
     project_config = _p8_project_config()
     return {
         "status": "P8_B01_SMOKE_PROVIDER_FREE_PREFLIGHT_PASS",
@@ -2069,8 +2335,10 @@ def p8_smoke_preflight() -> dict[str, object]:
         "document_summary_sha256": smoke_inputs["document_summary_sha256"],
         "source_summary_sha256": smoke_inputs["source_summary_sha256"],
         "numeric_sample_apis_invoked": False,
-        "planner_revision_closure": closure,
-        "isolated_arm_identity_processes": identities,
+        "planner_revision_closure": arm_preflight["closure"],
+        "isolated_arm_identity_processes": arm_preflight["identities"],
+        "checkpoint": checkpoint,
+        "arms": list(P8_SMOKE_COMPARE_ARMS),
         "wire_schema_sha256": P8_EXPECTED_SCHEMA_SHA256,
         "project_config": {
             "fingerprint_sha256": project_config.fingerprint_sha256,
@@ -2380,9 +2648,10 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--p8-smoke-child-b01", action="store_true")
     parser.add_argument("--p8-output-dir")
     parser.add_argument("--p8-child-case")
-    parser.add_argument("--p8-arm", choices=P8_COMPARE_ARMS)
+    parser.add_argument("--p8-arm", choices=P8_CHILD_ARMS)
     parser.add_argument("--p8-raw-io")
     parser.add_argument("--p8-verify-arm", choices=P8_COMPARE_ARMS)
+    parser.add_argument("--p8-smoke-verify-arm", choices=P8_SMOKE_COMPARE_ARMS)
     parser.add_argument("--authorized-checkpoint")
     parser.add_argument("--base-url")
     parser.add_argument("--api-key-file")
@@ -2393,6 +2662,9 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     """Run provider-free validation unless explicit live flags are supplied."""
     args = _parser().parse_args(argv)
+    if args.p8_smoke_verify_arm:
+        print(json.dumps(_run_smoke_identity_probe(args.p8_smoke_verify_arm), sort_keys=True))
+        return 0
     if args.p8_verify_arm:
         print(json.dumps(_run_identity_probe(args.p8_verify_arm), sort_keys=True))
         return 0

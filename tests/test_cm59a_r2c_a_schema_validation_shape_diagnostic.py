@@ -8,11 +8,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from pydantic import BaseModel, ConfigDict, Field, create_model
+from pydantic import BaseModel, ConfigDict, Field, create_model, field_validator
 from scripts import cm57p9_runtime_fingerprint as fingerprint
 from scripts import cm59a_r2c_a_schema_validation_shape_diagnostic as r2c
 
-from wellplot.agent.code_mode.planner import SemanticPlan
+from wellplot.agent.code_mode.planner import SemanticPlan, _PlannerWirePlan
 from wellplot.agent.providers import openai_compat_v2
 from wellplot.agent.providers.base import ProviderFailureCategory, StructuredGenerationRequest
 from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
@@ -28,6 +28,18 @@ class _Plan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     title: str = Field(min_length=1)
+
+
+class _ArbitraryReasonModel(BaseModel):
+    """Local validator used to prove unknown messages are not projected."""
+
+    value: str
+
+    @field_validator("value")
+    @classmethod
+    def reject_value(cls, value: str) -> str:
+        """Produce a deliberately non-allowlisted local validation message."""
+        raise ValueError("arbitrary internal diagnostic text")
 
 
 class _FakeCompletions:
@@ -146,6 +158,89 @@ def test_validation_shape_is_bounded_and_sorted() -> None:
         error.validation_shape.issues,
         key=lambda issue: (issue.error_type, issue.location),
     )
+
+
+def test_allowlisted_planner_operation_reason_is_projected() -> None:
+    """Canonical local SemanticOperation failures retain one safe reason."""
+    payload = {
+        "version": "wellplot.semantic-plan.v2",
+        "summary": "Add a requested channel binding.",
+        "section_tasks": [
+            {
+                "goal": "Add the requested binding.",
+                "capability_ids": ["section.log_plot"],
+                "existing_section_hint": "Main Log",
+                "scope_ref": "main_log",
+                "operations": [
+                    {
+                        "local_ref": "ensure_binding",
+                        "scope_ref": "main_log",
+                        "verb": "ENSURE",
+                        "object_kind": "binding",
+                    }
+                ],
+            }
+        ],
+    }
+
+    error = _run(payload, _PlannerWirePlan)
+
+    assert error.validation_shape is not None
+    value_error = next(
+        issue for issue in error.validation_shape.issues if issue.error_type == "value_error"
+    )
+    assert value_error.location == ("section_tasks", "*", "operations", "*")
+    assert value_error.reason == "ENSURE requires a request-local semantic_ref."
+    assert value_error.to_json() == {
+        "error_type": "value_error",
+        "location": ["section_tasks", "*", "operations", "*"],
+        "reason": "ENSURE requires a request-local semantic_ref.",
+    }
+
+
+def test_another_allowlisted_operation_reason_is_projected() -> None:
+    """A different canonical operation rule uses the same bounded projection."""
+    payload = {
+        "version": "wellplot.semantic-plan.v2",
+        "summary": "Update one requested field.",
+        "section_tasks": [
+            {
+                "goal": "Update one requested field.",
+                "capability_ids": ["section.log_plot"],
+                "existing_section_hint": "Main Log",
+                "scope_ref": "main_log",
+                "operations": [
+                    {
+                        "local_ref": "set_field",
+                        "scope_ref": "main_log",
+                        "verb": "SET",
+                        "object_kind": "binding",
+                        "target_clue": "Gamma Ray binding",
+                        "field_values": [],
+                    }
+                ],
+            }
+        ],
+    }
+
+    error = _run(payload, _PlannerWirePlan)
+
+    assert error.validation_shape is not None
+    value_error = next(
+        issue for issue in error.validation_shape.issues if issue.error_type == "value_error"
+    )
+    assert value_error.reason == "SET requires exactly one field value."
+
+
+def test_unknown_local_validation_message_is_not_serialized() -> None:
+    """Unknown local messages are suppressed rather than forwarded or truncated."""
+    error = _run({"value": "trigger"}, _ArbitraryReasonModel)
+    serialized = json.dumps(error.validation_shape.to_json(), sort_keys=True)
+
+    assert error.validation_shape is not None
+    assert error.validation_shape.issues[0].reason is None
+    assert "arbitrary internal diagnostic text" not in serialized
+    assert "arbitrary internal diagnostic text" not in str(error)
 
 
 def test_diagnostic_extraction_failure_preserves_schema_error(

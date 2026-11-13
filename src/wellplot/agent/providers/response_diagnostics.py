@@ -31,6 +31,18 @@ UNKNOWN_ERROR_TYPE = "<unknown_error_type>"
 UNKNOWN_FIELD = "<unknown_field>"
 UNKNOWN_SEGMENT = "<unknown_segment>"
 TRUNCATED_LOCATION = "<truncated>"
+_CANONICAL_VALIDATION_REASONS = frozenset(
+    {
+        "CREATE requires a request-local semantic_ref.",
+        "ENSURE requires a request-local semantic_ref.",
+        "UPDATE requires a natural-language target_clue.",
+        "REMOVE requires a natural-language target_clue.",
+        "SET requires a natural-language target_clue.",
+        "MOVE requires semantic_ref, relation, and anchor_ref.",
+        "Only MOVE operations may define presentation relation fields.",
+        "SET requires exactly one field value.",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,6 +51,7 @@ class ProviderSchemaValidationIssue:
 
     error_type: str
     location: tuple[str, ...]
+    reason: str | None = None
 
     def __post_init__(self) -> None:
         """Reject values outside the intentionally small diagnostic vocabulary."""
@@ -51,13 +64,18 @@ class ProviderSchemaValidationIssue:
             raise ValueError("location depth is outside the diagnostic bound.")
         if any(not isinstance(segment, str) for segment in self.location):
             raise TypeError("location segments must be strings.")
+        if self.reason is not None and self.reason not in _CANONICAL_VALIDATION_REASONS:
+            raise ValueError("reason is not an allowlisted local validation message.")
 
     def to_json(self) -> dict[str, object]:
         """Return a plain JSON-compatible representation."""
-        return {
+        value: dict[str, object] = {
             "error_type": self.error_type,
             "location": list(self.location),
         }
+        if self.reason is not None:
+            value["reason"] = self.reason
+        return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,7 +185,19 @@ def _sanitize_issue(
             segments = segments[: MAX_SCHEMA_VALIDATION_LOCATION_DEPTH - 1]
             segments.append(TRUNCATED_LOCATION)
         sanitized_location = tuple(segments)
-    return ProviderSchemaValidationIssue(error_type, sanitized_location)
+    raw_message = raw_issue.get("msg")
+    reason = _allowlisted_reason(raw_message)
+    return ProviderSchemaValidationIssue(error_type, sanitized_location, reason)
+
+
+def _allowlisted_reason(raw_message: object) -> str | None:
+    """Retain only exact canonical messages from local structural validators."""
+    if not isinstance(raw_message, str):
+        return None
+    for reason in _CANONICAL_VALIDATION_REASONS:
+        if raw_message == reason or raw_message == f"Value error, {reason}":
+            return reason
+    return None
 
 
 class StructuredResponseProviderError(ProviderRequestError):

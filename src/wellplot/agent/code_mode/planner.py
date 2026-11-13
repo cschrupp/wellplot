@@ -1563,33 +1563,42 @@ def _schema_failure_diagnostic(error: Exception) -> dict[str, object]:
             issue.error_type == "value_error" and issue.location == ("$root",)
             for issue in shape.issues
         ):
+            root_issue = next(
+                issue
+                for issue in shape.issues
+                if issue.error_type == "value_error" and issue.location == ("$root",)
+            )
+            root_diagnostic: dict[str, object] = {
+                "location": ["$root"],
+                "error_type": "value_error",
+                "constraint": "provide a non-null report_task or non-empty section_tasks",
+            }
+            if root_issue.reason is not None:
+                root_diagnostic["reason"] = root_issue.reason
             return {
                 "code": "missing_executable_work_unit",
-                "issues": [
-                    {
-                        "location": ["$root"],
-                        "error_type": "value_error",
-                        "constraint": ("provide a non-null report_task or non-empty section_tasks"),
-                    }
-                ],
+                "issues": [root_diagnostic],
                 "truncated": shape.truncated,
                 "previous_invalid_candidate": "unavailable_at_existing_provider_error_boundary",
             }
         if shape is not None:
             issues = sorted(shape.issues, key=lambda issue: (issue.location, issue.error_type))
+            projected_issues: list[dict[str, object]] = []
+            for issue in issues:
+                item = {
+                    "location": list(issue.location),
+                    "error_type": issue.error_type,
+                    "constraint": descriptions.get(
+                        issue.error_type,
+                        "satisfy the declared response-schema constraint",
+                    ),
+                }
+                if issue.reason is not None:
+                    item["reason"] = issue.reason
+                projected_issues.append(item)
             return {
                 "code": "schema_validation",
-                "issues": [
-                    {
-                        "location": list(issue.location),
-                        "error_type": issue.error_type,
-                        "constraint": descriptions.get(
-                            issue.error_type,
-                            "satisfy the declared response-schema constraint",
-                        ),
-                    }
-                    for issue in issues
-                ],
+                "issues": projected_issues,
                 "issue_count": shape.issue_count,
                 "truncated": shape.truncated,
                 "previous_invalid_candidate": "unavailable_at_existing_provider_error_boundary",

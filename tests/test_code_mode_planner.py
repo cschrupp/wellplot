@@ -1923,6 +1923,64 @@ def test_schema_validation_uses_a_bounded_schema_correction_request() -> None:
     assert backend.response_models == [_PlannerWirePlan, _PlannerWirePlan]
 
 
+def test_schema_correction_passes_only_allowlisted_validator_reason() -> None:
+    """The existing correction request receives the sanitized local reason."""
+    failure = StructuredResponseProviderError(
+        "Planner returned invalid structured output.",
+        response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
+        validation_shape=ProviderSchemaValidationShape(
+            issue_count=2,
+            issues=(
+                ProviderSchemaValidationIssue("too_short", ("section_tasks", "*", "operations")),
+                ProviderSchemaValidationIssue(
+                    "value_error",
+                    ("section_tasks", "*", "operations", "*"),
+                    "ENSURE requires a request-local semantic_ref.",
+                ),
+            ),
+            truncated=False,
+        ),
+    )
+    backend = _SequenceBackend(responses=[failure, _plan_payload()])
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+
+    asyncio.run(
+        planner.plan(
+            request="In the Main Pass section, build the CBL quicklook.",
+            mode="revise",
+            current_document_summary={"sections": ["existing"]},
+            source_summary={"sources": [{"labels": ["main pass"], "channels": []}]},
+            timeout_seconds=5.0,
+        )
+    )
+
+    correction_request = backend.requests[1]
+    correction_context = json.loads(
+        correction_request.user_prompt.split("Schema correction context:\n", 1)[1]
+    )
+    diagnostic = correction_context["diagnostic"]
+    assert diagnostic["issues"] == [
+        {
+            "location": ["section_tasks", "*", "operations"],
+            "error_type": "too_short",
+            "constraint": "provide the required minimum number of items or characters",
+        },
+        {
+            "location": ["section_tasks", "*", "operations", "*"],
+            "error_type": "value_error",
+            "constraint": "satisfy the model's cross-field constraint",
+            "reason": "ENSURE requires a request-local semantic_ref.",
+        },
+    ]
+    assert diagnostic["previous_invalid_candidate"] == (
+        "unavailable_at_existing_provider_error_boundary"
+    )
+    assert "ENSURE requires a request-local semantic_ref." in correction_request.user_prompt
+    assert "unavailable_at_existing_provider_error_boundary" in correction_request.user_prompt
+    assert "candidate_body" not in correction_request.user_prompt
+    assert len(backend.requests) == 2
+
+
 def test_schema_correction_reports_missing_work_unit_without_answer_injection() -> None:
     """Known root work-unit failures get structural, bounded retry feedback."""
     failure = StructuredResponseProviderError(
@@ -1971,6 +2029,33 @@ def test_schema_correction_contains_bounded_validation_location_and_type() -> No
             "location": ["report_task", "operations"],
             "error_type": "too_short",
             "constraint": "provide the required minimum number of items or characters",
+        }
+    ]
+
+
+def test_schema_failure_does_not_infer_reason_from_location_and_type() -> None:
+    """A generic value error remains generic when no safe reason was projected."""
+    failure = StructuredResponseProviderError(
+        "Invalid structured output.",
+        response_reason=ProviderResponseFailureReason.SCHEMA_VALIDATION,
+        validation_shape=ProviderSchemaValidationShape(
+            issue_count=1,
+            issues=(
+                ProviderSchemaValidationIssue(
+                    "value_error", ("section_tasks", "*", "operations", "*")
+                ),
+            ),
+            truncated=False,
+        ),
+    )
+
+    diagnostic = planner_module._schema_failure_diagnostic(failure)
+
+    assert diagnostic["issues"] == [
+        {
+            "location": ["section_tasks", "*", "operations", "*"],
+            "error_type": "value_error",
+            "constraint": "satisfy the model's cross-field constraint",
         }
     ]
 

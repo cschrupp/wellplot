@@ -599,8 +599,18 @@ def test_p8_revision_preflight_qualifies_two_fresh_planner_processes() -> None:
     assert identities["C1"]["prompt_sha256"] == p8.P8_EXPECTED_PROMPT_SHA256["C1"]
 
 
-def test_p8_b01_smoke_preflight_uses_approved_las_without_provider_calls() -> None:
+def test_p8_b01_smoke_preflight_uses_approved_las_without_provider_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The smoke case is B01, source-bound, and metadata-only before inference."""
+    monkeypatch.setattr(
+        p8,
+        "_verify_p8_smoke_arms",
+        lambda checkpoint: {
+            "closure": {"checkpoint": checkpoint},
+            "identities": {"P-current": {"pid": 1}, "C1D": {"pid": 2}},
+        },
+    )
     report = p8.p8_smoke_preflight()
 
     assert report["status"] == "P8_B01_SMOKE_PROVIDER_FREE_PREFLIGHT_PASS"
@@ -619,6 +629,7 @@ def test_p8_b01_smoke_preflight_uses_approved_las_without_provider_calls() -> No
     assert report["logical_invocations"] == 2
     assert report["physical_generation_cap_total"] == 4
     assert report["semantic_scoring"] == "NOT_PERFORMED"
+    assert report["arms"] == ["P-current", "C1D"]
 
 
 def test_p8_b01_smoke_inputs_never_open_frozen_benchmark(
@@ -702,16 +713,28 @@ def test_p8_smoke_child_command_selects_one_arm_and_guards_internal_entry(
     tmp_path: Path,
 ) -> None:
     """The B01 child uses a fresh process and its own arm-scoped raw-I/O path."""
-    raw_io = tmp_path / "B01" / "C1" / "model-io.jsonl"
-    command, env = p8._p8_smoke_child_command("C1", raw_io)
+    raw_io = tmp_path / "B01" / "C1D" / "model-io.jsonl"
+    checkpoint = "a" * 40
+    planner_sha256 = "b" * 64
+    diagnostics_sha256 = "c" * 64
+    command, env = p8._p8_smoke_child_command(
+        "C1D",
+        raw_io,
+        checkpoint=checkpoint,
+        planner_sha256=planner_sha256,
+        diagnostics_sha256=diagnostics_sha256,
+    )
 
     assert command[0] == p8.sys.executable
     assert command[1] == str(Path(p8.__file__).resolve())
     assert "--p8-smoke-child-b01" in command
-    assert command[command.index("--p8-arm") + 1] == "C1"
+    assert command[command.index("--p8-arm") + 1] == "C1D"
     assert command[command.index("--p8-raw-io") + 1] == str(raw_io)
-    assert env[p8.P8_REVISION_ARM_ENV] == "C1"
+    assert env[p8.P8_REVISION_ARM_ENV] == "C1D"
     assert env["WELLPLOT_P8_SMOKE_CHILD"] == "B01"
+    assert env[p8.P8_SMOKE_C1D_CHECKPOINT_ENV] == checkpoint
+    assert env[p8.P8_SMOKE_C1D_PLANNER_SHA_ENV] == planner_sha256
+    assert env[p8.P8_SMOKE_C1D_DIAGNOSTICS_SHA_ENV] == diagnostics_sha256
 
 
 def test_p8_smoke_readiness_checks_exact_model_without_generation(
