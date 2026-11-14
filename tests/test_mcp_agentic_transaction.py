@@ -10,8 +10,14 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
 import yaml
-from tests._mcp_fixtures import REPO_ROOT, create_mcp_fixture_paths
+from tests._mcp_fixtures import (
+    REPO_ROOT,
+    Host02GammaBackend,
+    create_approved_gamma_fixture_paths,
+    create_mcp_fixture_paths,
+)
 
 from wellplot.agent.code_mode.obligations import (
     RequestObligation,
@@ -322,6 +328,165 @@ def test_notebook_and_mcp_revisions_persist_equivalent_canonical_documents() -> 
         "max": 125.0,
         "reverse": False,
     }
+
+
+def test_host02_automatic_semantic_contract_reaches_both_adapters() -> None:
+    """Notebook and MCP publish the same host-compiled Gamma Ray contract."""
+    request = "Plot Gamma Ray."
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="host02-adapter-parity-") as temp_dir:
+        root = Path(temp_dir)
+        notebook_fixture = create_approved_gamma_fixture_paths(root / "notebook")
+        mcp_fixture = create_approved_gamma_fixture_paths(root / "mcp")
+        notebook_backend = Host02GammaBackend()
+        mcp_backend = Host02GammaBackend()
+        notebook_compilations: list[object] = []
+        mcp_compilations: list[object] = []
+        notebook_session = AgentSession(
+            compiler=create_canonical_compile_facade(
+                backend=notebook_backend,
+                server_root=REPO_ROOT,
+                result_callback=notebook_compilations.append,
+            ),
+            config=AgentSessionConfig(),
+        )
+        mcp_session = AgentSession(
+            compiler=create_canonical_compile_facade(
+                backend=mcp_backend,
+                server_root=REPO_ROOT,
+                result_callback=mcp_compilations.append,
+            ),
+            config=AgentSessionConfig(),
+        )
+        notebook = DirectNotebookSession(
+            session=notebook_session,
+            provider="test",
+            model="test-model",
+            credential_source=None,
+            server_root=REPO_ROOT,
+        )
+        mcp = GraphAuthoringMcpOperations.create(session=mcp_session, root=REPO_ROOT)
+
+        with (
+            patch(
+                "wellplot.agent.direct_notebook.verify_document_postconditions",
+                wraps=verify_document_postconditions,
+            ) as notebook_verify,
+            patch(
+                "wellplot.mcp.agentic.verify_document_postconditions",
+                wraps=verify_document_postconditions,
+            ) as mcp_verify,
+        ):
+            notebook_result = asyncio.run(
+                notebook.revise(
+                    feedback=request,
+                    logfile_path=notebook_fixture.single_logfile,
+                )
+            )
+            mcp_result = asyncio.run(
+                mcp.revise(
+                    logfile_path=str(mcp_fixture.single_logfile),
+                    request=request,
+                )
+            )
+
+        assert notebook_result.report_facts["success"] is True
+        assert (
+            notebook_result.report_facts["host_stage_evidence"]["semantic_postcondition"] == "PASS"
+        )
+        assert mcp_result.success is True, mcp_result.errors
+        assert notebook_verify.call_count == 1
+        assert mcp_verify.call_count == 1
+        assert notebook_backend.response_models == ["_PlannerWirePlan", "AddBindingAction"]
+        assert mcp_backend.response_models == ["_PlannerWirePlan", "AddBindingAction"]
+
+        notebook_contract = notebook_compilations[0].semantic_publication_contract
+        mcp_contract = mcp_compilations[0].semantic_publication_contract
+        assert notebook_contract is not None
+        assert mcp_contract is not None
+        assert notebook_contract.model_dump(mode="json") == mcp_contract.model_dump(mode="json")
+        expected = notebook_contract.expected_bindings[0]
+        assert expected.requested_term == "Gamma Ray"
+        assert expected.source_handle == "source-1"
+        assert expected.track_id == "gr"
+
+        notebook_document = yaml.safe_load(
+            notebook_fixture.single_logfile.read_text(encoding="utf-8")
+        )["document"]
+        mcp_document = yaml.safe_load(mcp_fixture.single_logfile.read_text(encoding="utf-8"))[
+            "document"
+        ]
+        for document in (notebook_document, mcp_document):
+            gamma_bindings = [
+                binding
+                for binding in document["bindings"]["channels"]
+                if binding["channel"] == "GR"
+            ]
+            assert len(gamma_bindings) == 1
+            assert gamma_bindings[0]["track_id"] == "gr"
+
+
+@pytest.mark.parametrize("adapter", ("notebook", "mcp"))
+def test_host02_automatic_semantic_failure_prevents_both_publications(
+    adapter: str,
+) -> None:
+    """A shared semantic rejection blocks publication for each public adapter."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="host02-adapter-reject-") as temp_dir:
+        root = Path(temp_dir)
+        fixture = create_approved_gamma_fixture_paths(root / adapter)
+        original_bytes = fixture.single_logfile.read_bytes()
+        backend = Host02GammaBackend()
+        compilations: list[object] = []
+        session = AgentSession(
+            compiler=create_canonical_compile_facade(
+                backend=backend,
+                server_root=REPO_ROOT,
+                result_callback=compilations.append,
+            ),
+            config=AgentSessionConfig(),
+        )
+        if adapter == "notebook":
+            operation = DirectNotebookSession(
+                session=session,
+                provider="test",
+                model="test-model",
+                credential_source=None,
+                server_root=REPO_ROOT,
+            )
+        else:
+            operation = GraphAuthoringMcpOperations.create(session=session, root=REPO_ROOT)
+
+        with (
+            patch(
+                "wellplot.agent.code_mode.obligations.verify_semantic_publication",
+                side_effect=ValueError("injected semantic rejection"),
+            ),
+            patch(
+                "wellplot.agent.direct_notebook.mcp_service.persist_authoring_document"
+            ) as notebook_persist,
+            patch("wellplot.mcp.agentic.service.persist_authoring_document") as mcp_persist,
+        ):
+            if adapter == "notebook":
+                result = asyncio.run(
+                    operation.revise(
+                        feedback="Plot Gamma Ray.",
+                        logfile_path=fixture.single_logfile,
+                    )
+                )
+                assert result.report_facts["success"] is False
+                notebook_persist.assert_not_called()
+            else:
+                result = asyncio.run(
+                    operation.revise(
+                        logfile_path=str(fixture.single_logfile),
+                        request="Plot Gamma Ray.",
+                    )
+                )
+                assert result.success is False
+                mcp_persist.assert_not_called()
+
+        assert fixture.single_logfile.read_bytes() == original_bytes
+        assert compilations[0].semantic_publication_contract is not None
+        assert backend.response_models == ["_PlannerWirePlan", "AddBindingAction"]
 
 
 def test_mcp_missing_semantic_evidence_does_not_publish() -> None:

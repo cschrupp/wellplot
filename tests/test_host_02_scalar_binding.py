@@ -15,7 +15,10 @@ from wellplot.agent.code_mode.enrichment import (
     SourceContext,
 )
 from wellplot.agent.code_mode.facade import CodeModeCompileFacade
-from wellplot.agent.code_mode.obligations import compile_request_contract
+from wellplot.agent.code_mode.obligations import (
+    compile_request_contract,
+    verify_document_postconditions,
+)
 from wellplot.agent.code_mode.planner import SectionTask, SemanticPlan
 from wellplot.agent.code_mode.semantic_actions import AddBindingAction, lower_section_action
 from wellplot.agent.code_mode.typed_section_worker import (
@@ -149,7 +152,10 @@ def test_non_authoring_gamma_ray_text_does_not_create_binding(request_text: str)
     assert not compilation.requirements.scopes.scopes
 
 
-@pytest.mark.parametrize("request_text", ("Plot Gamma Ray.", "Bind Gamma Ray."))
+@pytest.mark.parametrize(
+    "request_text",
+    ("Plot Gamma Ray.", "Bind Gamma Ray.", "Plot gamma ray.", "Plot Gamma   Ray."),
+)
 def test_bounded_authoring_gamma_ray_text_creates_binding(request_text: str) -> None:
     """Recognize reviewed terms only in bounded scalar authoring syntax."""
     compilation = compile_request_contract(request_text)
@@ -160,7 +166,7 @@ def test_bounded_authoring_gamma_ray_text_creates_binding(request_text: str) -> 
     ]
 
     assert len(channel_facts) == 1
-    assert channel_facts[0].value == "Gamma Ray"
+    assert channel_facts[0].value == request_text.split(maxsplit=1)[1].rstrip(".")
     assert compilation.requirements.scopes.scopes[0].origin == "HOST_CONTEXT"
     assert compilation.requirements.scopes.scopes[0].provenance == ()
 
@@ -315,11 +321,13 @@ def test_host02_flagship_chain_reaches_canonical_resolution_reconcile_and_verify
         obligations=task.obligations,
     )
     work_contract = build_section_work_contract(task, context)
+    operation_contract = build_section_operation_contract(task, context)
     action = AddBindingAction(
         action="add_binding",
         target={"handle": "track-1"},
         binding={"semantic_id": "request.binding.1", "channel": "Gamma Ray"},
     )
+    validate_section_action_contract(action, work_contract, operation_contract)
     intent = lower_section_action(
         action,
         context=context,
@@ -367,8 +375,29 @@ def test_host02_flagship_chain_reaches_canonical_resolution_reconcile_and_verify
     assert reconciliation.ready is True
     assert reconciliation.operations[0].object_kind == "curve_binding"
     service = AuthoringService(document)
+    original_document = document.model_dump(mode="json")
+    original_source_identity = context.sources[0].model_dump(mode="json")
     execution = execute_authoring_plan(service, reconciliation)
     assert execution.success is True
+    bindings = service.document.sections[0].tracks[0].bindings
+    assert len(bindings) == 1
+    assert bindings[0].binding_id == work_contract.required_bindings[0].host_binding_id
+    assert bindings[0].channel == "GR"
+    updated_document = service.document.model_dump(mode="json")
+    assert updated_document["sections"][0]["title"] == original_document["sections"][0]["title"]
+    assert (
+        updated_document["sections"][0]["tracks"][0]["title"]
+        == original_document["sections"][0]["tracks"][0]["title"]
+    )
+    assert context.sources[0].model_dump(mode="json") == original_source_identity
+    verify_document_postconditions(
+        document,
+        service.document,
+        task.obligations,
+        reconciliation.operations,
+        semantic_contract=semantic_contract,
+        semantic_evidence=tuple(resolution.semantic_resolutions),
+    )
     verify_semantic_publication(
         service.document,
         observed=tuple(resolution.semantic_resolutions),

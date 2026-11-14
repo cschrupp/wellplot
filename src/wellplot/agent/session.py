@@ -389,7 +389,11 @@ class AgentSession:
         return projected.model_copy(
             update={
                 "request_sha256": request_sha256,
-                "semantic_publication_contract": semantic_publication_contract,
+                "semantic_publication_contract": (
+                    semantic_publication_contract
+                    if semantic_publication_contract is not None
+                    else projected.semantic_publication_contract
+                ),
             }
         )
 

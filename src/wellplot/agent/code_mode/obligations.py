@@ -20,6 +20,7 @@ from ...semantic_catalog import (
     SemanticResolutionEvidence,
     TrustedCatalogRelease,
     load_deployed_catalog_release,
+    normalize_request_term,
     revalidate_deployed_catalog_release,
     verify_semantic_publication,
 )
@@ -1258,8 +1259,9 @@ def _extract_reviewed_semantic_channel_obligation(
             continue
         for term in rule.terms:
             for match in _SEMANTIC_CHANNEL_AUTHORING_RE.finditer(request):
-                if match.group("term").strip().casefold() == term.casefold():
-                    matches.append((match, match.group("term").strip()))
+                requested_term = match.group("term")
+                if normalize_request_term(requested_term) == normalize_request_term(term):
+                    matches.append((match, requested_term.strip()))
     if len(matches) != 1:
         return []
     match, term = matches[0]
@@ -2542,6 +2544,7 @@ def verify_document_obligations(
     obligations: tuple[RequestObligation, ...],
     *,
     grounded_operations: Sequence[object] = (),
+    semantic_requirement_ids: frozenset[str] = frozenset(),
 ) -> None:
     """Verify the reconciled candidate before persistence."""
     dump = document.model_dump(mode="json")
@@ -2630,14 +2633,22 @@ def verify_document_obligations(
                             (
                                 owner == "request"
                                 and (not grounded_binding_ids or binding_id in grounded_binding_ids)
-                                and binding.get("channel") == item.value
+                                and (
+                                    item.requirement_id in semantic_requirement_ids
+                                    or binding.get("channel") == item.value
+                                )
                             )
                             or owner in track_identity
                             or owner in binding_identity
                         ):
                             matches.append(binding)
-            if not any(binding.get("channel") == item.value for binding in matches):
-                raise ValueError("Post-lowering channel obligation failed.")
+                channel_satisfied = (
+                    bool(matches)
+                    if item.requirement_id in semantic_requirement_ids
+                    else any(binding.get("channel") == item.value for binding in matches)
+                )
+                if not channel_satisfied:
+                    raise ValueError("Post-lowering channel obligation failed.")
         if item.owner_kind is OwnerKind.BINDING and item.field in {
             "scale_kind",
             "scale_minimum",
@@ -2792,15 +2803,20 @@ def verify_document_postconditions(
     semantic_evidence: Sequence[SemanticResolutionEvidence] = (),
 ) -> None:
     """Verify request, preservation, and optional semantic trust before publish."""
+    expected = () if semantic_contract is None else semantic_contract.expected_bindings
     try:
-        verify_document_obligations(after, obligations, grounded_operations=operations)
+        verify_document_obligations(
+            after,
+            obligations,
+            grounded_operations=operations,
+            semantic_requirement_ids=frozenset(item.requirement_id for item in expected),
+        )
     except ValueError as error:
         raise DocumentPostconditionError("obligations", str(error)) from error
     try:
         verify_document_preservation(before, after, operations)
     except ValueError as error:
         raise DocumentPostconditionError("preservation", str(error)) from error
-    expected = () if semantic_contract is None else semantic_contract.expected_bindings
     if not expected and not semantic_evidence:
         return
     if semantic_contract is None:

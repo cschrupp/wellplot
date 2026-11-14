@@ -28,6 +28,10 @@ from pathlib import Path
 
 import yaml
 
+from wellplot.agent.code_mode.planner import _PlannerWirePlan
+from wellplot.agent.code_mode.semantic_actions import AddBindingAction
+from wellplot.agent.providers.base import ProviderMetrics, StructuredGenerationResult
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 _BASE_LOGFILE = REPO_ROOT / "examples" / "cbl_main.log.yaml"
 _BASE_LOGFILE_MAPPING = yaml.safe_load(_BASE_LOGFILE.read_text(encoding="utf-8"))
@@ -76,6 +80,78 @@ class McpFixturePaths:
     single_logfile_relative: str
     multi_logfile_relative: str
     single_logfile_text: str
+
+
+class Host02GammaBackend:
+    """Deterministic worker seam for the automatic HOST-02 adapter tests."""
+
+    def __init__(self) -> None:
+        self.response_models: list[str] = []
+
+    async def generate_structured(
+        self,
+        _request: object,
+        *,
+        response_model: type[object],
+    ) -> StructuredGenerationResult[object]:
+        """Return the fixed planner and scalar action through canonical seams."""
+        self.response_models.append(response_model.__name__)
+        if response_model is _PlannerWirePlan:
+            value = response_model.model_validate(
+                {
+                    "version": "wellplot.semantic-plan.v2",
+                    "summary": "Plot the reviewed Gamma Ray channel.",
+                    "section_tasks": [
+                        {
+                            "goal": "Add the reviewed Gamma Ray binding.",
+                            "capability_ids": [
+                                "section.log_plot",
+                                "track.normal",
+                                "binding.curve",
+                            ],
+                            "existing_section_hint": "Main Log",
+                            "source_hints": ["30-23a-3 8117_d.las"],
+                            "requirements": [],
+                            "constraints": [],
+                            "scope_ref": "scope.existing.request.1",
+                            "operations": [
+                                {
+                                    "local_ref": "create_gamma_ray_binding",
+                                    "scope_ref": "scope.existing.request.1",
+                                    "verb": "CREATE",
+                                    "object_kind": "binding",
+                                    "semantic_ref": "request.binding.1",
+                                    "field_values": [
+                                        {
+                                            "field": "channel",
+                                            "state": "SET",
+                                            "value": "Gamma Ray",
+                                        }
+                                    ],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            )
+        elif response_model is AddBindingAction:
+            value = response_model.model_validate(
+                {
+                    "action": "add_binding",
+                    "target": {"handle": "track-1"},
+                    "binding": {
+                        "semantic_id": "request.binding.1",
+                        "channel": "Gamma Ray",
+                    },
+                }
+            )
+        else:
+            raise AssertionError(f"unexpected canonical worker model: {response_model!r}")
+
+        return StructuredGenerationResult(
+            value=value,
+            metrics=ProviderMetrics(input_tokens=1, output_tokens=1, total_tokens=2),
+        )
 
 
 def create_mcp_fixture_paths(fixture_dir: Path, *, repo_root: Path = REPO_ROOT) -> McpFixturePaths:
@@ -148,3 +224,20 @@ def create_mcp_fixture_paths(fixture_dir: Path, *, repo_root: Path = REPO_ROOT) 
         multi_logfile_relative=Path(os.path.relpath(multi_logfile, start=repo_root)).as_posix(),
         single_logfile_text=single_logfile.read_text(encoding="utf-8"),
     )
+
+
+def create_approved_gamma_fixture_paths(
+    fixture_dir: Path,
+    *,
+    repo_root: Path = REPO_ROOT,
+) -> McpFixturePaths:
+    """Create a temporary document bound to the reviewed Gamma Ray LAS asset."""
+    paths = create_mcp_fixture_paths(fixture_dir, repo_root=repo_root)
+    mapping = yaml.safe_load(paths.single_logfile.read_text(encoding="utf-8"))
+    section = mapping["document"]["layout"]["log_sections"][0]
+    section["tracks"] = [track for track in section["tracks"] if track.get("id") == "gr"]
+    mapping["document"]["bindings"]["channels"] = []
+    section["data"]["source_path"] = str(repo_root / "workspace/data/30-23a-3 8117_d.las")
+    section["data"]["source_format"] = "las"
+    paths.single_logfile.write_text(yaml.safe_dump(mapping, sort_keys=False), encoding="utf-8")
+    return paths
