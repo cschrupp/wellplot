@@ -12,14 +12,20 @@ from wellplot.agent.code_mode.enrichment import (
     ExistingCurveContext,
     ExistingTrackContext,
     ResolvedSectionContext,
+    SemanticEnrichmentError,
     SourceContext,
+    _resolved_section_id,
 )
 from wellplot.agent.code_mode.facade import CodeModeCompileFacade
 from wellplot.agent.code_mode.obligations import (
     compile_request_contract,
     verify_document_postconditions,
 )
-from wellplot.agent.code_mode.planner import SectionTask, SemanticPlan
+from wellplot.agent.code_mode.planner import (
+    SectionTask,
+    SemanticPlan,
+    _attach_compiled_requirements,
+)
 from wellplot.agent.code_mode.semantic_actions import AddBindingAction, lower_section_action
 from wellplot.agent.code_mode.typed_section_worker import (
     _provider_operation_contract,
@@ -169,6 +175,71 @@ def test_bounded_authoring_gamma_ray_text_creates_binding(request_text: str) -> 
     assert channel_facts[0].value == request_text.split(maxsplit=1)[1].rstrip(".")
     assert compilation.requirements.scopes.scopes[0].origin == "HOST_CONTEXT"
     assert compilation.requirements.scopes.scopes[0].provenance == ()
+
+
+def test_host_context_scope_ignores_planner_hint_for_unique_section() -> None:
+    """Host context selects the only section despite an invented planner hint."""
+    plan = SemanticPlan(
+        summary="HOST-02R3 authority",
+        section_tasks=(_task().model_copy(update={"existing_section_hint": "Invented Section"}),),
+    )
+    attached = _attach_compiled_requirements(
+        plan,
+        compile_request_contract("Plot Gamma Ray."),
+    )
+
+    task = attached.section_tasks[0]
+    assert task.scope_id == "existing:scope_existing_request_1"
+    assert task.existing_section_hint is None
+    document = AuthoringDocumentSpec(
+        name="host-02r3-unique",
+        sections=[
+            {
+                "id": "section-main",
+                "title": "Main",
+                "tracks": [{"id": "track-main", "title": "Main", "kind": "normal", "width_mm": 20}],
+            }
+        ],
+    )
+    assert _resolved_section_id(task, document, task_index=0) == "section-main"
+
+
+def test_host_context_scope_hint_cannot_resolve_ambiguity() -> None:
+    """A planner hint cannot choose among multiple host-eligible sections."""
+    plan = SemanticPlan(
+        summary="HOST-02R3 ambiguity",
+        section_tasks=(_task().model_copy(update={"existing_section_hint": "Main"}),),
+    )
+    attached = _attach_compiled_requirements(
+        plan,
+        compile_request_contract("Plot Gamma Ray."),
+    )
+    assert attached.section_tasks[0].existing_section_hint is None
+    document = AuthoringDocumentSpec(
+        name="host-02r3-ambiguous",
+        sections=[
+            {
+                "id": "section-main",
+                "title": "Main",
+                "tracks": [{"id": "track-main", "title": "Main", "kind": "normal", "width_mm": 20}],
+            },
+            {
+                "id": "section-repeat",
+                "title": "Repeat",
+                "tracks": [
+                    {
+                        "id": "track-repeat",
+                        "title": "Repeat",
+                        "kind": "normal",
+                        "width_mm": 20,
+                    }
+                ],
+            },
+        ],
+    )
+    with pytest.raises(SemanticEnrichmentError) as error:
+        _resolved_section_id(attached.section_tasks[0], document, task_index=0)
+    assert error.value.code.value == "section_hint_ambiguous"
 
 
 def test_scalar_binding_contract_is_host_selected_and_provider_ids_stay_private() -> None:

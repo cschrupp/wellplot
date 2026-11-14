@@ -425,6 +425,37 @@ def test_host02_automatic_semantic_contract_reaches_both_adapters() -> None:
             assert gamma_bindings[0]["track_id"] == "gr"
 
 
+def test_host02_notebook_ignores_planner_hint_for_host_context_scope() -> None:
+    """The canonical Notebook path ignores a planner-selected section hint."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="host02-scope-authority-") as temp_dir:
+        fixture = create_approved_gamma_fixture_paths(Path(temp_dir) / "notebook")
+        backend = Host02GammaBackend(existing_section_hint="Invented Section")
+        session = AgentSession(
+            compiler=create_canonical_compile_facade(
+                backend=backend,
+                server_root=REPO_ROOT,
+            ),
+            config=AgentSessionConfig(),
+        )
+        notebook = DirectNotebookSession(
+            session=session,
+            provider="test",
+            model="test-model",
+            credential_source=None,
+            server_root=REPO_ROOT,
+        )
+
+        result = asyncio.run(
+            notebook.revise(
+                feedback="Plot Gamma Ray.",
+                logfile_path=fixture.single_logfile,
+            )
+        )
+
+        assert result.report_facts["success"] is True
+        assert backend.response_models == ["_PlannerWirePlan", "AddBindingAction"]
+
+
 @pytest.mark.parametrize("adapter", ("notebook", "mcp"))
 def test_host02_automatic_semantic_failure_prevents_both_publications(
     adapter: str,

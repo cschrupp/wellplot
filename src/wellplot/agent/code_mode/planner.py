@@ -981,24 +981,26 @@ def _attach_compiled_requirements(
     sections: list[SectionTask] = []
     is_shared = bool(compilation.requirements.shared_scope_rules)
     for task, assigned in zip(plan.section_tasks, assigned_scope_ids, strict=True):
-        selector = None if assigned.startswith("new:") else task.existing_section_hint
-        declaration_id = next(
-            (
-                scope.declaration_id
-                for scope in scopes
-                if (
-                    assigned
-                    == (
-                        f"existing:{_scope_key(scope.selector_text)}"
-                        if scope.kind == "EXISTING_SECTION" and scope.selector_text is not None
-                        else f"new:{_scope_key(scope.selector_text)}"
-                        if scope.selector_text is not None
-                        else f"new:{_scope_key(scope.declaration_id)}"
-                    )
-                )
-            ),
+        declaration = next(
+            (scope for scope in scopes if _scope_id(scope) == assigned),
             None,
         )
+        if declaration is None:
+            raise PlannerSemanticError(
+                "unresolved_existing_object",
+                "Planner task could not be matched to a host-owned request scope.",
+            )
+        host_context_scope = (
+            declaration.kind == "EXISTING_SECTION"
+            and declaration.origin == "HOST_CONTEXT"
+            and declaration.selector_text is None
+        )
+        selector = (
+            None
+            if assigned.startswith("new:") or host_context_scope
+            else task.existing_section_hint
+        )
+        declaration_id = declaration.declaration_id
         requirement_scope = {
             _scope_key(scope.selector_text or ""): scope.declaration_id
             for scope in scopes
@@ -1089,9 +1091,7 @@ def _resolve_section_scope_ids(
                 "ambiguous_scope_resolution",
                 "Two request scope declarations resolve to the same section selector.",
             )
-        expected_by_selector[key] = (
-            f"existing:{key}" if declaration.kind == "EXISTING_SECTION" else f"new:{key}"
-        )
+        expected_by_selector[key] = _scope_id(declaration)
 
     new_scopes = [scope for scope in scopes if scope.kind == "NEW_SECTION"]
     anonymous_new_scopes = [scope for scope in new_scopes if scope.selector_text is None]
@@ -1100,12 +1100,20 @@ def _resolve_section_scope_ids(
         for scope in scopes
         if scope.kind == "EXISTING_SECTION" and scope.selector_text is None
     ]
+    anonymous_host_existing_scopes = [
+        scope for scope in anonymous_existing_scopes if scope.origin == "HOST_CONTEXT"
+    ]
     assigned_scope_ids: list[str] = []
     for task in plan.section_tasks:
         if len(scopes) == 1 and len(anonymous_new_scopes) == 1:
             assigned = f"new:{_scope_key(anonymous_new_scopes[0].declaration_id)}"
         elif len(scopes) == 1 and len(anonymous_existing_scopes) == 1:
-            assigned = f"existing:{_scope_key(anonymous_existing_scopes[0].declaration_id)}"
+            assigned = _scope_id(anonymous_existing_scopes[0])
+        elif len(anonymous_host_existing_scopes) == 1 and (
+            not task.existing_section_hint
+            or _scope_key(task.existing_section_hint) not in expected_by_selector
+        ):
+            assigned = _scope_id(anonymous_host_existing_scopes[0])
         elif task.existing_section_hint:
             key = _scope_key(task.existing_section_hint)
             assigned = expected_by_selector.get(key)
@@ -1131,14 +1139,17 @@ def _resolve_section_scope_ids(
         assigned_scope_ids.append(assigned)
 
     expected_scope_ids = tuple(expected_by_selector.values()) + tuple(
-        f"new:{_scope_key(scope.declaration_id)}"
-        for scope in new_scopes
-        if scope.selector_text is None
+        _scope_id(scope) for scope in new_scopes if scope.selector_text is None
     )
-    expected_scope_ids += tuple(
-        f"existing:{_scope_key(scope.declaration_id)}" for scope in anonymous_existing_scopes
-    )
+    expected_scope_ids += tuple(_scope_id(scope) for scope in anonymous_existing_scopes)
     return tuple(assigned_scope_ids), expected_scope_ids
+
+
+def _scope_id(scope: ScopeDeclaration) -> str:
+    """Return the host-owned identity for one compiled request scope."""
+    prefix = "existing" if scope.kind == "EXISTING_SECTION" else "new"
+    key = _scope_key(scope.selector_text or scope.declaration_id)
+    return f"{prefix}:{key}"
 
 
 def _assert_duplicate_scope_consolidation_preserves_semantics(
@@ -1348,8 +1359,25 @@ def validate_semantic_plan(
         )
 
     closed_section_tasks: list[SectionTask] = []
+    host_context_scope_ids = {
+        _scope_id(scope)
+        for scope in (
+            plan.requirement_compilation.requirements.scopes.scopes
+            if plan.requirement_compilation is not None
+            else ()
+        )
+        if (
+            scope.kind == "EXISTING_SECTION"
+            and scope.origin == "HOST_CONTEXT"
+            and scope.selector_text is None
+        )
+    }
     for task in plan.section_tasks:
-        if mode == "revise" and task.existing_section_hint is None:
+        if (
+            mode == "revise"
+            and task.existing_section_hint is None
+            and task.scope_id not in host_context_scope_ids
+        ):
             raise PlannerSemanticError(
                 "missing_existing_section_hint",
                 (

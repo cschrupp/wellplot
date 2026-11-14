@@ -85,8 +85,9 @@ class McpFixturePaths:
 class Host02GammaBackend:
     """Deterministic worker seam for the automatic HOST-02 adapter tests."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, existing_section_hint: str | None = None) -> None:
         self.response_models: list[str] = []
+        self.existing_section_hint = existing_section_hint
 
     async def generate_structured(
         self,
@@ -109,7 +110,7 @@ class Host02GammaBackend:
                                 "track.normal",
                                 "binding.curve",
                             ],
-                            "existing_section_hint": "Main Log",
+                            "existing_section_hint": self.existing_section_hint,
                             "source_hints": ["30-23a-3 8117_d.las"],
                             "requirements": [],
                             "constraints": [],
