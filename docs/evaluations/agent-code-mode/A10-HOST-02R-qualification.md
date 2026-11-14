@@ -1,17 +1,26 @@
 # A10-SEM-HOST-02R Qualification Record
 
-Status: `A10_SEM_HOST_02R_PROVIDER_FREE_PASS — INDEPENDENT_REVIEW_REQUIRED`
+Status: `A10_SEM_HOST_02R2_PROVIDER_FREE_PASS — FINAL_HA_REVIEW_REQUIRED`
 
 ## Candidate
 
-- Corrective implementation commit: `ad46ff7718ea2cbabdb28be4640d2793408735a4`
-- Parent: `4a52b7dc4aeda686f518cabd704b2c0765e116c4`
+- Corrective implementation commit: `b398e7d4293f76ae1ff4a397e5b05e7f65b3cc93`
+- Parent: `a259d4a43510a206e7836ea59885a3aac6a559f5`
 - Branch: `engineering-d5-binding-path-repair`
 - Provider/model/live calls: `0`
 - Planner wire-schema change: none; `planner.py` is absent from the candidate diff.
 
 The unrelated notebook edits and untracked `examples/families/` directory were
 preserved and were not included in the candidate.
+
+This corrective closes the remaining HOST-02R qualification gaps without
+introducing a second engine or workflow. Reviewed semantic request extraction
+now uses canonical request-term normalization while preserving the exact
+request span. The flagship path crosses the real work/operation contracts,
+lowering, reconciliation, execution, request postconditions, and semantic
+publication verification. Notebook and MCP regressions exercise the same
+automatically generated semantic publication contract and both fail closed
+before persistence when semantic verification rejects it.
 
 ## Corrective results
 
@@ -74,6 +83,11 @@ The fixture is deterministic and provider-free. It does not alter the
 scientific loaders, reconciler, executor, persistence implementation, or
 planner wire schema.
 
+The flagship assertions also require one host-owned binding with physical
+mnemonic `GR`, preserve the existing section/track and source identity, and
+pass the shared `verify_document_postconditions()` boundary before the
+semantic publication check.
+
 ## Negative and parity coverage
 
 The focused suites provide the following coverage without adding a parallel
@@ -104,6 +118,10 @@ engine:
 - Explicit physical requests, unrelated requests, empty-catalog compatibility,
   and CAT-03 activation containment: `test_semantic_catalog.py` physical,
   empty-catalog, and activation-guard tests.
+- Automatic semantic-contract parity and fail-closed publication for both
+  public adapters: `test_host02_automatic_semantic_contract_reaches_both_adapters`
+  and `test_host02_automatic_semantic_failure_prevents_both_publications` in
+  `test_mcp_agentic_transaction.py`.
 
 No adapter constructs a HOST-02 semantic contract. Both adapters consume the
 same shared post-publication verification boundary.
@@ -124,7 +142,7 @@ PYTHONPATH=src .venv/bin/python -m pytest -q \
   tests/test_agent_session.py
 ```
 
-Result: `316 passed in 8.45s`, exit code `0`, pytest stderr empty.
+Result: `321 passed in 14.25s`, exit code `0`, pytest stderr empty.
 
 Additional gates:
 
@@ -133,7 +151,12 @@ Additional gates:
 - Python compilation: PASS.
 - `git diff --check`: PASS.
 - `scripts/d5_single_engine_attestation.py --check`: PASS.
-- `_PlannerWirePlan` schema SHA-256 before/after: `b6b05fec2caabbc62708d17b1d752d8888e6cf7e2b91b4b67889eb583b080cbb`.
+- `_PlannerWirePlan` schema SHA-256 before/after:
+  `b6b05fec2caabbc62708d17b1d752d8888e6cf7e2b91b4b67889eb583b080cbb`.
+
+The automatic Notebook/MCP parity tests use deterministic provider-free
+responses through the existing canonical worker seams. No provider/model,
+live, or scientific calls were made by the qualification.
 
 ## Candidate file digests
 
@@ -141,12 +164,15 @@ These SHA-256 values identify the committed implementation/test inputs used
 for the qualification:
 
 ```text
-d7dbebaf581410e47e4ac12471a9ab07ebb62997d8a91d531a293278bf9e6f77  src/wellplot/agent/code_mode/obligations.py
+98b5c1b0889d2782546f25c978820e0651363a0f6a9dade54f9b74f150654ee3  src/wellplot/agent/code_mode/obligations.py
+96f8665629be9312b71ff43d960c6c1eba16bf01a5c5e1d6ae1a69e33a496aa2  src/wellplot/agent/session.py
 69e98a31d12da44b0f4663092346c90e9087e671f5d0d33031f0f06bbf86a193  src/wellplot/agent/code_mode/facade.py
 8aa59abb937a02eb723e83591fde2d6ea6a5546912c2f1d7e2e6de433105d1ef  src/wellplot/agent/code_mode/enrichment.py
 b57239082f39f5fa487bb85185fb7d2d9242a94d284de1fb0e3c0ddae9afbe03  src/wellplot/agent/code_mode/worker_contracts.py
-520f70d3dce63bb18bce40aa02003195638eae4d6c46f6d9a5eea0c09e3d7ba8  tests/test_host_02_scalar_binding.py
-327ab9eedebb4f75739b755021229da3ca38d35cb8dbdb4c560a0c9a6aa1bf0a  docs/architecture/D5_SINGLE_ENGINE_PRODUCTION_MANIFEST.json
+4095170d84c18f1b44f319b560821c2b2c79d4ff33726c35a7c273be959bb043  tests/_mcp_fixtures.py
+f620baec92641631066bad32e3d8b30c1c2d8bec7959ce409cd4064fe6624bd9  tests/test_host_02_scalar_binding.py
+ad2005a7f4f74c67aae374898fcb84e80c6e5f172bad7c1cc4968c4ac532e3fc  tests/test_mcp_agentic_transaction.py
+4bfd6634e27fd171fa27e341359b62bc242f51b42c6a908f8334f7471767408c  docs/architecture/D5_SINGLE_ENGINE_PRODUCTION_MANIFEST.json
 ```
 
 The known stale Codex checkpoint-ref repack warning occurred during commit
