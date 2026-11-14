@@ -1,14 +1,15 @@
 # A10-SEM-HOST-02R Qualification Record
 
-Status: `A10_SEM_HOST_02R2_PROVIDER_FREE_PASS — FINAL_HA_REVIEW_REQUIRED`
+Status: `A10_SEM_HOST_02R3_PROVIDER_FREE_PASS — FINAL_HA_ACCEPTANCE_REVIEW`
 
 ## Candidate
 
-- Corrective implementation commit: `b398e7d4293f76ae1ff4a397e5b05e7f65b3cc93`
-- Parent: `a259d4a43510a206e7836ea59885a3aac6a559f5`
+- Corrective implementation commit: `511c6a80489eb9745b6aa2bc3fddc8e801bb417b`
+- Parent: `1b5207787c4e8fceb925435e64ea1cf8dcdc0d10`
 - Branch: `engineering-d5-binding-path-repair`
 - Provider/model/live calls: `0`
-- Planner wire-schema change: none; `planner.py` is absent from the candidate diff.
+- Planner wire-schema change: none; `planner.py` changes are limited to
+  host-context scope attachment and validation.
 
 The unrelated notebook edits and untracked `examples/families/` directory were
 preserved and were not included in the candidate.
@@ -59,6 +60,17 @@ returns `binding_identity_collision`; no replacement ID is allocated.
 Source contexts now carry an incrementally computed source-content SHA-256,
 revalidated against the source revision token, and the private semantic source
 binding carries that digest. Provider-facing work contracts remain unchanged.
+
+### R3 — HOST_CONTEXT scope authority closure
+
+Anonymous existing-section scopes created by the host for bounded semantic
+requests now ignore planner `existing_section_hint` values during assignment
+and attachment. The actual host-owned scope declaration is used for lookup;
+its attached hint is always `None`, so the existing-section resolver selects
+exactly one eligible section or fails closed on zero or multiple candidates.
+Explicit `REQUEST` section scopes retain their existing exact-target behavior.
+Revision-mode validation permits a missing hint only when the attached scope
+is the anonymous host context scope.
 
 ## Flagship provider-free path
 
@@ -122,6 +134,9 @@ engine:
   public adapters: `test_host02_automatic_semantic_contract_reaches_both_adapters`
   and `test_host02_automatic_semantic_failure_prevents_both_publications` in
   `test_mcp_agentic_transaction.py`.
+- HOST_CONTEXT authority: `test_host_context_scope_ignores_planner_hint_for_unique_section`,
+  `test_host_context_scope_hint_cannot_resolve_ambiguity`, and
+  `test_host02_notebook_ignores_planner_hint_for_host_context_scope`.
 
 No adapter constructs a HOST-02 semantic contract. Both adapters consume the
 same shared post-publication verification boundary.
@@ -142,7 +157,7 @@ PYTHONPATH=src .venv/bin/python -m pytest -q \
   tests/test_agent_session.py
 ```
 
-Result: `321 passed in 14.25s`, exit code `0`, pytest stderr empty.
+Result: `324 passed in 17.73s`, exit code `0`, pytest stderr empty.
 
 Additional gates:
 
@@ -165,14 +180,15 @@ for the qualification:
 
 ```text
 98b5c1b0889d2782546f25c978820e0651363a0f6a9dade54f9b74f150654ee3  src/wellplot/agent/code_mode/obligations.py
+7ff3b59dd9515bcaec0168b5cc3b9e0c0fc36026e632f8de0ce9585b2f6c8ddd  src/wellplot/agent/code_mode/planner.py
 96f8665629be9312b71ff43d960c6c1eba16bf01a5c5e1d6ae1a69e33a496aa2  src/wellplot/agent/session.py
 69e98a31d12da44b0f4663092346c90e9087e671f5d0d33031f0f06bbf86a193  src/wellplot/agent/code_mode/facade.py
 8aa59abb937a02eb723e83591fde2d6ea6a5546912c2f1d7e2e6de433105d1ef  src/wellplot/agent/code_mode/enrichment.py
 b57239082f39f5fa487bb85185fb7d2d9242a94d284de1fb0e3c0ddae9afbe03  src/wellplot/agent/code_mode/worker_contracts.py
-4095170d84c18f1b44f319b560821c2b2c79d4ff33726c35a7c273be959bb043  tests/_mcp_fixtures.py
-f620baec92641631066bad32e3d8b30c1c2d8bec7959ce409cd4064fe6624bd9  tests/test_host_02_scalar_binding.py
-ad2005a7f4f74c67aae374898fcb84e80c6e5f172bad7c1cc4968c4ac532e3fc  tests/test_mcp_agentic_transaction.py
-4bfd6634e27fd171fa27e341359b62bc242f51b42c6a908f8334f7471767408c  docs/architecture/D5_SINGLE_ENGINE_PRODUCTION_MANIFEST.json
+48c4f5aba8d76c66d20f78e56685dfa2e40fb78f12a1b489ffaac9b0eda25686  tests/_mcp_fixtures.py
+df2cb04d921ec85d6298cb503d0d1756b665d08b53b62abe632dfa11e767ec81  tests/test_host_02_scalar_binding.py
+a81a42b9dc5cd23cabc1cd6deeceff27ea7346eaf64bfe6731e568a83319e715  tests/test_mcp_agentic_transaction.py
+a421e6e09b499086c270a3e4ac786d4a80e6f03523b2e0178a6ad2ab50026839  docs/architecture/D5_SINGLE_ENGINE_PRODUCTION_MANIFEST.json
 ```
 
 The known stale Codex checkpoint-ref repack warning occurred during commit
