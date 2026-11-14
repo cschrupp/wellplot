@@ -41,6 +41,7 @@ from .section_leaf_safety import (
     SectionLeafSafetyFailure,
 )
 from .state import CodeModeGraphState, ConditionalOmissionEvidence, WorkerOutcome
+from .worker_contracts import SectionWorkContractError
 from .workflow import CodeModeGraphDependencies, build_compile_graph
 
 
@@ -220,6 +221,10 @@ class CodeModeCompileFacade:
         except SectionLeafSafetyFailure as error:
             return self._observe_result(
                 _failure_result((_section_leaf_safety_failure_diagnostic(error),))
+            )
+        except SectionWorkContractError as error:
+            return self._observe_result(
+                _failure_result((_section_work_contract_failure_diagnostic(error),))
             )
         except SemanticEnrichmentError as error:
             return self._observe_result(_failure_result((_enrichment_diagnostic(error),)))
@@ -522,6 +527,36 @@ def _section_leaf_safety_failure_diagnostic(
         stage="section_leaf_safety",
         code=f"section_leaf_safety.{error.code}",
         message=error.safe_message,
+        failure_owner="host_safety",
+        retryable=False,
+    )
+
+
+_SECTION_WORK_CONTRACT_MESSAGES = {
+    "semantic_catalog_unavailable": "The trusted semantic catalog release is unavailable.",
+    "semantic_binding_scope_missing": "The semantic binding scope could not be established.",
+    "section_target_missing": "The requested section target is unavailable.",
+    "section_target_ambiguous": "The requested section target is ambiguous.",
+    "track_target_missing": "The requested track target is unavailable.",
+    "track_target_ambiguous": "The requested track target is ambiguous.",
+    "track_target_incompatible": "The requested track target is incompatible.",
+    "section_work_source_missing": "The requested source target is unavailable.",
+    "section_work_source_ambiguous": "The requested source target is ambiguous.",
+    "binding_cardinality_unsupported": "The request requires an unsupported binding cardinality.",
+}
+
+
+def _section_work_contract_failure_diagnostic(
+    error: SectionWorkContractError,
+) -> CompileDiagnostic:
+    """Project host contract failures without exposing exception text."""
+    return CompileDiagnostic(
+        stage="semantic_publication",
+        code=f"host_contract.{error.code}",
+        message=_SECTION_WORK_CONTRACT_MESSAGES.get(
+            error.code,
+            "The host semantic work contract could not be established.",
+        ),
         failure_owner="host_safety",
         retryable=False,
     )

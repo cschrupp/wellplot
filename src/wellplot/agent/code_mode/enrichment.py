@@ -23,6 +23,7 @@ from ...semantic_catalog import (
     SemanticSourceBinding,
     SemanticSourceChannel,
     canonical_physical_identity,
+    sha256_file,
 )
 from ..inspection import (
     AuthoringInspectionFacade,
@@ -108,6 +109,7 @@ class SourceContext(_EnrichmentModel):
     source_format: SourceFormat | None = None
     inspection_state: Literal["inspected", "not_inspected", "unavailable"] = "inspected"
     revision_token: str | None = None
+    source_content_sha256: str | None = Field(default=None, pattern=r"^[a-f0-9]{64}$")
     dataset_name: str = ""
     well_metadata: tuple[SourceMetadata, ...] = ()
     channels: tuple[ChannelContext, ...] = ()
@@ -126,6 +128,14 @@ class ExistingCurveContext(_EnrichmentModel):
     scale_minimum: float | None = None
     scale_maximum: float | None = None
     reverse: bool | None = None
+    source_handle: str | None = None
+    source_revision: str | None = None
+    snapshot_id: str | None = None
+    physical_identity: dict[str, object] = Field(default_factory=dict)
+    style_color: str | None = None
+    style_line_style: str | None = None
+    style_line_width: float | None = None
+    style_alpha: float | None = None
 
 
 class ExistingTrackContext(_EnrichmentModel):
@@ -502,6 +512,7 @@ class SemanticEnricher:
                 ) from exc
         loaded = loaded_cache[cache_key]
         try:
+            source_content_sha256 = sha256_file(str(candidate.path))
             revision_after = file_revision_token(candidate.path)
         except OSError as exc:
             raise SemanticEnrichmentError(
@@ -525,6 +536,7 @@ class SemanticEnricher:
             source_format=candidate.source_format,
             inspection_state="inspected",
             revision_token=revision_after,
+            source_content_sha256=source_content_sha256,
             dataset_name=loaded.dataset_name,
             well_metadata=loaded.well_metadata,
             channels=loaded.channels,
@@ -563,7 +575,7 @@ class SemanticEnricher:
             sources=sources,
             channels=channels,
             existing_tracks=_existing_tracks(document, section_id),
-            existing_curves=_existing_curves(document, section_id),
+            existing_curves=_existing_curves(document, section_id, sources, snapshot_id),
         )
 
 
@@ -583,6 +595,8 @@ class _NormalizedCandidate:
 def _existing_curves(
     document: AuthoringDocumentSpec,
     section_id: str | None,
+    sources: tuple[SourceContext, ...] = (),
+    snapshot_id: str | None = None,
 ) -> tuple[ExistingCurveContext, ...]:
     """Project exact curve identities from the selected current section."""
     if section_id is None:
@@ -590,12 +604,35 @@ def _existing_curves(
     for section in document.sections:
         if section.id != section_id:
             continue
+        data_source = section.data_source
+        source_matches = tuple(
+            source
+            for source in sources
+            if data_source is not None
+            and source.canonical_path is not None
+            and Path(source.canonical_path).expanduser().resolve(strict=False)
+            == Path(data_source.source_path).expanduser().resolve(strict=False)
+        )
+        source = source_matches[0] if len(source_matches) == 1 else None
         curves: list[ExistingCurveContext] = []
         for track in section.tracks:
             for binding in getattr(track, "bindings", ()):
                 if getattr(binding, "kind", None) != "curve":
                     continue
                 scale = getattr(binding, "scale", None)
+                source_channels = (
+                    ()
+                    if source is None
+                    else tuple(
+                        channel
+                        for channel in source.channels
+                        if channel.mnemonic.casefold() == binding.channel.casefold()
+                    )
+                )
+                physical_identity = (
+                    source_channels[0].physical_identity if len(source_channels) == 1 else {}
+                )
+                style = getattr(binding, "style", None)
                 curves.append(
                     ExistingCurveContext(
                         track_id=track.id,
@@ -608,6 +645,14 @@ def _existing_curves(
                         scale_minimum=None if scale is None else scale.minimum,
                         scale_maximum=None if scale is None else scale.maximum,
                         reverse=None if scale is None else scale.reverse,
+                        source_handle=None if source is None else source.handle,
+                        source_revision=None if source is None else source.revision_token,
+                        snapshot_id=snapshot_id,
+                        physical_identity=physical_identity,
+                        style_color=None if style is None else style.color,
+                        style_line_style=None if style is None else style.line_style,
+                        style_line_width=None if style is None else style.line_width,
+                        style_alpha=None if style is None else style.alpha,
                     )
                 )
         return tuple(curves)
@@ -1079,6 +1124,7 @@ def semantic_source_bindings(
                 inspection_snapshot_id=section.snapshot_id,
                 source_revision=source.revision_token,
                 source_path=source.canonical_path,
+                source_content_sha256=source.source_content_sha256,
                 channels=tuple(channels),
             )
             result[(scope_key, source.candidate_id, source.handle)] = source_binding

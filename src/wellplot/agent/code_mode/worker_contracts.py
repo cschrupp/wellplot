@@ -25,8 +25,10 @@ from ...semantic_catalog import (
 from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
 from .enrichment import (
     ChannelContext,
+    ExistingCurveContext,
     ReportContext,
     ResolvedSectionContext,
+    SourceContext,
     bind_semantic_publication_sources,
 )
 from .obligations import ObligationState, OwnerKind, RequestObligation
@@ -749,24 +751,62 @@ def build_scalar_binding_slot(
     existing = tuple(
         curve for curve in section_context.existing_curves if curve.binding_id == binding_id
     )
-    if existing:
-        accepted_channels = {
-            str(fact.value).casefold(),
-            *(
-                channel.mnemonic.casefold()
-                for channel in _semantic_source_channels(str(fact.value), source)
-            ),
-        }
-        if not (
-            len(existing) == 1
-            and existing[0].track_id == track_id
-            and existing[0].channel.casefold() in accepted_channels
-        ):
-            raise SectionWorkContractError(
-                "binding_identity_collision",
-                "The derived binding identity conflicts with an existing binding.",
-            )
+    if existing and (
+        len(existing) != 1
+        or not _is_exact_scalar_binding_replay(
+            existing[0],
+            fact=fact,
+            section_context=section_context,
+            track_id=track_id,
+            source=source,
+        )
+    ):
+        raise SectionWorkContractError(
+            "binding_identity_collision",
+            "The derived binding identity conflicts with an existing binding.",
+        )
     return fact, track_handle, track_id, source_handle, binding_id
+
+
+def _is_exact_scalar_binding_replay(
+    existing: ExistingCurveContext,
+    *,
+    fact: RequestObligation,
+    section_context: ResolvedSectionContext,
+    track_id: str,
+    source: SourceContext,
+) -> bool:
+    """Require every host-owned HOST-02 fact before accepting an idempotent replay."""
+    accepted_channels = {
+        str(fact.value).casefold(),
+        *(
+            channel.mnemonic.casefold()
+            for channel in _semantic_source_channels(str(fact.value), source)
+        ),
+    }
+    physical_matches = tuple(
+        channel
+        for channel in source.channels
+        if channel.mnemonic.casefold() == existing.channel.casefold()
+    )
+    expected_identity = physical_matches[0].physical_identity if len(physical_matches) == 1 else {}
+    return (
+        existing.track_id == track_id
+        and existing.source_handle == source.handle
+        and existing.source_revision == source.revision_token
+        and existing.snapshot_id == section_context.snapshot_id
+        and existing.channel.casefold() in accepted_channels
+        and (not expected_identity or existing.physical_identity == expected_identity)
+        and existing.label is None
+        and existing.scale_kind is None
+        and existing.scale_minimum is None
+        and existing.scale_maximum is None
+        and existing.reverse is None
+        and existing.style_color is None
+        and existing.style_line_style in {None, "-"}
+        and existing.style_line_width in {None, 0.8}
+        and existing.style_alpha in {None, 1.0}
+    )
 
 
 def build_preworker_semantic_publication_contract(

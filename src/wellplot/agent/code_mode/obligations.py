@@ -168,6 +168,7 @@ class ScopeDeclaration(BaseModel):
     kind: Literal["EXISTING_SECTION", "NEW_SECTION"]
     selector_text: str | None = None
     provenance: tuple[RequirementProvenance, ...] = ()
+    origin: Literal["REQUEST", "HOST_CONTEXT"] = "REQUEST"
 
 
 class ScopeDeclarationSet(BaseModel):
@@ -480,6 +481,11 @@ _CHANNEL_RE = re.compile(
     r"\b(?i:plot|bind|select|use(?:\s+exact)?|channel)\s+"
     r"(?i:the\s+)?(?i:channel\s+)?(?P<channel>[A-Z][A-Z0-9_]{1,11})\b"
     r"(?:\s+curve|\s+binding)?",
+)
+_SEMANTIC_CHANNEL_AUTHORING_RE = re.compile(
+    r"\b(?:plot|bind|select|use(?:\s+exact)?|channel)\s+"
+    r"(?:the\s+)?(?P<term>[^.;,\n]+?)\s*(?=[.;,\n]|$)",
+    re.IGNORECASE,
 )
 _TARGET_CHANNEL_RE = re.compile(
     r"\b(?i:on)\s+(?i:the\s+)?(?P<target>[A-Za-z][A-Za-z0-9_ -]{0,32}?)\s*[:,]\s*"
@@ -1246,27 +1252,34 @@ def _extract_reviewed_semantic_channel_obligation(
         release = load_deployed_catalog_release()
     except SemanticCatalogTrustError:
         return []
-    matches: list[re.Match[str]] = []
+    matches: list[tuple[re.Match[str], str]] = []
     for rule in release.catalog.request_term_rules:
         if rule.status != "reviewed":
             continue
         for term in rule.terms:
-            pattern = re.compile(rf"(?<![A-Za-z0-9_]){re.escape(term)}(?![A-Za-z0-9_])", re.I)
-            matches.extend(pattern.finditer(request))
+            for match in _SEMANTIC_CHANNEL_AUTHORING_RE.finditer(request):
+                if match.group("term").strip().casefold() == term.casefold():
+                    matches.append((match, match.group("term").strip()))
     if len(matches) != 1:
         return []
-    match = matches[0]
+    match, term = matches[0]
+    start = _byte_offset(request, match.start("term"))
+    end = _byte_offset(request, match.end("term"))
+    request_bytes = request.encode("utf-8")
+    span = request_bytes[start:end]
     return [
-        _make_obligation(
-            request=request,
-            request_sha256=request_sha256,
-            match=match,
+        RequestObligation(
             kind=ObligationKind.EXPLICIT_FIELD,
             owner_kind=OwnerKind.BINDING,
             owner_ref="request",
             field="channel",
-            value=match.group(0),
-        ).model_copy(update={"slot_key": "request.binding.1"})
+            value=term,
+            request_sha256=request_sha256,
+            start_byte=start,
+            end_byte=end,
+            span_sha256=hashlib.sha256(span).hexdigest(),
+            slot_key="request.binding.1",
+        )
     ]
 
 
@@ -1766,23 +1779,13 @@ def compile_request_contract(request: str) -> RequestCompilationResult:
         )
         and not scopes.scopes
     ):
-        start = _byte_offset(request, 0)
-        end = _byte_offset(request, len(request))
-        span = request.encode("utf-8")[start:end]
         scopes = ScopeDeclarationSet(
             scopes=(
                 ScopeDeclaration(
                     declaration_id="scope.existing.request.1",
                     kind="EXISTING_SECTION",
                     selector_text=None,
-                    provenance=(
-                        RequirementProvenance(
-                            request_sha256=request_sha256,
-                            start_byte=start,
-                            end_byte=end,
-                            span_sha256=hashlib.sha256(span).hexdigest(),
-                        ),
-                    ),
+                    origin="HOST_CONTEXT",
                 ),
             )
         )
