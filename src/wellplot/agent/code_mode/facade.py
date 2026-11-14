@@ -223,8 +223,15 @@ class CodeModeCompileFacade:
             )
         except SemanticEnrichmentError as error:
             return self._observe_result(_failure_result((_enrichment_diagnostic(error),)))
-        projected = _project_graph_result(result).model_copy(
-            update={"semantic_publication_contract": semantic_publication_contract}
+        projected_result = _project_graph_result(result)
+        projected = projected_result.model_copy(
+            update={
+                "semantic_publication_contract": (
+                    semantic_publication_contract
+                    if semantic_publication_contract is not None
+                    else projected_result.semantic_publication_contract
+                )
+            }
         )
         return self._observe_result(projected)
 
@@ -239,6 +246,12 @@ def _project_graph_result(state: dict[str, object]) -> CodeModeCompileResult:
     """Project validated graph state into the stable host-facing result."""
     plan = SemanticPlan.model_validate(state["plan"])
     enriched_context = EnrichedSemanticContext.model_validate(state["enriched_context"])
+    semantic_payload = state.get("semantic_publication_contract")
+    semantic_contract = (
+        None
+        if not isinstance(semantic_payload, dict) or not semantic_payload
+        else SemanticPublicationContract.model_validate(semantic_payload)
+    )
     outcomes = tuple(
         WorkerOutcome.model_validate(json.loads(payload))
         for payload in state.get("worker_outcomes", [])
@@ -275,6 +288,7 @@ def _project_graph_result(state: dict[str, object]) -> CodeModeCompileResult:
             metrics=metrics,
             obligations=remaining_obligations,
             inspection_context=enriched_context,
+            semantic_publication_contract=semantic_contract,
         )
 
     merged_payload = state.get("merged_intent")
@@ -290,6 +304,7 @@ def _project_graph_result(state: dict[str, object]) -> CodeModeCompileResult:
         workers=workers,
         metrics=metrics,
         inspection_context=enriched_context,
+        semantic_publication_contract=semantic_contract,
     )
 
 

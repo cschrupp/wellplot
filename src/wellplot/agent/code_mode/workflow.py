@@ -51,6 +51,7 @@ from .worker_contracts import (
     SectionOperationContract,
     SectionWorkContract,
     SectionWorkContractError,
+    build_preworker_semantic_publication_contract,
     build_report_operation_contract,
     build_section_operation_contract,
     build_section_work_contract,
@@ -185,6 +186,17 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
         return {
             "plan": result.safe_plan.model_dump(mode="json"),
             "report_boundary_safety": result.evidence().model_dump(mode="json"),
+        }
+
+    async def prepare_semantic_publication_node(state: CodeModeGraphState) -> dict[str, object]:
+        """Freeze semantic binding expectations before dispatching workers."""
+        plan = SemanticPlan.model_validate(state["plan"])
+        context = EnrichedSemanticContext.model_validate(state["enriched_context"])
+        contract = build_preworker_semantic_publication_contract(plan, context)
+        return {
+            "semantic_publication_contract": (
+                {} if contract is None else contract.model_dump(mode="json")
+            )
         }
 
     async def section_leaf_safety_node(state: CodeModeGraphState) -> dict[str, object]:
@@ -578,6 +590,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
     builder.add_node("report_boundary_safety", report_boundary_safety_node)
     builder.add_node("section_leaf_safety", section_leaf_safety_node)
     builder.add_node("enrich_context", enrich_node)
+    builder.add_node("prepare_semantic_publication", prepare_semantic_publication_node)
     builder.add_node("compile_worker", compile_worker_node)
     builder.add_node("merge_intent", merge_node)
     builder.add_edge(START, "plan_v2")
@@ -585,8 +598,9 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
     builder.add_edge("capability_safety", "report_boundary_safety")
     builder.add_edge("report_boundary_safety", "section_leaf_safety")
     builder.add_edge("section_leaf_safety", "enrich_context")
+    builder.add_edge("enrich_context", "prepare_semantic_publication")
     builder.add_conditional_edges(
-        "enrich_context",
+        "prepare_semantic_publication",
         dispatch_workers,
         ["compile_worker"],
     )

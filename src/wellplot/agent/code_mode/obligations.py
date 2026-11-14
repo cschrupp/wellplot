@@ -1214,7 +1214,60 @@ def extract_supported_obligations(request: str) -> tuple[RequestObligation, ...]
             )
     obligations.extend(_extract_presentation_obligations(request, request_sha256))
     obligations.extend(_extract_report_obligations(request, request_sha256))
+    obligations.extend(
+        _extract_reviewed_semantic_channel_obligation(request, request_sha256, obligations)
+    )
     return _append_conflicts(obligations)
+
+
+def _extract_reviewed_semantic_channel_obligation(
+    request: str,
+    request_sha256: str,
+    existing: Sequence[RequestObligation],
+) -> list[RequestObligation]:
+    """Compile one reviewed scientist term without resolving its physical channel."""
+    scale_only_fields = {
+        "scale_kind",
+        "scale_minimum",
+        "scale_maximum",
+        "scale_reverse",
+    }
+    if existing and all(
+        (item.owner_kind is OwnerKind.BINDING and item.field in scale_only_fields)
+        or (item.owner_kind is OwnerKind.BINDING and item.field == "target")
+        or (item.owner_kind is OwnerKind.SECTION and item.field == "target")
+        or item.owner_kind is OwnerKind.FILL
+        for item in existing
+    ):
+        return []
+    if any(item.owner_kind is OwnerKind.BINDING and item.field == "channel" for item in existing):
+        return []
+    try:
+        release = load_deployed_catalog_release()
+    except SemanticCatalogTrustError:
+        return []
+    matches: list[re.Match[str]] = []
+    for rule in release.catalog.request_term_rules:
+        if rule.status != "reviewed":
+            continue
+        for term in rule.terms:
+            pattern = re.compile(rf"(?<![A-Za-z0-9_]){re.escape(term)}(?![A-Za-z0-9_])", re.I)
+            matches.extend(pattern.finditer(request))
+    if len(matches) != 1:
+        return []
+    match = matches[0]
+    return [
+        _make_obligation(
+            request=request,
+            request_sha256=request_sha256,
+            match=match,
+            kind=ObligationKind.EXPLICIT_FIELD,
+            owner_kind=OwnerKind.BINDING,
+            owner_ref="request",
+            field="channel",
+            value=match.group(0),
+        ).model_copy(update={"slot_key": "request.binding.1"})
+    ]
 
 
 def _extract_report_obligations(
@@ -1702,6 +1755,37 @@ def compile_request_contract(request: str) -> RequestCompilationResult:
     obligations = list(extract_supported_obligations(request))
     anchors = extract_supported_anchors(request)
     scopes = _request_scope_declarations(request, request_sha256)
+    if (
+        any(
+            item.owner_kind is OwnerKind.BINDING
+            and item.field == "channel"
+            and item.owner_ref == "request"
+            and item.value is not None
+            and not str(item.value).isupper()
+            for item in obligations
+        )
+        and not scopes.scopes
+    ):
+        start = _byte_offset(request, 0)
+        end = _byte_offset(request, len(request))
+        span = request.encode("utf-8")[start:end]
+        scopes = ScopeDeclarationSet(
+            scopes=(
+                ScopeDeclaration(
+                    declaration_id="scope.existing.request.1",
+                    kind="EXISTING_SECTION",
+                    selector_text=None,
+                    provenance=(
+                        RequirementProvenance(
+                            request_sha256=request_sha256,
+                            start_byte=start,
+                            end_byte=end,
+                            span_sha256=hashlib.sha256(span).hexdigest(),
+                        ),
+                    ),
+                ),
+            )
+        )
     for declaration in scopes.scopes:
         if declaration.kind != "NEW_SECTION" or declaration.selector_text is None:
             continue
@@ -2055,6 +2139,21 @@ def validate_section_obligations(
     object_bindings: SectionObjectBindings | None = None,
 ) -> None:
     """Require every supported section obligation before canonical lowering."""
+    if getattr(action, "action", None) == "add_binding":
+        binding = action.binding
+        for item in obligations:
+            if item.state in {ObligationState.CONFLICTING, ObligationState.UNRESOLVED}:
+                raise ValueError("Request obligation is unresolved or conflicting.")
+            if item.state is ObligationState.FORBIDDEN:
+                if item.field == "channel" and binding.channel == item.value:
+                    raise ValueError(f"Forbidden channel {item.value} was emitted.")
+                continue
+            if item.owner_kind is OwnerKind.BINDING and item.field == "channel":
+                if binding.kind != "curve" or binding.channel != item.value:
+                    raise ValueError(f"Requested channel {item.value} was not satisfied.")
+            elif item.owner_kind is not OwnerKind.BINDING:
+                raise ValueError("Sparse binding cannot satisfy a non-binding obligation.")
+        return
     if getattr(action, "action", None) == "update_curve_scale":
         if section_context is None:
             raise ValueError("Existing-object obligations require resolved section context.")

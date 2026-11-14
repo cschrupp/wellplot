@@ -43,6 +43,7 @@ from .section_semantics import (
     TrackSemanticDraft,
 )
 from .semantic_actions import (
+    AddBindingAction,
     AddFillAction,
     AddTrackAction,
     AddTracksAction,
@@ -66,6 +67,7 @@ _ACTION_RESPONSE_MODELS = {
     "add_tracks": AddTracksAction,
     "update_curve_scale": UpdateCurveScaleAction,
     "add_fill": AddFillAction,
+    "add_binding": AddBindingAction,
 }
 
 _SECTION_ACTION_EXAMPLE_VERSION = "wellplot.section-action-examples.v1"
@@ -154,6 +156,32 @@ _SECTION_ACTION_EXAMPLES: dict[str, dict[str, object]] = {
         },
     },
 }
+
+
+def _provider_work_contract(contract: SectionWorkContract) -> dict[str, object]:
+    """Project the host contract without exposing canonical binding IDs."""
+    payload = contract.model_dump(mode="json")
+    for binding in payload.get("required_bindings", ()):
+        if isinstance(binding, dict):
+            binding.pop("requirement_id", None)
+            binding.pop("host_binding_id", None)
+    return payload
+
+
+def _provider_operation_contract(
+    contract: SectionOperationContract | None,
+) -> dict[str, object] | None:
+    """Project operation facts while keeping host-created IDs private."""
+    if contract is None:
+        return None
+    payload = contract.model_dump(mode="json")
+    for operation in payload.get("operations", ()):
+        if isinstance(operation, dict):
+            operation.pop("binding_id", None)
+    for operation in payload.get("omitted_operations", ()):
+        if isinstance(operation, dict):
+            operation.pop("binding_id", None)
+    return payload
 
 
 def _section_action_example(action: str) -> dict[str, object]:
@@ -392,7 +420,7 @@ class CanonicalSectionWorker:
         section_context = ResolvedSectionContext.model_validate(context.sections[task_index])
         task = SectionTask.model_validate(context.plan.section_tasks[task_index])
         if (
-            work_contract.required_action in {"add_tracks", "update_curve_scale"}
+            work_contract.required_action in {"add_tracks", "update_curve_scale", "add_binding"}
             and operation_contract is None
         ):
             return _canonical_failure(
@@ -403,12 +431,8 @@ class CanonicalSectionWorker:
                 worker_obligation="FAIL",
             )
         payload = {
-            "section_work_contract": work_contract.model_dump(mode="json"),
-            "operation_contract": (
-                operation_contract.model_dump(mode="json")
-                if operation_contract is not None
-                else None
-            ),
+            "section_work_contract": _provider_work_contract(work_contract),
+            "operation_contract": _provider_operation_contract(operation_contract),
             "section_task": _provider_section_task(task),
             "section_context": _canonical_section_context(section_context, work_contract),
             "authoritative_request": authoritative_request,
@@ -419,8 +443,9 @@ class CanonicalSectionWorker:
                 "authoritative_request": "supporting context only",
                 "section_task": "supporting scoped decomposition only",
             },
-            "action_example": _section_action_example(work_contract.required_action),
         }
+        if work_contract.required_action != "add_binding":
+            payload["action_example"] = _section_action_example(work_contract.required_action)
         request = StructuredGenerationRequest(
             system_prompt=(
                 "You are the WellPlot section semantic serialization worker. The host has "
@@ -528,10 +553,22 @@ class CanonicalSectionWorker:
                 )
                 try:
                     lowering_action = _restore_add_tracks_operation_refs(raw_action, action)
+                    host_binding_id = None
+                    if work_contract.required_action == "add_binding":
+                        if len(work_contract.required_bindings) != 1:
+                            return _canonical_failure(
+                                "binding_cardinality_unsupported",
+                                "The host binding slot is not singular.",
+                                normalization="PASS",
+                                worker_obligation="PASS",
+                            )
+                        host_binding_id = work_contract.required_bindings[0].host_binding_id
                     intent = lower_section_action(
                         lowering_action,
                         context=section_context,
                         document=document,
+                        host_binding_id=host_binding_id,
+                        expected_snapshot_id=work_contract.snapshot_id,
                     )
                 except SemanticActionError as error:
                     return _canonical_failure(
@@ -707,6 +744,14 @@ def _canonical_section_context(
     return {
         "target": {"kind": "existing" if context.section_id else "new"},
         "sources": [source.model_dump(mode="json") for source in work_contract.source_facts],
+        "existing_tracks": [
+            {
+                "handle": track.handle,
+                "title": track.title,
+                "kind": track.kind,
+            }
+            for track in context.existing_tracks
+        ],
         "existing_curves": [
             {
                 "handle": f"curve-{index}",

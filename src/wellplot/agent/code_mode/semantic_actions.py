@@ -15,9 +15,14 @@ from ...model.intent import (
     AuthoringTrackIntent,
 )
 from ..identity import IdAllocator
-from .enrichment import ExistingCurveContext, ResolvedSectionContext
+from .enrichment import ExistingCurveContext, ExistingTrackContext, ResolvedSectionContext
 from .planner import MAX_SEMANTIC_OPERATIONS
-from .section_semantics import SectionSemanticDraft, SemanticScale, TrackSemanticDraft
+from .section_semantics import (
+    CurveBindingSemanticDraft,
+    SectionSemanticDraft,
+    SemanticScale,
+    TrackSemanticDraft,
+)
 from .semantic_section_compiler import compile_section_semantics
 
 
@@ -33,6 +38,12 @@ class _SemanticActionModel(BaseModel):
 
 class ExistingCurveSelector(_SemanticActionModel):
     """Request-local existing-curve identity; canonical IDs stay host-owned."""
+
+    handle: str = Field(min_length=1)
+
+
+class ExistingTrackSelector(_SemanticActionModel):
+    """Request-local selector for one host-bound existing track."""
 
     handle: str = Field(min_length=1)
 
@@ -130,12 +141,21 @@ class AddFillAction(_SemanticActionModel):
     fill: FillSemanticDraft
 
 
+class AddBindingAction(_SemanticActionModel):
+    """Add exactly one scalar curve binding to an existing track."""
+
+    action: Literal["add_binding"]
+    target: ExistingTrackSelector
+    binding: CurveBindingSemanticDraft
+
+
 SectionSemanticAction: TypeAlias = Annotated[
     ReconstructSectionAction
     | UpdateCurveScaleAction
     | AddTrackAction
     | AddTracksAction
-    | AddFillAction,
+    | AddFillAction
+    | AddBindingAction,
     Field(discriminator="action"),
 ]
 
@@ -154,6 +174,8 @@ def lower_section_action(
     *,
     context: ResolvedSectionContext,
     document: object,
+    host_binding_id: str | None = None,
+    expected_snapshot_id: str | None = None,
 ) -> AuthoringDocumentIntent:
     """Lower one validated action into a provider-neutral authoring intent."""
     if action.action == "reconstruct":
@@ -182,6 +204,30 @@ def lower_section_action(
                     section_id=section_id,
                     track_id=target.track_id,
                     scale=_scale(action.scale),
+                )
+            ]
+        )
+
+    if action.action == "add_binding":
+        if expected_snapshot_id is not None and context.snapshot_id != expected_snapshot_id:
+            raise SemanticActionError("snapshot_stale", "The binding target snapshot is stale.")
+        if host_binding_id is None:
+            raise SemanticActionError(
+                "binding_identity_missing", "The host did not allocate a binding identity."
+            )
+        target = resolve_existing_track(action.target, context)
+        if action.binding.kind != "curve":
+            raise SemanticActionError(
+                "binding_kind_unsupported", "Sparse HOST-02 bindings must be scalar curves."
+            )
+        return AuthoringDocumentIntent(
+            curve_bindings=[
+                AuthoringCurveBindingIntent(
+                    kind="curve",
+                    binding_id=host_binding_id,
+                    section_id=section_id,
+                    track_id=target.track_id,
+                    channel=action.binding.channel,
                 )
             ]
         )
@@ -258,6 +304,21 @@ def resolve_existing_curve(
             "target_missing", "No grounded existing curve matches the handle."
         )
     return context.existing_curves[index]
+
+
+def resolve_existing_track(
+    selector: ExistingTrackSelector,
+    context: ResolvedSectionContext,
+) -> ExistingTrackContext:
+    """Resolve one opaque track handle from the captured section snapshot."""
+    if not selector.handle.startswith("track-"):
+        raise SemanticActionError("target_invalid", "The existing-track handle is invalid.")
+    matches = [item for item in context.existing_tracks if item.handle == selector.handle]
+    if len(matches) != 1:
+        raise SemanticActionError(
+            "target_missing", "No grounded existing track matches the handle."
+        )
+    return matches[0]
 
 
 def _lower_added_track(
@@ -393,12 +454,14 @@ def _scale(value: SemanticScale) -> AuthoringScale:
 
 
 __all__ = [
+    "AddBindingAction",
     "AddFillAction",
     "AddTrackAction",
     "BaselineSplitFill",
     "BetweenCurvesFill",
     "BetweenInstancesFill",
     "ExistingCurveSelector",
+    "ExistingTrackSelector",
     "FillSemanticDraft",
     "LimitFill",
     "ReconstructSectionAction",
@@ -407,4 +470,5 @@ __all__ = [
     "UpdateCurveScaleAction",
     "lower_section_action",
     "resolve_existing_curve",
+    "resolve_existing_track",
 ]

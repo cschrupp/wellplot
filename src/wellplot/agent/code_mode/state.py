@@ -76,6 +76,7 @@ class CodeModeGraphState(TypedDict, total=False):
     report_boundary_safety: dict[str, Any]
     section_leaf_safety: dict[str, Any]
     enriched_context: dict[str, Any]
+    semantic_publication_contract: dict[str, Any]
     worker_outcomes: Annotated[list[str], operator.add]
     diagnostics: Annotated[list[str], operator.add]
     merged_intent: Annotated[dict[str, Any], replace_merged_intent]

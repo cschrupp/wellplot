@@ -128,6 +128,15 @@ class ExistingCurveContext(_EnrichmentModel):
     reverse: bool | None = None
 
 
+class ExistingTrackContext(_EnrichmentModel):
+    """One opaque existing-track selector bound to the inspection snapshot."""
+
+    handle: str = Field(min_length=1)
+    track_id: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    kind: str = Field(min_length=1)
+
+
 class ResolvedSectionContext(_EnrichmentModel):
     """Canonical read-only context for one semantic section task."""
 
@@ -137,6 +146,7 @@ class ResolvedSectionContext(_EnrichmentModel):
     snapshot_id: str | None = Field(default=None, min_length=1)
     sources: tuple[SourceContext, ...] = ()
     channels: tuple[ChannelInspectionSummary, ...] = ()
+    existing_tracks: tuple[ExistingTrackContext, ...] = ()
     existing_curves: tuple[ExistingCurveContext, ...] = ()
 
 
@@ -552,6 +562,7 @@ class SemanticEnricher:
             snapshot_id=snapshot_id,
             sources=sources,
             channels=channels,
+            existing_tracks=_existing_tracks(document, section_id),
             existing_curves=_existing_curves(document, section_id),
         )
 
@@ -600,6 +611,28 @@ def _existing_curves(
                     )
                 )
         return tuple(curves)
+    return ()
+
+
+def _existing_tracks(
+    document: AuthoringDocumentSpec,
+    section_id: str | None,
+) -> tuple[ExistingTrackContext, ...]:
+    """Project all eligible parent tracks behind opaque snapshot-local handles."""
+    if section_id is None:
+        return ()
+    for section in document.sections:
+        if section.id != section_id:
+            continue
+        return tuple(
+            ExistingTrackContext(
+                handle=f"track-{index}",
+                track_id=track.id,
+                title=track.title,
+                kind=track.kind,
+            )
+            for index, track in enumerate(section.tracks, start=1)
+        )
     return ()
 
 
@@ -849,6 +882,22 @@ def _resolved_section_id(
 ) -> str | None:
     """Resolve an advisory hint by exact title, subtitle, then containment."""
     if task.existing_section_hint is None:
+        if task.scope_id is not None and task.scope_id.startswith("existing:"):
+            sections = tuple(document.sections)
+            if len(sections) == 1:
+                return str(sections[0].id)
+            if not sections:
+                raise SemanticEnrichmentError(
+                    EnrichmentErrorCode.SECTION_HINT_UNRESOLVED,
+                    "No eligible existing section is available for implicit binding.",
+                    task_index=task_index,
+                )
+            raise SemanticEnrichmentError(
+                EnrichmentErrorCode.SECTION_HINT_AMBIGUOUS,
+                "Multiple eligible existing sections require an explicit target.",
+                task_index=task_index,
+                candidates=tuple(str(section.id) for section in sections),
+            )
         return None
     hint = _normalize_lexical(task.existing_section_hint)
     sections = tuple(document.sections)
@@ -1221,6 +1270,7 @@ __all__ = [
     "EnrichmentWarning",
     "EnrichmentErrorCode",
     "ExistingCurveContext",
+    "ExistingTrackContext",
     "HeaderSlotInspectionSummary",
     "LoadedSource",
     "ReportContext",

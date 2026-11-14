@@ -13,8 +13,22 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ...authoring_context import AuthoringChannelCandidate, source_bound_request_mnemonic
 from ...model.intent import AuthoringDocumentIntent
+from ...semantic_catalog import (
+    ExpectedSemanticBinding,
+    SemanticCatalogTrustError,
+    SemanticPublicationContract,
+    SemanticRequestClassification,
+    load_deployed_catalog_release,
+    normalize_request_term,
+    revalidate_deployed_catalog_release,
+)
 from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
-from .enrichment import ChannelContext, ReportContext, ResolvedSectionContext
+from .enrichment import (
+    ChannelContext,
+    ReportContext,
+    ResolvedSectionContext,
+    bind_semantic_publication_sources,
+)
 from .obligations import ObligationState, OwnerKind, RequestObligation
 from .planner import (
     MAX_SEMANTIC_OPERATIONS,
@@ -116,6 +130,8 @@ class SectionWorkBinding(BaseModel):
 
     handle: str = Field(min_length=1)
     track_handle: str = Field(min_length=1)
+    requirement_id: str | None = Field(default=None, min_length=1)
+    host_binding_id: str | None = Field(default=None, min_length=1)
     kind: Literal["curve", "raster"] = "curve"
     channel: str | None = None
     label: str | None = None
@@ -170,7 +186,7 @@ class SectionWorkContract(BaseModel):
     snapshot_id: str | None = None
     target: SectionWorkTarget
     required_action: Literal[
-        "reconstruct", "add_track", "add_tracks", "update_curve_scale", "add_fill"
+        "reconstruct", "add_track", "add_tracks", "update_curve_scale", "add_fill", "add_binding"
     ]
     required_tracks: tuple[SectionWorkTrack, ...] = ()
     required_bindings: tuple[SectionWorkBinding, ...] = ()
@@ -189,10 +205,13 @@ class WorkerOperationContractEntry(BaseModel):
 
     operation_id: str = Field(min_length=1)
     operation_ref: str = Field(min_length=1)
-    operation_type: Literal["ADD_TRACK", "UPDATE_CURVE_SCALE"]
+    operation_type: Literal["ADD_TRACK", "ADD_BINDING", "UPDATE_CURVE_SCALE"]
     scope_ref: str = Field(min_length=1)
     target_handle: str | None = None
     requested_scale: SectionWorkScale | None = None
+    binding_id: str | None = Field(default=None, min_length=1)
+    requested_channel: str | None = Field(default=None, min_length=1)
+    source_handle: str | None = Field(default=None, min_length=1)
     parent_operation_id: str | None = None
     condition_predicate: str | None = None
     condition_result: Literal[
@@ -214,6 +233,15 @@ class WorkerOperationContractEntry(BaseModel):
                 raise ValueError("Scale-update operations require a binding target and scale.")
             if not self.requirement_ids:
                 raise ValueError("Scale-update operations require request evidence.")
+        elif self.operation_type == "ADD_BINDING":
+            if self.target_handle is None or self.binding_id is None:
+                raise ValueError("Binding-create operations require a track and binding identity.")
+            if self.requested_channel is None or self.source_handle is None:
+                raise ValueError("Binding-create operations require channel and source evidence.")
+            if not self.requirement_ids:
+                raise ValueError("Binding-create operations require request evidence.")
+            if self.requested_scale is not None:
+                raise ValueError("Binding-create operations cannot carry presentation scale.")
         elif self.requested_scale is not None:
             raise ValueError("Only scale-update operations may carry a requested scale.")
         return self
@@ -405,7 +433,13 @@ def _channel_kind(
                 mnemonic,
             )
         ]
-        return matches[0] if len(matches) == 1 else None
+        if len(matches) == 1:
+            return matches[0]
+        semantic_matches = _semantic_source_channel_kinds(
+            mnemonic,
+            section_context.sources[selected_source_index],
+        )
+        return semantic_matches[0] if len(semantic_matches) == 1 else None
 
     if not section_context.sources:
         return None
@@ -434,6 +468,72 @@ def _matching_source_channels(
     if exact:
         return exact
     return [item for item in channels if _channel_request_mnemonic(item) == mnemonic]
+
+
+def _semantic_source_channels(
+    requested: str,
+    source: object,
+) -> tuple[ChannelContext, ...]:
+    """Project one reviewed semantic term onto exact source channels."""
+    try:
+        release = load_deployed_catalog_release()
+    except SemanticCatalogTrustError:
+        return ()
+    family_ids = {
+        rule.family_id
+        for rule in release.catalog.request_term_rules
+        if rule.status == "reviewed"
+        and any(
+            normalize_request_term(term) == normalize_request_term(requested) for term in rule.terms
+        )
+    }
+    if len(family_ids) != 1:
+        return ()
+    family_id = next(iter(family_ids))
+    physical_rules = tuple(
+        rule
+        for rule in release.catalog.physical_channel_rules
+        if rule.status == "reviewed" and rule.family_id == family_id
+    )
+    source_path = getattr(source, "canonical_path", None)
+    matches: list[ChannelContext] = []
+    for channel in getattr(source, "channels", ()):
+        for rule in physical_rules:
+            if (
+                rule.matcher_kind != "exact_mnemonic"
+                or rule.matcher_value.casefold() != channel.mnemonic.casefold()
+            ):
+                continue
+            if rule.source_scope and (
+                source_path is None
+                or not any(
+                    Path(source_path).expanduser().resolve(strict=False)
+                    == Path(scope).expanduser().resolve(strict=False)
+                    for scope in rule.source_scope
+                )
+            ):
+                continue
+            if rule.kind_constraints and channel.kind.casefold() not in {
+                value.casefold() for value in rule.kind_constraints
+            }:
+                continue
+            if rule.unit_constraints and (
+                channel.unit is None
+                or channel.unit.casefold()
+                not in {value.casefold() for value in rule.unit_constraints}
+            ):
+                continue
+            matches.append(channel)
+            break
+    return tuple(matches)
+
+
+def _semantic_source_channel_kinds(
+    requested: str,
+    source: object,
+) -> tuple[str, ...]:
+    """Project one reviewed semantic term onto its exact source channel kind."""
+    return tuple(channel.kind for channel in _semantic_source_channels(requested, source))
 
 
 def _channel_request_mnemonic(channel: ChannelContext) -> str | None:
@@ -509,6 +609,259 @@ def _exact_existing_curve_handle(
         code = "section_work_target_missing" if not matches else "section_work_target_ambiguous"
         raise SectionWorkContractError(code, "Existing curve target is not uniquely grounded.")
     return f"curve-{matches[0] + 1}"
+
+
+def _binding_id_for_slot(
+    request_sha256: str,
+    requirement_id: str,
+    section_id: str,
+    track_id: str,
+) -> str:
+    """Derive a stable host-owned binding identity from immutable slot facts."""
+    payload = "\x1f".join((request_sha256, requirement_id, section_id, track_id))
+    digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:24]
+    return f"binding-host-{digest}"
+
+
+def _existing_track_handle(
+    owner: str,
+    context: ResolvedSectionContext,
+) -> str:
+    """Resolve one explicit track selector against the snapshot inventory."""
+    identity = _work_handle(owner)
+    matches = [
+        track
+        for track in context.existing_tracks
+        if identity
+        in {
+            _work_handle(track.handle),
+            _work_handle(track.track_id),
+            _work_handle(track.title),
+        }
+    ]
+    compatible = [track for track in matches if track.kind in {"normal", "reference", "array"}]
+    if not matches:
+        raise SectionWorkContractError(
+            "track_target_missing", "The explicit existing track target was not found."
+        )
+    if len(matches) != 1:
+        raise SectionWorkContractError(
+            "track_target_ambiguous", "The explicit existing track target is ambiguous."
+        )
+    if not compatible:
+        raise SectionWorkContractError(
+            "track_target_incompatible", "The explicit track is not scalar-compatible."
+        )
+    return compatible[0].handle
+
+
+def _select_scalar_binding_track(
+    task: SectionTask,
+    context: ResolvedSectionContext,
+) -> tuple[str, str]:
+    """Select one existing scalar-compatible track without source-based fallback."""
+    if context.section_id is None:
+        raise SectionWorkContractError(
+            "section_target_missing", "A sparse binding requires an existing section."
+        )
+    target_facts = tuple(
+        item
+        for item in task.obligations
+        if item.owner_kind is OwnerKind.TRACK and item.field == "target"
+    )
+    if target_facts:
+        values = tuple(dict.fromkeys(str(item.value) for item in target_facts))
+        if len(values) != 1:
+            raise SectionWorkContractError(
+                "track_target_ambiguous", "The request identifies multiple track targets."
+            )
+        handle = _existing_track_handle(values[0], context)
+    else:
+        eligible = tuple(
+            track
+            for track in context.existing_tracks
+            if track.kind in {"normal", "reference", "array"}
+        )
+        if len(eligible) == 0:
+            raise SectionWorkContractError(
+                "track_target_missing", "No scalar-compatible existing track is available."
+            )
+        if len(eligible) != 1:
+            raise SectionWorkContractError(
+                "track_target_ambiguous", "Multiple scalar-compatible tracks require a target."
+            )
+        handle = eligible[0].handle
+    track = next(track for track in context.existing_tracks if track.handle == handle)
+    return handle, track.track_id
+
+
+def build_scalar_binding_slot(
+    task: SectionTask,
+    section_context: ResolvedSectionContext,
+) -> tuple[RequestObligation, str, str, str, str]:
+    """Bind one scalar channel obligation to one existing host track and ID."""
+    channel_facts = tuple(
+        item
+        for item in task.obligations
+        if item.owner_kind is OwnerKind.BINDING
+        and item.field == "channel"
+        and item.state is ObligationState.SET
+    )
+    if len(channel_facts) != 1:
+        raise SectionWorkContractError(
+            "binding_cardinality_unsupported",
+            "HOST-02 requires exactly one scalar binding channel obligation.",
+        )
+    fact = channel_facts[0]
+    track_handle, track_id = _select_scalar_binding_track(task, section_context)
+    source_facts = tuple(item for item in task.obligations if item.owner_kind is OwnerKind.SOURCE)
+    if source_facts:
+        source_handle = _source_handle(str(source_facts[0].value), section_context)
+    elif len(section_context.sources) == 1:
+        source_handle = section_context.sources[0].handle
+    else:
+        raise SectionWorkContractError(
+            "source_target_ambiguous", "A scalar binding requires one selected source."
+        )
+    if len(source_facts) > 1 or source_handle is None:
+        raise SectionWorkContractError(
+            "source_target_ambiguous", "The scalar binding source is not uniquely selected."
+        )
+    if (
+        _channel_kind(
+            str(fact.value),
+            section_context,
+            selected_source_index=_source_index(source_handle, section_context),
+        )
+        != "scalar"
+    ):
+        raise SectionWorkContractError(
+            "binding_kind_unsupported",
+            "HOST-02 sparse binding requires one scalar source channel.",
+        )
+    binding_id = _binding_id_for_slot(
+        fact.request_sha256,
+        fact.requirement_id,
+        section_context.section_id or "",
+        track_id,
+    )
+    source = section_context.sources[_source_index(source_handle, section_context)]
+    existing = tuple(
+        curve for curve in section_context.existing_curves if curve.binding_id == binding_id
+    )
+    if existing:
+        accepted_channels = {
+            str(fact.value).casefold(),
+            *(
+                channel.mnemonic.casefold()
+                for channel in _semantic_source_channels(str(fact.value), source)
+            ),
+        }
+        if not (
+            len(existing) == 1
+            and existing[0].track_id == track_id
+            and existing[0].channel.casefold() in accepted_channels
+        ):
+            raise SectionWorkContractError(
+                "binding_identity_collision",
+                "The derived binding identity conflicts with an existing binding.",
+            )
+    return fact, track_handle, track_id, source_handle, binding_id
+
+
+def build_preworker_semantic_publication_contract(
+    plan: object,
+    context: object,
+) -> SemanticPublicationContract | None:
+    """Build semantic expectations from host facts before any worker response."""
+    section_tasks = tuple(getattr(plan, "section_tasks", ()))
+    try:
+        release = load_deployed_catalog_release()
+    except SemanticCatalogTrustError:
+        return None
+    classifications: list[SemanticRequestClassification] = []
+    expectations: list[ExpectedSemanticBinding] = []
+    for task_index, task in enumerate(section_tasks):
+        section_context = context.sections[task_index]
+        for item in task.obligations:
+            if item.owner_kind is not OwnerKind.BINDING or item.field != "channel":
+                continue
+            matches = tuple(
+                rule
+                for rule in release.catalog.request_term_rules
+                if rule.status == "reviewed"
+                and any(
+                    normalize_request_term(term) == normalize_request_term(str(item.value))
+                    for term in rule.terms
+                )
+            )
+            if len(matches) != 1:
+                classifications.append(
+                    SemanticRequestClassification(
+                        requirement_id=item.requirement_id,
+                        request_kind="EXPLICIT_PHYSICAL"
+                        if str(item.value).isupper()
+                        else "UNRESOLVED",
+                    )
+                )
+                continue
+            fact, _track_handle, track_id, source_handle, binding_id = build_scalar_binding_slot(
+                task, section_context
+            )
+            source = next(
+                source for source in section_context.sources if source.handle == source_handle
+            )
+            scope_key = item.scope_key or task.scope_id
+            if (
+                scope_key is None
+                or section_context.snapshot_id is None
+                or source.revision_token is None
+            ):
+                raise SectionWorkContractError(
+                    "semantic_binding_scope_missing",
+                    "Semantic binding expectations require a bound scope and snapshot.",
+                )
+            expected = ExpectedSemanticBinding(
+                request_kind="SEMANTIC_FAMILY",
+                requirement_id=fact.requirement_id,
+                request_sha256=fact.request_sha256,
+                scope_key=scope_key,
+                track_scope=fact.owner_ref,
+                binding_slot=fact.slot_key or "request.binding.1",
+                requested_term=str(fact.value),
+                source_candidate_id=source.candidate_id,
+                source_handle=source.handle,
+                inspection_snapshot_id=section_context.snapshot_id,
+                source_revision=source.revision_token,
+                task_index=task_index,
+                section_id=section_context.section_id or "",
+                track_id=track_id,
+                binding_id=binding_id,
+            )
+            classifications.append(
+                SemanticRequestClassification(
+                    requirement_id=fact.requirement_id,
+                    request_kind="SEMANTIC_FAMILY",
+                    expected_binding=expected,
+                )
+            )
+            expectations.append(expected)
+    if not expectations:
+        return None
+    contract = SemanticPublicationContract(
+        expected_bindings=tuple(expectations),
+        trusted_release=revalidate_deployed_catalog_release(release),
+    )
+    # Re-run the canonical compiler so its completeness and request-binding
+    # checks remain the single semantic publication contract authority.
+    from .obligations import compile_semantic_publication_contract
+
+    compiled = compile_semantic_publication_contract(
+        tuple(plan.obligations),
+        tuple(classifications),
+        trusted_release=contract.trusted_release,
+    )
+    return bind_semantic_publication_sources(compiled, context)
 
 
 def _scale_target_identity(
@@ -725,6 +1078,24 @@ def build_section_work_contract(
                 "A required track has no compiled binding slot.",
             )
 
+    scalar_binding: tuple[RequestObligation, str, str, str, str] | None = None
+    if not work_tracks and any(
+        item.owner_kind is OwnerKind.BINDING and item.field == "channel" for item in obligations
+    ):
+        scalar_binding = build_scalar_binding_slot(task, section_context)
+        fact, track_handle, _track_id, selected_source_handle, host_binding_id = scalar_binding
+        target_handle = track_handle
+        work_bindings.append(
+            SectionWorkBinding(
+                handle=fact.slot_key or "request.binding.1",
+                track_handle=track_handle,
+                requirement_id=fact.requirement_id,
+                host_binding_id=host_binding_id,
+                kind="curve",
+                channel=str(fact.value),
+            )
+        )
+
     fill_facts = [item for item in obligations if item.owner_kind is OwnerKind.FILL]
     scale_only = bool(obligations) and all(
         (
@@ -737,8 +1108,15 @@ def build_section_work_contract(
     )
     if fill_facts:
         required_action: Literal[
-            "reconstruct", "add_track", "add_tracks", "update_curve_scale", "add_fill"
+            "reconstruct",
+            "add_track",
+            "add_tracks",
+            "update_curve_scale",
+            "add_fill",
+            "add_binding",
         ] = "add_fill"
+    elif scalar_binding is not None:
+        required_action = "add_binding"
     elif scale_only and section_context.section_id is not None:
         required_action = "update_curve_scale"
     elif section_context.section_id is not None and len(work_tracks) == 1:
@@ -771,6 +1149,8 @@ def build_section_work_contract(
         handle=section_context.section_handle,
     )
     target_handle = None
+    if scalar_binding is not None:
+        target_handle = scalar_binding[1]
     required_scale = None
     required_fill = None
     if required_action == "update_curve_scale":
@@ -821,7 +1201,7 @@ def build_section_work_contract(
 
     source_handle = (
         selected_source_handle
-        if required_action in {"reconstruct", "add_track", "add_tracks"}
+        if required_action in {"reconstruct", "add_track", "add_tracks", "add_binding"}
         else None
     )
 
@@ -986,7 +1366,30 @@ def build_section_operation_contract(
         owner: str | None = None
         requested_scale: SectionWorkScale | None = None
         target_handle: str | None = None
-        if operation_type == "UPDATE_CURVE_SCALE":
+        binding_id: str | None = None
+        requested_channel: str | None = None
+        source_handle: str | None = None
+        operation_facts: list[RequestObligation] = []
+        if operation_type == "ADD_BINDING":
+            if len(task.operations) != 1:
+                raise SectionWorkContractError(
+                    "binding_cardinality_unsupported",
+                    "HOST-02 admits exactly one sparse binding operation.",
+                )
+            fact, target_handle, _track_id, source_handle, binding_id = build_scalar_binding_slot(
+                task, section_context
+            )
+            operation_facts = [fact]
+            requested_channel = str(fact.value)
+            channel_fields = [item for item in operation.field_values if item.field == "channel"]
+            if channel_fields and (
+                len(channel_fields) != 1 or channel_fields[0].value != fact.value
+            ):
+                raise SectionWorkContractError(
+                    "section_operation_field_coverage_incomplete",
+                    "Binding operation must carry the exact request channel term.",
+                )
+        elif operation_type == "UPDATE_CURVE_SCALE":
             if not scale_owners:
                 raise SectionWorkContractError(
                     "section_operation_unsupported",
@@ -1063,6 +1466,8 @@ def build_section_operation_contract(
             and item.owner_ref == owner
             and item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK, OwnerKind.BINDING}
         ]
+        if operation_type == "ADD_BINDING":
+            facts = operation_facts
         for proposal in operation.field_values:
             matching_facts = [item for item in facts if item.field == proposal.field]
             if (
@@ -1097,6 +1502,9 @@ def build_section_operation_contract(
             scope_ref=task.scope_ref,
             target_handle=target_handle,
             requested_scale=requested_scale,
+            binding_id=binding_id,
+            requested_channel=requested_channel,
+            source_handle=source_handle,
             parent_operation_id=(
                 semantic_operation_ids.get(operation.parent_ref)
                 if operation.parent_ref is not None
@@ -1332,10 +1740,17 @@ def build_report_operation_contract(
 
 def _section_operation_type(
     operation: SemanticOperation,
-) -> Literal["ADD_TRACK", "UPDATE_CURVE_SCALE"]:
-    """Accept only canonical track-add and existing-curve scale operations."""
+) -> Literal["ADD_TRACK", "ADD_BINDING", "UPDATE_CURVE_SCALE"]:
+    """Accept canonical track-add, scalar-binding-add, and scale operations."""
     if operation.verb == "CREATE" and operation.object_kind == "track":
         return "ADD_TRACK"
+    if operation.verb == "CREATE" and operation.object_kind == "binding":
+        if operation.parent_ref is not None:
+            raise SectionWorkContractError(
+                "section_operation_parent_unsupported",
+                "Sparse binding creation cannot use a parent operation.",
+            )
+        return "ADD_BINDING"
     if operation.verb == "SET" and operation.object_kind == "binding":
         return "UPDATE_CURVE_SCALE"
     raise SectionWorkContractError(
@@ -1428,6 +1843,46 @@ def validate_section_action_contract(
                 "worker_operation_order_mismatch",
                 "Track patches do not preserve the authorized operation order.",
             )
+    elif contract.required_action == "add_binding":
+        if operation_contract is None or len(operation_contract.operations) != 1:
+            raise SectionWorkContractError(
+                "worker_operation_contract_missing",
+                "Sparse binding creation requires one authoritative operation.",
+            )
+        if len(contract.required_bindings) != 1:
+            raise SectionWorkContractError(
+                "binding_cardinality_unsupported",
+                "HOST-02 requires one expected scalar binding slot.",
+            )
+        expected = contract.required_bindings[0]
+        operation = operation_contract.operations[0]
+        if (
+            operation.operation_type != "ADD_BINDING"
+            or operation.target_handle != contract.target_handle
+            or operation.binding_id != expected.host_binding_id
+            or operation.requirement_ids != (expected.requirement_id,)
+            or operation.source_handle != contract.source_handle
+            or operation.requested_channel != expected.channel
+            or operation_contract.snapshot_id != contract.snapshot_id
+        ):
+            raise SectionWorkContractError(
+                "worker_operation_contract_target_mismatch",
+                "Binding operation contract differs from the host slot.",
+            )
+        if (
+            action.target.handle != contract.target_handle
+            or action.binding.semantic_id != expected.handle
+            or action.binding.kind != "curve"
+            or action.binding.channel != expected.channel
+            or action.binding.label is not None
+            or action.binding.scale is not None
+            or action.binding.style is not None
+        ):
+            raise SectionWorkContractError(
+                "worker_contract_binding_mismatch",
+                "Sparse binding response changed the host-authorized scalar slot.",
+            )
+        return
     elif contract.required_action == "update_curve_scale":
         if operation_contract is None:
             raise SectionWorkContractError(

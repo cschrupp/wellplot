@@ -1422,10 +1422,17 @@ def test_worker_contract_is_bound_to_opaque_section_and_snapshot_handles() -> No
 
 def test_action_schemas_and_static_examples_are_versioned_and_specific() -> None:
     """Each contract action has one strict schema and one hashed static example."""
-    expected = {"reconstruct", "add_track", "add_tracks", "update_curve_scale", "add_fill"}
+    expected = {
+        "reconstruct",
+        "add_track",
+        "add_tracks",
+        "update_curve_scale",
+        "add_fill",
+        "add_binding",
+    }
     assert set(_ACTION_RESPONSE_MODELS) == expected
-    assert set(_SECTION_ACTION_EXAMPLES) == expected
-    for action_name in sorted(expected):
+    assert set(_SECTION_ACTION_EXAMPLES) == expected - {"add_binding"}
+    for action_name in sorted(expected - {"add_binding"}):
         model = _ACTION_RESPONSE_MODELS[action_name]
         schema = model.model_json_schema()
         assert schema["properties"]["action"]["const"] == action_name
@@ -1441,7 +1448,15 @@ def test_action_schema_is_the_schema_sent_by_existing_openai_compat_adapter(
 ) -> None:
     """The canonical adapter emits each strict action model's exact JSON Schema."""
     model = _ACTION_RESPONSE_MODELS[action_name]
-    payload = _section_action_example(action_name)["payload"]
+    payload = (
+        {
+            "action": "add_binding",
+            "target": {"handle": "track-1"},
+            "binding": {"semantic_id": "request.binding.1", "channel": "Gamma Ray"},
+        }
+        if action_name == "add_binding"
+        else _section_action_example(action_name)["payload"]
+    )
     captured: dict[str, object] = {}
 
     class _Create:

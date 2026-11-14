@@ -1095,10 +1095,17 @@ def _resolve_section_scope_ids(
 
     new_scopes = [scope for scope in scopes if scope.kind == "NEW_SECTION"]
     anonymous_new_scopes = [scope for scope in new_scopes if scope.selector_text is None]
+    anonymous_existing_scopes = [
+        scope
+        for scope in scopes
+        if scope.kind == "EXISTING_SECTION" and scope.selector_text is None
+    ]
     assigned_scope_ids: list[str] = []
     for task in plan.section_tasks:
         if len(scopes) == 1 and len(anonymous_new_scopes) == 1:
             assigned = f"new:{_scope_key(anonymous_new_scopes[0].declaration_id)}"
+        elif len(scopes) == 1 and len(anonymous_existing_scopes) == 1:
+            assigned = f"existing:{_scope_key(anonymous_existing_scopes[0].declaration_id)}"
         elif task.existing_section_hint:
             key = _scope_key(task.existing_section_hint)
             assigned = expected_by_selector.get(key)
@@ -1127,6 +1134,9 @@ def _resolve_section_scope_ids(
         f"new:{_scope_key(scope.declaration_id)}"
         for scope in new_scopes
         if scope.selector_text is None
+    )
+    expected_scope_ids += tuple(
+        f"existing:{_scope_key(scope.declaration_id)}" for scope in anonymous_existing_scopes
     )
     return tuple(assigned_scope_ids), expected_scope_ids
 
