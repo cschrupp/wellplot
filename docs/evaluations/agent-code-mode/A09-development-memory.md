@@ -775,3 +775,26 @@ its `FAIL` terminal. A09 integrated CBL+VDL qualification remains open and is
 ready for a separately authorized fresh execution. Do not use attempt 003's
 raw-PDF-byte label oracle. This acceptance does not itself authorize execution,
 A10/A12, provider/live, or scientific work.
+
+## A10-SEM-HOST-02R3 Independent Acceptance (2026-11-14)
+
+Independent review accepted the final HOST-02R3 corrective as
+`A10_SEM_HOST_02R3_INDEPENDENT_REVIEW_PASS`. The implementation commit is
+`511c6a80489eb9745b6aa2bc3fddc8e801bb417b`, followed by documentation
+acceptance commit `fec44639c0dbf4d80861bad9742e98c1b30c6f25`.
+
+The remaining authority leak was that an anonymous host-created existing
+section could retain a planner `existing_section_hint`. HOST-02R3 now binds
+the actual anonymous `HOST_CONTEXT` declaration, discards the planner hint,
+and leaves section selection to the canonical document resolver. A unique
+eligible section succeeds; multiple eligible sections fail closed. Explicit
+request-declared section targets remain exact and unchanged. The scope-ID
+lookup now preserves the actual declaration kind rather than treating an
+anonymous existing declaration as a new section.
+
+Qualification evidence reports 324 passing provider-free tests, passing Ruff,
+format, compilation, diff-check, and single-engine attestation gates, zero
+provider/model/live calls, and an unchanged planner wire schema. No alternate
+engine, parallel workflow, P8 run, live smoke, or holdout access was added or
+authorized. The independent reviewer accepted the source and committed
+evidence without rerunning the suite.

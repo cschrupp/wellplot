@@ -469,3 +469,25 @@ motivate a regression but do not authorize a global sentinel. A `0–1 mV`
 range is presentation-only when explicitly requested, not null handling,
 calibration, or a universal default. No null-handling implementation is
 authorized here.
+
+## A10-SEM-HOST-02R3 — Host Context Scope Authority Closure (2026-11-14)
+
+Independent review accepted HOST-02R3 as
+`A10_SEM_HOST_02R3_INDEPENDENT_REVIEW_PASS` at remote branch tip
+`fec44639c0dbf4d80861bad9742e98c1b30c6f25`. The implementation commit is
+`511c6a80489eb9745b6aa2bc3fddc8e801bb417b`, parent
+`1b5207787c4e8fceb925435e64ea1cf8dcdc0d10`.
+
+The corrective makes anonymous `HOST_CONTEXT` section scope authority
+host-owned throughout assignment and attachment. Planner-supplied
+`existing_section_hint` is ignored and attached as `None`; the existing
+canonical resolver selects a unique eligible section or reports ambiguity.
+Explicit `REQUEST` section targets retain their prior behavior. The planner
+wire schema, resolver policy, reconciler, executor, persistence boundary,
+provider behavior, and single-engine architecture are unchanged.
+
+The committed qualification record reports 324 provider-free tests passed;
+Ruff, formatting, compilation, diff checks, and single-engine attestation
+passed. No provider/model/live calls, P8 execution, holdout access, or
+parallel workflow occurred. This acceptance closes HOST-02R3 but does not
+authorize the next A10 evaluation stage.

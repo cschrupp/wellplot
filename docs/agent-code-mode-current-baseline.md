@@ -959,3 +959,31 @@ of current authority.
   baseline. The legacy MCP `check_channel_availability` alias interpretation
   remains operational debt and is not semantic authority. This acceptance
   authorizes neither provider calls nor the benchmark by itself.
+
+### A10-SEM-HOST-02R3 Independent Acceptance
+
+- **Status:** `A10_SEM_HOST_02R3_INDEPENDENT_REVIEW_PASS`;
+  HOST-02R2's outstanding corrective is closed.
+- **Accepted lineage:** HOST-02R2 implementation
+  `b398e7d4293f76ae1ff4a397e5b05e7f65b3cc93`, qualification record
+  `1b5207787c4e8fceb925435e64ea1cf8dcdc0d10`, HOST-02R3 implementation
+  `511c6a80489eb9745b6aa2bc3fddc8e801bb417b`, and acceptance record
+  `fec44639c0dbf4d80861bad9742e98c1b30c6f25`.
+- **Accepted behavior:** anonymous `HOST_CONTEXT` existing-section scopes
+  are assigned and attached from the host-owned scope declaration. Planner
+  `existing_section_hint` values are discarded for those scopes, so one
+  eligible section is selected by the canonical document and multiple
+  eligible sections fail closed as ambiguous. Explicit `REQUEST` section
+  targets retain their existing exact-target behavior.
+- **Architecture:** the existing planner wire schema, resolver, reconciler,
+  executor, persistence boundary, provider behavior, and single-engine path
+  are preserved. No alternate engine or parallel workflow was introduced.
+- **Qualification:** the focused provider-free HOST-02R suite reports 324
+  passed. Ruff, formatting, Python compilation, `git diff --check`, and
+  single-engine attestation passed. Provider/model/live calls were zero and
+  the planner wire-schema SHA remained unchanged. The reported test result is
+  retained as Codex-produced qualification evidence; independent review
+  accepted the source and committed record without rerunning the suite.
+- **Boundary:** this acceptance closes HOST-02R3 only. It does not authorize
+  P8, a new live smoke, provider/model execution, holdout access, baseline
+  promotion beyond this Knowledge Delta, or unrelated semantic expansion.

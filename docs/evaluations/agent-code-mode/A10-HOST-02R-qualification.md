@@ -1,6 +1,6 @@
 # A10-SEM-HOST-02R Qualification Record
 
-Status: `A10_SEM_HOST_02R3_PROVIDER_FREE_PASS — FINAL_HA_ACCEPTANCE_REVIEW`
+Status: `A10_SEM_HOST_02R3_INDEPENDENT_REVIEW_PASS`
 
 ## Candidate
 
@@ -194,3 +194,17 @@ a421e6e09b499086c270a3e4ac786d4a80e6f03523b2e0178a6ad2ab50026839  docs/architect
 The known stale Codex checkpoint-ref repack warning occurred during commit
 maintenance. It did not affect the commit object, test results, or branch
 content.
+
+## Independent acceptance
+
+Independent review accepted HOST-02R3 as
+`A10_SEM_HOST_02R3_INDEPENDENT_REVIEW_PASS`. GitHub verification confirms the
+remote branch resolves to `fec44639c0dbf4d80861bad9742e98c1b30c6f25`; the
+implementation lineage is `1b5207787c` -> `511c6a8048` -> `fec44639c0`.
+The reviewer accepted the host-authority source behavior, the committed
+qualification record, and the containment of the corrective without
+independently rerunning the reported 324-test suite.
+
+HOST-02R3 is closed. This acceptance does not authorize P8, a new live smoke,
+provider/model calls, holdout access, baseline promotion beyond this recorded
+Knowledge Delta, or semantic architecture expansion.

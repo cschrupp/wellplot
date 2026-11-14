@@ -583,3 +583,15 @@ calibration/normalization. A `0–1 mV` range remains presentation-only if
 explicitly requested for a test; it is not a universal default and does not
 mask missing samples. Implement only under a separately reviewed slice after
 inspecting the canonical configuration model and context/data flow.
+
+### A10-SEM-HOST-02R3 — Accepted
+
+HOST-02R3 is independently accepted at implementation commit
+`511c6a80489eb9745b6aa2bc3fddc8e801bb417b`, with documentation acceptance
+commit `fec44639c0dbf4d80861bad9742e98c1b30c6f25` on
+`engineering-d5-binding-path-repair`. Anonymous host-created existing-section
+scopes now ignore planner section hints and fail closed on multiple eligible
+sections; explicit request targets remain unchanged. The provider-free scoped
+qualification reported 324 passing tests with static and single-engine gates
+passing. No provider/model/live/P8/holdout activity occurred. HOST-02R3 is
+closed; the next A10 stage requires its own authorization and execution gates.
