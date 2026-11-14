@@ -28,6 +28,7 @@ from wellplot.agent.code_mode.worker_contracts import (
     validate_section_action_contract,
 )
 from wellplot.model.authoring import AuthoringDocumentSpec
+from wellplot.semantic_catalog import SemanticCatalogTrustError
 
 
 def _context() -> ResolvedSectionContext:
@@ -157,6 +158,35 @@ def test_preworker_ledger_binds_semantic_expectation_before_worker_output() -> N
     assert expected.track_id == "track-main"
     assert expected.binding_id.startswith("binding-host-")
     assert expected.source_handle == "source-1"
+
+
+def test_preworker_semantic_binding_rejects_untrusted_catalog(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Do not downgrade semantic publication when catalog trust fails."""
+    task = _task()
+    plan = SemanticPlan(
+        summary="HOST-02 trust test",
+        section_tasks=(task,),
+        obligations=task.obligations,
+    )
+
+    def reject_catalog() -> object:
+        raise SemanticCatalogTrustError("deployment_pin_missing")
+
+    monkeypatch.setattr(
+        "wellplot.agent.code_mode.worker_contracts.load_deployed_catalog_release",
+        reject_catalog,
+    )
+
+    with pytest.raises(SectionWorkContractError) as caught:
+        build_preworker_semantic_publication_contract(
+            plan,
+            SimpleNamespace(sections=(_context(),)),
+        )
+
+    assert caught.value.code == "semantic_catalog_unavailable"
+    assert caught.value.details == {"catalog_error": "deployment_pin_missing"}
 
 
 def test_scalar_binding_action_lowers_through_existing_intent_boundary() -> None:

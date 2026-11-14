@@ -775,17 +775,31 @@ def build_preworker_semantic_publication_contract(
 ) -> SemanticPublicationContract | None:
     """Build semantic expectations from host facts before any worker response."""
     section_tasks = tuple(getattr(plan, "section_tasks", ()))
+    channel_items = tuple(
+        item
+        for task in section_tasks
+        for item in task.obligations
+        if item.owner_kind is OwnerKind.BINDING and item.field == "channel"
+    )
+    if not any(not str(item.value).isupper() for item in channel_items):
+        return None
     try:
         release = load_deployed_catalog_release()
-    except SemanticCatalogTrustError:
-        return None
+    except SemanticCatalogTrustError as error:
+        raise SectionWorkContractError(
+            "semantic_catalog_unavailable",
+            "Trusted semantic catalog release is unavailable.",
+            details={"catalog_error": error.code},
+        ) from error
     classifications: list[SemanticRequestClassification] = []
     expectations: list[ExpectedSemanticBinding] = []
     for task_index, task in enumerate(section_tasks):
         section_context = context.sections[task_index]
-        for item in task.obligations:
-            if item.owner_kind is not OwnerKind.BINDING or item.field != "channel":
-                continue
+        for item in (
+            item
+            for item in task.obligations
+            if item.owner_kind is OwnerKind.BINDING and item.field == "channel"
+        ):
             matches = tuple(
                 rule
                 for rule in release.catalog.request_term_rules
