@@ -49,7 +49,12 @@ from wellplot.agent.providers.response_diagnostics import (  # noqa: E402
 )
 from wellplot.capabilities import create_builtin_registry  # noqa: E402
 
-BASELINE_SHA = "17540f98c9c035ae07385b28c71bd11dccff323b"
+# The original E2 contract remains historical evidence.  Current pre-live
+# checks must bind to the accepted implementation checkpoint instead.
+HISTORICAL_E2_BASELINE_SHA = "17540f98c9c035ae07385b28c71bd11dccff323b"
+HISTORICAL_E2_PROMPT_SHA256 = "5e7a0732af01e4b1f16b3ccf019c005ea2e9ba5c0e93e94870a56a261e2bca18"
+HISTORICAL_E2_SCHEMA_SHA256 = "3a331166ccc570a74056dea7770d04b16f8fa32dc3641d6c37de6c26cf81d9e3"
+BASELINE_SHA = "7c63a2b48412cf0b49ac98de4a9389fc6677c160"
 EXPERIMENT_VERSION = "CM-59A-R2C-A"
 DIAGNOSTIC_CONTRACT_VERSION = "cm59a.r2c.a.schema-validation-shape.v1"
 CASE_PATH = REPO_ROOT / "tests/fixtures/typed_worker/cm59a_system_reevaluation_cases.json"
@@ -64,8 +69,8 @@ MAX_TOKENS_PARAMETER = "max_tokens"
 TIMEOUT_SECONDS = 900.0
 ATTEMPTS = 2
 EXPECTED_CORPUS_SHA256 = "b6a605158e667e5250df99a53cb4ba521473f8146fad2022aed2dff77d5f551b"
-EXPECTED_PROMPT_SHA256 = "5e7a0732af01e4b1f16b3ccf019c005ea2e9ba5c0e93e94870a56a261e2bca18"
-EXPECTED_SCHEMA_SHA256 = "3a331166ccc570a74056dea7770d04b16f8fa32dc3641d6c37de6c26cf81d9e3"
+EXPECTED_PROMPT_SHA256 = "4bb8005845dc8bd78ea5797e8887f35ea5afe085dace71ffcf31de0f1d2b9483"
+EXPECTED_SCHEMA_SHA256 = "f645b12c0a9f98601d71a65d2f27b2d9c7d306d52806ffe01ab48f25233274f7"
 EXPECTED_SOURCE_SUMMARY_SHA256 = "ec6147a1b5e1ac6374e34ae3d66d11275542c6b340337cb26d3ae1d06240532e"
 EXPECTED_ENDPOINT_IDENTITY = "23afb5ebf67063154bcf02ada6d25b2c929250b14c6a4cad06e8649d087bc980"
 EXPECTED_REQUEST_HASHES = {

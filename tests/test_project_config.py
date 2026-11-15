@@ -28,10 +28,10 @@ def test_repository_config_has_expected_derived_urls_and_values() -> None:
 
     assert config.provider.name == "openai_compat"
     assert config.provider.model == "qwen3.6-35b-a3b"
-    assert config.server_origin == "http://192.168.2.141:8888"
-    assert config.openai_compat_base_url == "http://192.168.2.141:8888/v1"
-    assert config.model_catalog_url == "http://192.168.2.141:8888/v1/models"
-    assert config.props_url == "http://192.168.2.141:8888/props"
+    assert config.server_origin == "http://192.168.2.140:8888"
+    assert config.openai_compat_base_url == "http://192.168.2.140:8888/v1"
+    assert config.model_catalog_url == "http://192.168.2.140:8888/v1/models"
+    assert config.props_url == "http://192.168.2.140:8888/props"
     assert config.provider.timeout_seconds == 900
     assert config.provider.max_retries == 2
     assert config.runtime.concurrency == 1

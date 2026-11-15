@@ -255,6 +255,7 @@ def test_revision_action_schema_is_discriminated_and_branch_strict() -> None:
         "add_track",
         "add_tracks",
         "add_fill",
+        "add_binding",
     }
     add_fill = schema["$defs"]["AddFillAction"]
     assert add_fill["required"] == ["action", "target", "fill"]
