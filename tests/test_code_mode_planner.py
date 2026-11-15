@@ -1937,10 +1937,12 @@ def test_schema_correction_describes_replacement_and_operation_rules() -> None:
     assert "No previous candidate is supplied" in request.user_prompt
     assert "Repair the supplied SemanticPlan candidate" not in request.user_prompt
     for guidance in (
-        "SET requires a non-null value",
-        "CLEAR requires a null value",
+        "Field-value state=SET requires a non-null value",
+        "field-value state=CLEAR requires a null value",
+        "Operation verb=SET requires a target_clue and exactly one field_values entry",
+        "may contain a field-value state=CLEAR",
         "CREATE and ENSURE require semantic_ref",
-        "UPDATE, REMOVE, and SET require target_clue",
+        "UPDATE and REMOVE require target_clue",
         "Preserve established verb meanings",
     ):
         assert guidance in request.user_prompt

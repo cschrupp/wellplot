@@ -43,10 +43,12 @@ _SCHEMA_CORRECTION_INSTRUCTION = (
     "details. Preserve requested work supported by the request and context, and "
     "do not create unrelated report or section work, add undeclared fields, or "
     "include prose. Preserve established verb meanings; never change a verb "
-    "merely to satisfy a validator. Operation constraints: SET requires a "
-    "non-null value; CLEAR requires a null value; CREATE and ENSURE require "
-    "semantic_ref; UPDATE, REMOVE, and SET require target_clue. Return only one "
-    "object matching the supplied structured response model."
+    "merely to satisfy a validator. Field-value state=SET requires a non-null "
+    "value; field-value state=CLEAR requires a null value. Operation verb=SET "
+    "requires a target_clue and exactly one field_values entry, and may contain "
+    "a field-value state=CLEAR. CREATE and ENSURE require semantic_ref; UPDATE "
+    "and REMOVE require target_clue. Return only one object matching the "
+    "supplied structured response model."
 )
 
 
