@@ -1,6 +1,6 @@
 # A10-SEM-NL-CORRECTION-01 Qualification
 
-Status: `A10_SEM_NL_CORRECTION_01R1_READY`
+Status: `A10_SEM_NL_CORRECTION_01R1_ACCEPTED`
 
 This record covers the bounded provider-free corrective based on the sealed
 Smoke 002 forensic evidence. It does not authorize a live smoke, P8, holdout,
@@ -42,13 +42,19 @@ rewrite historical evaluation evidence.
 
 ## Exact prompt delta
 
-Previous correction instruction:
+Original pre-C1D correction instruction:
 
 ```text
 Repair the supplied SemanticPlan candidate using the original request and the listed validation violations. Preserve already-valid requested work and change only what is needed to satisfy those violations. Do not create unrelated report or section work, add undeclared fields, or include prose. Return only one object matching the supplied structured response model.
 ```
 
-Previous candidate correction instruction:
+C1D candidate correction instruction (`85bbecffdc1d0bb84b1dadc96fabdd50ca316a4b`):
+
+```text
+Generate one complete replacement SemanticPlan from the original request, authoritative context, and the listed validation violations. No previous candidate is supplied, so do not assume or reconstruct unavailable candidate details. Preserve requested work supported by the request and context, and do not create unrelated report or section work, add undeclared fields, or include prose. Preserve established verb meanings; never change a verb merely to satisfy a validator. Operation constraints: SET requires a non-null value; CLEAR requires a null value; CREATE and ENSURE require semantic_ref; UPDATE, REMOVE, and SET require target_clue. Return only one object matching the supplied structured response model.
+```
+
+R1 corrected instruction (`7b5794efa8e7a5a2fc648b34f5f97bb0cb0ab389`):
 
 ```text
 Generate one complete replacement SemanticPlan from the original request, authoritative context, and the listed validation violations. No previous candidate is supplied, so do not assume or reconstruct unavailable candidate details. Preserve requested work supported by the request and context, and do not create unrelated report or section work, add undeclared fields, or include prose. Preserve established verb meanings; never change a verb merely to satisfy a validator. Field-value state=SET requires a non-null value; field-value state=CLEAR requires a null value. Operation verb=SET requires a target_clue and exactly one field_values entry, and may contain a field-value state=CLEAR. CREATE and ENSURE require semantic_ref; UPDATE and REMOVE require target_clue. Return only one object matching the supplied structured response model.
@@ -115,6 +121,11 @@ were made.
 
 ## Review boundary
 
-This is an implementation candidate for independent review. It must not be
-interpreted as evidence that a model will repair the historical Smoke 002
-responses. Any live smoke remains a separate, freshly authorized activity.
+Independent review accepted R1 at commit
+`7b5794efa8e7a5a2fc648b34f5f97bb0cb0ab389`. This acceptance covers the
+bounded prompt clarification and provider-free evidence only; it does not
+claim that a model will repair the historical Smoke 002 responses.
+
+The next planner-only operational smoke remains a separate, freshly
+authorized activity. No smoke, P8, holdout, or scientific execution occurred
+under this record.
