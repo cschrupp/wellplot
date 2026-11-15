@@ -18,6 +18,7 @@ from typing import Any
 import httpx
 import pytest
 from pydantic import BaseModel
+from scripts import a10_semantic_corpus_adapter as a10_adapter
 from scripts import nlp_d4_live_acceptance as d4
 from scripts import nlp_d5_live_semantic_qualification as d5
 
@@ -2553,6 +2554,111 @@ def test_planner_smoke_selects_only_authorized_frozen_case() -> None:
     assert "expected" not in selected
     with pytest.raises(d5.D5StaticPreflightError, match="does not match its authority"):
         d5._planner_smoke_case(REPO_ROOT, authorization, case_id="B01")
+
+
+def test_a10_case_authorization_is_case_scoped_and_reuses_planner_controls(
+    tmp_path: Path,
+) -> None:
+    """A10 derives case custody from the existing planner-smoke authority."""
+    case = a10_adapter.load_a10_benchmark(REPO_ROOT)[0]
+    authorization = replace(
+        _authorization(campaign_id="a10", artifact_root=str(tmp_path / "a10")),
+        a10_evaluation_mode=d5.A10_PLANNER_EVALUATION_KIND,
+        a10_benchmark_sha256=a10_adapter.A10_BENCHMARK_SHA256,
+        a10_source_inventory_sha256=a10_adapter.A10_SOURCE_INVENTORY_SHA256,
+        a10_harness_sha256="a" * 64,
+        a10_sdk_max_retries=0,
+    )
+
+    derived = d5._a10_case_authorization(
+        authorization,
+        case,
+        artifact_root=tmp_path / "a10" / case.case_id,
+    )
+
+    assert derived.planner_smoke_mode == d5.SMOKE_PLANNER_KIND
+    assert derived.planner_smoke_case_id == case.case_id
+    assert derived.planner_smoke_benchmark_sha256 == authorization.a10_benchmark_sha256
+    assert derived.planner_smoke_sdk_max_retries == 0
+    assert derived.campaign_id.endswith("-a01")
+
+
+def test_a10_evaluation_orchestrates_exact_53_cases_without_provider_calls(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The future A10 mode uses one canonical case loop and no provider in tests."""
+    authorization = replace(
+        _authorization(campaign_id="a10", artifact_root=str(tmp_path / "a10")),
+        a10_evaluation_mode=d5.A10_PLANNER_EVALUATION_KIND,
+        a10_benchmark_sha256=a10_adapter.A10_BENCHMARK_SHA256,
+        a10_source_inventory_sha256=a10_adapter.A10_SOURCE_INVENTORY_SHA256,
+        a10_harness_sha256="a" * 64,
+        a10_sdk_max_retries=0,
+    )
+    calls: list[str] = []
+    wire_response = {
+        "version": "wellplot.semantic-plan.v2",
+        "summary": "synthetic",
+        "report_task": None,
+        "section_tasks": [
+            {
+                "goal": "synthetic",
+                "capability_ids": ["binding.curve", "track.normal"],
+                "existing_section_hint": "Main Log",
+                "scope_ref": "main-log",
+                "source_hints": [],
+                "operations": [
+                    {
+                        "local_ref": "binding",
+                        "scope_ref": "main-log",
+                        "verb": "ENSURE",
+                        "object_kind": "binding",
+                        "semantic_ref": "binding.gr-curve",
+                        "target_clue": "GR scalar channel",
+                    }
+                ],
+            }
+        ],
+    }
+
+    def fake_smoke(**kwargs: object) -> dict[str, object]:
+        case_id = str(kwargs["case_id"])
+        calls.append(case_id)
+        case = next(
+            case for case in a10_adapter.load_a10_benchmark(REPO_ROOT) if case.case_id == case_id
+        )
+        case_authorization = d5._a10_case_authorization(
+            authorization,
+            case,
+            artifact_root=Path(kwargs["artifact_root"]),
+        )
+        paths = d5.EvidencePaths(Path(kwargs["artifact_root"]), case_authorization.campaign_id)
+        paths.root.mkdir(parents=True, exist_ok=True)
+        paths.planner_wire.write_text(json.dumps({"validated_response": wire_response}) + "\n")
+        return {
+            "status": "SMOKE_PASS",
+            "terminal": {
+                "logical_generation_calls": 1,
+                "physical_generation_attempts": 1,
+            },
+        }
+
+    monkeypatch.setattr(d5, "execute_live_planner_smoke", fake_smoke)
+    result = d5.execute_live_a10_planner_evaluation(
+        repo_root=REPO_ROOT,
+        authorization=authorization,
+        artifact_root=tmp_path / "a10",
+    )
+
+    assert result["status"] == "FAIL"
+    assert result["case_count"] == 53
+    assert result["completed_case_count"] == 53
+    assert result["physical_generation_attempts"] == 53
+    assert calls == [case.case_id for case in a10_adapter.load_a10_benchmark(REPO_ROOT)]
+    assert result["workers"] == 0
+    assert result["persistence"] == 0
+    assert result["render"] == 0
 
 
 def test_planner_smoke_unknown_case_and_benchmark_drift_fail_closed() -> None:

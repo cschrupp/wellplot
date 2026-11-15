@@ -27,7 +27,7 @@ import urllib.error
 import urllib.request
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, Protocol
@@ -35,6 +35,7 @@ from typing import Any, Literal, Protocol
 from jsonschema import Draft202012Validator
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from scripts import a10_semantic_corpus_adapter as a10_adapter
 from scripts import d5_5_final_population as final_population
 from scripts import nlp_d4_live_acceptance as d4
 from scripts.d5_5_c02_contract_grader import grade_c02_artifact
@@ -92,6 +93,9 @@ SMOKE_PLANNER_MAX_RETRIES = 0
 # The production planner permits one invalid-response correction after the initial call.
 SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS = MAX_PLANNER_LOGICAL_CALLS
 SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS_PER_REQUEST = 1
+A10_PLANNER_EVALUATION_KIND = "a10_planner_53"
+A10_PLANNER_MAX_CASES = 53
+A10_PLANNER_MAX_PHYSICAL_ATTEMPTS = 106
 A10_SEM_01_ROOT = "workspace/evaluations/a10-sem-01-20261110"
 A10_SEM_01_BENCHMARK = f"{A10_SEM_01_ROOT}/benchmark.json"
 A10_SEM_01_SOURCE_INVENTORY = f"{A10_SEM_01_ROOT}/source-inventory.json"
@@ -574,6 +578,11 @@ class D5Authorization:
     planner_smoke_wire_schema_sha256: str = ""
     planner_smoke_sdk_max_retries: int | None = None
     expected_worktree_porcelain: str = ""
+    a10_evaluation_mode: str = ""
+    a10_benchmark_sha256: str = ""
+    a10_source_inventory_sha256: str = ""
+    a10_harness_sha256: str = ""
+    a10_sdk_max_retries: int | None = None
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> D5Authorization:
@@ -666,6 +675,11 @@ class D5Authorization:
             planner_smoke_wire_schema_sha256=str(value.get("planner_smoke_wire_schema_sha256", "")),
             planner_smoke_sdk_max_retries=value.get("planner_smoke_sdk_max_retries"),
             expected_worktree_porcelain=str(value.get("expected_worktree_porcelain", "")),
+            a10_evaluation_mode=str(value.get("a10_evaluation_mode", "")),
+            a10_benchmark_sha256=str(value.get("a10_benchmark_sha256", "")),
+            a10_source_inventory_sha256=str(value.get("a10_source_inventory_sha256", "")),
+            a10_harness_sha256=str(value.get("a10_harness_sha256", "")),
+            a10_sdk_max_retries=value.get("a10_sdk_max_retries"),
         )
 
 
@@ -5069,6 +5083,166 @@ def execute_live_planner_smoke(
     }
 
 
+def _a10_case_authorization(
+    authorization: D5Authorization,
+    case: a10_adapter.A10BenchmarkCase,
+    *,
+    artifact_root: Path,
+) -> D5Authorization:
+    """Derive one case-scoped planner-smoke authorization from A10 custody."""
+    request_sha256 = hashlib.sha256(case.request.encode("utf-8")).hexdigest()
+    return replace(
+        authorization,
+        authorization_id=f"{authorization.authorization_id}:{case.case_id}",
+        campaign_id=f"{authorization.campaign_id}-{case.case_id.lower()}",
+        artifact_root=str(artifact_root),
+        planner_smoke_mode=SMOKE_PLANNER_KIND,
+        planner_smoke_case_id=case.case_id,
+        planner_smoke_request_sha256=request_sha256,
+        planner_smoke_benchmark_sha256=authorization.a10_benchmark_sha256,
+        planner_smoke_source_inventory_sha256=authorization.a10_source_inventory_sha256,
+        planner_smoke_harness_sha256=authorization.a10_harness_sha256,
+        planner_smoke_sdk_max_retries=authorization.a10_sdk_max_retries,
+        expected_worktree_porcelain=authorization.expected_worktree_porcelain,
+    )
+
+
+def _a10_wire_plan_from_custody(
+    repo_root: Path,
+    case_authorization: D5Authorization,
+) -> object | None:
+    """Read the final validated wire DTO from one sealed case namespace."""
+    paths = EvidencePaths(
+        _authorized_artifact_root(repo_root, case_authorization),
+        case_authorization.campaign_id,
+    )
+    if not paths.planner_wire.is_file():
+        return None
+    rows = [json.loads(line) for line in paths.planner_wire.read_text().splitlines() if line]
+    if not rows:
+        return None
+    response = rows[-1].get("validated_response")
+    if not isinstance(response, Mapping):
+        return None
+    from wellplot.agent.code_mode.planner import _PlannerWirePlan
+
+    try:
+        return _PlannerWirePlan.model_validate(response)
+    except Exception:
+        return None
+
+
+def execute_live_a10_planner_evaluation(
+    *,
+    repo_root: Path,
+    authorization: D5Authorization,
+    artifact_root: Path,
+    endpoint_get: Callable[[str, str], object] = _credential_bearing_json_get,
+    api_key_loader: Callable[[], str] | None = None,
+    static_checker: Callable[[Path, D5Authorization, EvidencePaths], dict[str, Any]] | None = None,
+    provider_factory: Callable[..., object] | None = None,
+) -> dict[str, Any]:
+    """Execute the frozen A10 population through the existing planner smoke path."""
+    if authorization.a10_evaluation_mode != A10_PLANNER_EVALUATION_KIND:
+        raise D5StaticPreflightError("A10 planner evaluation mode is not authorized")
+    if authorization.a10_sdk_max_retries != 0:
+        raise D5StaticPreflightError("A10 planner evaluation requires zero SDK retries")
+    for digest in (
+        authorization.a10_benchmark_sha256,
+        authorization.a10_source_inventory_sha256,
+        authorization.a10_harness_sha256,
+    ):
+        if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise D5StaticPreflightError("A10 planner evaluation authority is incomplete")
+    root = artifact_root.resolve()
+    if root != _authorized_artifact_root(repo_root, authorization):
+        raise D5StaticPreflightError("A10 evaluation artifact root is not authorized")
+    if root.exists() and any(root.iterdir()):
+        raise D5StaticPreflightError("A10 evaluation artifact namespace is not fresh")
+    cases = a10_adapter.load_a10_benchmark(repo_root)
+    if len(cases) != A10_PLANNER_MAX_CASES:
+        raise D5StaticPreflightError("A10 benchmark population is not exactly 53 cases")
+    inventory_path = repo_root / A10_SEM_01_SOURCE_INVENTORY
+    _assert_hash(inventory_path, authorization.a10_source_inventory_sha256, "A10 source inventory")
+    planned_rows: list[dict[str, Any]] = []
+    total_physical_attempts = 0
+    total_logical_calls = 0
+    stopped_reason: str | None = None
+    for case in cases:
+        case_root = root / case.case_id
+        case_authorization = _a10_case_authorization(
+            authorization,
+            case,
+            artifact_root=case_root,
+        )
+        result = execute_live_planner_smoke(
+            repo_root=repo_root,
+            authorization=case_authorization,
+            artifact_root=case_root,
+            endpoint_get=endpoint_get,
+            api_key_loader=api_key_loader,
+            static_checker=static_checker,
+            provider_factory=provider_factory,
+            case_id=case.case_id,
+        )
+        terminal = result.get("terminal")
+        if isinstance(terminal, Mapping):
+            logical_calls = int(terminal.get("logical_generation_calls", 0))
+            physical_attempts = int(terminal.get("physical_generation_attempts", 0))
+        else:
+            logical_calls = 0
+            physical_attempts = 0
+        total_logical_calls += logical_calls
+        total_physical_attempts += physical_attempts
+        if total_physical_attempts > A10_PLANNER_MAX_PHYSICAL_ATTEMPTS:
+            raise D5CallCapExceeded("A10 planner evaluation physical call ceiling exceeded")
+        plan = _a10_wire_plan_from_custody(repo_root, case_authorization)
+        score = a10_adapter.score_a10_plan(case, plan)
+        planned_rows.append(
+            {
+                "case_id": case.case_id,
+                "gold": case.gold,
+                "class": case.case_class,
+                "request_sha256": hashlib.sha256(case.request.encode("utf-8")).hexdigest(),
+                "status": result.get("status"),
+                "logical_generation_calls": logical_calls,
+                "physical_generation_attempts": physical_attempts,
+                "score": score.__dict__,
+            }
+        )
+        if result.get("status") in {"SMOKE_NOT_READY", "SMOKE_ENVIRONMENT_BLOCKED"}:
+            stopped_reason = str(result.get("status"))
+            break
+    aggregate_status = "PASS" if len(planned_rows) == len(cases) else "INCONCLUSIVE"
+    if any(row["status"] != "SMOKE_PASS" for row in planned_rows):
+        aggregate_status = "INCONCLUSIVE"
+    if any(not row["score"]["passed"] for row in planned_rows):
+        aggregate_status = "FAIL" if aggregate_status == "PASS" else aggregate_status
+    root.mkdir(parents=True, exist_ok=True)
+    summary = {
+        "experiment_version": D5_EXPERIMENT_VERSION,
+        "mode": A10_PLANNER_EVALUATION_KIND,
+        "status": aggregate_status,
+        "authorization_id": authorization.authorization_id,
+        "campaign_id": authorization.campaign_id,
+        "benchmark_sha256": authorization.a10_benchmark_sha256,
+        "source_inventory_sha256": authorization.a10_source_inventory_sha256,
+        "case_count": len(cases),
+        "completed_case_count": len(planned_rows),
+        "logical_generation_calls": total_logical_calls,
+        "physical_generation_attempts": total_physical_attempts,
+        "logical_call_ceiling": A10_PLANNER_MAX_CASES * 2,
+        "physical_attempt_ceiling": A10_PLANNER_MAX_PHYSICAL_ATTEMPTS,
+        "workers": 0,
+        "persistence": 0,
+        "render": 0,
+        "stopped_reason": stopped_reason,
+        "rows": planned_rows,
+    }
+    _atomic_json(root / "a10-planner-evaluation-summary.json", summary, exclusive=True)
+    return summary
+
+
 def execute_live_schema_behavior_probe(
     *,
     repo_root: Path,
@@ -6509,6 +6683,7 @@ def main() -> int:
     modes.add_argument("--provider-free-preflight", action="store_true")
     modes.add_argument("--execute-smoke", action="store_true")
     modes.add_argument("--execute-planner-smoke", action="store_true")
+    modes.add_argument("--execute-a10-evaluation", action="store_true")
     modes.add_argument("--execute-schema-behavior-probe", action="store_true")
     modes.add_argument("--execute-live", action="store_true")
     parser.add_argument("--population", choices=("d4", "final"), default="d4")
@@ -6552,6 +6727,12 @@ def main() -> int:
             authorization=authorization,
             artifact_root=artifact_root,
             case_id=args.planner_case_id,
+        )
+    elif args.execute_a10_evaluation:
+        result = execute_live_a10_planner_evaluation(
+            repo_root=repo_root,
+            authorization=authorization,
+            artifact_root=artifact_root,
         )
     elif args.execute_schema_behavior_probe:
         result = execute_live_schema_behavior_probe(

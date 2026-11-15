@@ -1,6 +1,6 @@
 # A10 Semantic Planner Evaluation Readiness
 
-Status: `A10_SEM_53_PLANNER_EVALUATION_READINESS — NOT_READY`
+Status: `A10_SEM_53_EXECUTION_PATH_01_CANDIDATE_READY — HA_REVIEW_REQUIRED`
 
 This is a provider-free readiness audit for the accepted frozen 53-case A10
 semantic planner evaluation. It does not execute the evaluation and does not
@@ -57,27 +57,30 @@ PASS: the canonical corpus-adapter and live-qualification suites reported
 
 ### Executable 53-case campaign path
 
-NOT READY. The existing canonical live qualification CLI currently exposes:
+The bounded execution-path candidate now exposes one additional mode in the
+existing canonical live qualification CLI:
 
-- `execute_live_planner_smoke`, which is pinned to one planner case (`B01`);
+- `execute_live_planner_smoke`, which remains pinned to one planner case
+  (`B01`);
 - `execute_live_campaign --population d4`, which uses the older D4 turn set;
 - `execute_live_campaign --population final`, which uses the separate ten-turn
   D5 final population.
-
-None of these executes the frozen A10 benchmark's 53 request records.
+- `execute_live_a10_planner_evaluation`, which processes the exact A10
+  benchmark population through the existing planner-smoke/provider/custody
+  path, with one case namespace per request.
 
 ### Scoring binding
 
-NOT READY. `scripts/a10_semantic_corpus_adapter.py` loads a separate 96-case
+The candidate adds an A10-specific adapter without changing the historical
+scorer. `scripts/a10_semantic_corpus_adapter.py` still loads a separate 96-case
 historical corpus and joins a 12-case P8 population. Its `score_plan()` accepts
 that corpus's `AdaptedCase` contract and intentionally leaves historical
 operation and source comparisons unscorable. It is not currently bound to the
 53 A10 benchmark fields (`id`, `gold`, `class`, `source`, `structured_channel`,
-and `expected`).
-
-Therefore, no safe authorization can claim that the current live campaign
-would produce one scored row for each A10 case. Reusing the P8 scorer for the
-53 cases would conflate two populations and is prohibited.
+and `expected`). The candidate now loads and validates those fields through
+`load_a10_benchmark()` and scores only the bounded planner dimensions through
+`score_a10_plan()`. Host resolution, source binding, and host execution remain
+explicitly unscorable because this evaluation stops at the planner wire DTO.
 
 ### Adjacent P8 status
 
@@ -87,7 +90,24 @@ current provider, schema, and planner bytes. They are not evidence about the
 53-case A10 planner population and were not refreshed. They remain a separate
 P8 authorization blocker.
 
-## Required Canonical Completion Before Authorization
+## Candidate Qualification
+
+The candidate was qualified without provider calls:
+
+- Focused A10 corpus-adapter and canonical live-harness tests: `165 passed`.
+- Ruff lint: PASS.
+- Ruff format check: PASS.
+- Python compilation: PASS.
+- `git diff --check`: PASS.
+- Single-engine attestation: PASS.
+- Provider/model/endpoint calls: `0`.
+- Live 53-case evaluation: not run.
+
+The adjacent CM-57P8 suite remains separately classified at `209 passed, 5
+failed` because of stale historical frozen hashes. Those pins were not changed
+by this candidate.
+
+## Required Canonical Completion Before Live Authorization
 
 The next implementation slice must remain inside the existing canonical live
 qualification and corpus-adapter infrastructure. It must not create a second
@@ -123,10 +143,9 @@ record supplies operational readiness evidence but does not authorize these
 
 ## Decision
 
-`A10_SEM_53_PLANNER_EVALUATION_READINESS — INDEPENDENT_AUTHORIZATION_BLOCKED`
+`A10_SEM_53_EXECUTION_PATH_01_CANDIDATE_READY — HA_REVIEW_REQUIRED`
 
-The frozen inputs and provider-free mechanics are ready for review, but the
-current executable path is not yet a complete 53-case evaluation. Do not run
-the benchmark, call the provider, access holdouts, or create a parallel
-workflow. The missing work is a bounded canonical harness/scorer binding, not a
-planner, schema, catalog, or semantic-engine redesign.
+The frozen inputs, canonical execution path, bounded A10 scorer, and
+provider-free custody qualification are ready for independent review. Do not
+run the benchmark, call the provider, access holdouts, or create a parallel
+workflow until a separate live authorization is issued.

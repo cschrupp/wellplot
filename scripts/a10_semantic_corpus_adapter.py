@@ -66,6 +66,9 @@ C1_SHA = "3a2cfbe3e9d61acdde2a072828e2256f59abcc4b"
 PLANNER_PATH = "src/wellplot/agent/code_mode/planner.py"
 PRODUCTION_ROOT = "src/wellplot/"
 P8_ARMS = ("P-current", "C1")
+A10_BENCHMARK_ID = "A10-SEM-01"
+A10_BENCHMARK_SHA256 = "595839779e9ca59d9ce8ff20cbbdaf006ad41138b4510acc0ea26733e080067a"
+A10_SOURCE_INVENTORY_SHA256 = "21f11462696af7a9f1d9b18d625a6a311794912b9ef10a70106f0267e83c19b0"
 
 
 def verify_planner_revision_closure(repo_root: Path) -> dict[str, Any]:
@@ -125,6 +128,35 @@ class CorpusIntegrityError(ValueError):
 
 
 @dataclass(frozen=True)
+class A10BenchmarkCase:
+    """One immutable request record from the accepted A10 benchmark."""
+
+    case_id: str
+    gold: str
+    case_class: str
+    source: str
+    request: str
+    structured_channel: str
+    expected: str
+    inventory_complete: bool = True
+
+
+@dataclass(frozen=True)
+class A10ScoreResult:
+    """Bounded planner-only score with explicit unscorable dimensions."""
+
+    disposition: str
+    passed: bool
+    findings: tuple[str, ...]
+    scorable_dimensions: tuple[str, ...]
+    unscorable_dimensions: tuple[str, ...]
+    operation_count: int
+    unresolved_count: int
+    semantic_refs: tuple[str, ...]
+    channel_tokens: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class AdaptedCase:
     """Historical request and gold semantics with immutable fixture identity."""
 
@@ -179,6 +211,159 @@ class ScoreResult:
 
 def _sha256(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
+
+def load_a10_benchmark(repo_root: Path) -> tuple[A10BenchmarkCase, ...]:
+    """Load and validate the exact 53-case A10 benchmark population."""
+    root = repo_root.resolve()
+    path = root / HOLDOUT_FIXTURE
+    raw = path.read_bytes()
+    if _sha256(raw) != A10_BENCHMARK_SHA256:
+        raise CorpusIntegrityError("A10 benchmark bytes changed")
+    payload = json.loads(raw)
+    if payload.get("benchmark_id") != A10_BENCHMARK_ID:
+        raise CorpusIntegrityError("A10 benchmark identity changed")
+    rows = payload.get("cases")
+    if not isinstance(rows, list) or len(rows) != 53:
+        raise CorpusIntegrityError("A10 benchmark must contain exactly 53 cases")
+    cases: list[A10BenchmarkCase] = []
+    seen: set[str] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            raise CorpusIntegrityError("A10 benchmark case is not an object")
+        required = {"id", "gold", "class", "source", "request", "structured_channel", "expected"}
+        if not required <= row.keys():
+            raise CorpusIntegrityError("A10 benchmark case is missing required fields")
+        case_id = row["id"]
+        if not isinstance(case_id, str) or not case_id or case_id in seen:
+            raise CorpusIntegrityError("A10 benchmark case IDs are not unique")
+        seen.add(case_id)
+        if row["gold"] not in {"P", "E"}:
+            raise CorpusIntegrityError(f"invalid A10 gold label: {case_id}")
+        if not all(isinstance(row[key], str) and row[key] for key in required - {"id"}):
+            raise CorpusIntegrityError(f"invalid A10 benchmark fields: {case_id}")
+        inventory_complete = row.get("inventory_complete", True)
+        if not isinstance(inventory_complete, bool):
+            raise CorpusIntegrityError(f"invalid A10 inventory flag: {case_id}")
+        cases.append(
+            A10BenchmarkCase(
+                case_id=case_id,
+                gold=row["gold"],
+                case_class=row["class"],
+                source=row["source"],
+                request=row["request"],
+                structured_channel=row["structured_channel"],
+                expected=row["expected"],
+                inventory_complete=inventory_complete,
+            )
+        )
+    if sum(case.gold == "P" for case in cases) != 35:
+        raise CorpusIntegrityError("A10 benchmark production partition changed")
+    if sum(case.gold == "E" for case in cases) != 18:
+        raise CorpusIntegrityError("A10 benchmark exploratory partition changed")
+    return tuple(cases)
+
+
+def _plan_operations(plan: _PlannerWirePlan) -> tuple[dict[str, Any], ...]:
+    """Project planner operations without introducing host-owned identities."""
+    operations: list[dict[str, Any]] = []
+    if plan.report_task is not None:
+        operations.extend(item.model_dump(mode="json") for item in plan.report_task.operations)
+    for task in plan.section_tasks:
+        operations.extend(item.model_dump(mode="json") for item in task.operations)
+    return tuple(operations)
+
+
+def _a10_channel_tokens(operations: tuple[dict[str, Any], ...]) -> tuple[str, ...]:
+    """Extract explicit channel/source values for bounded planner scoring."""
+    tokens: list[str] = []
+    for operation in operations:
+        for value in operation.get("field_values", ()):  # host resolution is not performed here
+            if value.get("state") == "SET" and value.get("field") in {"channel", "source"}:
+                candidate = value.get("value")
+                if isinstance(candidate, str):
+                    tokens.append(candidate)
+        clue = operation.get("target_clue")
+        if isinstance(clue, str):
+            tokens.extend(
+                token for token in ("GR", "CGR", "GRD", "RHOB", "CBL", "VDL") if token in clue
+            )
+    return tuple(tokens)
+
+
+def score_a10_plan(case: A10BenchmarkCase, plan: _PlannerWirePlan | None) -> A10ScoreResult:
+    """Score only frozen A10 planner dimensions; leave host dimensions unscorable."""
+    if plan is None:
+        return A10ScoreResult(
+            disposition="PLANNER_TERMINAL_FAILURE",
+            passed=False,
+            findings=("planner_returned_no_wire_plan",),
+            scorable_dimensions=("final_structural_validity",),
+            unscorable_dimensions=("source_channel_grounding", "host_resolution"),
+            operation_count=0,
+            unresolved_count=0,
+            semantic_refs=(),
+            channel_tokens=(),
+        )
+    operations = _plan_operations(plan)
+    unresolved_count = len(plan.unresolved_requirements) + len(plan.unresolved_semantics)
+    semantic_refs = tuple(
+        str(item["semantic_ref"])
+        for item in operations
+        if isinstance(item.get("semantic_ref"), str)
+    )
+    channel_tokens = _a10_channel_tokens(operations)
+    findings: list[str] = []
+    expected = case.expected
+    safe_rejection = expected.startswith("SAFE_REJECT") or expected == "UNSUPPORTED_FAIL_CLOSED"
+    if safe_rejection:
+        if unresolved_count == 0:
+            findings.append("safe_rejection_not_declared")
+    elif expected == "SAFE_CORRECT_GR":
+        if "binding.gr-curve" not in semantic_refs:
+            findings.append("gamma_ray_semantic_binding_missing")
+    elif expected == "SAFE_CORRECT_PHYSICAL_GR":
+        if "GR" not in channel_tokens:
+            findings.append("physical_gr_channel_missing")
+    elif expected == "SAFE_CORRECT":
+        if not operations or unresolved_count:
+            findings.append("explicit_physical_plan_incomplete")
+    elif expected == "two_add_track_operations_exact_channels":
+        if len(operations) != 2 or set(channel_tokens) != {"GR", "RHOB"}:
+            findings.append("multi_operation_channel_shape_mismatch")
+    elif expected == "two_add_track_operations_correct_kinds":
+        if len(operations) != 2 or set(channel_tokens) != {"CBL", "VDL"}:
+            findings.append("multi_operation_kind_shape_mismatch")
+    elif expected == "ordered_add_track_operations":
+        if tuple(channel_tokens) != ("GR", "CGR"):
+            findings.append("multi_operation_order_mismatch")
+    elif expected == "semantic_GR_plus_physical_RHOB":
+        if "binding.gr-curve" not in semantic_refs or "RHOB" not in channel_tokens:
+            findings.append("mixed_semantic_physical_shape_mismatch")
+    elif expected in {
+        "ADD_TRACK_plus_explicit_scale",
+        "UPDATE_CURVE_SCALE",
+        "ADD_TRACK",
+        "ADD_TRACK_order_preserved",
+    }:
+        if not operations:
+            findings.append("mutation_operation_missing")
+    elif expected == "UNSUPPORTED_operation_if_no_canonical_contract":
+        if unresolved_count == 0:
+            findings.append("unsupported_mutation_not_rejected")
+    else:
+        findings.append("unrecognized_a10_expectation")
+    return A10ScoreResult(
+        disposition="A10_PLANNER_PLAN" if not findings else "A10_PLANNER_MISMATCH",
+        passed=not findings,
+        findings=tuple(findings),
+        scorable_dimensions=("final_structural_validity", "declared_intent_shape"),
+        unscorable_dimensions=("source_channel_grounding", "host_resolution", "host_execution"),
+        operation_count=len(operations),
+        unresolved_count=unresolved_count,
+        semantic_refs=semantic_refs,
+        channel_tokens=channel_tokens,
+    )
 
 
 _FIRST_DIVERGENCE_ORDER = (

@@ -128,6 +128,66 @@ def test_b01_holdout_is_matched_by_exact_request_bytes() -> None:
     assert result["fresh_holdout_count"] == 52
 
 
+def test_a10_benchmark_is_loaded_as_its_own_population() -> None:
+    """The 53-case A10 benchmark is not substituted with the P8 corpus."""
+    cases = adapter.load_a10_benchmark(REPO_ROOT)
+
+    assert len(cases) == 53
+    assert sum(case.gold == "P" for case in cases) == 35
+    assert sum(case.gold == "E" for case in cases) == 18
+    assert [case.case_id for case in cases[:3]] == ["A01", "A02", "A03"]
+    assert cases[8].case_id == "B01"
+    assert cases[8].expected == "SAFE_CORRECT_GR"
+
+
+def test_a10_gamma_ray_score_requires_the_approved_semantic_ref() -> None:
+    """Gamma Ray scoring is separate from the historical P8 scorer."""
+    case = next(case for case in adapter.load_a10_benchmark(REPO_ROOT) if case.case_id == "B01")
+    plan = _PlannerWirePlan.model_validate(
+        {
+            "version": "wellplot.semantic-plan.v2",
+            "summary": "Gamma Ray",
+            "report_task": None,
+            "section_tasks": [
+                {
+                    "goal": "Bind Gamma Ray",
+                    "capability_ids": ["binding.curve", "track.normal"],
+                    "existing_section_hint": "Main Log",
+                    "scope_ref": "main-log",
+                    "source_hints": ["approved_las"],
+                    "operations": [
+                        {
+                            "local_ref": "gr-binding",
+                            "scope_ref": "main-log",
+                            "verb": "ENSURE",
+                            "object_kind": "binding",
+                            "semantic_ref": "binding.gr-curve",
+                            "target_clue": "GR scalar channel",
+                        }
+                    ],
+                }
+            ],
+        }
+    )
+
+    result = adapter.score_a10_plan(case, plan)
+
+    assert result.passed
+    assert result.disposition == "A10_PLANNER_PLAN"
+    assert "host_resolution" in result.unscorable_dimensions
+
+
+def test_a10_safe_rejection_requires_declared_unresolved_semantics() -> None:
+    """Unsupported semantic cases cannot pass from structural validity alone."""
+    case = next(case for case in adapter.load_a10_benchmark(REPO_ROOT) if case.case_id == "D01")
+    plan = _section_plan(("section.log_plot",))
+
+    result = adapter.score_a10_plan(case, plan)
+
+    assert not result.passed
+    assert "safe_rejection_not_declared" in result.findings
+
+
 def test_p8_frozen_revision_production_closure_is_planner_only() -> None:
     """The immutable P-current/C1 revisions differ only at planner.py in src."""
     result = adapter.verify_planner_revision_closure(REPO_ROOT)
