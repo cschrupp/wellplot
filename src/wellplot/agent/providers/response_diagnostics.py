@@ -38,6 +38,8 @@ _CANONICAL_VALIDATION_REASONS = frozenset(
         "UPDATE requires a natural-language target_clue.",
         "REMOVE requires a natural-language target_clue.",
         "SET requires a natural-language target_clue.",
+        "CLEAR field values cannot also provide a value.",
+        "SET field values require an explicit value.",
         "MOVE requires semantic_ref, relation, and anchor_ref.",
         "Only MOVE operations may define presentation relation fields.",
         "SET requires exactly one field value.",

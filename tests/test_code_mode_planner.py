@@ -1923,6 +1923,29 @@ def test_schema_validation_uses_a_bounded_schema_correction_request() -> None:
     assert backend.response_models == [_PlannerWirePlan, _PlannerWirePlan]
 
 
+def test_schema_correction_describes_replacement_and_operation_rules() -> None:
+    """Correction guidance matches the evidence available at the retry boundary."""
+    request = _schema_correction_request(
+        context={"request": "Plot Gamma Ray."},
+        diagnostic={"code": "schema_validation", "issues": []},
+        timeout_seconds=5.0,
+        temperature=0.0,
+        max_output_tokens=2048,
+    )
+
+    assert "Generate one complete replacement SemanticPlan" in request.user_prompt
+    assert "No previous candidate is supplied" in request.user_prompt
+    assert "Repair the supplied SemanticPlan candidate" not in request.user_prompt
+    for guidance in (
+        "SET requires a non-null value",
+        "CLEAR requires a null value",
+        "CREATE and ENSURE require semantic_ref",
+        "UPDATE, REMOVE, and SET require target_clue",
+        "Preserve established verb meanings",
+    ):
+        assert guidance in request.user_prompt
+
+
 def test_schema_correction_passes_only_allowlisted_validator_reason() -> None:
     """The existing correction request receives the sanitized local reason."""
     failure = StructuredResponseProviderError(

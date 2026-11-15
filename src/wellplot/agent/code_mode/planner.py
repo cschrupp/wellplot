@@ -37,11 +37,16 @@ CompilationMode = Literal["reconstruct", "revise"]
 MAX_SEMANTIC_OPERATIONS = 20
 
 _SCHEMA_CORRECTION_INSTRUCTION = (
-    "Repair the supplied SemanticPlan candidate using the original request and "
-    "the listed validation violations. Preserve already-valid requested work and "
-    "change only what is needed to satisfy those violations. Do not create "
-    "unrelated report or section work, add undeclared fields, or include prose. "
-    "Return only one object matching the supplied structured response model."
+    "Generate one complete replacement SemanticPlan from the original request, "
+    "authoritative context, and the listed validation violations. No previous "
+    "candidate is supplied, so do not assume or reconstruct unavailable candidate "
+    "details. Preserve requested work supported by the request and context, and "
+    "do not create unrelated report or section work, add undeclared fields, or "
+    "include prose. Preserve established verb meanings; never change a verb "
+    "merely to satisfy a validator. Operation constraints: SET requires a "
+    "non-null value; CLEAR requires a null value; CREATE and ENSURE require "
+    "semantic_ref; UPDATE, REMOVE, and SET require target_clue. Return only one "
+    "object matching the supplied structured response model."
 )
 
 

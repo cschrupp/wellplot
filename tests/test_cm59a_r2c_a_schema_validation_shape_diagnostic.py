@@ -232,6 +232,58 @@ def test_another_allowlisted_operation_reason_is_projected() -> None:
     assert value_error.reason == "SET requires exactly one field value."
 
 
+@pytest.mark.parametrize(
+    ("state", "value", "expected_reason"),
+    [
+        (
+            "CLEAR",
+            "GR",
+            "CLEAR field values cannot also provide a value.",
+        ),
+        (
+            "SET",
+            None,
+            "SET field values require an explicit value.",
+        ),
+    ],
+)
+def test_field_value_state_reasons_are_allowlisted(
+    state: str,
+    value: object,
+    expected_reason: str,
+) -> None:
+    """Observed SET/CLEAR local rules are projected without arbitrary text."""
+    payload = {
+        "version": "wellplot.semantic-plan.v2",
+        "summary": "Apply one requested field value.",
+        "section_tasks": [
+            {
+                "goal": "Apply one requested field value.",
+                "capability_ids": ["section.log_plot"],
+                "existing_section_hint": "Main Log",
+                "scope_ref": "main_log",
+                "operations": [
+                    {
+                        "local_ref": "field_value",
+                        "scope_ref": "main_log",
+                        "verb": "ENSURE" if state == "CLEAR" else "SET",
+                        "object_kind": "binding",
+                        "semantic_ref": "binding_ref" if state == "CLEAR" else None,
+                        "target_clue": "Gamma Ray binding" if state == "SET" else None,
+                        "field_values": [{"field": "channel", "state": state, "value": value}],
+                    }
+                ],
+            }
+        ],
+    }
+
+    error = _run(payload, _PlannerWirePlan)
+
+    assert error.validation_shape is not None
+    reasons = [issue.reason for issue in error.validation_shape.issues]
+    assert expected_reason in reasons
+
+
 def test_unknown_local_validation_message_is_not_serialized() -> None:
     """Unknown local messages are suppressed rather than forwarded or truncated."""
     error = _run({"value": "trigger"}, _ArbitraryReasonModel)
