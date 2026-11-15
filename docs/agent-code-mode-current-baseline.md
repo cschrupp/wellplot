@@ -987,3 +987,29 @@ of current authority.
 - **Boundary:** this acceptance closes HOST-02R3 only. It does not authorize
   P8, a new live smoke, provider/model execution, holdout access, baseline
   promotion beyond this Knowledge Delta, or unrelated semantic expansion.
+
+### A10-SEM-NL-CORRECTION-01R1 and Planner Smoke 003
+
+- **Status:** `A10_SEM_NL_PLANNER_SMOKE_003_INDEPENDENT_OPERATIONAL_ACCEPTANCE`;
+  the R1 correction and its planner-only smoke are accepted within their
+  bounded operational scope.
+- **Accepted implementation:** R1 commit
+  `7b5794efa8e7a5a2fc648b34f5f97bb0cb0ab389`; acceptance/documentation commit
+  `29bbcfe7c8ecbb9da49674240996499a20a5f183`.
+- **Smoke checkpoint:** `29bbcfe7c8ecbb9da49674240996499a20a5f183`;
+  evidence namespace
+  `workspace/evaluations/a10-sem-nl-correction-01r1-planner-smoke-20261115-003/`.
+- **Finding:** the canonical planner completed one initial generation and one
+  native schema correction. The initial response was invalid; the correction
+  returned a schema-valid wire plan with exact `GR` and `binding.gr-curve`.
+  Source custody remained unchanged and no downstream authoring or scientific
+  stage ran.
+- **Evidence:** two model calls, zero retries, complete raw request/response
+  custody, and a verified `SHA256SUMS` manifest. No semantic score is implied.
+- **Open questions:** the smoke does not establish whether the emitted
+  capability set needs an explicit `section.log_plot` ancestor or whether the
+  implicit linear scale is an acceptable host default.
+- **Next gate:** a separately authorized frozen 53-case planner evaluation
+  readiness review. This acceptance does not authorize that evaluation,
+  holdout access, P8 expansion, workers, persistence, rendering, or scientific
+  execution.

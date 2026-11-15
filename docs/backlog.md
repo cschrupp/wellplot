@@ -595,3 +595,20 @@ sections; explicit request targets remain unchanged. The provider-free scoped
 qualification reported 324 passing tests with static and single-engine gates
 passing. No provider/model/live/P8/holdout activity occurred. HOST-02R3 is
 closed; the next A10 stage requires its own authorization and execution gates.
+
+### A10-SEM-NL-PLANNER-SMOKE-003 — Operational acceptance
+
+Smoke 003 is accepted as planner operational readiness at checkpoint
+`29bbcfe7c8ecbb9da49674240996499a20a5f183`. The canonical planner completed
+one initial generation plus one native schema correction and produced a
+schema-valid wire plan with exact `GR` and `binding.gr-curve`. The evidence
+namespace is
+`workspace/evaluations/a10-sem-nl-correction-01r1-planner-smoke-20261115-003/`;
+its verified `SHA256SUMS` digest is
+`b16abbd24169ef7607a7f8c48969137d2b57c911de232704d93a229868f2b1b3`.
+
+This is not semantic-quality or downstream authoring evidence. The emitted
+capability set and implicit linear scale remain open host-contract questions.
+The next bounded work item is a separately authorized frozen 53-case planner
+evaluation-readiness review. Do not run workers, persistence, rendering,
+holdouts, P8 expansion or scientific execution under this acceptance.
