@@ -1009,7 +1009,23 @@ of current authority.
 - **Open questions:** the smoke does not establish whether the emitted
   capability set needs an explicit `section.log_plot` ancestor or whether the
   implicit linear scale is an acceptable host default.
-- **Next gate:** a separately authorized frozen 53-case planner evaluation
-  readiness review. This acceptance does not authorize that evaluation,
-  holdout access, P8 expansion, workers, persistence, rendering, or scientific
-  execution.
+- **Scope-recovery note:** the later R1/R2 frozen 53-case execution-path
+  candidate was retired and is not an active next gate. Any future planner
+  measurement must be designed around the existing canonical planner-smoke
+  path and separately authorized.
+
+### A10-SEM-53 Canonical Scope Recovery — Closed
+
+- **Disposition:** `A10_SEM_53_CANONICAL_SCOPE_RECOVERY — PASS`.
+- **Lineage:** retirement commit `4a7ea130c293a6ac3b7fc3ddfab12f83f8f2eb78`
+  and final merged branch tip `a8a312e7bcb70d7a69bacc4c28db6869dc5b57f1`.
+- **Finding:** comparison with pre-execution-path checkpoint `b3973390`
+  restored all four A10 implementation/test files to their original contents.
+  The remaining changes are governance/documentation records only.
+- **Boundary:** the R1/R2 campaign orchestrator, private campaign lifecycle,
+  and partial semantic scorer are retired. Smoke 003, the frozen benchmark,
+  and source inventory remain immutable. No provider/model/P8/holdout
+  execution or replacement workflow is authorized by this closure.
+- **Next decision:** determine how to collect frozen planner observations
+  through the canonical planner-smoke path without maintaining a parallel
+  runner or semantic-scoring workflow.

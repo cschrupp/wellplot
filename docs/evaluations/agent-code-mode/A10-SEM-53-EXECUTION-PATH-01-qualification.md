@@ -1,6 +1,6 @@
 # A10 53-Case Execution Path Qualification
 
-Status: `A10_SEM_53_CANONICAL_SCOPE_RECOVERY_COMPLETE — HA_REVIEW_REQUIRED`
+Status: `A10_SEM_53_CANONICAL_SCOPE_RECOVERY — PASS / CLOSED`
 
 This record covers the provider-free corrective of the accepted frozen 53-case
 A10 semantic planner evaluation path. It does not execute the live evaluation.
@@ -8,17 +8,17 @@ The R1/R2 implementation evidence below is retained as historical record. The
 R2 execution-path implementation was subsequently retired because it
 introduced a separate campaign orchestrator and partial semantic scorer.
 
-## Scope
+## Scope (Historical Candidate)
 
-The candidate extends the existing canonical live qualification harness and
-read-only corpus adapter only:
+The retired candidate extended the existing canonical live qualification
+harness and read-only corpus adapter only:
 
 - `scripts/nlp_d5_live_semantic_qualification.py`
 - `scripts/a10_semantic_corpus_adapter.py`
 - `tests/test_nlp_d5_live_semantic_qualification.py`
 - `tests/test_a10_semantic_corpus_adapter.py`
 
-The mode processes the exact 53-case A10 benchmark through the existing
+The retired mode processed the exact 53-case A10 benchmark through the existing
 planner-only smoke boundary. Each case receives a case-scoped custody
 namespace, one initial generation plus at most one native correction, and the
 same provider construction, context preparation, structured validation and
@@ -27,8 +27,8 @@ started before delegation, updated after each case, and sealed on normal or
 caught failure termination. It never enters workers, reconciliation,
 execution, persistence or rendering.
 
-The existing historical 96-case/P8 scorer is unchanged. The A10 adapter
-validates the accepted 53-case benchmark identity and scores only frozen
+The existing historical 96-case/P8 scorer remains unchanged. The retired A10
+adapter validated the accepted 53-case benchmark identity and scored only frozen
 planner dimensions. Scoring requires exact channel tokens, operation
 verbs/kinds, operation counts, and explicit scale components where the frozen
 expectation supports them. Safe-rejection cases cannot pass with executable

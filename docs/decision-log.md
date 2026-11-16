@@ -491,3 +491,21 @@ Ruff, formatting, compilation, diff checks, and single-engine attestation
 passed. No provider/model/live calls, P8 execution, holdout access, or
 parallel workflow occurred. This acceptance closes HOST-02R3 but does not
 authorize the next A10 evaluation stage.
+
+## A10-SEM-53 Canonical Scope Recovery (2026-11-16)
+
+Independent review accepted the final A10 scope recovery as
+`A10_SEM_53_CANONICAL_SCOPE_RECOVERY — PASS`. Retirement commit
+`4a7ea130c293a6ac3b7fc3ddfab12f83f8f2eb78` was incorporated at merged branch
+tip `a8a312e7bcb70d7a69bacc4c28db6869dc5b57f1`.
+
+Comparison with pre-execution-path checkpoint `b3973390` restored all four A10
+implementation/test files to their original contents. The R1/R2 campaign
+orchestrator, private campaign lifecycle, and partial semantic scorer are
+retired. Smoke 003, the frozen benchmark, and source inventory remain
+immutable. No provider/model/P8/holdout execution or replacement workflow is
+authorized by this closure.
+
+Any future planner measurement must be separately designed around the existing
+canonical planner-smoke path; this record does not authorize a parallel runner
+or semantic-scoring workflow.

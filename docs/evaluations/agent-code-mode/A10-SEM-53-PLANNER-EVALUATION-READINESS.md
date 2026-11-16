@@ -1,6 +1,6 @@
 # A10 Semantic Planner Evaluation Readiness
 
-Status: `A10_SEM_53_CANONICAL_SCOPE_RECOVERY_COMPLETE — HA_REVIEW_REQUIRED`
+Status: `A10_SEM_53_CANONICAL_SCOPE_RECOVERY — PASS / CLOSED`
 
 This is a provider-free readiness audit for the accepted frozen 53-case A10
 semantic planner evaluation. It does not execute the evaluation and does not
@@ -75,15 +75,13 @@ existing canonical live qualification CLI:
 ### Historical scoring binding (Retired)
 
 The retired candidate added an A10-specific adapter without changing the historical
-scorer. `scripts/a10_semantic_corpus_adapter.py` still loads a separate 96-case
+scorer. `scripts/a10_semantic_corpus_adapter.py` still loads the separate 96-case
 historical corpus and joins a 12-case P8 population. Its `score_plan()` accepts
 that corpus's `AdaptedCase` contract and intentionally leaves historical
 operation and source comparisons unscorable. It is not currently bound to the
-53 A10 benchmark fields (`id`, `gold`, `class`, `source`, `structured_channel`,
-and `expected`). The candidate now loads and validates those fields through
-`load_a10_benchmark()` and scores only the bounded planner dimensions through
-`score_a10_plan()`. Host resolution, source binding, and host execution remain
-explicitly unscorable because this evaluation stops at the planner wire DTO.
+53-case A10 benchmark as an active scoring population. The retired candidate's
+benchmark loader and `score_a10_plan()` were removed. Host resolution, source
+binding, and host execution remain host-owned and are not reproduced here.
 
 ### Adjacent P8 status
 
@@ -112,24 +110,25 @@ by this candidate.
 
 ### R2 integrity corrections (Historical, Retired)
 
-The scorer now binds channel and scale evidence to operation-local targets and
+The retired scorer bound channel and scale evidence to operation-local targets and
 requires validated presentation constraints for ordered edits. Unsupported
 mutation expectations reject executable work. The benchmark loader rejects any
 expected label without an explicit scoring disposition, and all 53 frozen
 labels are declared `PARTLY_SCORABLE` at this planner-only boundary.
 
-Campaign custody now distinguishes three outcomes: campaign status, campaign
+The retired campaign custody code distinguished three outcomes: campaign status,
 integrity, and the independent production (`P`) verdict. Exact case-ID
 coverage is required. Production infrastructure or harness-contract failures,
 missing/duplicate cases, and incomplete production coverage are inconclusive;
 exploratory (`E`) infrastructure failures make campaign integrity inconclusive
 without changing a complete production verdict.
 
-## Required Canonical Completion Before Live Authorization
+## Historical Requirements (Retired)
 
-The next implementation slice must remain inside the existing canonical live
-qualification and corpus-adapter infrastructure. It must not create a second
-runner, semantic engine, provider path, or scoring workflow.
+The following requirements belonged to the retired execution-path candidate.
+They are preserved for historical traceability, not as an active implementation
+plan. Any future measurement must be separately designed around the existing
+canonical planner-smoke path and independently authorized.
 
 It must provide, and provider-free-test, all of the following:
 
@@ -161,7 +160,7 @@ record supplies operational readiness evidence but does not authorize these
 
 ## Scope-Recovery Decision
 
-`A10_SEM_53_CANONICAL_SCOPE_RECOVERY_COMPLETE — HA_REVIEW_REQUIRED`
+`A10_SEM_53_CANONICAL_SCOPE_RECOVERY — PASS / CLOSED`
 
 The frozen benchmark, source inventory, Smoke 003 evidence, and existing
 canonical planner-smoke path remain preserved. The separate A10 orchestrator,

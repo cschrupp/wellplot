@@ -609,6 +609,17 @@ its verified `SHA256SUMS` digest is
 
 This is not semantic-quality or downstream authoring evidence. The emitted
 capability set and implicit linear scale remain open host-contract questions.
-The next bounded work item is a separately authorized frozen 53-case planner
-evaluation-readiness review. Do not run workers, persistence, rendering,
-holdouts, P8 expansion or scientific execution under this acceptance.
+The retired R1/R2 execution-path candidate is not an active work item. Any
+future planner measurement must use the existing canonical planner-smoke path
+and receive separate execution authorization. Do not run workers, persistence,
+rendering, holdouts, P8 expansion or scientific execution under this acceptance.
+
+### A10-SEM-53 Canonical Scope Recovery — Closed
+
+Scope recovery is accepted as `A10_SEM_53_CANONICAL_SCOPE_RECOVERY — PASS`.
+Retirement commit `4a7ea130c293a6ac3b7fc3ddfab12f83f8f2eb78` was incorporated
+at merged branch tip `a8a312e7bcb70d7a69bacc4c28db6869dc5b57f1`. Comparison with
+checkpoint `b3973390` restored the four A10 implementation/test files to their
+original contents. The R1/R2 orchestrator, private campaign state, and partial
+scorer are retired; the frozen benchmark, source inventory, and Smoke 003
+evidence remain immutable. No parallel runner or scorer is authorized.
