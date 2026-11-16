@@ -62,7 +62,9 @@ def _section_plan(
 
 
 def _operations_plan(
-    operations: list[dict[str, object]], unresolved: bool = False
+    operations: list[dict[str, object]],
+    unresolved: bool = False,
+    presentation_constraints: list[dict[str, object]] | None = None,
 ) -> _PlannerWirePlan:
     """Build a compact wire plan for scorer adversarial tests."""
     return _PlannerWirePlan.model_validate(
@@ -78,6 +80,7 @@ def _operations_plan(
                     "scope_ref": "main-log",
                     "source_hints": [],
                     "operations": operations,
+                    "presentation_constraints": presentation_constraints or [],
                 }
             ],
             "unresolved_requirements": [],
@@ -173,6 +176,7 @@ def test_a10_benchmark_is_loaded_as_its_own_population() -> None:
     assert [case.case_id for case in cases[:3]] == ["A01", "A02", "A03"]
     assert cases[8].case_id == "B01"
     assert cases[8].expected == "SAFE_CORRECT_GR"
+    assert {case.expected for case in cases} <= set(adapter.A10_EXPECTATION_SCORING_SCOPE)
 
 
 def test_a10_gamma_ray_score_requires_the_approved_semantic_ref() -> None:
@@ -310,6 +314,170 @@ def test_a10_operation_kind_and_explicit_scale_are_scored() -> None:
     scale_result = adapter.score_a10_plan(scale_case, missing_scale)
     assert not scale_result.passed
     assert "track_or_explicit_scale_missing" in scale_result.findings
+
+
+def test_a10_scale_and_channel_evidence_stay_bound_to_one_operation() -> None:
+    """Unrelated channel and scale operations cannot combine into a pass."""
+    case = next(case for case in adapter.load_a10_benchmark(REPO_ROOT) if case.case_id == "F04")
+    plan = _operations_plan(
+        [
+            {
+                "local_ref": "cbl-track",
+                "scope_ref": "main-log",
+                "verb": "CREATE",
+                "object_kind": "track",
+                "semantic_ref": "cbl-track",
+                "target_clue": "CBL track",
+                "field_values": [{"field": "scale_kind", "state": "SET", "value": "linear"}],
+            },
+            {
+                "local_ref": "other-binding",
+                "scope_ref": "main-log",
+                "verb": "CREATE",
+                "object_kind": "binding",
+                "semantic_ref": "other-binding",
+                "target_clue": "RHOB binding",
+                "field_values": [
+                    {"field": "scale_minimum", "state": "SET", "value": 0},
+                    {"field": "scale_maximum", "state": "SET", "value": 1},
+                ],
+            },
+        ]
+    )
+
+    result = adapter.score_a10_plan(case, plan)
+
+    assert not result.passed
+    assert "track_or_explicit_scale_missing" in result.findings
+
+
+def test_a10_ordering_requires_operation_order_and_presentation_constraint() -> None:
+    """Reversed or omitted requested order does not pass as an ordered edit."""
+    cases = adapter.load_a10_benchmark(REPO_ROOT)
+    ordered_case = next(case for case in cases if case.case_id == "F03")
+    reversed_plan = _operations_plan(
+        [
+            {
+                "local_ref": "cgr-track",
+                "scope_ref": "main-log",
+                "verb": "CREATE",
+                "object_kind": "track",
+                "semantic_ref": "cgr-track",
+                "target_clue": "CGR track",
+            },
+            {
+                "local_ref": "gr-track",
+                "scope_ref": "main-log",
+                "verb": "CREATE",
+                "object_kind": "track",
+                "semantic_ref": "gr-track",
+                "target_clue": "GR track",
+            },
+        ]
+    )
+    assert not adapter.score_a10_plan(ordered_case, reversed_plan).passed
+
+    add_after_case = next(case for case in cases if case.case_id == "G03")
+    omitted_order = _operations_plan(
+        [
+            {
+                "local_ref": "vdl-track",
+                "scope_ref": "main-log",
+                "verb": "CREATE",
+                "object_kind": "track",
+                "semantic_ref": "vdl-track",
+                "target_clue": "VDL raster track",
+            }
+        ]
+    )
+    assert not adapter.score_a10_plan(add_after_case, omitted_order).passed
+
+    valid_order = _operations_plan(
+        [
+            {
+                "local_ref": "cbl-track",
+                "scope_ref": "main-log",
+                "verb": "CREATE",
+                "object_kind": "track",
+                "semantic_ref": "cbl-track",
+                "target_clue": "CBL track",
+            },
+            {
+                "local_ref": "vdl-track",
+                "scope_ref": "main-log",
+                "verb": "CREATE",
+                "object_kind": "track",
+                "semantic_ref": "vdl-track",
+                "target_clue": "VDL raster track",
+            },
+        ],
+        presentation_constraints=[
+            {
+                "scope_ref": "main-log",
+                "item_ref": "vdl-track",
+                "relation": "after",
+                "anchor_ref": "cbl-track",
+            }
+        ],
+    )
+    assert adapter.score_a10_plan(add_after_case, valid_order).passed
+
+
+def test_a10_unsupported_operation_requires_no_executable_operations() -> None:
+    """Unsupported mutation evidence cannot pass with a proposed operation."""
+    case = next(case for case in adapter.load_a10_benchmark(REPO_ROOT) if case.case_id == "G04")
+    plan = _operations_plan(
+        [
+            {
+                "local_ref": "remove-cbl",
+                "scope_ref": "main-log",
+                "verb": "REMOVE",
+                "object_kind": "binding",
+                "target_clue": "CBL binding",
+            }
+        ],
+        unresolved=True,
+    )
+
+    result = adapter.score_a10_plan(case, plan)
+
+    assert not result.passed
+    assert "unsupported_mutation_contains_executable_work" in result.findings
+
+
+def test_a10_valid_scoped_operation_and_scale_continue_to_pass() -> None:
+    """A valid operation-local scale remains accepted after hardening."""
+    case = next(case for case in adapter.load_a10_benchmark(REPO_ROOT) if case.case_id == "F04")
+    plan = _operations_plan(
+        [
+            {
+                "local_ref": "cbl-track",
+                "scope_ref": "main-log",
+                "verb": "CREATE",
+                "object_kind": "track",
+                "semantic_ref": "cbl-track",
+                "target_clue": "CBL track",
+            },
+            {
+                "local_ref": "cbl-binding",
+                "scope_ref": "main-log",
+                "verb": "CREATE",
+                "object_kind": "binding",
+                "semantic_ref": "cbl-binding",
+                "target_clue": "CBL binding",
+                "field_values": [
+                    {"field": "scale_kind", "state": "SET", "value": "linear"},
+                    {"field": "scale_minimum", "state": "SET", "value": 0},
+                    {"field": "scale_maximum", "state": "SET", "value": 1},
+                ],
+            },
+        ]
+    )
+
+    result = adapter.score_a10_plan(case, plan)
+
+    assert result.passed
+    assert result.scoring_scope == "PARTLY_SCORABLE"
 
 
 def test_p8_frozen_revision_production_closure_is_planner_only() -> None:

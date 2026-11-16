@@ -1,6 +1,6 @@
 # A10 53-Case Execution Path Qualification
 
-Status: `A10_SEM_53_EXECUTION_PATH_01R1_READY — HA_REVIEW_REQUIRED`
+Status: `A10_SEM_53_EXECUTION_PATH_01R2_READY — HA_REVIEW_REQUIRED`
 
 This record covers the provider-free corrective of the accepted frozen 53-case
 A10 semantic planner evaluation path. It does not execute the live evaluation.
@@ -87,6 +87,50 @@ The adjacent CM-57P8 provider-free suite remains separate: it reports
 `209 passed, 5 failed` because its historical provider/schema/planner hashes
 are stale against the current repository. No P8 hashes were refreshed or
 waived by this candidate.
+
+## R2 Qualification
+
+R2 closes the independent-review gaps without changing the canonical planner,
+provider, authoring, or execution path.
+
+- Channel evidence is scored within the operation that supplies it; `CGR` and
+  `GRD` cannot satisfy an exact `GR` requirement through substring matching.
+- Explicit scale components remain within one target group, so unrelated
+  operations cannot be combined into a passing scale assertion.
+- Ordered multi-operation cases require operation order and the corresponding
+  validated presentation constraint.
+- Unsupported mutation expectations fail when executable operations are
+  present, even if unresolved evidence is also declared.
+- Every frozen expected label has an explicit `PARTLY_SCORABLE` disposition;
+  source grounding, host resolution, and host execution remain unscorable.
+- Campaign integrity is reported separately from the production verdict.
+  Production `HARNESS_CONTRACT_FAILURE`, infrastructure interruption,
+  unknown failure, incomplete coverage, duplicate case IDs, or missing case IDs
+  produce an inconclusive production verdict rather than a planner failure.
+  Exploratory infrastructure failures make campaign integrity inconclusive but
+  cannot independently fail a complete production partition.
+
+Exact command:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m pytest -q \
+  tests/test_a10_semantic_corpus_adapter.py \
+  tests/test_nlp_d5_live_semantic_qualification.py
+```
+
+Result: `182 passed`.
+
+Additional R2 checks:
+
+- `ruff check` on the changed scripts and tests: PASS.
+- `ruff format --check` on the changed scripts and tests: PASS.
+- `PYTHONPATH=src .venv/bin/python -m py_compile` on the changed scripts and
+  tests: PASS.
+- `git diff --check`: PASS.
+- `PYTHONPATH=src .venv/bin/python scripts/d5_single_engine_attestation.py
+  --check`: PASS.
+- Provider/model/endpoint calls: `0`.
+- Live evaluation, P8, and holdout access: not run.
 
 ## Live authorization boundary
 

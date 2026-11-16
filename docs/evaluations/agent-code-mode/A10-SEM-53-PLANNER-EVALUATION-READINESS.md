@@ -1,6 +1,6 @@
 # A10 Semantic Planner Evaluation Readiness
 
-Status: `A10_SEM_53_EXECUTION_PATH_01R1_READY — HA_REVIEW_REQUIRED`
+Status: `A10_SEM_53_EXECUTION_PATH_01R2_READY — HA_REVIEW_REQUIRED`
 
 This is a provider-free readiness audit for the accepted frozen 53-case A10
 semantic planner evaluation. It does not execute the evaluation and does not
@@ -52,8 +52,8 @@ schema identities are recorded above.
 
 ### Provider-free harness and corpus checks
 
-PASS: the R1 canonical corpus-adapter and live-qualification suites reported
-`175 passed` with no provider, endpoint, or model calls.
+PASS: the R2 canonical corpus-adapter and live-qualification suites reported
+`182 passed` with no provider, endpoint, or model calls.
 
 ### Executable 53-case campaign path
 
@@ -95,7 +95,7 @@ P8 authorization blocker.
 
 The candidate was qualified without provider calls:
 
-- Focused A10 corpus-adapter and canonical live-harness tests: `165 passed`.
+- Focused A10 corpus-adapter and canonical live-harness tests: `182 passed`.
 - Ruff lint: PASS.
 - Ruff format check: PASS.
 - Python compilation: PASS.
@@ -107,6 +107,21 @@ The candidate was qualified without provider calls:
 The adjacent CM-57P8 suite remains separately classified at `209 passed, 5
 failed` because of stale historical frozen hashes. Those pins were not changed
 by this candidate.
+
+### R2 integrity corrections
+
+The scorer now binds channel and scale evidence to operation-local targets and
+requires validated presentation constraints for ordered edits. Unsupported
+mutation expectations reject executable work. The benchmark loader rejects any
+expected label without an explicit scoring disposition, and all 53 frozen
+labels are declared `PARTLY_SCORABLE` at this planner-only boundary.
+
+Campaign custody now distinguishes three outcomes: campaign status, campaign
+integrity, and the independent production (`P`) verdict. Exact case-ID
+coverage is required. Production infrastructure or harness-contract failures,
+missing/duplicate cases, and incomplete production coverage are inconclusive;
+exploratory (`E`) infrastructure failures make campaign integrity inconclusive
+without changing a complete production verdict.
 
 ## Required Canonical Completion Before Live Authorization
 
@@ -144,7 +159,7 @@ record supplies operational readiness evidence but does not authorize these
 
 ## Decision
 
-`A10_SEM_53_EXECUTION_PATH_01R1_READY — HA_REVIEW_REQUIRED`
+`A10_SEM_53_EXECUTION_PATH_01R2_READY — HA_REVIEW_REQUIRED`
 
 The frozen inputs, canonical execution path, bounded A10 scorer, and
 provider-free custody qualification are ready for independent review. Do not

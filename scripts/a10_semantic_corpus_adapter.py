@@ -70,6 +70,28 @@ P8_ARMS = ("P-current", "C1")
 A10_BENCHMARK_ID = "A10-SEM-01"
 A10_BENCHMARK_SHA256 = "595839779e9ca59d9ce8ff20cbbdaf006ad41138b4510acc0ea26733e080067a"
 A10_SOURCE_INVENTORY_SHA256 = "21f11462696af7a9f1d9b18d625a6a311794912b9ef10a70106f0267e83c19b0"
+A10_EXPECTATION_SCORING_SCOPE = {
+    "SAFE_CORRECT": "PARTLY_SCORABLE",
+    "SAFE_CORRECT_GR": "PARTLY_SCORABLE",
+    "SAFE_CORRECT_PHYSICAL_GR": "PARTLY_SCORABLE",
+    "SAFE_REJECT_ABSENT": "PARTLY_SCORABLE",
+    "SAFE_REJECT_ADDRESSABILITY_UNKNOWN": "PARTLY_SCORABLE",
+    "SAFE_REJECT_AMBIGUOUS": "PARTLY_SCORABLE",
+    "SAFE_REJECT_INCOMPLETE_INVENTORY": "PARTLY_SCORABLE",
+    "SAFE_REJECT_NO_BEST_GUESS": "PARTLY_SCORABLE",
+    "SAFE_REJECT_UNAUTHORIZED_AMBIGUOUS_CANDIDATES": "PARTLY_SCORABLE",
+    "SAFE_REJECT_UNAUTHORIZED_MAPPING": "PARTLY_SCORABLE",
+    "UNSUPPORTED_FAIL_CLOSED": "PARTLY_SCORABLE",
+    "UNSUPPORTED_operation_if_no_canonical_contract": "PARTLY_SCORABLE",
+    "ADD_TRACK": "PARTLY_SCORABLE",
+    "ADD_TRACK_order_preserved": "PARTLY_SCORABLE",
+    "ADD_TRACK_plus_explicit_scale": "PARTLY_SCORABLE",
+    "UPDATE_CURVE_SCALE": "PARTLY_SCORABLE",
+    "ordered_add_track_operations": "PARTLY_SCORABLE",
+    "semantic_GR_plus_physical_RHOB": "PARTLY_SCORABLE",
+    "two_add_track_operations_correct_kinds": "PARTLY_SCORABLE",
+    "two_add_track_operations_exact_channels": "PARTLY_SCORABLE",
+}
 
 
 def verify_planner_revision_closure(repo_root: Path) -> dict[str, Any]:
@@ -160,6 +182,7 @@ class A10ScoreResult:
     object_kinds: tuple[str, ...] = ()
     verbs: tuple[str, ...] = ()
     scale_fields: tuple[str, ...] = ()
+    scoring_scope: str = "PARTLY_SCORABLE"
 
 
 @dataclass(frozen=True)
@@ -248,6 +271,8 @@ def load_a10_benchmark(repo_root: Path) -> tuple[A10BenchmarkCase, ...]:
             raise CorpusIntegrityError(f"invalid A10 gold label: {case_id}")
         if not all(isinstance(row[key], str) and row[key] for key in required - {"id"}):
             raise CorpusIntegrityError(f"invalid A10 benchmark fields: {case_id}")
+        if row["expected"] not in A10_EXPECTATION_SCORING_SCOPE:
+            raise CorpusIntegrityError(f"A10 expectation has no scoring disposition: {case_id}")
         inventory_complete = row.get("inventory_complete", True)
         if not isinstance(inventory_complete, bool):
             raise CorpusIntegrityError(f"invalid A10 inventory flag: {case_id}")
@@ -280,16 +305,52 @@ def _plan_operations(plan: _PlannerWirePlan) -> tuple[dict[str, Any], ...]:
     return tuple(operations)
 
 
+def _a10_presentation_constraints(plan: _PlannerWirePlan) -> tuple[dict[str, Any], ...]:
+    """Project the planner's request-local presentation ordering evidence."""
+    constraints: list[dict[str, Any]] = []
+    if plan.report_task is not None:
+        constraints.extend(
+            item.model_dump(mode="json") for item in plan.report_task.presentation_constraints
+        )
+    for task in plan.section_tasks:
+        constraints.extend(item.model_dump(mode="json") for item in task.presentation_constraints)
+    return tuple(constraints)
+
+
 _A10_CHANNEL_NAMES = ("GR", "CGR", "GRD", "RHOB", "CBL", "VDL", "SP", "CALI", "TDEP")
+
+
+def _a10_operation_channel_tokens(operation: dict[str, Any]) -> tuple[str, ...]:
+    """Return exact channel evidence in the order present in one operation."""
+    tokens: list[str] = []
+    for value in operation.get("field_values", ()):
+        if value.get("state") == "SET" and value.get("field") == "channel":
+            candidate = value.get("value")
+            if isinstance(candidate, str):
+                tokens.append(candidate)
+    clue = operation.get("target_clue")
+    if isinstance(clue, str):
+        tokens.extend(
+            match.group(1).upper()
+            for match in re.finditer(
+                r"(?<![A-Za-z0-9_.-])(" + "|".join(_A10_CHANNEL_NAMES) + r")(?![A-Za-z0-9_.-])",
+                clue,
+                flags=re.IGNORECASE,
+            )
+        )
+    return tuple(dict.fromkeys(tokens))
 
 
 def _a10_channel_observations(
     operations: tuple[dict[str, Any], ...],
-) -> tuple[tuple[str, ...], tuple[str, ...]]:
+) -> tuple[tuple[str, ...], tuple[str, ...], tuple[tuple[str, ...], ...]]:
     """Project explicit channels separately from exact tokens in target clues."""
     explicit: list[str] = []
     clues: list[str] = []
+    operation_tokens: list[tuple[str, ...]] = []
     for operation in operations:
+        per_operation = _a10_operation_channel_tokens(operation)
+        operation_tokens.append(per_operation)
         for value in operation.get("field_values", ()):  # host resolution is not performed here
             if value.get("state") == "SET" and value.get("field") == "channel":
                 candidate = value.get("value")
@@ -303,13 +364,31 @@ def _a10_channel_observations(
                 flags=re.IGNORECASE,
             ):
                 clues.append(match.group(1).upper())
-    return tuple(explicit), tuple(clues)
+    return tuple(explicit), tuple(clues), tuple(operation_tokens)
 
 
 def _a10_channel_tokens(operations: tuple[dict[str, Any], ...]) -> tuple[str, ...]:
     """Return exact channel tokens without treating CGR or GRD as GR."""
-    explicit, clues = _a10_channel_observations(operations)
-    return explicit + clues
+    return tuple(
+        token for operation in operations for token in _a10_operation_channel_tokens(operation)
+    )
+
+
+def _a10_has_operation_channel(
+    operations: tuple[dict[str, Any], ...],
+    operation_tokens: tuple[tuple[str, ...], ...],
+    *,
+    verb: str | None = None,
+    object_kind: str | None = None,
+    channel: str,
+) -> bool:
+    """Require channel evidence and operation shape on the same operation."""
+    return any(
+        (verb is None or operation.get("verb") == verb)
+        and (object_kind is None or operation.get("object_kind") == object_kind)
+        and channel in tokens
+        for operation, tokens in zip(operations, operation_tokens, strict=True)
+    )
 
 
 def _a10_expected_scale(request: str) -> dict[str, float | str] | None:
@@ -324,19 +403,23 @@ def _a10_expected_scale(request: str) -> dict[str, float | str] | None:
     }
 
 
-def _a10_scale_fields(operations: tuple[dict[str, Any], ...]) -> dict[str, object]:
-    """Collect non-null scale assignments from explicit SET field values."""
-    fields: dict[str, object] = {}
+def _a10_scale_groups(operations: tuple[dict[str, Any], ...]) -> dict[str, dict[str, object]]:
+    """Group scale assignments by the operation-local target identity."""
+    groups: dict[str, dict[str, object]] = {}
     for operation in operations:
+        target = operation.get("target_clue") or operation.get("semantic_ref")
+        if not isinstance(target, str):
+            continue
+        fields = groups.setdefault(target, {})
         for value in operation.get("field_values", ()):
             field = value.get("field")
-            if (
-                operation.get("verb") == "SET"
-                and value.get("state") == "SET"
-                and field in {"scale_kind", "scale_minimum", "scale_maximum"}
-            ):
+            if value.get("state") == "SET" and field in {
+                "scale_kind",
+                "scale_minimum",
+                "scale_maximum",
+            }:
                 fields[str(field)] = value.get("value")
-    return fields
+    return groups
 
 
 def _a10_has_expected_scale(
@@ -347,8 +430,10 @@ def _a10_has_expected_scale(
     expected = _a10_expected_scale(case.request)
     if expected is None:
         return False
-    actual = _a10_scale_fields(operations)
-    return all(actual.get(field) == value for field, value in expected.items())
+    return any(
+        all(fields.get(field) == value for field, value in expected.items())
+        for fields in _a10_scale_groups(operations).values()
+    )
 
 
 def score_a10_plan(case: A10BenchmarkCase, plan: _PlannerWirePlan | None) -> A10ScoreResult:
@@ -372,11 +457,15 @@ def score_a10_plan(case: A10BenchmarkCase, plan: _PlannerWirePlan | None) -> A10
         for item in operations
         if isinstance(item.get("semantic_ref"), str)
     )
-    explicit_channel_tokens, channel_clues = _a10_channel_observations(operations)
-    channel_tokens = explicit_channel_tokens + channel_clues
+    explicit_channel_tokens, channel_clues, operation_channel_tokens = _a10_channel_observations(
+        operations
+    )
+    channel_tokens = tuple(token for tokens in operation_channel_tokens for token in tokens)
     object_kinds = tuple(str(operation.get("object_kind")) for operation in operations)
     verbs = tuple(str(operation.get("verb")) for operation in operations)
-    scale_fields = tuple(sorted(_a10_scale_fields(operations)))
+    scale_fields = tuple(
+        sorted({field for fields in _a10_scale_groups(operations).values() for field in fields})
+    )
     findings: list[str] = []
     expected = case.expected
     safe_rejection = expected.startswith("SAFE_REJECT") or expected == "UNSUPPORTED_FAIL_CLOSED"
@@ -393,13 +482,19 @@ def score_a10_plan(case: A10BenchmarkCase, plan: _PlannerWirePlan | None) -> A10
             findings.append("physical_gr_channel_missing")
     elif expected == "SAFE_CORRECT":
         expected_channels = tuple(case.structured_channel.split(";"))
-        if not operations or unresolved_count or tuple(channel_tokens) != expected_channels:
+        if (
+            not operations
+            or unresolved_count
+            or len(operations) != len(expected_channels)
+            or tuple(tokens for tokens in operation_channel_tokens if tokens)
+            != tuple((channel,) for channel in expected_channels)
+        ):
             findings.append("explicit_physical_plan_incomplete")
     elif expected == "two_add_track_operations_exact_channels":
         if (
             len(operations) != 2
             or tuple(object_kinds) != ("track", "track")
-            or tuple(channel_tokens) != ("GR", "RHOB")
+            or operation_channel_tokens != (("GR",), ("RHOB",))
             or tuple(verbs) != ("CREATE", "CREATE")
         ):
             findings.append("multi_operation_channel_shape_mismatch")
@@ -419,7 +514,7 @@ def score_a10_plan(case: A10BenchmarkCase, plan: _PlannerWirePlan | None) -> A10
             len(operations) != 2
             or tuple(object_kinds) != ("track", "track")
             or tuple(verbs) != ("CREATE", "CREATE")
-            or tuple(channel_tokens) != ("CBL", "VDL")
+            or operation_channel_tokens != (("CBL",), ("VDL",))
             or track_kinds != ("normal", "array")
         ):
             findings.append("multi_operation_kind_shape_mismatch")
@@ -428,51 +523,69 @@ def score_a10_plan(case: A10BenchmarkCase, plan: _PlannerWirePlan | None) -> A10
             len(operations) != 2
             or tuple(object_kinds) != ("track", "track")
             or tuple(verbs) != ("CREATE", "CREATE")
-            or tuple(channel_tokens) != ("GR", "CGR")
+            or operation_channel_tokens != (("GR",), ("CGR",))
         ):
             findings.append("multi_operation_order_mismatch")
     elif expected == "semantic_GR_plus_physical_RHOB":
         if "binding.gr-curve" not in semantic_refs or "RHOB" not in channel_tokens:
             findings.append("mixed_semantic_physical_shape_mismatch")
     elif expected == "ADD_TRACK_plus_explicit_scale":
-        if (
-            not any(
-                operation.get("verb") == "CREATE" and operation.get("object_kind") == "track"
-                for operation in operations
-            )
-            or "CBL" not in channel_tokens
-            or not _a10_has_expected_scale(case, operations)
-        ):
+        if not _a10_has_operation_channel(
+            operations,
+            operation_channel_tokens,
+            verb="CREATE",
+            object_kind="track",
+            channel="CBL",
+        ) or not _a10_has_expected_scale(case, operations):
             findings.append("track_or_explicit_scale_missing")
     elif expected == "UPDATE_CURVE_SCALE":
-        if (
-            not any(
-                operation.get("verb") == "SET" and operation.get("object_kind") == "binding"
-                for operation in operations
-            )
-            or "CBL" not in channel_tokens
-            or not _a10_has_expected_scale(case, operations)
-        ):
+        if not _a10_has_operation_channel(
+            operations,
+            operation_channel_tokens,
+            verb="SET",
+            object_kind="binding",
+            channel="CBL",
+        ) or not _a10_has_expected_scale(case, operations):
             findings.append("curve_scale_update_incomplete")
     elif expected == "ADD_TRACK":
-        if not any(
-            operation.get("verb") == "CREATE"
-            and operation.get("object_kind") == "track"
-            and "GR" in channel_tokens
-            for operation in operations
+        if not _a10_has_operation_channel(
+            operations,
+            operation_channel_tokens,
+            verb="CREATE",
+            object_kind="track",
+            channel="GR",
         ):
             findings.append("track_operation_missing")
     elif expected == "ADD_TRACK_order_preserved":
-        if not any(
-            operation.get("verb") == "CREATE"
+        vdl_refs = {
+            str(operation.get("local_ref"))
+            for operation, tokens in zip(operations, operation_channel_tokens, strict=True)
+            if operation.get("verb") == "CREATE"
             and operation.get("object_kind") == "track"
-            and "VDL" in channel_tokens
-            for operation in operations
+            and "VDL" in tokens
+        }
+        order_constraint = any(
+            constraint.get("relation") == "after"
+            and constraint.get("item_ref") in vdl_refs
+            and "cbl" in str(constraint.get("anchor_ref", "")).casefold()
+            for constraint in _a10_presentation_constraints(plan)
+        )
+        if (
+            not _a10_has_operation_channel(
+                operations,
+                operation_channel_tokens,
+                verb="CREATE",
+                object_kind="track",
+                channel="VDL",
+            )
+            or not order_constraint
         ):
             findings.append("ordered_track_operation_missing")
     elif expected == "UNSUPPORTED_operation_if_no_canonical_contract":
         if unresolved_count == 0:
             findings.append("unsupported_mutation_not_rejected")
+        if operations:
+            findings.append("unsupported_mutation_contains_executable_work")
     else:
         findings.append("unrecognized_a10_expectation")
     return A10ScoreResult(
@@ -490,6 +603,7 @@ def score_a10_plan(case: A10BenchmarkCase, plan: _PlannerWirePlan | None) -> A10
         object_kinds=object_kinds,
         verbs=verbs,
         scale_fields=scale_fields,
+        scoring_scope=A10_EXPECTATION_SCORING_SCOPE[expected],
     )
 
 

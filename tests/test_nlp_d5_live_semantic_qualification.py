@@ -2663,6 +2663,80 @@ def test_a10_exploratory_failure_does_not_change_production_verdict() -> None:
     assert d5._a10_aggregate_status(cases, rows) == "PASS"
 
 
+def test_a10_exploratory_infrastructure_failure_makes_campaign_inconclusive_only() -> None:
+    """Exploratory infrastructure evidence cannot fail a complete P verdict."""
+    cases = a10_adapter.load_a10_benchmark(REPO_ROOT)
+    rows = [
+        {
+            "case_id": case.case_id,
+            "gold": case.gold,
+            "failure_class": "PASS",
+            "score": {"passed": True},
+        }
+        for case in cases
+    ]
+    exploratory_index = next(index for index, case in enumerate(cases) if case.gold == "E")
+    rows[exploratory_index]["failure_class"] = "INFRASTRUCTURE_INTERRUPTION"
+
+    assert d5._a10_partition_verdicts(cases, rows) == (
+        "INCONCLUSIVE",
+        "INCONCLUSIVE",
+        "PASS",
+    )
+
+
+def test_a10_production_harness_contract_failure_is_inconclusive() -> None:
+    """A production harness-contract failure cannot become a planner FAIL."""
+    cases = a10_adapter.load_a10_benchmark(REPO_ROOT)
+    rows = [
+        {
+            "case_id": case.case_id,
+            "gold": case.gold,
+            "failure_class": "PASS",
+            "score": {"passed": True},
+        }
+        for case in cases
+    ]
+    production_index = next(index for index, case in enumerate(cases) if case.gold == "P")
+    rows[production_index]["failure_class"] = "HARNESS_CONTRACT_FAILURE"
+    rows[production_index]["score"]["passed"] = False
+
+    assert d5._a10_partition_verdicts(cases, rows) == (
+        "INCONCLUSIVE",
+        "INCONCLUSIVE",
+        "INCONCLUSIVE",
+    )
+
+
+def test_a10_incomplete_or_duplicate_population_is_inconclusive() -> None:
+    """Population custody requires every expected case exactly once."""
+    cases = a10_adapter.load_a10_benchmark(REPO_ROOT)
+    rows = [
+        {
+            "case_id": case.case_id,
+            "gold": case.gold,
+            "failure_class": "PASS",
+            "score": {"passed": True},
+        }
+        for case in cases
+    ]
+
+    incomplete = rows[:-1]
+    assert d5._a10_partition_verdicts(cases, incomplete) == (
+        "INCONCLUSIVE",
+        "INCONCLUSIVE",
+        "INCONCLUSIVE",
+    )
+
+    duplicate = list(rows)
+    duplicate[-1] = dict(duplicate[-2])
+    assert d5._a10_partition_verdicts(cases, duplicate) == (
+        "INCONCLUSIVE",
+        "INCONCLUSIVE",
+        "INCONCLUSIVE",
+    )
+
+
 def test_a10_case_authorization_is_case_scoped_and_reuses_planner_controls(
     tmp_path: Path,
 ) -> None:

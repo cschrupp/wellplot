@@ -5234,6 +5234,7 @@ def _a10_campaign_seal(
     completed_ids = [str(row["case_id"]) for row in rows]
     production_rows = [row for row in rows if row["gold"] == "P"]
     exploratory_rows = [row for row in rows if row["gold"] == "E"]
+    campaign_status, campaign_integrity, production_verdict = _a10_partition_verdicts(cases, rows)
 
     def partition_metrics(
         partition_rows: Sequence[Mapping[str, Any]], denominator: int
@@ -5272,8 +5273,10 @@ def _a10_campaign_seal(
     payload = {
         "experiment_version": D5_EXPERIMENT_VERSION,
         "mode": A10_PLANNER_EVALUATION_KIND,
-        "status": status,
+        "status": status if status != "AUTO" else campaign_status,
         "failure_class": failure_class,
+        "campaign_integrity": campaign_integrity,
+        "production_verdict": production_verdict,
         "stopped_reason": stopped_reason,
         "authorization_id": authorization.authorization_id,
         "campaign_id": authorization.campaign_id,
@@ -5320,21 +5323,58 @@ def _a10_aggregate_status(
     rows: Sequence[Mapping[str, Any]],
 ) -> str:
     """Authorize only the complete production partition, not exploratory cases."""
-    production_rows = [row for row in rows if row["gold"] == "P"]
-    infrastructure_failure = any(
-        row["failure_class"]
-        in {"INFRASTRUCTURE_INTERRUPTION", "HARNESS_FAILURE", "UNKNOWN_FAILURE"}
-        for row in rows
+    return _a10_partition_verdicts(cases, rows)[0]
+
+
+def _a10_partition_verdicts(
+    cases: Sequence[a10_adapter.A10BenchmarkCase],
+    rows: Sequence[Mapping[str, Any]],
+) -> tuple[str, str, str]:
+    """Return campaign status, integrity status, and independent P verdict."""
+    expected_case_ids = {case.case_id for case in cases}
+    expected_gold = {case.case_id: case.gold for case in cases}
+    expected_production_ids = {case.case_id for case in cases if case.gold == "P"}
+    row_case_ids = [str(row["case_id"]) for row in rows]
+    row_partitions_match = all(
+        expected_gold.get(str(row["case_id"])) == row["gold"] for row in rows
     )
-    if (
-        len(rows) != len(cases)
-        or len(production_rows) != sum(case.gold == "P" for case in cases)
-        or infrastructure_failure
-    ):
-        return "INCONCLUSIVE"
-    if any(row["failure_class"] != "PASS" or not row["score"]["passed"] for row in production_rows):
-        return "FAIL"
-    return "PASS"
+    production_rows = [row for row in rows if row["gold"] == "P"]
+    infrastructure_classes = {
+        "INFRASTRUCTURE_INTERRUPTION",
+        "HARNESS_FAILURE",
+        "HARNESS_CONTRACT_FAILURE",
+        "UNKNOWN_FAILURE",
+    }
+    production_incomplete = {
+        str(row["case_id"]) for row in production_rows
+    } != expected_production_ids
+    production_infrastructure = any(
+        row["failure_class"] in infrastructure_classes for row in production_rows
+    )
+    if production_incomplete or production_infrastructure:
+        production_verdict = "INCONCLUSIVE"
+    elif any(not row["score"]["passed"] for row in production_rows):
+        production_verdict = "FAIL"
+    else:
+        production_verdict = "PASS"
+    campaign_integrity = (
+        "COMPLETE"
+        if len(rows) == len(cases)
+        and len(set(row_case_ids)) == len(row_case_ids)
+        and set(row_case_ids) == expected_case_ids
+        and row_partitions_match
+        and not any(row["failure_class"] in infrastructure_classes for row in rows)
+        else "INCONCLUSIVE"
+    )
+    if campaign_integrity != "COMPLETE":
+        campaign_status = "INCONCLUSIVE"
+    elif production_verdict == "FAIL":
+        campaign_status = "FAIL"
+    elif production_verdict == "PASS":
+        campaign_status = "PASS"
+    else:
+        campaign_status = "INCONCLUSIVE"
+    return campaign_status, campaign_integrity, production_verdict
 
 
 def execute_live_a10_planner_evaluation(
