@@ -31,8 +31,11 @@ memory or the latest implementation suggestion. Establish:
 1. **Objective:** the active slice's concrete product or technical goal.
 2. **Exit criteria:** the smallest observable outcome or evidence that closes it.
 3. **Scope firewall:** what the slice authorizes and forbids, especially the one
-   canonical semantic engine and authoring workflow. No parallel, shadow,
-   evaluation-only, fallback, or partially implemented engine or workflow path.
+   canonical semantic engine and authoring workflow. Do not add a second
+   semantic engine, shadow scorer that claims host authority, independent
+   orchestrator, fallback workflow, or parallel path, even if evaluation-only
+   or only partly implemented. A separately authorized mode that genuinely
+   reuses an accepted canonical harness is not a second engine by itself.
 4. **Next gate:** the next authorized action and whether provider/model calls,
    benchmark/holdout use, mutation, deployment, or other live work are permitted.
 5. **Necessity:** whether the proposed change resolves a demonstrated present
