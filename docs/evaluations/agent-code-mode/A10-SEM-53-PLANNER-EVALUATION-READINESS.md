@@ -1,10 +1,12 @@
 # A10 Semantic Planner Evaluation Readiness
 
-Status: `A10_SEM_53_EXECUTION_PATH_01R2_READY — HA_REVIEW_REQUIRED`
+Status: `A10_SEM_53_CANONICAL_SCOPE_RECOVERY_COMPLETE — HA_REVIEW_REQUIRED`
 
 This is a provider-free readiness audit for the accepted frozen 53-case A10
 semantic planner evaluation. It does not execute the evaluation and does not
-make a planner-quality claim.
+make a planner-quality claim. The R1/R2 readiness candidate is preserved as
+historical evidence, but the R2 execution path was retired because it created
+an additional campaign workflow and partial semantic authority.
 
 ## Accepted Inputs
 
@@ -55,9 +57,9 @@ schema identities are recorded above.
 PASS: the R2 canonical corpus-adapter and live-qualification suites reported
 `182 passed` with no provider, endpoint, or model calls.
 
-### Executable 53-case campaign path
+### Historical 53-case campaign path (Retired)
 
-The bounded execution-path candidate now exposes one additional mode in the
+The retired bounded execution-path candidate exposed one additional mode in the
 existing canonical live qualification CLI:
 
 - `execute_live_planner_smoke`, which remains pinned to one planner case
@@ -70,9 +72,9 @@ existing canonical live qualification CLI:
   path, with one case namespace per request and a durable parent campaign
   boundary.
 
-### Scoring binding
+### Historical scoring binding (Retired)
 
-The candidate adds an A10-specific adapter without changing the historical
+The retired candidate added an A10-specific adapter without changing the historical
 scorer. `scripts/a10_semantic_corpus_adapter.py` still loads a separate 96-case
 historical corpus and joins a 12-case P8 population. Its `score_plan()` accepts
 that corpus's `AdaptedCase` contract and intentionally leaves historical
@@ -91,7 +93,7 @@ current provider, schema, and planner bytes. They are not evidence about the
 53-case A10 planner population and were not refreshed. They remain a separate
 P8 authorization blocker.
 
-## Candidate Qualification
+## Candidate Qualification (Historical, Retired)
 
 The candidate was qualified without provider calls:
 
@@ -108,7 +110,7 @@ The adjacent CM-57P8 suite remains separately classified at `209 passed, 5
 failed` because of stale historical frozen hashes. Those pins were not changed
 by this candidate.
 
-### R2 integrity corrections
+### R2 integrity corrections (Historical, Retired)
 
 The scorer now binds channel and scale evidence to operation-local targets and
 requires validated presentation constraints for ordered edits. Unsupported
@@ -157,11 +159,12 @@ namespace, timeout, and terminal classification rules. The accepted Smoke 003
 record supplies operational readiness evidence but does not authorize these
 53 model evaluations.
 
-## Decision
+## Scope-Recovery Decision
 
-`A10_SEM_53_EXECUTION_PATH_01R2_READY — HA_REVIEW_REQUIRED`
+`A10_SEM_53_CANONICAL_SCOPE_RECOVERY_COMPLETE — HA_REVIEW_REQUIRED`
 
-The frozen inputs, canonical execution path, bounded A10 scorer, and
-provider-free custody qualification are ready for independent review. Do not
-run the benchmark, call the provider, access holdouts, or create a parallel
-workflow until a separate live authorization is issued.
+The frozen benchmark, source inventory, Smoke 003 evidence, and existing
+canonical planner-smoke path remain preserved. The separate A10 orchestrator,
+its private campaign lifecycle, and its heuristic semantic scorer are retired.
+No benchmark, provider call, holdout access, or replacement workflow is
+authorized by this record.

@@ -1,9 +1,12 @@
 # A10 53-Case Execution Path Qualification
 
-Status: `A10_SEM_53_EXECUTION_PATH_01R2_READY — HA_REVIEW_REQUIRED`
+Status: `A10_SEM_53_CANONICAL_SCOPE_RECOVERY_COMPLETE — HA_REVIEW_REQUIRED`
 
 This record covers the provider-free corrective of the accepted frozen 53-case
 A10 semantic planner evaluation path. It does not execute the live evaluation.
+The R1/R2 implementation evidence below is retained as historical record. The
+R2 execution-path implementation was subsequently retired because it
+introduced a separate campaign orchestrator and partial semantic scorer.
 
 ## Scope
 
@@ -88,10 +91,12 @@ The adjacent CM-57P8 provider-free suite remains separate: it reports
 are stale against the current repository. No P8 hashes were refreshed or
 waived by this candidate.
 
-## R2 Qualification
+## R2 Historical Qualification (Retired)
 
-R2 closes the independent-review gaps without changing the canonical planner,
-provider, authoring, or execution path.
+The R2 candidate closed its review findings in provider-free testing, but it is
+not current implementation authority. Its operation-local scoring and campaign
+verdict machinery were retired during canonical scope recovery because planner
+wire evidence cannot replace host-owned resolution and execution semantics.
 
 - Channel evidence is scored within the operation that supplies it; `CGR` and
   `GRD` cannot satisfy an exact `GR` requirement through substring matching.
@@ -132,9 +137,12 @@ Additional R2 checks:
 - Provider/model/endpoint calls: `0`.
 - Live evaluation, P8, and holdout access: not run.
 
-## Live authorization boundary
+## Historical Live Authorization Boundary (Not Current)
 
-Independent review must authorize a fresh evidence namespace and exact
+The following historical command was never authorized or run. Any future A10
+measurement must be designed under the accepted canonical planner-smoke path;
+the retired R2 command is not an active entrypoint. Independent review must
+authorize a fresh evidence namespace and exact
 runtime/repository identities before invoking:
 
 ```bash
@@ -144,6 +152,5 @@ PYTHONPATH=src .venv/bin/python scripts/nlp_d5_live_semantic_qualification.py \
   --artifact-root <fresh-authorized-namespace>
 ```
 
-That command is recorded for future authorization only. It was not run here.
 No live authority, holdout access, provider call, or scientific result is
-claimed by this qualification.
+claimed by this historical record.
