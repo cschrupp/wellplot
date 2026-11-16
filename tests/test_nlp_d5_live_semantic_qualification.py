@@ -104,6 +104,17 @@ def _authorization(
     )
 
 
+def _a10_authorization(*, campaign_id: str, artifact_root: str) -> d5.D5Authorization:
+    """Build a provider-free authorization pinned to the frozen A10 population."""
+    authorization = _authorization(campaign_id=campaign_id, artifact_root=artifact_root)
+    return replace(
+        authorization,
+        planner_population=d5.A10_SEM_53_POPULATION,
+        planner_population_benchmark_sha256=d5.A10_SEM_53_BENCHMARK_SHA256,
+        planner_population_source_inventory_sha256=d5.A10_SEM_53_SOURCE_INVENTORY_SHA256,
+    )
+
+
 def _authorization_payload() -> dict[str, object]:
     """Build the smallest JSON-shaped authorization payload for parser tests."""
     return {
@@ -288,6 +299,160 @@ def test_population_and_decoder_policy_are_frozen() -> None:
         "max_completion_tokens": "ABSENT",
         "model_substitution": "FORBIDDEN",
     }
+
+
+class _ProviderFreePlannerPopulationAdapter:
+    """Simulate canonical planner observations without provider activity."""
+
+    logical_call_count = 0
+
+    def __init__(self) -> None:
+        self._call_started: Callable[[dict[str, object]], None] | None = None
+        self._call_completed: Callable[[dict[str, object]], None] | None = None
+        self._physical_attempt: Callable[[int], None] | None = None
+        self._model_io: Callable[[dict[str, object]], None] | None = None
+        self._trace_events: list[dict[str, object]] = []
+        self._active_turn: str | None = None
+
+    def bind_call_started(self, callback: Callable[[dict[str, object]], None]) -> None:
+        self._call_started = callback
+
+    def bind_call_completed(self, callback: Callable[[dict[str, object]], None]) -> None:
+        self._call_completed = callback
+
+    def bind_physical_attempt(self, callback: Callable[[int], None]) -> None:
+        self._physical_attempt = callback
+
+    def bind_model_io(self, callback: Callable[[dict[str, object]], None]) -> None:
+        self._model_io = callback
+
+    def set_active_turn(self, turn_id: str) -> None:
+        self._active_turn = turn_id
+
+    def consume_planner_trace_events(self) -> tuple[dict[str, object], ...]:
+        events = tuple(self._trace_events)
+        self._trace_events.clear()
+        return events
+
+    @property
+    def observes_physical_attempts(self) -> bool:
+        return True
+
+    async def execute_planner_case(self, case: dict[str, object]) -> dict[str, object]:
+        self.logical_call_count += 1
+        index = self.logical_call_count
+        if self._call_started is not None:
+            self._call_started(
+                {
+                    "event": "logical_call_started",
+                    "index": index,
+                    "generation_role": "planner",
+                    "provider": d5.EXPECTED_PROVIDER,
+                    "model": d5.EXPECTED_MODEL,
+                }
+            )
+        if self._physical_attempt is not None:
+            self._physical_attempt(index)
+        if self._model_io is not None:
+            self._model_io(
+                {
+                    "event": "physical_request",
+                    "logical_call_index": index,
+                    "role": "planner",
+                    "model": d5.EXPECTED_MODEL,
+                    "physical_attempt": 1,
+                    "request_sha256": "a" * 64,
+                    "response_sha256": "b" * 64,
+                }
+            )
+        self._trace_events.append(
+            {
+                "event": "PLANNER_GENERATION_PASS",
+                "attempt": 1,
+                "response_schema": "_PlannerWirePlan",
+                "validated_response": {},
+            }
+        )
+        if self._call_completed is not None:
+            self._call_completed(
+                {
+                    "event": "logical_call_completed",
+                    "index": index,
+                    "generation_role": "planner",
+                    "provider": d5.EXPECTED_PROVIDER,
+                    "model": d5.EXPECTED_MODEL,
+                    "outcome": "success",
+                }
+            )
+        return {
+            "observation_status": "SCHEMA_VALID_WIRE_CAPTURED",
+            "schema_valid": True,
+            "source_asset_identity": {
+                "asset_id": case["source_key"],
+                "relative_path": case["source_path"],
+                "path_basename": Path(str(case["source_path"])).name,
+                "format": case["source_format"],
+                "size_bytes": 1,
+                "sha256": case["source_sha256"],
+            },
+            "source_channel_count": 1,
+            "numeric_sample_apis_invoked": False,
+        }
+
+
+def test_a10_population_is_authenticated_and_provider_free(tmp_path: Path) -> None:
+    """The frozen 53 cases and source inventory are checked before campaign setup."""
+    authorization = _a10_authorization(
+        campaign_id="a10-population-preflight",
+        artifact_root=str(tmp_path / "evidence"),
+    )
+    result = d5.provider_free_preflight(
+        REPO_ROOT,
+        authorization,
+        _paths(tmp_path, authorization.campaign_id),
+        static_checker=lambda repo, checked, paths: {"status": "PASS"},
+        population=d5.A10_SEM_53_POPULATION,
+    )
+    assert result["population"]["turns"] == 53
+    assert result["population"]["turn_ids"][8] == "A10-SEM-53:B01"
+    assert result["logical_call_ceiling"] == 106
+    assert result["physical_attempt_upper_bound"] == 318
+    assert result["provider_calls"] == 0
+    assert result["model_calls"] == 0
+
+
+def test_a10_campaign_uses_shared_runner_without_semantic_scoring(tmp_path: Path) -> None:
+    """The canonical runner records all cases while leaving semantic grading open."""
+    campaign_id = "a10-observation-campaign"
+    authorization = _a10_authorization(
+        campaign_id=campaign_id,
+        artifact_root=str(tmp_path / "evidence"),
+    )
+    adapter = _ProviderFreePlannerPopulationAdapter()
+    runner = d5.D5CampaignRunner(
+        repo_root=REPO_ROOT,
+        authorization=authorization,
+        paths=_paths(tmp_path, campaign_id),
+        readiness=_ready(),
+        provenance={"population": d5.A10_SEM_53_POPULATION},
+    )
+    result = asyncio.run(
+        runner.run(
+            adapter,
+            mode="planner_only",
+            population=d5.A10_SEM_53_POPULATION,
+        )
+    )
+    assert result["decision"] == "PASS"
+    assert result["attribution"] == "OBSERVATION_COLLECTION"
+    assert result["completed_turns"] == 53
+    assert result["logical_generation_calls"] == 53
+    assert result["physical_generation_attempts"] == 53
+    assert result["terminal"]["scientific_terminal"] is None
+    assert all(row["semantic_status"] == "NOT_ESTABLISHED" for row in result["rows"])
+    b01 = next(row for row in result["rows"] if row["case_id"] == "B01")
+    assert b01["diagnostic_case"] is True
+    assert b01["first_divergence"] == "NONE"
 
 
 def test_provider_free_preflight_is_network_free_and_fail_closed() -> None:

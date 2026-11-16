@@ -95,6 +95,13 @@ SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS_PER_REQUEST = 1
 A10_SEM_01_ROOT = "workspace/evaluations/a10-sem-01-20261110"
 A10_SEM_01_BENCHMARK = f"{A10_SEM_01_ROOT}/benchmark.json"
 A10_SEM_01_SOURCE_INVENTORY = f"{A10_SEM_01_ROOT}/source-inventory.json"
+A10_SEM_53_POPULATION = "a10-53"
+A10_SEM_53_BENCHMARK_SHA256 = "595839779e9ca59d9ce8ff20cbbdaf006ad41138b4510acc0ea26733e080067a"
+A10_SEM_53_SOURCE_INVENTORY_SHA256 = (
+    "21f11462696af7a9f1d9b18d625a6a311794912b9ef10a70106f0267e83c19b0"
+)
+A10_SEM_53_CASE_COUNT = 53
+A10_SEM_53_DIAGNOSTIC_CASE_ID = "B01"
 A10_SEM_02_SMOKE_CASE_ID = "B01"
 A10_SEM_02_SMOKE_SOURCE_KEY = "approved_las"
 A10_SEM_02_SMOKE_SOURCE_PATH = "workspace/data/30-23a-3 8117_d.las"
@@ -574,6 +581,9 @@ class D5Authorization:
     planner_smoke_wire_schema_sha256: str = ""
     planner_smoke_sdk_max_retries: int | None = None
     expected_worktree_porcelain: str = ""
+    planner_population: str = ""
+    planner_population_benchmark_sha256: str = ""
+    planner_population_source_inventory_sha256: str = ""
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> D5Authorization:
@@ -666,6 +676,13 @@ class D5Authorization:
             planner_smoke_wire_schema_sha256=str(value.get("planner_smoke_wire_schema_sha256", "")),
             planner_smoke_sdk_max_retries=value.get("planner_smoke_sdk_max_retries"),
             expected_worktree_porcelain=str(value.get("expected_worktree_porcelain", "")),
+            planner_population=str(value.get("planner_population", "")),
+            planner_population_benchmark_sha256=str(
+                value.get("planner_population_benchmark_sha256", "")
+            ),
+            planner_population_source_inventory_sha256=str(
+                value.get("planner_population_source_inventory_sha256", "")
+            ),
         )
 
 
@@ -1203,6 +1220,84 @@ def _planner_smoke_case(
         "sdk_max_retries": authorization.planner_smoke_sdk_max_retries,
         "physical_attempt_limit": SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS,
     }
+
+
+def _load_a10_planner_population(repo_root: Path) -> list[dict[str, Any]]:
+    """Load the immutable A10 cases without loading numerical samples or gold into prompts."""
+    benchmark_path = repo_root / A10_SEM_01_BENCHMARK
+    inventory_path = repo_root / A10_SEM_01_SOURCE_INVENTORY
+    _assert_hash(benchmark_path, A10_SEM_53_BENCHMARK_SHA256, "A10 benchmark")
+    _assert_hash(inventory_path, A10_SEM_53_SOURCE_INVENTORY_SHA256, "A10 source inventory")
+    benchmark = json.loads(benchmark_path.read_text(encoding="utf-8"))
+    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    cases = benchmark.get("cases")
+    sources = inventory.get("sources")
+    if not isinstance(cases, list) or len(cases) != A10_SEM_53_CASE_COUNT:
+        raise D5StaticPreflightError("A10 planner population must contain exactly 53 cases")
+    if not isinstance(sources, list):
+        raise D5StaticPreflightError("A10 source inventory is invalid")
+    source_rows = {
+        str(row.get("path")): row
+        for row in sources
+        if isinstance(row, Mapping) and isinstance(row.get("path"), str)
+    }
+    if len(source_rows) != len(sources):
+        raise D5StaticPreflightError("A10 source inventory contains duplicate paths")
+
+    result: list[dict[str, Any]] = []
+    seen_ids: set[str] = set()
+    validated_source_hashes: dict[str, str] = {}
+    for item in cases:
+        if not isinstance(item, Mapping):
+            raise D5StaticPreflightError("A10 planner case is not an object")
+        case_id = item.get("id")
+        request = item.get("request")
+        source_key = item.get("source")
+        if (
+            not isinstance(case_id, str)
+            or not re.fullmatch(r"[A-H]\d{2}", case_id)
+            or case_id in seen_ids
+            or not isinstance(request, str)
+            or not request.strip()
+            or not isinstance(source_key, str)
+        ):
+            raise D5StaticPreflightError("A10 planner case identity or request is invalid")
+        seen_ids.add(case_id)
+        relative_source_path = A10_SEM_02_SOURCE_PATH_BY_KEY.get(source_key)
+        if relative_source_path is None:
+            raise D5StaticPreflightError(f"A10 planner case names unknown source: {source_key}")
+        source_row = source_rows.get(relative_source_path)
+        if source_row is None:
+            raise D5StaticPreflightError("A10 planner source is missing from inventory")
+        source_sha256 = source_row.get("sha256")
+        source_format = source_row.get("format")
+        if not isinstance(source_sha256, str) or source_format not in {"LAS", "DLIS"}:
+            raise D5StaticPreflightError("A10 planner source identity is invalid")
+        source_path = repo_root / relative_source_path
+        if not source_path.is_file():
+            raise D5StaticPreflightError("A10 planner source is not provisioned")
+        if relative_source_path not in validated_source_hashes:
+            _assert_hash(source_path, source_sha256, relative_source_path)
+            validated_source_hashes[relative_source_path] = source_sha256
+        result.append(
+            {
+                "case_id": case_id,
+                "turn_id": f"A10-SEM-53:{case_id}",
+                "request": request,
+                "request_sha256": hashlib.sha256(request.encode("utf-8")).hexdigest(),
+                "source_key": source_key,
+                "source_path": relative_source_path,
+                "source_format": source_format.lower(),
+                "source_sha256": source_sha256,
+                "benchmark_class": item.get("class"),
+                "benchmark_exposure": item.get("gold"),
+                "benchmark_expected": item.get("expected"),
+                "diagnostic_case": case_id == A10_SEM_53_DIAGNOSTIC_CASE_ID,
+            }
+        )
+    if len(seen_ids) != A10_SEM_53_CASE_COUNT or A10_SEM_53_DIAGNOSTIC_CASE_ID not in seen_ids:
+        raise D5StaticPreflightError("A10 planner population identity is incomplete")
+    return result
 
 
 def _default_planner_smoke_static_checks(
@@ -2986,13 +3081,19 @@ class D5CampaignCustody:
         live: bool = False,
         endpoint_call_count: int = 2,
         mode: str = "scientific",
+        logical_call_ceiling: int | None = None,
+        physical_attempt_ceiling: int | None = None,
     ) -> D5CampaignCustody:
         """Prepare custody without consuming it before the first generation."""
         ensure_fresh_namespace(paths)
         if paths.campaign_id != authorization.campaign_id:
             raise D5HarnessError("campaign path does not match authorization")
-        if mode not in {"smoke", "scientific"}:
+        if mode not in {"smoke", "scientific", "planner_only"}:
             raise D5HarnessError("unknown campaign mode")
+        logical_limit = logical_call_ceiling or MAX_LOGICAL_CALLS
+        physical_limit = physical_attempt_ceiling or MAX_PHYSICAL_ATTEMPTS
+        if logical_limit < 1 or physical_limit < 1:
+            raise D5HarnessError("campaign call ceilings must be positive")
         state = {
             "experiment_version": D5_EXPERIMENT_VERSION,
             "mode": mode,
@@ -3013,6 +3114,8 @@ class D5CampaignCustody:
             "provenance": dict(provenance),
             "started": False,
             "campaign_consumed": False,
+            "logical_call_ceiling": logical_limit,
+            "physical_attempt_upper_bound": physical_limit,
         }
         if not evidence_is_redacted(state):
             raise D5HarnessError("state redaction failure")
@@ -3020,7 +3123,10 @@ class D5CampaignCustody:
             paths=paths,
             campaign_id=paths.campaign_id,
             state=state,
-            ledger=D5LogicalCallLedger(),
+            ledger=D5LogicalCallLedger(
+                max_logical_calls=logical_limit,
+                max_physical_attempts=physical_limit,
+            ),
             authorization_id=authorization.authorization_id,
             mode=mode,
             live=live,
@@ -3039,6 +3145,8 @@ class D5CampaignCustody:
         live: bool = False,
         endpoint_call_count: int = 2,
         mode: str = "scientific",
+        logical_call_ceiling: int | None = None,
+        physical_attempt_ceiling: int | None = None,
     ) -> D5CampaignCustody:
         """Retain the historical constructor for legacy custody tests only."""
         custody = cls.prepare(
@@ -3049,6 +3157,8 @@ class D5CampaignCustody:
             live=live,
             endpoint_call_count=endpoint_call_count,
             mode=mode,
+            logical_call_ceiling=logical_call_ceiling,
+            physical_attempt_ceiling=physical_attempt_ceiling,
         )
         custody.paths.model_io.touch(exist_ok=False)
         custody.legacy_eager = True
@@ -3336,6 +3446,39 @@ class D5CampaignCustody:
             }
         )
         self.append_model_io(bounded)
+
+    def record_planner_observability(self, event: Mapping[str, Any]) -> None:
+        """Append planner observations without collapsing multiple case contexts."""
+        if self.mode != "planner_only":
+            raise D5HarnessError("planner campaign observability used outside planner-only mode")
+        name = event.get("event")
+        if name == "PLANNER_GENERATION_PASS":
+            payload = {
+                "turn_id": self._active_turn_id,
+                "attempt": event.get("attempt"),
+                "response_schema": event.get("response_schema"),
+                "validated_response": event.get("validated_response"),
+            }
+        elif name == "PLANNER_CONTEXT":
+            payload = {
+                "event": name,
+                "turn_id": self._active_turn_id,
+                "context": _sanitize_planner_context(event.get("context")),
+            }
+        elif name == "REQUEST_COMPILATION_PASS":
+            payload = {
+                "event": name,
+                "turn_id": self._active_turn_id,
+                "result": event.get("result"),
+            }
+        else:
+            payload = {"turn_id": self._active_turn_id, **dict(event)}
+        if not evidence_is_redacted(payload):
+            raise D5HarnessError("planner campaign observability redaction failure")
+        destination = (
+            self.paths.planner_wire if name == "PLANNER_GENERATION_PASS" else self.paths.stage_trace
+        )
+        _append_jsonl(destination, payload)
 
     def record_logical_model_result(self, event: Mapping[str, Any]) -> None:
         """Persist canonical parse/validation outcome after backend consumption."""
@@ -4003,6 +4146,18 @@ class _ObservedLiveAdapter:
     def __init__(self, inner: object, observer: _PhysicalAttemptObserver) -> None:
         self.inner = inner
         self.observer = observer
+        self._trace_events: list[dict[str, Any]] = []
+        self._stop_after_wire = False
+
+    def enable_planner_only_boundary(self) -> None:
+        """Stop the canonical planner after a validated wire response."""
+        self._stop_after_wire = True
+
+    def consume_planner_trace_events(self) -> tuple[dict[str, Any], ...]:
+        """Return and clear planner trace events collected since the last case."""
+        events = tuple(self._trace_events)
+        self._trace_events.clear()
+        return events
 
     def bind_call_started(self, callback: Callable[[dict[str, Any]], None]) -> None:
         """Bind logical custody and select the active HTTP call."""
@@ -4126,6 +4281,63 @@ class _ObservedLiveAdapter:
         """Execute through the accepted Direct Notebook adapter."""
         return await self.inner.execute_turn(case, expected)
 
+    async def execute_planner_case(self, case: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Observe one planner-only case through the canonical SemanticPlanner."""
+        context = _build_planner_smoke_inputs(self.inner.repo_root, case)
+        session = self.inner.session.session
+        planner = session.compiler.dependencies.planner
+        from wellplot.agent.code_mode.planner import SemanticPlanner
+
+        if not isinstance(planner, SemanticPlanner):
+            raise D5HarnessError("canonical semantic planner is unavailable")
+        self.set_active_turn(str(case["turn_id"]))
+        self.enable_planner_only_boundary()
+        try:
+            await planner.plan(
+                request=str(case["request"]),
+                mode="revise",
+                current_document_summary=context["document_summary"],
+                source_summary=context["source_summary"],
+                timeout_seconds=session.config.timeout_seconds,
+                temperature=session.config.planner_temperature,
+                max_output_tokens=session.config.max_output_tokens,
+            )
+        except _PlannerOnlyWireCaptured:
+            return {
+                "observation_status": "SCHEMA_VALID_WIRE_CAPTURED",
+                "schema_valid": True,
+                "source_asset_identity": context["source_asset_identity"],
+                "source_channel_count": context["source_channel_count"],
+                "numeric_sample_apis_invoked": context["numeric_sample_apis_invoked"],
+            }
+        except ProviderRequestError as error:
+            return {
+                "observation_status": "PROVIDER_FAILURE",
+                "schema_valid": False,
+                "failure_category": error.category.value,
+                "source_asset_identity": context["source_asset_identity"],
+                "source_channel_count": context["source_channel_count"],
+                "numeric_sample_apis_invoked": context["numeric_sample_apis_invoked"],
+            }
+        except Exception as error:
+            return {
+                "observation_status": "PLANNER_FAILURE",
+                "schema_valid": False,
+                "failure_category": type(error).__name__,
+                "source_asset_identity": context["source_asset_identity"],
+                "source_channel_count": context["source_channel_count"],
+                "numeric_sample_apis_invoked": context["numeric_sample_apis_invoked"],
+            }
+        finally:
+            self._stop_after_wire = False
+        return {
+            "observation_status": "PLANNER_COMPLETED_BEFORE_WIRE_CAPTURE",
+            "schema_valid": False,
+            "source_asset_identity": context["source_asset_identity"],
+            "source_channel_count": context["source_channel_count"],
+            "numeric_sample_apis_invoked": context["numeric_sample_apis_invoked"],
+        }
+
 
 def create_live_adapter(
     *,
@@ -4197,6 +4409,15 @@ def create_live_adapter(
         ledger=ledger,
         capture_logical_identity=section_action_capture_mode != "off",
     )
+    trace_events: list[dict[str, Any]] = []
+
+    def relay_trace(event: Mapping[str, Any]) -> None:
+        trace_events.append(dict(event))
+        if trace_callback is not None:
+            trace_callback(event)
+        if adapter._stop_after_wire and event.get("event") == "PLANNER_GENERATION_PASS":
+            raise _PlannerOnlyWireCaptured
+
     session = d4.build_notebook_session(
         backend=counted,
         provider=resolved_provider,
@@ -4205,7 +4426,7 @@ def create_live_adapter(
         credential_source="configured",
         timeout=project_config.provider.timeout_seconds,
         diagnostic_callback=observer.capture_worker_diagnostic,
-        trace_callback=trace_callback,
+        trace_callback=relay_trace,
         compile_result_callback=compile_result_callback,
         section_action_callback=section_action_callback,
         section_action_capture_mode=section_action_capture_mode,
@@ -4217,7 +4438,9 @@ def create_live_adapter(
         call_source=d4.CampaignCallSource(backends=(counted,), calls=calls, ledger=ledger),
         provider_backed=True,
     )
-    return _ObservedLiveAdapter(inner, observer)
+    adapter = _ObservedLiveAdapter(inner, observer)
+    adapter._trace_events = trace_events
+    return adapter
 
 
 def _credential_bearing_json_get(url: str, api_key: str) -> object:
@@ -4291,6 +4514,8 @@ def execute_live_campaign(
     population: str = "d4",
 ) -> dict[str, Any]:
     """Run selected frozen turns after static/readiness interlocks."""
+    if population == A10_SEM_53_POPULATION and mode != "planner_only":
+        raise D5StaticPreflightError("A10 population requires planner-only campaign mode")
     if artifact_root.resolve() != _authorized_artifact_root(repo_root, authorization):
         raise D5StaticPreflightError("artifact root is not authorized")
     project_config = load_project_config(repo_root)
@@ -5751,6 +5976,75 @@ def _bounded_turn_row(
     }
 
 
+def _bounded_planner_observation_row(
+    case: Mapping[str, Any],
+    actual: Mapping[str, Any],
+    *,
+    execution_index: int,
+    call_count: int,
+    physical_attempt_count: int,
+    provider: str,
+    model: str,
+) -> dict[str, Any]:
+    """Record planner observations without assigning semantic correctness."""
+    observation_status = str(actual.get("observation_status", "PLANNER_FAILURE"))
+    schema_valid = actual.get("schema_valid") is True
+    if observation_status == "PROVIDER_FAILURE":
+        first_divergence = "PROVIDER_OR_STRUCTURED"
+    elif observation_status == "PLANNER_FAILURE":
+        first_divergence = "PLANNER_STRUCTURAL"
+    else:
+        first_divergence = "NONE" if schema_valid else "PLANNER_STRUCTURAL"
+    source_identity = actual.get("source_asset_identity")
+    if not isinstance(source_identity, Mapping):
+        source_identity = {}
+    return {
+        "experiment_version": D5_EXPERIMENT_VERSION,
+        "case_id": case["case_id"],
+        "turn_id": case["turn_id"],
+        "execution_index": execution_index,
+        "request_sha256": case["request_sha256"],
+        "source_key": case["source_key"],
+        "source_path": case["source_path"],
+        "source_format": case["source_format"],
+        "source_sha256": case["source_sha256"],
+        "source_asset_identity": dict(source_identity),
+        "benchmark_class": case.get("benchmark_class"),
+        "benchmark_exposure": case.get("benchmark_exposure"),
+        "diagnostic_case": case.get("diagnostic_case") is True,
+        "observation_status": observation_status,
+        "schema_valid": schema_valid,
+        "semantic_status": "NOT_ESTABLISHED",
+        "host_resolution_status": "NOT_REACHED",
+        "authoring_status": "NOT_REACHED",
+        "correction_usage": {
+            "initial_generation": 1,
+            "native_correction": max(call_count - 1, 0),
+        },
+        "failure_category": actual.get("failure_category"),
+        "first_divergence": first_divergence,
+        "evidence_dimensions": {
+            "provider_structured": "PASS" if observation_status != "PROVIDER_FAILURE" else "FAIL",
+            "planner_structural": "PASS" if schema_valid else "FAIL",
+            "semantic": "NOT_ESTABLISHED",
+            "target_grounding": "NOT_ESTABLISHED",
+            "source_channel_grounding": "NOT_ESTABLISHED",
+            "capability": "NOT_ESTABLISHED",
+            "correction_preservation": "NOT_ESTABLISHED",
+            "safe_negative": "NOT_APPLICABLE",
+            "mutation": "NOT_REACHED",
+            "persistence_reload_render": "NOT_REACHED",
+            "deterministic_grading": "NOT_APPLICABLE",
+        },
+        "numeric_sample_apis_invoked": actual.get("numeric_sample_apis_invoked") is True,
+        "source_channel_count": actual.get("source_channel_count"),
+        "logical_generation_calls": call_count,
+        "physical_attempts": physical_attempt_count,
+        "provider": provider,
+        "model": model,
+    }
+
+
 _INFRASTRUCTURE_GRADE_ERRORS = frozenset(
     {
         "persistence_not_proven",
@@ -6200,7 +6494,7 @@ class D5CampaignRunner:
         """Run selected frozen turns through the shared canonical adapter."""
         if self._started or self._finished:
             raise D5HarnessError("campaign cannot be resumed or invoked twice")
-        if mode not in {"smoke", "scientific"}:
+        if mode not in {"smoke", "scientific", "planner_only"}:
             raise D5HarnessError("unknown campaign mode")
         if population == "d4":
             cases = d4.load_cases(self.repo_root)
@@ -6210,6 +6504,12 @@ class D5CampaignRunner:
             cases, gold_payload = final_population.load_final_population(self.repo_root)
             gold_cases = {item["turn_id"]: item for item in gold_payload["cases"]}
             population_ids = final_population.FINAL_TURN_IDS
+        elif population == A10_SEM_53_POPULATION:
+            if mode != "planner_only":
+                raise D5StaticPreflightError("A10 population requires planner-only mode")
+            cases = _load_a10_planner_population(self.repo_root)
+            gold_cases = {item["turn_id"]: item for item in cases}
+            population_ids = tuple(item["turn_id"] for item in cases)
         else:
             raise D5StaticPreflightError("unknown population")
         selected_ids = tuple(str(turn_id) for turn_id in (turn_ids or population_ids))
@@ -6224,6 +6524,17 @@ class D5CampaignRunner:
             != _authorized_artifact_root(self.repo_root, self.authorization)
         ):
             raise D5StaticPreflightError("artifact root is not authorized")
+        selected_cases = [case for case in cases if case["turn_id"] in selected_ids]
+        if tuple(case["turn_id"] for case in selected_cases) != selected_ids:
+            raise D5StaticPreflightError("selected turn population drifted")
+        logical_ceiling = (
+            len(selected_ids) * MAX_PLANNER_LOGICAL_CALLS if mode == "planner_only" else None
+        )
+        physical_ceiling = (
+            logical_ceiling * (1 + self.authorization.sdk_max_retries)
+            if logical_ceiling is not None
+            else None
+        )
         self._started = True
         custody = D5CampaignCustody.prepare(
             self.paths,
@@ -6233,6 +6544,8 @@ class D5CampaignRunner:
             live=self.readiness.live,
             endpoint_call_count=len(self.readiness.endpoint_calls),
             mode=mode,
+            logical_call_ceiling=logical_ceiling,
+            physical_attempt_ceiling=physical_ceiling,
         )
         custody.require_physical_observer = bool(
             getattr(adapter, "observes_physical_attempts", False)
@@ -6252,11 +6565,12 @@ class D5CampaignRunner:
                 adapter.bind_model_io(custody.record_model_io)
             if callable(getattr(adapter, "bind_worker_diagnostic", None)):
                 adapter.bind_worker_diagnostic(custody.record_worker_diagnostic)
-            selected_cases = [case for case in cases if case["turn_id"] in selected_ids]
-            if tuple(case["turn_id"] for case in selected_cases) != selected_ids:
-                raise D5StaticPreflightError("selected turn population drifted")
             execute_turn = getattr(adapter, "execute_turn", None)
-            if not callable(execute_turn):
+            execute_planner_case = getattr(adapter, "execute_planner_case", None)
+            if mode == "planner_only":
+                if not callable(execute_planner_case):
+                    raise D5ProductionFailure("adapter has no canonical execute_planner_case")
+            elif not callable(execute_turn):
                 raise D5ProductionFailure("adapter has no canonical execute_turn")
             for execution_index, case in enumerate(selected_cases, start=1):
                 custody.begin_turn(str(case["turn_id"]))
@@ -6266,8 +6580,33 @@ class D5CampaignRunner:
                 cursor = int(getattr(adapter, "logical_call_count", 0))
                 physical_cursor = custody.ledger.physical_attempts
                 started = time.perf_counter()
-                actual = await execute_turn(case, expected)
+                actual = (
+                    await execute_planner_case(case)
+                    if mode == "planner_only"
+                    else await execute_turn(case, expected)
+                )
+                if mode == "planner_only":
+                    for event in adapter.consume_planner_trace_events():
+                        custody.record_planner_observability(event)
                 observed_failure = _classify_logical_call_failure(custody.ledger.calls[cursor:])
+                if mode == "planner_only":
+                    calls = int(getattr(adapter, "logical_call_count", 0)) - cursor
+                    row = _bounded_planner_observation_row(
+                        case,
+                        actual,
+                        execution_index=execution_index,
+                        call_count=calls,
+                        physical_attempt_count=custody.ledger.physical_attempts - physical_cursor,
+                        provider=self.authorization.provider,
+                        model=self.authorization.model,
+                    )
+                    row["duration_seconds"] = round(time.perf_counter() - started, 6)
+                    if observed_failure is not None:
+                        row["observation_status"] = "PROVIDER_FAILURE"
+                        row["failure_category"] = observed_failure[1]
+                    custody.append_turn(row)
+                    rows.append(row)
+                    continue
                 grade = (
                     {"status": "INCONCLUSIVE", "errors": [], "verifier_requirements": []}
                     if observed_failure is not None
@@ -6309,7 +6648,19 @@ class D5CampaignRunner:
             provider_attributions = [
                 str(row["attribution"]) for row in rows if row.get("attribution") is not None
             ]
-            if provider_attributions:
+            if mode == "planner_only":
+                provider_attributions = [
+                    str(row["failure_category"])
+                    for row in rows
+                    if row.get("observation_status") == "PROVIDER_FAILURE"
+                ]
+                if provider_attributions:
+                    decision, attribution = "INCONCLUSIVE", provider_attributions[0]
+                elif len(rows) != len(selected_ids):
+                    decision, attribution = "INCONCLUSIVE", "POPULATION_INCOMPLETE"
+                else:
+                    decision, attribution = "PASS", "OBSERVATION_COLLECTION"
+            elif provider_attributions:
                 decision, attribution = "INCONCLUSIVE", provider_attributions[0]
             elif any(row.get("failure_category") in _HOST_FAILURE_CATEGORIES for row in rows):
                 decision, attribution = (
@@ -6427,6 +6778,31 @@ class D5CampaignRunner:
         }
 
 
+def _default_a10_static_checks(
+    repo_root: Path,
+    authorization: D5Authorization,
+    artifact_paths: EvidencePaths,
+) -> dict[str, Any]:
+    """Run canonical static checks for the authenticated A10 population."""
+    if authorization.planner_population != A10_SEM_53_POPULATION:
+        raise D5StaticPreflightError("A10 planner population authority drifted")
+    if authorization.planner_population_benchmark_sha256 != A10_SEM_53_BENCHMARK_SHA256:
+        raise D5StaticPreflightError("A10 benchmark authority drifted")
+    if (
+        authorization.planner_population_source_inventory_sha256
+        != A10_SEM_53_SOURCE_INVENTORY_SHA256
+    ):
+        raise D5StaticPreflightError("A10 source inventory authority drifted")
+    return _default_smoke_static_checks(
+        repo_root,
+        authorization,
+        artifact_paths,
+        expected_worktree_porcelain=authorization.expected_worktree_porcelain or None,
+        expected_schema_sha256=_planner_wire_schema_sha256(),
+        mode="canonical_planner_only_smoke",
+    )
+
+
 def provider_free_preflight(
     repo_root: Path,
     authorization: D5Authorization,
@@ -6442,9 +6818,22 @@ def provider_free_preflight(
         raise D5StaticPreflightError("project configuration fingerprint mismatch")
     if population == "final":
         final_population.load_final_population(repo_root)
+    elif population == A10_SEM_53_POPULATION:
+        if (
+            authorization.planner_population != A10_SEM_53_POPULATION
+            or authorization.planner_population_benchmark_sha256 != A10_SEM_53_BENCHMARK_SHA256
+            or authorization.planner_population_source_inventory_sha256
+            != A10_SEM_53_SOURCE_INVENTORY_SHA256
+        ):
+            raise D5StaticPreflightError("A10 population authority is incomplete")
+        cases = _load_a10_planner_population(repo_root)
     elif population != "d4":
         raise D5StaticPreflightError("unknown population")
-    checker = static_checker or _default_static_checks
+    checker = static_checker or (
+        _default_a10_static_checks
+        if population == A10_SEM_53_POPULATION
+        else _default_static_checks
+    )
     facts = checker(repo_root, authorization, paths)
     if facts.get("status") != "PASS":
         raise D5StaticPreflightError("provider-free static preflight failed")
@@ -6457,15 +6846,37 @@ def provider_free_preflight(
         "accepted_d5_design_checkpoint": D5_DESIGN_CHECKPOINT,
         "accepted_h_implementation_checkpoint": D5I_ACCEPTED_H_IMPLEMENTATION_CHECKPOINT,
         "population": {
-            "turns": len(FROZEN_TURN_IDS)
-            if population == "d4"
-            else len(final_population.FINAL_TURN_IDS),
-            "turn_ids": list(
-                FROZEN_TURN_IDS if population == "d4" else final_population.FINAL_TURN_IDS
+            "turns": (
+                len(FROZEN_TURN_IDS)
+                if population == "d4"
+                else len(final_population.FINAL_TURN_IDS)
+                if population == "final"
+                else len(cases)
+            ),
+            "turn_ids": (
+                list(FROZEN_TURN_IDS)
+                if population == "d4"
+                else list(final_population.FINAL_TURN_IDS)
+                if population == "final"
+                else [case["turn_id"] for case in cases]
+            ),
+            "benchmark_sha256": (
+                A10_SEM_53_BENCHMARK_SHA256 if population == A10_SEM_53_POPULATION else None
+            ),
+            "source_inventory_sha256": (
+                A10_SEM_53_SOURCE_INVENTORY_SHA256 if population == A10_SEM_53_POPULATION else None
             ),
         },
-        "logical_call_ceiling": MAX_LOGICAL_CALLS,
-        "physical_attempt_upper_bound": MAX_PHYSICAL_ATTEMPTS,
+        "logical_call_ceiling": (
+            len(cases) * MAX_PLANNER_LOGICAL_CALLS
+            if population == A10_SEM_53_POPULATION
+            else MAX_LOGICAL_CALLS
+        ),
+        "physical_attempt_upper_bound": (
+            len(cases) * MAX_PLANNER_LOGICAL_CALLS * (1 + EXPECTED_SDK_MAX_RETRIES)
+            if population == A10_SEM_53_POPULATION
+            else MAX_PHYSICAL_ATTEMPTS
+        ),
         "role_logical_call_limits": dict(ROLE_LOGICAL_CALL_LIMITS),
         "scientific_terminals": sorted(D5I_SCIENTIFIC_TERMINALS),
         "first_divergences": sorted(D5I_FIRST_DIVERGENCES),
@@ -6511,7 +6922,11 @@ def main() -> int:
     modes.add_argument("--execute-planner-smoke", action="store_true")
     modes.add_argument("--execute-schema-behavior-probe", action="store_true")
     modes.add_argument("--execute-live", action="store_true")
-    parser.add_argument("--population", choices=("d4", "final"), default="d4")
+    parser.add_argument(
+        "--population",
+        choices=("d4", "final", A10_SEM_53_POPULATION),
+        default="d4",
+    )
     parser.add_argument("--artifact-root", type=Path)
     parser.add_argument("--authorization-json", type=Path, required=True)
     parser.add_argument(
@@ -6566,6 +6981,7 @@ def main() -> int:
                 authorization=authorization,
                 artifact_root=artifact_root,
                 population=args.population,
+                mode=("planner_only" if args.population == A10_SEM_53_POPULATION else "scientific"),
             )
         except D5ReadinessError as error:
             print(json.dumps(_readiness_failure_result(error), indent=2, sort_keys=True))
