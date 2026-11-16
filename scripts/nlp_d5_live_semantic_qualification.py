@@ -980,6 +980,7 @@ def _default_smoke_static_checks(
     expected_worktree_porcelain: str | None = None,
     expected_schema_sha256: str = SMOKE_SCHEMA_SHA256,
     mode: str = "canonical_live_smoke",
+    expected_sdk_max_retries: int = EXPECTED_SDK_MAX_RETRIES,
 ) -> dict[str, Any]:
     """Validate smoke custody without loading scientific cases or sources."""
     current = _git(repo_root, "rev-parse", "HEAD")
@@ -1005,7 +1006,7 @@ def _default_smoke_static_checks(
         raise D5StaticPreflightError("invalid section action capture mode")
     if authorization.sdk_version != EXPECTED_OPENAI_VERSION:
         raise D5StaticPreflightError("OpenAI package contract drifted")
-    if authorization.sdk_max_retries != EXPECTED_SDK_MAX_RETRIES:
+    if authorization.sdk_max_retries != expected_sdk_max_retries:
         raise D5StaticPreflightError("SDK retry contract drifted")
     version, retries = _inspect_openai_sdk()
     if authorization.structured_output_contract != EXPECTED_STRUCTURED_OUTPUT:
@@ -1039,6 +1040,7 @@ def _default_smoke_static_checks(
         "model": authorization.model,
         "sdk_version": version,
         "sdk_max_retries": retries,
+        "effective_sdk_max_retries": authorization.sdk_max_retries,
         "structured_output_contract": authorization.structured_output_contract,
         "thinking_control_mechanism": THINKING_CONTROL_MECHANISM,
         "thinking_control_options_sha256": THINKING_CONTROL_OPTIONS_SHA256,
@@ -3586,6 +3588,16 @@ class D5CampaignCustody:
             }
         )
         _atomic_json(self.paths.state, self.state)
+        planner_observability_digests: dict[str, str] = {}
+        if self.mode == "planner_only":
+            # An empty planner-wire file is valid when no response passed the
+            # wire boundary; both planner custody files still need a bound hash.
+            self.paths.planner_wire.touch(exist_ok=True)
+            self.paths.stage_trace.touch(exist_ok=True)
+            planner_observability_digests = {
+                "planner_wire_sha256": _sha256_file(self.paths.planner_wire),
+                "stage_trace_sha256": _sha256_file(self.paths.stage_trace),
+            }
         if not self.paths.evidence.exists():
             self.paths.evidence.touch()
         evidence_digest = (
@@ -3619,6 +3631,7 @@ class D5CampaignCustody:
         }
         if model_io_digest is not None:
             terminal["model_io_sha256"] = model_io_digest
+        terminal.update(planner_observability_digests)
         _atomic_json(self.paths.terminal, terminal, exclusive=True)
         summary = {
             "experiment_version": D5_EXPERIMENT_VERSION,
@@ -3639,13 +3652,14 @@ class D5CampaignCustody:
         }
         if model_io_digest is not None:
             summary["model_io_sha256"] = model_io_digest
+        summary.update(planner_observability_digests)
         _atomic_json(self.paths.summary, summary, exclusive=True)
         self._terminal_written = True
         return terminal
 
 
 def verify_custody_artifacts(paths: EvidencePaths) -> dict[str, str]:
-    """Recompute old five-file or new six-file custody without mutation."""
+    """Recompute campaign custody, including planner-only observability when present."""
     required = (paths.state, paths.journal, paths.terminal, paths.summary, paths.evidence)
     if not all(path.is_file() for path in required):
         raise D5HarnessError("custody artifact set is incomplete")
@@ -3686,6 +3700,18 @@ def verify_custody_artifacts(paths: EvidencePaths) -> dict[str, str]:
         raise D5HarnessError("terminal evidence digest mismatch")
     if summary.get("terminal_sha256") != digests["terminal_sha256"]:
         raise D5HarnessError("summary terminal digest mismatch")
+    if state.get("mode") == "planner_only":
+        planner_paths = (paths.planner_wire, paths.stage_trace)
+        if not all(path.is_file() for path in planner_paths):
+            raise D5HarnessError("planner observability artifact set is incomplete")
+        planner_digests = {
+            "planner_wire_sha256": _sha256_file(paths.planner_wire),
+            "stage_trace_sha256": _sha256_file(paths.stage_trace),
+        }
+        for key, digest in planner_digests.items():
+            if terminal.get(key) != digest or summary.get(key) != digest:
+                raise D5HarnessError(f"planner observability digest mismatch: {key}")
+        digests.update(planner_digests)
     return digests
 
 
@@ -4311,19 +4337,15 @@ class _ObservedLiveAdapter:
                 "numeric_sample_apis_invoked": context["numeric_sample_apis_invoked"],
             }
         except ProviderRequestError as error:
+            if error.category is not ProviderFailureCategory.INVALID_RESPONSE:
+                raise
             return {
-                "observation_status": "PROVIDER_FAILURE",
+                "observation_status": "MODEL_STRUCTURAL_FAILURE",
                 "schema_valid": False,
-                "failure_category": error.category.value,
-                "source_asset_identity": context["source_asset_identity"],
-                "source_channel_count": context["source_channel_count"],
-                "numeric_sample_apis_invoked": context["numeric_sample_apis_invoked"],
-            }
-        except Exception as error:
-            return {
-                "observation_status": "PLANNER_FAILURE",
-                "schema_valid": False,
-                "failure_category": type(error).__name__,
+                "failure_category": "MODEL_STRUCTURAL_INVALID_RESPONSE",
+                "provider_response_reason": getattr(
+                    getattr(error, "response_reason", None), "value", None
+                ),
                 "source_asset_identity": context["source_asset_identity"],
                 "source_channel_count": context["source_channel_count"],
                 "numeric_sample_apis_invoked": context["numeric_sample_apis_invoked"],
@@ -4539,6 +4561,7 @@ def execute_live_campaign(
             project_config=project_config,
             request_options=authorization.thinking_control_options,
             require_thinking_control=True,
+            max_retries_override=authorization.sdk_max_retries,
         )
     )
     readiness = prepare_readiness(
@@ -5989,7 +6012,7 @@ def _bounded_planner_observation_row(
     """Record planner observations without assigning semantic correctness."""
     observation_status = str(actual.get("observation_status", "PLANNER_FAILURE"))
     schema_valid = actual.get("schema_valid") is True
-    if observation_status == "PROVIDER_FAILURE":
+    if observation_status in {"PROVIDER_FAILURE", "MODEL_STRUCTURAL_FAILURE"}:
         first_divergence = "PROVIDER_OR_STRUCTURED"
     elif observation_status == "PLANNER_FAILURE":
         first_divergence = "PLANNER_STRUCTURAL"
@@ -6022,9 +6045,14 @@ def _bounded_planner_observation_row(
             "native_correction": max(call_count - 1, 0),
         },
         "failure_category": actual.get("failure_category"),
+        "provider_response_reason": actual.get("provider_response_reason"),
         "first_divergence": first_divergence,
         "evidence_dimensions": {
-            "provider_structured": "PASS" if observation_status != "PROVIDER_FAILURE" else "FAIL",
+            "provider_structured": (
+                "FAIL"
+                if observation_status in {"PROVIDER_FAILURE", "MODEL_STRUCTURAL_FAILURE"}
+                else "PASS"
+            ),
             "planner_structural": "PASS" if schema_valid else "FAIL",
             "semantic": "NOT_ESTABLISHED",
             "target_grounding": "NOT_ESTABLISHED",
@@ -6126,6 +6154,10 @@ def _classify_logical_call_failure(
 
 def _classify_exception(error: Exception) -> tuple[str, str]:
     """Map bounded post-STARTED failures without exposing exception text."""
+    if isinstance(error, ProviderRequestError):
+        if error.category is ProviderFailureCategory.INVALID_RESPONSE:
+            return "INCONCLUSIVE", "PROVIDER_BOUNDARY / STRUCTURED_OUTPUT"
+        return "INCONCLUSIVE", "PROVIDER_OR_TRANSPORT_RUNTIME"
     if isinstance(error, D5StructuredOutputRejected):
         return "INCONCLUSIVE", "PROVIDER_BOUNDARY / STRUCTURED_OUTPUT"
     if isinstance(error, (D5TransportFailure, TimeoutError, OSError)):
@@ -6143,7 +6175,9 @@ def _classify_exception(error: Exception) -> tuple[str, str]:
 
 def _first_divergence_for_exception(error: Exception) -> str:
     """Map a post-STARTED exception to the earliest bounded evidence layer."""
-    if isinstance(error, (D5StructuredOutputRejected, D5TransportFailure, TimeoutError)):
+    if isinstance(
+        error, (ProviderRequestError, D5StructuredOutputRejected, D5TransportFailure, TimeoutError)
+    ):
         return "PROVIDER_OR_STRUCTURED"
     return "HARNESS"
 
@@ -6601,9 +6635,14 @@ class D5CampaignRunner:
                         model=self.authorization.model,
                     )
                     row["duration_seconds"] = round(time.perf_counter() - started, 6)
-                    if observed_failure is not None:
+                    if (
+                        observed_failure is not None
+                        and actual.get("observation_status") != "MODEL_STRUCTURAL_FAILURE"
+                    ):
                         row["observation_status"] = "PROVIDER_FAILURE"
                         row["failure_category"] = observed_failure[1]
+                    if campaign_first_divergence == "NONE":
+                        campaign_first_divergence = str(row["first_divergence"])
                     custody.append_turn(row)
                     rows.append(row)
                     continue
@@ -6800,6 +6839,7 @@ def _default_a10_static_checks(
         expected_worktree_porcelain=authorization.expected_worktree_porcelain or None,
         expected_schema_sha256=_planner_wire_schema_sha256(),
         mode="canonical_planner_only_smoke",
+        expected_sdk_max_retries=0,
     )
 
 
@@ -6826,6 +6866,8 @@ def provider_free_preflight(
             != A10_SEM_53_SOURCE_INVENTORY_SHA256
         ):
             raise D5StaticPreflightError("A10 population authority is incomplete")
+        if authorization.sdk_max_retries != 0:
+            raise D5StaticPreflightError("A10 planner population requires zero SDK retries")
         cases = _load_a10_planner_population(repo_root)
     elif population != "d4":
         raise D5StaticPreflightError("unknown population")
@@ -6873,7 +6915,7 @@ def provider_free_preflight(
             else MAX_LOGICAL_CALLS
         ),
         "physical_attempt_upper_bound": (
-            len(cases) * MAX_PLANNER_LOGICAL_CALLS * (1 + EXPECTED_SDK_MAX_RETRIES)
+            len(cases) * MAX_PLANNER_LOGICAL_CALLS * (1 + authorization.sdk_max_retries)
             if population == A10_SEM_53_POPULATION
             else MAX_PHYSICAL_ATTEMPTS
         ),

@@ -1,6 +1,6 @@
 # A10-SEM-53 Canonical Measurement Qualification
 
-Status: `A10_SEM_53_CANONICAL_MEASUREMENT_HANDOFF — HA_REVIEW_REQUIRED`
+Status: `A10_SEM_53_CANONICAL_MEASUREMENT_R1_READY — HA_REVIEW_REQUIRED`
 
 This record covers a provider-free implementation that makes the accepted
 frozen 53-case A10 planner population available through the existing D5
@@ -18,7 +18,8 @@ holdout data, or make a planner-quality claim.
 - Diagnostic case: `B01`, retained as an explicitly identified exposed case.
 - Maximum logical planner calls: `106` (one initial generation plus one
   native correction per case).
-- Maximum physical attempts: `318` under the existing SDK retry ceiling.
+- Maximum physical attempts: `106`; A10 pins the existing adapter to zero SDK
+  retries.
 
 The benchmark and source inventory are authenticated before campaign setup.
 Each case validates its source path, format and host-computed source digest.
@@ -87,6 +88,45 @@ position and diagnostic identity, enforce the planner-only call ceilings, use
 the shared `D5CampaignRunner`, and keep semantic status unestablished. The
 existing planner-only custody tests cover the stop-at-wire boundary and
 fail-closed provider-free behavior.
+
+## R1 Measurement-Integrity Corrective
+
+R1 preserves the same canonical path and makes four bounded corrections:
+
+- A10 authorizations require `sdk_max_retries=0`; the existing adapter receives
+  that override, and the 53-case physical ceiling is `106` rather than being
+  expanded by the general D4/D5 retry default.
+- Only final `INVALID_RESPONSE` provider results are recorded as model
+  structural observations. Runtime, call-cap, custody and unexpected failures
+  propagate to the existing campaign terminal and stop further cases.
+- Planner-wire and stage-trace files are bound by SHA-256 in the existing
+  campaign terminal and verified by `verify_custody_artifacts()`. An empty
+  planner-wire file is valid when no response crossed the wire boundary, but
+  its bound artifact must still exist.
+- The direct observed-adapter regression exercises the production
+  `SemanticPlanner` boundary with a provider double.
+
+R1 qualification:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m pytest -q \
+  tests/test_a10_semantic_corpus_adapter.py \
+  tests/test_nlp_d5_live_semantic_qualification.py
+```
+
+Result: `166 passed in 29.61s`.
+
+Targeted R1 selection: `6 passed`.
+
+R1 static checks:
+
+- Ruff check: PASS;
+- Ruff format check: PASS;
+- Python compilation: PASS;
+- `git diff --check`: PASS;
+- single-engine attestation: PASS;
+- provider/model/endpoint calls: `0`;
+- live smoke, 53-case benchmark and holdout access: not run.
 
 ## Changed files
 

@@ -109,6 +109,7 @@ def _a10_authorization(*, campaign_id: str, artifact_root: str) -> d5.D5Authoriz
     authorization = _authorization(campaign_id=campaign_id, artifact_root=artifact_root)
     return replace(
         authorization,
+        sdk_max_retries=0,
         planner_population=d5.A10_SEM_53_POPULATION,
         planner_population_benchmark_sha256=d5.A10_SEM_53_BENCHMARK_SHA256,
         planner_population_source_inventory_sha256=d5.A10_SEM_53_SOURCE_INVENTORY_SHA256,
@@ -306,7 +307,14 @@ class _ProviderFreePlannerPopulationAdapter:
 
     logical_call_count = 0
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        observation_status: str = "SCHEMA_VALID_WIRE_CAPTURED",
+        calls_per_case: int = 1,
+    ) -> None:
+        self.observation_status = observation_status
+        self.calls_per_case = calls_per_case
         self._call_started: Callable[[dict[str, object]], None] | None = None
         self._call_completed: Callable[[dict[str, object]], None] | None = None
         self._physical_attempt: Callable[[int], None] | None = None
@@ -339,54 +347,58 @@ class _ProviderFreePlannerPopulationAdapter:
         return True
 
     async def execute_planner_case(self, case: dict[str, object]) -> dict[str, object]:
-        self.logical_call_count += 1
-        index = self.logical_call_count
-        if self._call_started is not None:
-            self._call_started(
-                {
-                    "event": "logical_call_started",
-                    "index": index,
-                    "generation_role": "planner",
-                    "provider": d5.EXPECTED_PROVIDER,
-                    "model": d5.EXPECTED_MODEL,
-                }
-            )
-        if self._physical_attempt is not None:
-            self._physical_attempt(index)
-        if self._model_io is not None:
-            self._model_io(
-                {
-                    "event": "physical_request",
-                    "logical_call_index": index,
-                    "role": "planner",
-                    "model": d5.EXPECTED_MODEL,
-                    "physical_attempt": 1,
-                    "request_sha256": "a" * 64,
-                    "response_sha256": "b" * 64,
-                }
-            )
-        self._trace_events.append(
-            {
-                "event": "PLANNER_GENERATION_PASS",
-                "attempt": 1,
-                "response_schema": "_PlannerWirePlan",
-                "validated_response": {},
-            }
-        )
-        if self._call_completed is not None:
-            self._call_completed(
-                {
-                    "event": "logical_call_completed",
-                    "index": index,
-                    "generation_role": "planner",
-                    "provider": d5.EXPECTED_PROVIDER,
-                    "model": d5.EXPECTED_MODEL,
-                    "outcome": "success",
-                }
-            )
+        for attempt in range(1, self.calls_per_case + 1):
+            self.logical_call_count += 1
+            index = self.logical_call_count
+            if self._call_started is not None:
+                self._call_started(
+                    {
+                        "event": "logical_call_started",
+                        "index": index,
+                        "generation_role": "planner",
+                        "provider": d5.EXPECTED_PROVIDER,
+                        "model": d5.EXPECTED_MODEL,
+                    }
+                )
+            if self._physical_attempt is not None:
+                self._physical_attempt(index)
+            if self._model_io is not None:
+                self._model_io(
+                    {
+                        "event": "physical_request",
+                        "logical_call_index": index,
+                        "role": "planner",
+                        "model": d5.EXPECTED_MODEL,
+                        "physical_attempt": 1,
+                        "request_sha256": "a" * 64,
+                        "response_sha256": "b" * 64,
+                    }
+                )
+            is_success = self.observation_status == "SCHEMA_VALID_WIRE_CAPTURED"
+            if is_success:
+                self._trace_events.append(
+                    {
+                        "event": "PLANNER_GENERATION_PASS",
+                        "attempt": attempt,
+                        "response_schema": "_PlannerWirePlan",
+                        "validated_response": {},
+                    }
+                )
+            if self._call_completed is not None:
+                self._call_completed(
+                    {
+                        "event": "logical_call_completed",
+                        "index": index,
+                        "generation_role": "planner",
+                        "provider": d5.EXPECTED_PROVIDER,
+                        "model": d5.EXPECTED_MODEL,
+                        "outcome": "success" if is_success else "failure",
+                        "failure_category": None if is_success else "invalid_response",
+                    }
+                )
         return {
-            "observation_status": "SCHEMA_VALID_WIRE_CAPTURED",
-            "schema_valid": True,
+            "observation_status": self.observation_status,
+            "schema_valid": self.observation_status == "SCHEMA_VALID_WIRE_CAPTURED",
             "source_asset_identity": {
                 "asset_id": case["source_key"],
                 "relative_path": case["source_path"],
@@ -416,9 +428,18 @@ def test_a10_population_is_authenticated_and_provider_free(tmp_path: Path) -> No
     assert result["population"]["turns"] == 53
     assert result["population"]["turn_ids"][8] == "A10-SEM-53:B01"
     assert result["logical_call_ceiling"] == 106
-    assert result["physical_attempt_upper_bound"] == 318
+    assert result["physical_attempt_upper_bound"] == 106
     assert result["provider_calls"] == 0
     assert result["model_calls"] == 0
+
+    with pytest.raises(d5.D5StaticPreflightError, match="zero SDK retries"):
+        d5.provider_free_preflight(
+            REPO_ROOT,
+            replace(authorization, sdk_max_retries=1),
+            _paths(tmp_path, "a10-population-nonzero-retry"),
+            static_checker=lambda repo, checked, paths: {"status": "PASS"},
+            population=d5.A10_SEM_53_POPULATION,
+        )
 
 
 def test_a10_campaign_uses_shared_runner_without_semantic_scoring(tmp_path: Path) -> None:
@@ -449,10 +470,188 @@ def test_a10_campaign_uses_shared_runner_without_semantic_scoring(tmp_path: Path
     assert result["logical_generation_calls"] == 53
     assert result["physical_generation_attempts"] == 53
     assert result["terminal"]["scientific_terminal"] is None
+    state = json.loads(
+        _paths(tmp_path, authorization.campaign_id).state.read_text(encoding="utf-8")
+    )
+    assert state["physical_attempt_upper_bound"] == 106
     assert all(row["semantic_status"] == "NOT_ESTABLISHED" for row in result["rows"])
     b01 = next(row for row in result["rows"] if row["case_id"] == "B01")
     assert b01["diagnostic_case"] is True
     assert b01["first_divergence"] == "NONE"
+
+
+def test_a10_invalid_after_correction_is_a_structural_observation(tmp_path: Path) -> None:
+    """A final invalid response is measured without becoming infrastructure failure."""
+    authorization = _a10_authorization(
+        campaign_id="a10-structural-observation",
+        artifact_root=str(tmp_path / "evidence"),
+    )
+    adapter = _ProviderFreePlannerPopulationAdapter(
+        observation_status="MODEL_STRUCTURAL_FAILURE",
+        calls_per_case=2,
+    )
+    runner = d5.D5CampaignRunner(
+        repo_root=REPO_ROOT,
+        authorization=authorization,
+        paths=_paths(tmp_path, authorization.campaign_id),
+        readiness=_ready(),
+        provenance={"population": d5.A10_SEM_53_POPULATION},
+    )
+    result = asyncio.run(
+        runner.run(
+            adapter,
+            mode="planner_only",
+            population=d5.A10_SEM_53_POPULATION,
+            turn_ids=("A10-SEM-53:A01",),
+        )
+    )
+    row = result["rows"][0]
+    assert result["decision"] == "PASS"
+    assert row["observation_status"] == "MODEL_STRUCTURAL_FAILURE"
+    assert row["correction_usage"]["native_correction"] == 1
+    assert row["first_divergence"] == "PROVIDER_OR_STRUCTURED"
+    assert result["terminal"]["planner_wire_sha256"]
+    assert d5.verify_custody_artifacts(_paths(tmp_path, authorization.campaign_id))[
+        "stage_trace_sha256"
+    ]
+
+
+def test_a10_infrastructure_interruption_reaches_campaign_terminal(tmp_path: Path) -> None:
+    """A call-cap interruption stops the population and seals an inconclusive terminal."""
+    authorization = _a10_authorization(
+        campaign_id="a10-call-cap-interruption",
+        artifact_root=str(tmp_path / "evidence"),
+    )
+    adapter = _ProviderFreePlannerPopulationAdapter()
+    original_execute = adapter.execute_planner_case
+
+    async def interrupt_after_first(case: dict[str, object]) -> dict[str, object]:
+        if adapter.logical_call_count >= 1:
+            raise d5.D5CallCapExceeded("test call cap")
+        return await original_execute(case)
+
+    adapter.execute_planner_case = interrupt_after_first  # type: ignore[method-assign]
+    runner = d5.D5CampaignRunner(
+        repo_root=REPO_ROOT,
+        authorization=authorization,
+        paths=_paths(tmp_path, authorization.campaign_id),
+        readiness=_ready(),
+        provenance={"population": d5.A10_SEM_53_POPULATION},
+    )
+    result = asyncio.run(
+        runner.run(
+            adapter,
+            mode="planner_only",
+            population=d5.A10_SEM_53_POPULATION,
+            turn_ids=("A10-SEM-53:A01", "A10-SEM-53:A02"),
+        )
+    )
+    assert result["decision"] == "INCONCLUSIVE"
+    assert result["attribution"] == "CALL_CAP_EXCEEDED"
+    assert result["completed_turns"] == 1
+    assert len(result["rows"]) == 1
+
+
+def test_a10_planner_observability_is_bound_and_tamper_evident(tmp_path: Path) -> None:
+    """Planner evidence is required after sealing and corruption is rejected."""
+    authorization = _a10_authorization(
+        campaign_id="a10-observability-integrity",
+        artifact_root=str(tmp_path / "evidence"),
+    )
+    paths = _paths(tmp_path, authorization.campaign_id)
+    custody = d5.D5CampaignCustody.prepare(
+        paths,
+        authorization=authorization,
+        provenance={"population": d5.A10_SEM_53_POPULATION},
+        readiness=_ready().projection,
+        mode="planner_only",
+        logical_call_ceiling=2,
+        physical_attempt_ceiling=2,
+    )
+    custody.record_call_started(
+        {
+            "event": "logical_call_started",
+            "index": 1,
+            "generation_role": "planner",
+            "provider": d5.EXPECTED_PROVIDER,
+            "model": d5.EXPECTED_MODEL,
+        }
+    )
+    custody.record_call_completed(
+        {
+            "event": "logical_call_completed",
+            "index": 1,
+            "generation_role": "planner",
+            "provider": d5.EXPECTED_PROVIDER,
+            "model": d5.EXPECTED_MODEL,
+            "outcome": "success",
+        }
+    )
+    custody.finish("PASS", attribution="OBSERVATION_COLLECTION", rows=[])
+    d5.verify_custody_artifacts(paths)
+    assert paths.planner_wire.read_text(encoding="utf-8") == ""
+
+    paths.planner_wire.write_text("corrupted\n", encoding="utf-8")
+    with pytest.raises(d5.D5HarnessError, match="planner observability digest mismatch"):
+        d5.verify_custody_artifacts(paths)
+    paths.planner_wire.write_text("", encoding="utf-8")
+    d5.verify_custody_artifacts(paths)
+    paths.stage_trace.unlink()
+    with pytest.raises(d5.D5HarnessError, match="planner observability artifact set is incomplete"):
+        d5.verify_custody_artifacts(paths)
+
+
+def test_observed_live_adapter_stops_at_the_canonical_wire_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The real observed adapter invokes SemanticPlanner and stops before lowering."""
+    backend = _PlannerOnlyBackend(payload=_planner_wire_payload())
+    adapter_ref: dict[str, d5._ObservedLiveAdapter] = {}
+
+    def trace(event: dict[str, object]) -> None:
+        adapter = adapter_ref["adapter"]
+        adapter._trace_events.append(dict(event))
+        if adapter._stop_after_wire and event.get("event") == "PLANNER_GENERATION_PASS":
+            raise d5._PlannerOnlyWireCaptured
+
+    planner = SemanticPlanner(
+        backend=backend,
+        registry=create_builtin_registry(),
+        trace_callback=trace,
+    )
+    session = SimpleNamespace(
+        compiler=SimpleNamespace(dependencies=SimpleNamespace(planner=planner)),
+        config=SimpleNamespace(
+            timeout_seconds=5.0,
+            planner_temperature=0.0,
+            max_output_tokens=None,
+        ),
+    )
+    inner = SimpleNamespace(
+        repo_root=REPO_ROOT,
+        session=SimpleNamespace(session=session),
+    )
+    adapter = d5._ObservedLiveAdapter(inner, d5._PhysicalAttemptObserver())
+    adapter_ref["adapter"] = adapter
+    monkeypatch.setattr(
+        d5,
+        "_build_planner_smoke_inputs",
+        lambda _repo_root, _case: {
+            "document_summary": {},
+            "source_summary": {"version": "test", "sources": []},
+            "source_asset_identity": {"asset_id": "test-source", "sha256": "a" * 64},
+            "source_channel_count": 3,
+            "numeric_sample_apis_invoked": False,
+        },
+    )
+
+    result = asyncio.run(
+        adapter.execute_planner_case({"turn_id": "A10-SEM-53:A01", "request": "Plot Gamma Ray."})
+    )
+    assert result["observation_status"] == "SCHEMA_VALID_WIRE_CAPTURED"
+    assert backend.response_models == [_PlannerWirePlan]
+    events = adapter.consume_planner_trace_events()
+    assert any(event["event"] == "PLANNER_GENERATION_PASS" for event in events)
 
 
 def test_provider_free_preflight_is_network_free_and_fail_closed() -> None:
