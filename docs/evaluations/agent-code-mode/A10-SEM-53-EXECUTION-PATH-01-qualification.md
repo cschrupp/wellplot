@@ -1,10 +1,9 @@
 # A10 53-Case Execution Path Qualification
 
-Status: `A10_SEM_53_EXECUTION_PATH_01_CANDIDATE_READY — HA_REVIEW_REQUIRED`
+Status: `A10_SEM_53_EXECUTION_PATH_01R1_READY — HA_REVIEW_REQUIRED`
 
-This record covers the provider-free implementation of the accepted frozen
-53-case A10 semantic planner evaluation path. It does not execute the live
-evaluation.
+This record covers the provider-free corrective of the accepted frozen 53-case
+A10 semantic planner evaluation path. It does not execute the live evaluation.
 
 ## Scope
 
@@ -16,17 +15,22 @@ read-only corpus adapter only:
 - `tests/test_nlp_d5_live_semantic_qualification.py`
 - `tests/test_a10_semantic_corpus_adapter.py`
 
-The new mode processes the exact 53-case A10 benchmark through the existing
+The mode processes the exact 53-case A10 benchmark through the existing
 planner-only smoke boundary. Each case receives a case-scoped custody
 namespace, one initial generation plus at most one native correction, and the
 same provider construction, context preparation, structured validation and
-raw-I/O custody used by Smoke 003. It never enters workers, reconciliation,
+raw-I/O custody used by Smoke 003. A parent campaign boundary is durably
+started before delegation, updated after each case, and sealed on normal or
+caught failure termination. It never enters workers, reconciliation,
 execution, persistence or rendering.
 
 The existing historical 96-case/P8 scorer is unchanged. The A10 adapter
 validates the accepted 53-case benchmark identity and scores only frozen
-planner dimensions. Source binding, host resolution and host execution remain
-explicitly `UNSCORABLE` at this planner-only boundary.
+planner dimensions. Scoring requires exact channel tokens, operation
+verbs/kinds, operation counts, and explicit scale components where the frozen
+expectation supports them. Safe-rejection cases cannot pass with executable
+work. Source binding, host resolution and host execution remain explicitly
+`UNSCORABLE` at this planner-only boundary.
 
 ## Frozen identities
 
@@ -38,12 +42,14 @@ explicitly `UNSCORABLE` at this planner-only boundary.
   `790121ab7b75a0fd2bdd27bec83bb543d6926455297f0ae7a498c4543431f1ba`.
 - Planner wire-schema SHA-256:
   `b6b05fec2caabbc62708d17b1d752d8888e6cf7e2b91b4b67889eb583b080cbb`.
+- Each case authority carries the accepted wire-schema digest and derives its
+  source digest from the host-owned frozen source inventory before preflight.
 - Population: 53 cases, 35 production-grounded and 18 exploratory.
 - Maximum logical planner calls: 106.
 - Maximum physical generation attempts: 106.
 - SDK transport retries: disabled for the A10 mode.
 
-## Qualification
+## R1 Qualification
 
 Exact command:
 
@@ -53,7 +59,7 @@ PYTHONPATH=src .venv/bin/python -m pytest -q \
   tests/test_nlp_d5_live_semantic_qualification.py
 ```
 
-Result: `165 passed`.
+Result: `175 passed`.
 
 Additional checks:
 
@@ -64,6 +70,18 @@ Additional checks:
 - `PYTHONPATH=src .venv/bin/python scripts/d5_single_engine_attestation.py --check`: PASS.
 - Provider/model/endpoint calls: `0`.
 - Live evaluation: not run.
+
+The provider-free regressions cover all three source families, missing and
+wrong per-case authority identities, exact GR/CGR/GRD separation, operation
+kind and scale false positives, unsafe rejection plans, P/E partition metrics,
+model-structural versus infrastructure classification, exact call caps, and
+durable parent terminal custody after a caught mid-campaign interruption.
+
+The authorizing verdict is computed only from the 35 production (P) cases.
+The 18 exploratory (E) cases remain visible with independent denominators,
+structural-validity counts, correction counts, scored outcomes, unscorable
+counts, and failure classes; they cannot independently determine the
+production verdict.
 
 The adjacent CM-57P8 provider-free suite remains separate: it reports
 `209 passed, 5 failed` because its historical provider/schema/planner hashes

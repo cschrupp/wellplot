@@ -61,6 +61,41 @@ def _section_plan(
     )
 
 
+def _operations_plan(
+    operations: list[dict[str, object]], unresolved: bool = False
+) -> _PlannerWirePlan:
+    """Build a compact wire plan for scorer adversarial tests."""
+    return _PlannerWirePlan.model_validate(
+        {
+            "version": "wellplot.semantic-plan.v2",
+            "summary": "Synthetic scorer fixture",
+            "report_task": None,
+            "section_tasks": [
+                {
+                    "goal": "Synthetic section",
+                    "capability_ids": ["section.log_plot", "track.normal"],
+                    "existing_section_hint": "Main Log",
+                    "scope_ref": "main-log",
+                    "source_hints": [],
+                    "operations": operations,
+                }
+            ],
+            "unresolved_requirements": [],
+            "unresolved_semantics": (
+                [
+                    {
+                        "local_ref": "ambiguous",
+                        "scope_ref": "main-log",
+                        "question": "Which channel?",
+                    }
+                ]
+                if unresolved
+                else []
+            ),
+        }
+    )
+
+
 def test_index_preserves_all_historical_cases_and_joins_p8() -> None:
     """P8 role metadata resolves to its P7 source without copied requests."""
     index = adapter.load_corpus_index(REPO_ROOT)
@@ -186,6 +221,95 @@ def test_a10_safe_rejection_requires_declared_unresolved_semantics() -> None:
 
     assert not result.passed
     assert "safe_rejection_not_declared" in result.findings
+
+
+def test_a10_safe_rejection_with_executable_work_does_not_pass() -> None:
+    """An unresolved declaration cannot bless an executable semantic plan."""
+    case = next(case for case in adapter.load_a10_benchmark(REPO_ROOT) if case.case_id == "D01")
+    plan = _operations_plan(
+        [
+            {
+                "local_ref": "unsupported",
+                "scope_ref": "main-log",
+                "verb": "CREATE",
+                "object_kind": "track",
+                "semantic_ref": "unsupported-track",
+            }
+        ],
+        unresolved=True,
+    )
+
+    result = adapter.score_a10_plan(case, plan)
+
+    assert not result.passed
+    assert "safe_rejection_contains_executable_work" in result.findings
+
+
+def test_a10_exact_channel_matching_does_not_confuse_cgr_with_gr() -> None:
+    """Physical GR scoring must not accept the related CGR mnemonic."""
+    case = next(case for case in adapter.load_a10_benchmark(REPO_ROOT) if case.case_id == "H05")
+    plan = _operations_plan(
+        [
+            {
+                "local_ref": "gr",
+                "scope_ref": "main-log",
+                "verb": "CREATE",
+                "object_kind": "binding",
+                "semantic_ref": "gr-binding",
+                "target_clue": "CGR scalar channel",
+            }
+        ]
+    )
+
+    result = adapter.score_a10_plan(case, plan)
+
+    assert not result.passed
+    assert result.channel_clues == ("CGR",)
+    assert "physical_gr_channel_missing" in result.findings
+
+
+def test_a10_operation_kind_and_explicit_scale_are_scored() -> None:
+    """Correct channel names do not hide wrong kinds or missing scale fields."""
+    cases = adapter.load_a10_benchmark(REPO_ROOT)
+    kinds_case = next(case for case in cases if case.case_id == "F02")
+    wrong_kind = _operations_plan(
+        [
+            {
+                "local_ref": "cbl",
+                "scope_ref": "main-log",
+                "verb": "CREATE",
+                "object_kind": "binding",
+                "semantic_ref": "cbl",
+                "field_values": [{"field": "channel", "state": "SET", "value": "CBL"}],
+            },
+            {
+                "local_ref": "vdl",
+                "scope_ref": "main-log",
+                "verb": "CREATE",
+                "object_kind": "binding",
+                "semantic_ref": "vdl",
+                "field_values": [{"field": "channel", "state": "SET", "value": "VDL"}],
+            },
+        ]
+    )
+    scale_case = next(case for case in cases if case.case_id == "F04")
+    missing_scale = _operations_plan(
+        [
+            {
+                "local_ref": "cbl-track",
+                "scope_ref": "main-log",
+                "verb": "CREATE",
+                "object_kind": "track",
+                "semantic_ref": "cbl-track",
+                "target_clue": "CBL track",
+            }
+        ]
+    )
+
+    assert not adapter.score_a10_plan(kinds_case, wrong_kind).passed
+    scale_result = adapter.score_a10_plan(scale_case, missing_scale)
+    assert not scale_result.passed
+    assert "track_or_explicit_scale_missing" in scale_result.findings
 
 
 def test_p8_frozen_revision_production_closure_is_planner_only() -> None:

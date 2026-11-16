@@ -2556,6 +2556,113 @@ def test_planner_smoke_selects_only_authorized_frozen_case() -> None:
         d5._planner_smoke_case(REPO_ROOT, authorization, case_id="B01")
 
 
+@pytest.mark.parametrize(
+    ("case_id", "source_key"),
+    [("A01", "approved_las"), ("A04", "cbl_repeat_dlis"), ("C06", "cbl_main_dlis")],
+)
+def test_a10_case_authorization_preflights_each_frozen_source(
+    tmp_path: Path,
+    case_id: str,
+    source_key: str,
+) -> None:
+    """Each A10 source family reaches the real canonical smoke preflight."""
+    _require_local_d5_sources()
+    authorization = _planner_case_authorization(tmp_path, case_id)
+    selected = d5._planner_smoke_case(REPO_ROOT, authorization, case_id=case_id)
+
+    assert selected["source_key"] == source_key
+    assert selected["source_sha256"] == authorization.planner_smoke_source_sha256
+    assert selected["wire_schema_sha256"] == d5._planner_wire_schema_sha256()
+
+
+def test_a10_case_authorization_rejects_missing_or_unauthorized_identity(
+    tmp_path: Path,
+) -> None:
+    """Missing schema, wrong source digest and unsupported sources fail closed."""
+    case = a10_adapter.load_a10_benchmark(REPO_ROOT)[0]
+    base = replace(
+        _authorization(campaign_id="a10-identity", artifact_root=str(tmp_path / "a10")),
+        a10_evaluation_mode=d5.A10_PLANNER_EVALUATION_KIND,
+        a10_benchmark_sha256=a10_adapter.A10_BENCHMARK_SHA256,
+        a10_source_inventory_sha256=a10_adapter.A10_SOURCE_INVENTORY_SHA256,
+        a10_harness_sha256="a" * 64,
+        a10_sdk_max_retries=0,
+    )
+    with pytest.raises(d5.D5StaticPreflightError, match="wire-schema digest"):
+        d5._a10_case_authorization(REPO_ROOT, base, case, artifact_root=tmp_path / "missing-schema")
+
+    with pytest.raises(d5.D5StaticPreflightError, match="missing a pinned digest"):
+        d5._planner_smoke_case(
+            REPO_ROOT,
+            replace(_planner_case_authorization(tmp_path, "A01"), planner_smoke_source_sha256=""),
+            case_id="A01",
+        )
+    with pytest.raises(d5.D5StaticPreflightError, match="missing a pinned digest"):
+        d5._planner_smoke_case(
+            REPO_ROOT,
+            replace(
+                _planner_case_authorization(tmp_path, "A01"),
+                planner_smoke_wire_schema_sha256="",
+            ),
+            case_id="A01",
+        )
+
+    wrong_source = replace(
+        base,
+        a10_wire_schema_sha256=d5._planner_wire_schema_sha256(),
+        planner_smoke_source_sha256="0" * 64,
+    )
+    with pytest.raises(d5.D5StaticPreflightError, match="planner source identity"):
+        d5._planner_smoke_case(
+            REPO_ROOT,
+            replace(
+                _planner_case_authorization(tmp_path, "A01"),
+                planner_smoke_source_sha256="0" * 64,
+            ),
+            case_id="A01",
+        )
+    unsupported = replace(
+        case,
+        source="unsupported_source",
+    )
+    with pytest.raises(d5.D5StaticPreflightError, match="unsupported source key"):
+        d5._a10_case_authorization(
+            REPO_ROOT, wrong_source, unsupported, artifact_root=tmp_path / "unsupported"
+        )
+
+
+def test_a10_failure_classes_keep_model_and_infrastructure_distinct() -> None:
+    """A failed response is not reported as an environment interruption."""
+    assert (
+        d5._a10_case_failure_class(
+            "SMOKE_CONTRACT_FAIL", {"final_structured_output_status": "INVALID_AFTER_CORRECTION"}
+        )
+        == "MODEL_STRUCTURAL_FAILURE"
+    )
+    assert d5._a10_case_failure_class("SMOKE_PROVIDER_INCONCLUSIVE", {}) == (
+        "INFRASTRUCTURE_INTERRUPTION"
+    )
+
+
+def test_a10_exploratory_failure_does_not_change_production_verdict() -> None:
+    """Exploratory diagnostics remain visible but cannot authorize or fail P."""
+    cases = a10_adapter.load_a10_benchmark(REPO_ROOT)
+    rows = [
+        {
+            "case_id": case.case_id,
+            "gold": case.gold,
+            "failure_class": "PASS",
+            "score": {"passed": True},
+        }
+        for case in cases
+    ]
+    exploratory_index = next(index for index, case in enumerate(cases) if case.gold == "E")
+    rows[exploratory_index]["failure_class"] = "MODEL_STRUCTURAL_FAILURE"
+    rows[exploratory_index]["score"]["passed"] = False
+
+    assert d5._a10_aggregate_status(cases, rows) == "PASS"
+
+
 def test_a10_case_authorization_is_case_scoped_and_reuses_planner_controls(
     tmp_path: Path,
 ) -> None:
@@ -2567,10 +2674,12 @@ def test_a10_case_authorization_is_case_scoped_and_reuses_planner_controls(
         a10_benchmark_sha256=a10_adapter.A10_BENCHMARK_SHA256,
         a10_source_inventory_sha256=a10_adapter.A10_SOURCE_INVENTORY_SHA256,
         a10_harness_sha256="a" * 64,
+        a10_wire_schema_sha256=d5._planner_wire_schema_sha256(),
         a10_sdk_max_retries=0,
     )
 
     derived = d5._a10_case_authorization(
+        REPO_ROOT,
         authorization,
         case,
         artifact_root=tmp_path / "a10" / case.case_id,
@@ -2579,6 +2688,11 @@ def test_a10_case_authorization_is_case_scoped_and_reuses_planner_controls(
     assert derived.planner_smoke_mode == d5.SMOKE_PLANNER_KIND
     assert derived.planner_smoke_case_id == case.case_id
     assert derived.planner_smoke_benchmark_sha256 == authorization.a10_benchmark_sha256
+    assert (
+        derived.planner_smoke_source_sha256
+        == "7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9"
+    )
+    assert derived.planner_smoke_wire_schema_sha256 == d5._planner_wire_schema_sha256()
     assert derived.planner_smoke_sdk_max_retries == 0
     assert derived.campaign_id.endswith("-a01")
 
@@ -2594,6 +2708,7 @@ def test_a10_evaluation_orchestrates_exact_53_cases_without_provider_calls(
         a10_benchmark_sha256=a10_adapter.A10_BENCHMARK_SHA256,
         a10_source_inventory_sha256=a10_adapter.A10_SOURCE_INVENTORY_SHA256,
         a10_harness_sha256="a" * 64,
+        a10_wire_schema_sha256=d5._planner_wire_schema_sha256(),
         a10_sdk_max_retries=0,
     )
     calls: list[str] = []
@@ -2629,6 +2744,7 @@ def test_a10_evaluation_orchestrates_exact_53_cases_without_provider_calls(
             case for case in a10_adapter.load_a10_benchmark(REPO_ROOT) if case.case_id == case_id
         )
         case_authorization = d5._a10_case_authorization(
+            REPO_ROOT,
             authorization,
             case,
             artifact_root=Path(kwargs["artifact_root"]),
@@ -2659,6 +2775,65 @@ def test_a10_evaluation_orchestrates_exact_53_cases_without_provider_calls(
     assert result["workers"] == 0
     assert result["persistence"] == 0
     assert result["render"] == 0
+    assert result["production_partition"]["denominator"] == 35
+    assert result["exploratory_partition"]["denominator"] == 18
+    assert (tmp_path / "a10" / "a10.terminal.json").is_file()
+
+
+def test_a10_campaign_interruption_seals_parent_terminal(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A caught mid-campaign failure cannot masquerade as a completed result."""
+    authorization = replace(
+        _authorization(campaign_id="a10-interrupted", artifact_root=str(tmp_path / "a10")),
+        a10_evaluation_mode=d5.A10_PLANNER_EVALUATION_KIND,
+        a10_benchmark_sha256=a10_adapter.A10_BENCHMARK_SHA256,
+        a10_source_inventory_sha256=a10_adapter.A10_SOURCE_INVENTORY_SHA256,
+        a10_harness_sha256="a" * 64,
+        a10_wire_schema_sha256=d5._planner_wire_schema_sha256(),
+        a10_sdk_max_retries=0,
+    )
+    monkeypatch.setattr(
+        d5,
+        "_a10_source_identities",
+        lambda _root, _authorization, _cases: {
+            "approved_las": {
+                "source_key": "approved_las",
+                "source_path": d5.A10_SEM_02_SMOKE_SOURCE_PATH,
+                "source_sha256": d5.A10_SEM_02_SMOKE_SOURCE_SHA256,
+                "source_format": "las",
+            },
+            "cbl_repeat_dlis": {
+                "source_key": "cbl_repeat_dlis",
+                "source_path": "workspace/data/CBL_Repeat.dlis",
+                "source_sha256": "a" * 64,
+                "source_format": "dlis",
+            },
+            "cbl_main_dlis": {
+                "source_key": "cbl_main_dlis",
+                "source_path": "workspace/data/CBL_Main.dlis",
+                "source_sha256": "b" * 64,
+                "source_format": "dlis",
+            },
+        },
+    )
+    monkeypatch.setattr(
+        d5,
+        "execute_live_planner_smoke",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("synthetic interruption")),
+    )
+
+    result = d5.execute_live_a10_planner_evaluation(
+        repo_root=REPO_ROOT,
+        authorization=authorization,
+        artifact_root=tmp_path / "a10",
+    )
+
+    assert result["status"] == "INCONCLUSIVE"
+    assert result["completed_case_count"] == 0
+    assert result["unattempted_case_ids"]
+    assert (tmp_path / "a10" / "a10-interrupted.terminal.json").is_file()
 
 
 def test_planner_smoke_unknown_case_and_benchmark_drift_fail_closed() -> None:

@@ -582,6 +582,7 @@ class D5Authorization:
     a10_benchmark_sha256: str = ""
     a10_source_inventory_sha256: str = ""
     a10_harness_sha256: str = ""
+    a10_wire_schema_sha256: str = ""
     a10_sdk_max_retries: int | None = None
 
     @classmethod
@@ -679,6 +680,7 @@ class D5Authorization:
             a10_benchmark_sha256=str(value.get("a10_benchmark_sha256", "")),
             a10_source_inventory_sha256=str(value.get("a10_source_inventory_sha256", "")),
             a10_harness_sha256=str(value.get("a10_harness_sha256", "")),
+            a10_wire_schema_sha256=str(value.get("a10_wire_schema_sha256", "")),
             a10_sdk_max_retries=value.get("a10_sdk_max_retries"),
         )
 
@@ -5083,14 +5085,59 @@ def execute_live_planner_smoke(
     }
 
 
+def _a10_source_identity(
+    repo_root: Path,
+    authorization: D5Authorization,
+    case: a10_adapter.A10BenchmarkCase,
+) -> dict[str, str]:
+    """Resolve one benchmark source from the host-owned frozen inventory."""
+    inventory_path = repo_root / A10_SEM_01_SOURCE_INVENTORY
+    _assert_hash(inventory_path, authorization.a10_source_inventory_sha256, "source inventory")
+    relative_path = A10_SEM_02_SOURCE_PATH_BY_KEY.get(case.source)
+    if relative_path is None:
+        raise D5StaticPreflightError("A10 case names an unsupported source key")
+    inventory = json.loads(inventory_path.read_text(encoding="utf-8"))
+    rows = [
+        row
+        for row in inventory.get("sources", ())
+        if isinstance(row, Mapping) and row.get("path") == relative_path
+    ]
+    if len(rows) != 1:
+        raise D5StaticPreflightError("A10 source inventory identity is missing or ambiguous")
+    row = rows[0]
+    source_sha256 = row.get("sha256")
+    source_format = row.get("format")
+    if (
+        not isinstance(source_sha256, str)
+        or not re.fullmatch(r"[0-9a-f]{64}", source_sha256)
+        or source_format not in {"LAS", "DLIS"}
+    ):
+        raise D5StaticPreflightError("A10 source inventory identity is invalid")
+    source_path = (repo_root / relative_path).resolve()
+    if not source_path.is_relative_to(repo_root.resolve()):
+        raise D5StaticPreflightError("A10 source escapes the repository")
+    _assert_hash(source_path, source_sha256, f"A10 source {case.source}")
+    return {
+        "source_key": case.source,
+        "source_path": relative_path,
+        "source_sha256": source_sha256,
+        "source_format": str(source_format).lower(),
+    }
+
+
 def _a10_case_authorization(
+    repo_root: Path,
     authorization: D5Authorization,
     case: a10_adapter.A10BenchmarkCase,
     *,
     artifact_root: Path,
+    source_identity: Mapping[str, str] | None = None,
 ) -> D5Authorization:
     """Derive one case-scoped planner-smoke authorization from A10 custody."""
     request_sha256 = hashlib.sha256(case.request.encode("utf-8")).hexdigest()
+    source = source_identity or _a10_source_identity(repo_root, authorization, case)
+    if not authorization.a10_wire_schema_sha256:
+        raise D5StaticPreflightError("A10 authority is missing the wire-schema digest")
     return replace(
         authorization,
         authorization_id=f"{authorization.authorization_id}:{case.case_id}",
@@ -5101,10 +5148,27 @@ def _a10_case_authorization(
         planner_smoke_request_sha256=request_sha256,
         planner_smoke_benchmark_sha256=authorization.a10_benchmark_sha256,
         planner_smoke_source_inventory_sha256=authorization.a10_source_inventory_sha256,
+        planner_smoke_source_sha256=source["source_sha256"],
         planner_smoke_harness_sha256=authorization.a10_harness_sha256,
+        planner_smoke_wire_schema_sha256=authorization.a10_wire_schema_sha256,
         planner_smoke_sdk_max_retries=authorization.a10_sdk_max_retries,
         expected_worktree_porcelain=authorization.expected_worktree_porcelain,
     )
+
+
+def _a10_source_identities(
+    repo_root: Path,
+    authorization: D5Authorization,
+    cases: Sequence[a10_adapter.A10BenchmarkCase],
+) -> dict[str, dict[str, str]]:
+    """Validate every distinct frozen source before any provider delegation."""
+    identities: dict[str, dict[str, str]] = {}
+    for case in cases:
+        if case.source not in identities:
+            identities[case.source] = _a10_source_identity(repo_root, authorization, case)
+    if set(identities) != {"approved_las", "cbl_repeat_dlis", "cbl_main_dlis"}:
+        raise D5StaticPreflightError("A10 population does not cover the authorized source set")
+    return identities
 
 
 def _a10_wire_plan_from_custody(
@@ -5132,6 +5196,147 @@ def _a10_wire_plan_from_custody(
         return None
 
 
+def _a10_case_failure_class(status: object, terminal: object) -> str:
+    """Classify one case without conflating model rejection and infrastructure."""
+    if status == "SMOKE_PASS":
+        return "PASS"
+    if status == "SMOKE_CONTRACT_FAIL":
+        if isinstance(terminal, Mapping) and terminal.get("final_structured_output_status") in {
+            "INVALID_AFTER_CORRECTION",
+            "PLANNER_FAILURE_BEFORE_GENERATION",
+        }:
+            return "MODEL_STRUCTURAL_FAILURE"
+        return "HARNESS_CONTRACT_FAILURE"
+    if status in {
+        "SMOKE_NOT_READY",
+        "SMOKE_ENVIRONMENT_BLOCKED",
+        "SMOKE_PROVIDER_INCONCLUSIVE",
+    }:
+        return "INFRASTRUCTURE_INTERRUPTION"
+    if status == "SMOKE_HARNESS_FAIL":
+        return "HARNESS_FAILURE"
+    return "UNKNOWN_FAILURE"
+
+
+def _a10_campaign_seal(
+    paths: EvidencePaths,
+    *,
+    authorization: D5Authorization,
+    cases: Sequence[a10_adapter.A10BenchmarkCase],
+    rows: Sequence[Mapping[str, Any]],
+    status: str,
+    failure_class: str | None,
+    stopped_reason: str | None,
+    total_logical_calls: int,
+    total_physical_attempts: int,
+) -> dict[str, Any]:
+    """Write one durable parent terminal and summary using existing custody helpers."""
+    completed_ids = [str(row["case_id"]) for row in rows]
+    production_rows = [row for row in rows if row["gold"] == "P"]
+    exploratory_rows = [row for row in rows if row["gold"] == "E"]
+
+    def partition_metrics(
+        partition_rows: Sequence[Mapping[str, Any]], denominator: int
+    ) -> dict[str, Any]:
+        """Report completion, structure, corrections, scoring and unscorable dimensions."""
+        failure_classes: dict[str, int] = {}
+        for row in partition_rows:
+            failure_class = str(row["failure_class"])
+            failure_classes[failure_class] = failure_classes.get(failure_class, 0) + 1
+        return {
+            "denominator": denominator,
+            "completed": len(partition_rows),
+            "structurally_valid": sum(bool(row["structurally_valid"]) for row in partition_rows),
+            "correction_used": sum(bool(row["correction_used"]) for row in partition_rows),
+            "scored_pass": sum(bool(row["score"]["passed"]) for row in partition_rows),
+            "scored_fail": sum(not row["score"]["passed"] for row in partition_rows),
+            "unscorable_dimension_count": sum(
+                len(row["score"]["unscorable_dimensions"]) for row in partition_rows
+            ),
+            "failure_classes": failure_classes,
+        }
+
+    terminal_digests = {
+        str(row["case_id"]): _sha256_file(
+            paths.root
+            / str(row["case_id"])
+            / f"{authorization.campaign_id}-{str(row['case_id']).lower()}.terminal.json"
+        )
+        for row in rows
+        if (
+            paths.root
+            / str(row["case_id"])
+            / f"{authorization.campaign_id}-{str(row['case_id']).lower()}.terminal.json"
+        ).is_file()
+    }
+    payload = {
+        "experiment_version": D5_EXPERIMENT_VERSION,
+        "mode": A10_PLANNER_EVALUATION_KIND,
+        "status": status,
+        "failure_class": failure_class,
+        "stopped_reason": stopped_reason,
+        "authorization_id": authorization.authorization_id,
+        "campaign_id": authorization.campaign_id,
+        "benchmark_sha256": authorization.a10_benchmark_sha256,
+        "source_inventory_sha256": authorization.a10_source_inventory_sha256,
+        "wire_schema_sha256": authorization.a10_wire_schema_sha256,
+        "case_count": len(cases),
+        "completed_case_count": len(rows),
+        "completed_case_ids": completed_ids,
+        "unattempted_case_ids": [
+            case.case_id for case in cases if case.case_id not in completed_ids
+        ],
+        "case_terminal_sha256": terminal_digests,
+        "exploratory_partition": {
+            **partition_metrics(
+                exploratory_rows,
+                sum(case.gold == "E" for case in cases),
+            )
+        },
+        "production_partition": {
+            **partition_metrics(
+                production_rows,
+                sum(case.gold == "P" for case in cases),
+            )
+        },
+        "logical_generation_calls": total_logical_calls,
+        "physical_generation_attempts": total_physical_attempts,
+        "logical_call_ceiling": A10_PLANNER_MAX_CASES * 2,
+        "physical_attempt_ceiling": A10_PLANNER_MAX_PHYSICAL_ATTEMPTS,
+        "workers": 0,
+        "persistence": 0,
+        "render": 0,
+        "rows": list(rows),
+    }
+    _atomic_json(paths.terminal, payload, exclusive=True)
+    summary = dict(payload)
+    summary["terminal_sha256"] = _sha256_file(paths.terminal)
+    _atomic_json(paths.summary, summary, exclusive=True)
+    return summary
+
+
+def _a10_aggregate_status(
+    cases: Sequence[a10_adapter.A10BenchmarkCase],
+    rows: Sequence[Mapping[str, Any]],
+) -> str:
+    """Authorize only the complete production partition, not exploratory cases."""
+    production_rows = [row for row in rows if row["gold"] == "P"]
+    infrastructure_failure = any(
+        row["failure_class"]
+        in {"INFRASTRUCTURE_INTERRUPTION", "HARNESS_FAILURE", "UNKNOWN_FAILURE"}
+        for row in rows
+    )
+    if (
+        len(rows) != len(cases)
+        or len(production_rows) != sum(case.gold == "P" for case in cases)
+        or infrastructure_failure
+    ):
+        return "INCONCLUSIVE"
+    if any(row["failure_class"] != "PASS" or not row["score"]["passed"] for row in production_rows):
+        return "FAIL"
+    return "PASS"
+
+
 def execute_live_a10_planner_evaluation(
     *,
     repo_root: Path,
@@ -5151,6 +5356,7 @@ def execute_live_a10_planner_evaluation(
         authorization.a10_benchmark_sha256,
         authorization.a10_source_inventory_sha256,
         authorization.a10_harness_sha256,
+        authorization.a10_wire_schema_sha256,
     ):
         if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
             raise D5StaticPreflightError("A10 planner evaluation authority is incomplete")
@@ -5164,83 +5370,134 @@ def execute_live_a10_planner_evaluation(
         raise D5StaticPreflightError("A10 benchmark population is not exactly 53 cases")
     inventory_path = repo_root / A10_SEM_01_SOURCE_INVENTORY
     _assert_hash(inventory_path, authorization.a10_source_inventory_sha256, "A10 source inventory")
+    source_identities = _a10_source_identities(repo_root, authorization, cases)
+    if _planner_wire_schema_sha256() != authorization.a10_wire_schema_sha256:
+        raise D5StaticPreflightError("A10 planner wire schema differs from authority")
+    campaign_paths = EvidencePaths(root, authorization.campaign_id)
+    _atomic_json(
+        campaign_paths.state,
+        {
+            "status": "A10_CAMPAIGN_STARTED",
+            "mode": A10_PLANNER_EVALUATION_KIND,
+            "authorization_id": authorization.authorization_id,
+            "campaign_id": authorization.campaign_id,
+            "benchmark_sha256": authorization.a10_benchmark_sha256,
+            "source_inventory_sha256": authorization.a10_source_inventory_sha256,
+            "wire_schema_sha256": authorization.a10_wire_schema_sha256,
+            "case_ids": [case.case_id for case in cases],
+            "source_identities": source_identities,
+            "completed_case_ids": [],
+            "unattempted_case_count": len(cases),
+            "logical_generation_calls": 0,
+            "physical_generation_attempts": 0,
+        },
+        exclusive=True,
+    )
     planned_rows: list[dict[str, Any]] = []
     total_physical_attempts = 0
     total_logical_calls = 0
     stopped_reason: str | None = None
-    for case in cases:
-        case_root = root / case.case_id
-        case_authorization = _a10_case_authorization(
-            authorization,
-            case,
-            artifact_root=case_root,
+    try:
+        for case in cases:
+            case_root = root / case.case_id
+            case_authorization = _a10_case_authorization(
+                repo_root,
+                authorization,
+                case,
+                artifact_root=case_root,
+                source_identity=source_identities[case.source],
+            )
+            result = execute_live_planner_smoke(
+                repo_root=repo_root,
+                authorization=case_authorization,
+                artifact_root=case_root,
+                endpoint_get=endpoint_get,
+                api_key_loader=api_key_loader,
+                static_checker=static_checker,
+                provider_factory=provider_factory,
+                case_id=case.case_id,
+            )
+            terminal = result.get("terminal")
+            if isinstance(terminal, Mapping):
+                logical_calls = int(terminal.get("logical_generation_calls", 0))
+                physical_attempts = int(terminal.get("physical_generation_attempts", 0))
+            else:
+                logical_calls = 0
+                physical_attempts = 0
+            if logical_calls > 2 or physical_attempts > 2:
+                raise D5CallCapExceeded("A10 case call ceiling exceeded")
+            total_logical_calls += logical_calls
+            total_physical_attempts += physical_attempts
+            if total_logical_calls > A10_PLANNER_MAX_PHYSICAL_ATTEMPTS:
+                raise D5CallCapExceeded("A10 planner evaluation logical call ceiling exceeded")
+            if total_physical_attempts > A10_PLANNER_MAX_PHYSICAL_ATTEMPTS:
+                raise D5CallCapExceeded("A10 planner evaluation physical call ceiling exceeded")
+            plan = _a10_wire_plan_from_custody(repo_root, case_authorization)
+            score = a10_adapter.score_a10_plan(case, plan)
+            case_status = result.get("status")
+            planned_rows.append(
+                {
+                    "case_id": case.case_id,
+                    "gold": case.gold,
+                    "class": case.case_class,
+                    "request_sha256": hashlib.sha256(case.request.encode("utf-8")).hexdigest(),
+                    "status": case_status,
+                    "failure_class": _a10_case_failure_class(case_status, terminal),
+                    "structurally_valid": case_status == "SMOKE_PASS",
+                    "correction_used": bool(
+                        isinstance(terminal, Mapping) and terminal.get("correction_path_entered")
+                    ),
+                    "logical_generation_calls": logical_calls,
+                    "physical_generation_attempts": physical_attempts,
+                    "score": score.__dict__,
+                }
+            )
+            _atomic_json(
+                campaign_paths.state,
+                {
+                    "status": "A10_CAMPAIGN_RUNNING",
+                    "authorization_id": authorization.authorization_id,
+                    "campaign_id": authorization.campaign_id,
+                    "completed_case_ids": [row["case_id"] for row in planned_rows],
+                    "unattempted_case_count": len(cases) - len(planned_rows),
+                    "source_identities": source_identities,
+                    "logical_generation_calls": total_logical_calls,
+                    "physical_generation_attempts": total_physical_attempts,
+                },
+            )
+            if case_status in {
+                "SMOKE_NOT_READY",
+                "SMOKE_ENVIRONMENT_BLOCKED",
+                "SMOKE_PROVIDER_INCONCLUSIVE",
+                "SMOKE_HARNESS_FAIL",
+            }:
+                stopped_reason = str(case_status)
+                break
+    except Exception as error:
+        return _a10_campaign_seal(
+            campaign_paths,
+            authorization=authorization,
+            cases=cases,
+            rows=planned_rows,
+            status="INCONCLUSIVE",
+            failure_class="HARNESS_FAILURE",
+            stopped_reason=type(error).__name__,
+            total_logical_calls=total_logical_calls,
+            total_physical_attempts=total_physical_attempts,
         )
-        result = execute_live_planner_smoke(
-            repo_root=repo_root,
-            authorization=case_authorization,
-            artifact_root=case_root,
-            endpoint_get=endpoint_get,
-            api_key_loader=api_key_loader,
-            static_checker=static_checker,
-            provider_factory=provider_factory,
-            case_id=case.case_id,
-        )
-        terminal = result.get("terminal")
-        if isinstance(terminal, Mapping):
-            logical_calls = int(terminal.get("logical_generation_calls", 0))
-            physical_attempts = int(terminal.get("physical_generation_attempts", 0))
-        else:
-            logical_calls = 0
-            physical_attempts = 0
-        total_logical_calls += logical_calls
-        total_physical_attempts += physical_attempts
-        if total_physical_attempts > A10_PLANNER_MAX_PHYSICAL_ATTEMPTS:
-            raise D5CallCapExceeded("A10 planner evaluation physical call ceiling exceeded")
-        plan = _a10_wire_plan_from_custody(repo_root, case_authorization)
-        score = a10_adapter.score_a10_plan(case, plan)
-        planned_rows.append(
-            {
-                "case_id": case.case_id,
-                "gold": case.gold,
-                "class": case.case_class,
-                "request_sha256": hashlib.sha256(case.request.encode("utf-8")).hexdigest(),
-                "status": result.get("status"),
-                "logical_generation_calls": logical_calls,
-                "physical_generation_attempts": physical_attempts,
-                "score": score.__dict__,
-            }
-        )
-        if result.get("status") in {"SMOKE_NOT_READY", "SMOKE_ENVIRONMENT_BLOCKED"}:
-            stopped_reason = str(result.get("status"))
-            break
-    aggregate_status = "PASS" if len(planned_rows) == len(cases) else "INCONCLUSIVE"
-    if any(row["status"] != "SMOKE_PASS" for row in planned_rows):
-        aggregate_status = "INCONCLUSIVE"
-    if any(not row["score"]["passed"] for row in planned_rows):
-        aggregate_status = "FAIL" if aggregate_status == "PASS" else aggregate_status
-    root.mkdir(parents=True, exist_ok=True)
-    summary = {
-        "experiment_version": D5_EXPERIMENT_VERSION,
-        "mode": A10_PLANNER_EVALUATION_KIND,
-        "status": aggregate_status,
-        "authorization_id": authorization.authorization_id,
-        "campaign_id": authorization.campaign_id,
-        "benchmark_sha256": authorization.a10_benchmark_sha256,
-        "source_inventory_sha256": authorization.a10_source_inventory_sha256,
-        "case_count": len(cases),
-        "completed_case_count": len(planned_rows),
-        "logical_generation_calls": total_logical_calls,
-        "physical_generation_attempts": total_physical_attempts,
-        "logical_call_ceiling": A10_PLANNER_MAX_CASES * 2,
-        "physical_attempt_ceiling": A10_PLANNER_MAX_PHYSICAL_ATTEMPTS,
-        "workers": 0,
-        "persistence": 0,
-        "render": 0,
-        "stopped_reason": stopped_reason,
-        "rows": planned_rows,
-    }
-    _atomic_json(root / "a10-planner-evaluation-summary.json", summary, exclusive=True)
-    return summary
+
+    aggregate_status = _a10_aggregate_status(cases, planned_rows)
+    return _a10_campaign_seal(
+        campaign_paths,
+        authorization=authorization,
+        cases=cases,
+        rows=planned_rows,
+        status=aggregate_status,
+        failure_class=None,
+        stopped_reason=stopped_reason,
+        total_logical_calls=total_logical_calls,
+        total_physical_attempts=total_physical_attempts,
+    )
 
 
 def execute_live_schema_behavior_probe(

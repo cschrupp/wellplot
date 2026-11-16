@@ -1,6 +1,6 @@
 # A10 Semantic Planner Evaluation Readiness
 
-Status: `A10_SEM_53_EXECUTION_PATH_01_CANDIDATE_READY — HA_REVIEW_REQUIRED`
+Status: `A10_SEM_53_EXECUTION_PATH_01R1_READY — HA_REVIEW_REQUIRED`
 
 This is a provider-free readiness audit for the accepted frozen 53-case A10
 semantic planner evaluation. It does not execute the evaluation and does not
@@ -8,7 +8,7 @@ make a planner-quality claim.
 
 ## Accepted Inputs
 
-- Current repository HEAD: `a1b29cef9a47d51afd58613b4a41207221b98a9c`.
+- Previous accepted repository HEAD: `a1b29cef9a47d51afd58613b4a41207221b98a9c`.
 - Accepted operational smoke: checkpoint
   `29bbcfe7c8ecbb9da49674240996499a20a5f183`; its production source paths
   are unchanged at the current HEAD.
@@ -52,8 +52,8 @@ schema identities are recorded above.
 
 ### Provider-free harness and corpus checks
 
-PASS: the canonical corpus-adapter and live-qualification suites reported
-`160 passed` with no provider, endpoint, or model calls.
+PASS: the R1 canonical corpus-adapter and live-qualification suites reported
+`175 passed` with no provider, endpoint, or model calls.
 
 ### Executable 53-case campaign path
 
@@ -67,7 +67,8 @@ existing canonical live qualification CLI:
   D5 final population.
 - `execute_live_a10_planner_evaluation`, which processes the exact A10
   benchmark population through the existing planner-smoke/provider/custody
-  path, with one case namespace per request.
+  path, with one case namespace per request and a durable parent campaign
+  boundary.
 
 ### Scoring binding
 
@@ -143,7 +144,7 @@ record supplies operational readiness evidence but does not authorize these
 
 ## Decision
 
-`A10_SEM_53_EXECUTION_PATH_01_CANDIDATE_READY — HA_REVIEW_REQUIRED`
+`A10_SEM_53_EXECUTION_PATH_01R1_READY — HA_REVIEW_REQUIRED`
 
 The frozen inputs, canonical execution path, bounded A10 scorer, and
 provider-free custody qualification are ready for independent review. Do not
