@@ -21,6 +21,42 @@ Operational requirements:
 
 The complete policy is in `docs/project-decision-protocol.md`.
 
+## Per-Turn Scope Drift Check
+
+Before **every agent turn** that plans, implements, reviews, tests, or authorizes governed
+work, compare the proposed action against the currently accepted active slice.
+Use repository-owned active authority, design, and baseline artifacts, not chat
+memory or the latest implementation suggestion. Establish:
+
+1. **Objective:** the active slice's concrete product or technical goal.
+2. **Exit criteria:** the smallest observable outcome or evidence that closes it.
+3. **Scope firewall:** what the slice authorizes and forbids, especially the one
+   canonical semantic engine and authoring workflow. Do not add a second
+   semantic engine, shadow scorer that claims host authority, independent
+   orchestrator, fallback workflow, or parallel path, even if evaluation-only
+   or only partly implemented. A separately authorized mode that genuinely
+   reuses an accepted canonical harness is not a second engine by itself.
+4. **Next gate:** the next authorized action and whether provider/model calls,
+   benchmark/holdout use, mutation, deployment, or other live work are permitted.
+5. **Necessity:** whether the proposed change resolves a demonstrated present
+   blocker or merely builds infrastructure for a hypothetical future question.
+
+If an action fails this check, **do not expand the slice to accommodate it**.
+Keep or recover the canonical path, retire redundant partial paths rather than
+leave dormant alternatives, and defer speculative scoring, harness, governance,
+or acceptance machinery. Report the concrete scope conflict at the existing
+handoff boundary; escalate only if resolving it changes an accepted contract
+or needs Human authority.
+
+If aligned, proceed within existing authority without asking for another
+approval. Record `DRIFT_CHECK: PASS` or `DRIFT_CHECK: FAIL` and the active slice
+objective in material handoffs. Keep routine checks brief; this check creates
+**no new approval gate, workflow, ledger, score, or independent review cycle**.
+
+This adapts Seneca's outcome-first / progressive-qualification and
+no-recursive-governance rules to WellPlot. It does not override the standing
+Project Decision Protocol, frozen evidence, or separate live-authority gates.
+
 ## Active Knowledge Lifecycle
 
 Before agent, architecture, implementation, or experiment work:
