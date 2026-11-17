@@ -552,6 +552,69 @@ def test_a10_infrastructure_interruption_reaches_campaign_terminal(tmp_path: Pat
     assert len(result["rows"]) == 1
 
 
+def test_d4_call_cap_exception_wins_over_prior_provider_failure(tmp_path: Path) -> None:
+    """A terminating D4 call-cap error is not relabeled by older failures."""
+    authorization = _a10_authorization(
+        campaign_id="a10-d4-call-cap-attribution",
+        artifact_root=str(tmp_path / "evidence"),
+    )
+
+    class Adapter:
+        logical_call_count = 0
+        observes_physical_attempts = False
+
+        def bind_call_started(self, callback: Callable[[dict[str, Any]], None]) -> None:
+            self._started = callback
+
+        def bind_call_aborted(self, callback: Callable[[dict[str, Any]], None]) -> None:
+            self._aborted = callback
+
+        async def execute_planner_case(self, case: dict[str, object]) -> dict[str, object]:
+            del case
+            self.logical_call_count = 1
+            self._started(
+                {
+                    "event": "logical_call_started",
+                    "index": 1,
+                    "generation_role": "planner",
+                    "provider": d5.EXPECTED_PROVIDER,
+                    "model": d5.EXPECTED_MODEL,
+                }
+            )
+            self._aborted(
+                {
+                    "event": "logical_call_aborted",
+                    "index": 1,
+                    "generation_role": "planner",
+                    "provider": d5.EXPECTED_PROVIDER,
+                    "model": d5.EXPECTED_MODEL,
+                    "exception_type": "StructuredResponseProviderError",
+                    "exception_module": "wellplot.agent.providers.response_diagnostics",
+                    "termination_kind": "provider_request_error",
+                }
+            )
+            raise d4.CallCapExceeded("call 107")
+
+    runner = d5.D5CampaignRunner(
+        repo_root=REPO_ROOT,
+        authorization=authorization,
+        paths=_paths(tmp_path, authorization.campaign_id),
+        readiness=_ready(),
+        provenance=_provenance(),
+    )
+    result = asyncio.run(
+        runner.run(
+            Adapter(),
+            mode="planner_only",
+            population=d5.A10_SEM_53_POPULATION,
+            turn_ids=("A10-SEM-53:A01",),
+        )
+    )
+
+    assert result["decision"] == "INCONCLUSIVE"
+    assert result["attribution"] == "CALL_CAP_EXCEEDED"
+
+
 def test_a10_planner_observability_is_bound_and_tamper_evident(tmp_path: Path) -> None:
     """Planner evidence is required after sealing and corruption is rejected."""
     authorization = _a10_authorization(
@@ -2414,6 +2477,69 @@ def test_real_live_adapter_transport_retries_keep_one_logical_id(
         assert str(requests[0].url).startswith(PROJECT_CONFIG.openai_compat_base_url)
         for request in requests:
             assert json.loads(request.content)["chat_template_kwargs"] == {"enable_thinking": False}
+
+
+def test_real_live_adapter_accepts_campaign_logical_ceiling_before_d4_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The canonical adapter propagates an A10 ceiling to the D4 backend ledger."""
+    from openai import _base_client
+
+    monkeypatch.setattr(_base_client, "get_platform", lambda: "Linux")
+    with TemporaryDirectory(dir=REPO_ROOT) as temporary:
+        clients: list[httpx.AsyncClient] = []
+        adapter = d5.create_live_adapter(
+            repo_root=Path(temporary),
+            artifact_root=Path(temporary) / "live",
+            api_key="provider-free-test-token",
+            project_config=PROJECT_CONFIG,
+            require_thinking_control=True,
+            request_options=d5._thinking_control_options(),
+            max_retries_override=0,
+            logical_call_ceiling=106,
+            http_client_factory=_live_transport_factory(
+                retry_count=0, clients=clients, requests=[]
+            ),
+        )
+        client = adapter.inner.session.session.compiler.dependencies.planner.backend.delegate.client
+        client._platform = "Linux"
+        backend = adapter.inner.session.session.compiler.dependencies.planner.backend
+        delegations: list[int] = []
+
+        class ProviderDouble:
+            async def generate_structured(
+                self,
+                request: StructuredGenerationRequest,
+                *,
+                response_model: type[BaseModel],
+            ) -> StructuredGenerationResult[BaseModel]:
+                del request
+                delegations.append(len(delegations) + 1)
+                return StructuredGenerationResult(
+                    value=response_model.model_validate(_planner_wire_payload()),
+                    metrics=ProviderMetrics(),
+                )
+
+        backend.delegate = ProviderDouble()
+
+        async def generate_to_boundary() -> None:
+            for _ in range(106):
+                await backend.generate_structured(
+                    _live_planner_request(),
+                    response_model=_PlannerWirePlan,
+                )
+            with pytest.raises(d4.CallCapExceeded, match="call 107"):
+                await backend.generate_structured(
+                    _live_planner_request(),
+                    response_model=_PlannerWirePlan,
+                )
+
+        try:
+            asyncio.run(generate_to_boundary())
+        finally:
+            asyncio.run(clients[0].aclose())
+
+        assert delegations == list(range(1, 107))
 
 
 @pytest.mark.parametrize("generation_role", ["planner", "report_worker", "section_worker"])

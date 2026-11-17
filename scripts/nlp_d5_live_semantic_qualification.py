@@ -4397,6 +4397,7 @@ def create_live_adapter(
     request_options: Mapping[str, object] | None = None,
     require_thinking_control: bool = False,
     max_retries_override: int | None = None,
+    logical_call_ceiling: int | None = None,
     trace_callback: Callable[[Mapping[str, Any]], None] | None = None,
     compile_result_callback: Callable[[Any], None] | None = None,
     section_action_callback: Callable[[Mapping[str, object]], None] | None = None,
@@ -4420,6 +4421,11 @@ def create_live_adapter(
         if type(max_retries_override) is not int or max_retries_override < 0:
             raise D5StaticPreflightError("max retries override must be a non-negative integer")
         max_retries = max_retries_override
+    d4_logical_call_ceiling = d4.MAX_LOGICAL_CALLS
+    if logical_call_ceiling is not None:
+        if type(logical_call_ceiling) is not int or logical_call_ceiling < 1:
+            raise D5StaticPreflightError("logical call ceiling must be a positive integer")
+        d4_logical_call_ceiling = logical_call_ceiling
     observer = _PhysicalAttemptObserver()
     http_client = (
         http_client_factory(observer)
@@ -4445,11 +4451,12 @@ def create_live_adapter(
         request_options=request_options,
     )
     calls: list[Any] = []
-    ledger = d4.LogicalCallLedger()
+    ledger = d4.LogicalCallLedger(max_calls=d4_logical_call_ceiling)
     counted = d4.CountingBackend(
         delegate=backend,
         provider=resolved_provider,
         model=resolved_model,
+        max_calls=d4_logical_call_ceiling,
         calls=calls,
         ledger=ledger,
         capture_logical_identity=section_action_capture_mode != "off",
@@ -4567,6 +4574,16 @@ def execute_live_campaign(
     _validate_project_config(project_config)
     if authorization.project_config_fingerprint_sha256 != project_config.fingerprint_sha256:
         raise D5StaticPreflightError("project configuration fingerprint mismatch")
+    campaign_logical_call_ceiling: int | None = None
+    if population == A10_SEM_53_POPULATION and mode == "planner_only":
+        a10_cases = _load_a10_planner_population(repo_root)
+        selected_turns = (
+            tuple(turn_ids)
+            if turn_ids is not None
+            else tuple(str(case["turn_id"]) for case in a10_cases)
+        )
+        if selected_turns:
+            campaign_logical_call_ceiling = len(selected_turns) * MAX_PLANNER_LOGICAL_CALLS
     paths = EvidencePaths(artifact_root, authorization.campaign_id)
     static = provider_free_preflight(
         repo_root,
@@ -4585,6 +4602,7 @@ def execute_live_campaign(
             request_options=authorization.thinking_control_options,
             require_thinking_control=True,
             max_retries_override=authorization.sdk_max_retries,
+            logical_call_ceiling=campaign_logical_call_ceiling,
         )
     )
     readiness = prepare_readiness(
@@ -6208,7 +6226,7 @@ def _classify_exception(error: Exception) -> tuple[str, str]:
         return "INCONCLUSIVE", "PRODUCTION_DEFECT"
     if isinstance(error, D5ProcessInterruption):
         return "INCONCLUSIVE", "PROCESS_INTERRUPTION"
-    if isinstance(error, D5CallCapExceeded):
+    if isinstance(error, (D5CallCapExceeded, d4.CallCapExceeded)):
         return "INCONCLUSIVE", "CALL_CAP_EXCEEDED"
     if isinstance(error, D5HarnessError):
         return "INCONCLUSIVE", "EVIDENCE_INTEGRITY"
@@ -6768,11 +6786,14 @@ class D5CampaignRunner:
                 active_turn=custody._active_turn_id,
                 completed_worker_outcomes=rows,
             )
-            observed_failure = _classify_logical_call_failure(custody.ledger.calls)
-            if observed_failure is not None:
-                decision, attribution = "INCONCLUSIVE", observed_failure[0]
-            else:
+            if isinstance(error, (D5CallCapExceeded, d4.CallCapExceeded)):
                 decision, attribution = _classify_exception(error)
+            else:
+                observed_failure = _classify_logical_call_failure(custody.ledger.calls)
+                if observed_failure is not None:
+                    decision, attribution = "INCONCLUSIVE", observed_failure[0]
+                else:
+                    decision, attribution = _classify_exception(error)
             if campaign_first_divergence == "NONE":
                 campaign_first_divergence = _first_divergence_for_exception(error)
         scientific_terminal = (
