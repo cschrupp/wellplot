@@ -43,6 +43,7 @@ from wellplot.agent.code_mode.obligations import (
     RequestCompilationResult,
     compile_request_contract,
 )
+from wellplot.agent.code_mode.planner import PlannerSemanticFailure
 from wellplot.agent.providers.base import (
     ProviderFailureCategory,
     ProviderRequestError,
@@ -3193,6 +3194,12 @@ class D5CampaignCustody:
         self.paths.model_io.touch(exist_ok=True)
         self.started = True
 
+    def begin_planner_observation(self) -> None:
+        """Activate planner-only custody before pre-provider compilation begins."""
+        if self.mode != "planner_only":
+            raise D5HarnessError("planner observation activation used outside planner-only mode")
+        self._activate()
+
     def record_call_started(self, event: Mapping[str, Any]) -> None:
         """Persist one role-aware logical call before delegation."""
         self._activate()
@@ -4346,6 +4353,22 @@ class _ObservedLiveAdapter:
                 "provider_response_reason": getattr(
                     getattr(error, "response_reason", None), "value", None
                 ),
+                "source_asset_identity": context["source_asset_identity"],
+                "source_channel_count": context["source_channel_count"],
+                "numeric_sample_apis_invoked": context["numeric_sample_apis_invoked"],
+            }
+        except PlannerSemanticFailure as error:
+            if not error.code.startswith("request_compilation_"):
+                raise
+            return {
+                "observation_status": "REQUEST_COMPILATION_REJECTION",
+                "schema_valid": None,
+                "correction_usage": {
+                    "initial_generation": 0,
+                    "native_correction": 0,
+                },
+                "failure_category": error.code,
+                "request_compilation_code": error.code,
                 "source_asset_identity": context["source_asset_identity"],
                 "source_channel_count": context["source_channel_count"],
                 "numeric_sample_apis_invoked": context["numeric_sample_apis_invoked"],
@@ -6011,8 +6034,10 @@ def _bounded_planner_observation_row(
 ) -> dict[str, Any]:
     """Record planner observations without assigning semantic correctness."""
     observation_status = str(actual.get("observation_status", "PLANNER_FAILURE"))
-    schema_valid = actual.get("schema_valid") is True
-    if observation_status in {"PROVIDER_FAILURE", "MODEL_STRUCTURAL_FAILURE"}:
+    schema_valid = actual.get("schema_valid")
+    if observation_status == "REQUEST_COMPILATION_REJECTION":
+        first_divergence = "NONE"
+    elif observation_status in {"PROVIDER_FAILURE", "MODEL_STRUCTURAL_FAILURE"}:
         first_divergence = "PROVIDER_OR_STRUCTURED"
     elif observation_status == "PLANNER_FAILURE":
         first_divergence = "PLANNER_STRUCTURAL"
@@ -6041,19 +6066,36 @@ def _bounded_planner_observation_row(
         "host_resolution_status": "NOT_REACHED",
         "authoring_status": "NOT_REACHED",
         "correction_usage": {
-            "initial_generation": 1,
-            "native_correction": max(call_count - 1, 0),
+            "initial_generation": (
+                0 if observation_status == "REQUEST_COMPILATION_REJECTION" else 1
+            ),
+            "native_correction": (
+                0
+                if observation_status == "REQUEST_COMPILATION_REJECTION"
+                else max(call_count - 1, 0)
+            ),
         },
         "failure_category": actual.get("failure_category"),
+        "request_compilation_code": actual.get("request_compilation_code"),
         "provider_response_reason": actual.get("provider_response_reason"),
         "first_divergence": first_divergence,
         "evidence_dimensions": {
             "provider_structured": (
-                "FAIL"
-                if observation_status in {"PROVIDER_FAILURE", "MODEL_STRUCTURAL_FAILURE"}
-                else "PASS"
+                "NOT_REACHED"
+                if observation_status == "REQUEST_COMPILATION_REJECTION"
+                else (
+                    "FAIL"
+                    if observation_status in {"PROVIDER_FAILURE", "MODEL_STRUCTURAL_FAILURE"}
+                    else "PASS"
+                )
             ),
-            "planner_structural": "PASS" if schema_valid else "FAIL",
+            "planner_structural": (
+                "NOT_REACHED"
+                if observation_status == "REQUEST_COMPILATION_REJECTION"
+                else "PASS"
+                if schema_valid is True
+                else "FAIL"
+            ),
             "semantic": "NOT_ESTABLISHED",
             "target_grounding": "NOT_ESTABLISHED",
             "source_channel_grounding": "NOT_ESTABLISHED",
@@ -6581,6 +6623,8 @@ class D5CampaignRunner:
             logical_call_ceiling=logical_ceiling,
             physical_attempt_ceiling=physical_ceiling,
         )
+        if mode == "planner_only":
+            custody.begin_planner_observation()
         custody.require_physical_observer = bool(
             getattr(adapter, "observes_physical_attempts", False)
         )

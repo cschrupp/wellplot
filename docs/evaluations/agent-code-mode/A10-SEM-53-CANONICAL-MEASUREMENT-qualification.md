@@ -128,6 +128,39 @@ R1 static checks:
 - provider/model/endpoint calls: `0`;
 - live smoke, 53-case benchmark and holdout access: not run.
 
+## Request-Compilation Classification Corrective
+
+The final R1 correction distinguishes deterministic request-compilation
+rejections from provider/model observations. When the canonical
+`SemanticPlanner.plan()` raises a `request_compilation_*` failure before any
+provider call, the existing planner-only adapter records the canonical code,
+trace and source provenance with `observation_status` set to
+`REQUEST_COMPILATION_REJECTION`. The observation has `schema_valid=None`, zero
+initial-generation and native-correction usage, zero logical generation calls
+and zero physical attempts. It is visible in campaign accounting and does not
+terminate otherwise valid observation collection. Provider failures, custody
+errors, call-cap errors and unexpected faults retain the R1 terminal behavior.
+
+The planner-only custody boundary is activated before pre-provider compilation
+so a zero-call rejection still seals its trace and terminal evidence. The
+provider-free regression exercises the real canonical compilation-rejection
+path with a synthetic request and verifies that no provider request occurs.
+
+Final corrective qualification:
+
+```bash
+PYTHONPATH=src .venv/bin/python -m pytest -q \
+  tests/test_a10_semantic_corpus_adapter.py \
+  tests/test_nlp_d5_live_semantic_qualification.py
+```
+
+Result: `167 passed in 36.10s`.
+
+Targeted regression selection: `2 passed`.
+
+The benchmark, live smoke, provider/model/endpoint calls and holdout access
+remain at zero/not run.
+
 ## Changed files
 
 - `scripts/nlp_d5_live_semantic_qualification.py`: adds the A10 population

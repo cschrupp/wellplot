@@ -629,7 +629,12 @@ def test_observed_live_adapter_stops_at_the_canonical_wire_boundary(
     )
     inner = SimpleNamespace(
         repo_root=REPO_ROOT,
+        logical_call_count=0,
         session=SimpleNamespace(session=session),
+        bind_call_started=lambda _callback: None,
+        bind_call_completed=lambda _callback: None,
+        bind_call_aborted=lambda _callback: None,
+        bind_model_io=lambda _callback: None,
     )
     adapter = d5._ObservedLiveAdapter(inner, d5._PhysicalAttemptObserver())
     adapter_ref["adapter"] = adapter
@@ -644,7 +649,6 @@ def test_observed_live_adapter_stops_at_the_canonical_wire_boundary(
             "numeric_sample_apis_invoked": False,
         },
     )
-
     result = asyncio.run(
         adapter.execute_planner_case({"turn_id": "A10-SEM-53:A01", "request": "Plot Gamma Ray."})
     )
@@ -652,6 +656,115 @@ def test_observed_live_adapter_stops_at_the_canonical_wire_boundary(
     assert backend.response_models == [_PlannerWirePlan]
     events = adapter.consume_planner_trace_events()
     assert any(event["event"] == "PLANNER_GENERATION_PASS" for event in events)
+
+
+def test_a10_request_compilation_rejection_is_not_model_generation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The real planner compilation gate records zero-generation rejection evidence."""
+    backend = _PlannerOnlyBackend(payload=_planner_wire_payload())
+    adapter_ref: dict[str, d5._ObservedLiveAdapter] = {}
+
+    def trace(event: dict[str, object]) -> None:
+        adapter_ref["adapter"]._trace_events.append(dict(event))
+
+    planner = SemanticPlanner(
+        backend=backend,
+        registry=create_builtin_registry(),
+        trace_callback=trace,
+    )
+    session = SimpleNamespace(
+        compiler=SimpleNamespace(dependencies=SimpleNamespace(planner=planner)),
+        config=SimpleNamespace(
+            timeout_seconds=5.0,
+            planner_temperature=0.0,
+            max_output_tokens=None,
+        ),
+    )
+    inner = SimpleNamespace(
+        repo_root=REPO_ROOT,
+        logical_call_count=0,
+        session=SimpleNamespace(session=session),
+        bind_call_started=lambda _callback: None,
+        bind_call_completed=lambda _callback: None,
+        bind_call_aborted=lambda _callback: None,
+        bind_model_io=lambda _callback: None,
+    )
+    adapter = d5._ObservedLiveAdapter(inner, d5._PhysicalAttemptObserver())
+    adapter_ref["adapter"] = adapter
+    monkeypatch.setattr(
+        d5,
+        "_build_planner_smoke_inputs",
+        lambda _repo_root, _case: {
+            "document_summary": {},
+            "source_summary": {"version": "test", "sources": []},
+            "source_asset_identity": {"asset_id": "test-source", "sha256": "a" * 64},
+            "source_channel_count": 3,
+            "numeric_sample_apis_invoked": False,
+        },
+    )
+    monkeypatch.setattr(
+        d5,
+        "_load_a10_planner_population",
+        lambda _repo_root: [
+            {
+                "case_id": "A01",
+                "turn_id": "A10-SEM-53:A01",
+                "request": "Add a reference track, but do not add a reference track.",
+                "request_sha256": "a" * 64,
+                "source_key": "approved_las",
+                "source_path": "workspace/data/30-23a-3 8117_d.las",
+                "source_format": "las",
+                "source_sha256": "b" * 64,
+                "benchmark_class": "synthetic",
+                "benchmark_exposure": "P",
+                "diagnostic_case": False,
+            }
+        ],
+    )
+    authorization = _a10_authorization(
+        campaign_id="a10-request-compilation-rejection",
+        artifact_root=str(tmp_path / "evidence"),
+    )
+    paths = _paths(tmp_path, authorization.campaign_id)
+    runner = d5.D5CampaignRunner(
+        repo_root=REPO_ROOT,
+        authorization=authorization,
+        paths=paths,
+        readiness=_ready(),
+        provenance={"population": d5.A10_SEM_53_POPULATION},
+    )
+
+    result = asyncio.run(
+        runner.run(
+            adapter,
+            mode="planner_only",
+            population=d5.A10_SEM_53_POPULATION,
+            turn_ids=("A10-SEM-53:A01",),
+        )
+    )
+
+    row = result["rows"][0]
+    assert row["observation_status"] == "REQUEST_COMPILATION_REJECTION"
+    assert row["request_compilation_code"] == "request_compilation_coverage_failure"
+    assert row["schema_valid"] is None
+    assert row["correction_usage"] == {"initial_generation": 0, "native_correction": 0}
+    assert row["logical_generation_calls"] == 0
+    assert row["physical_attempts"] == 0
+    assert row["semantic_status"] == "NOT_ESTABLISHED"
+    assert result["decision"] == "PASS"
+    assert result["attribution"] == "OBSERVATION_COLLECTION"
+    assert result["terminal"]["decision"] == "PASS"
+    assert backend.requests == []
+    trace_events = [
+        json.loads(line) for line in paths.stage_trace.read_text(encoding="utf-8").splitlines()
+    ]
+    assert [event["event"] for event in trace_events] == [
+        "REQUEST_COMPILATION_ENTER",
+        "REQUEST_COMPILATION_PASS",
+        "REQUEST_COMPILATION_FAIL",
+    ]
 
 
 def test_provider_free_preflight_is_network_free_and_fail_closed() -> None:
