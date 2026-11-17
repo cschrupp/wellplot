@@ -1,6 +1,6 @@
 # A10 Semantic Planner Evaluation Readiness
 
-Status: `A10_SEM_53_CANONICAL_SCOPE_RECOVERY — PASS / CLOSED`
+Status: `A10_SEM_53_CANONICAL_MEASUREMENT_IMPLEMENTATION_ACCEPTED — B01_LIVE_DIAGNOSTIC_PREPARATION_ONLY`
 
 This is a provider-free readiness audit for the accepted frozen 53-case A10
 semantic planner evaluation. It does not execute the evaluation and does not
@@ -167,3 +167,19 @@ canonical planner-smoke path remain preserved. The separate A10 orchestrator,
 its private campaign lifecycle, and its heuristic semantic scorer are retired.
 No benchmark, provider call, holdout access, or replacement workflow is
 authorized by this record.
+
+## Current implementation acceptance
+
+The canonical 53-case measurement implementation is accepted at
+`8c9612700a55f4f78197b38b1d871b430e35365e`. Its provider-free qualification
+reported 167 passing tests and passing static, formatting, compilation, diff,
+and single-engine gates. The implementation uses the existing
+`D5CampaignRunner`/custody/planner-only path and preserves the separation
+between provider structural outcomes, infrastructure failures, and
+pre-generation request-compilation rejections.
+
+The next prepared operation is not the 53-case evaluation. It is a separate,
+B01-only operational diagnostic using the existing planner-smoke entrypoint,
+with at most two logical generations, two physical attempts and zero SDK
+retries. It remains unauthorized until a fresh namespace and current rolling
+llama.cpp readiness identity are independently authorized.

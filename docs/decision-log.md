@@ -509,3 +509,36 @@ authorized by this closure.
 Any future planner measurement must be separately designed around the existing
 canonical planner-smoke path; this record does not authorize a parallel runner
 or semantic-scoring workflow.
+
+## A10-SEM-53 Canonical Measurement Implementation Acceptance (2026-11-17)
+
+Accept the provider-free canonical measurement implementation at
+`8c9612700a55f4f78197b38b1d871b430e35365e`, parent
+`3409d92816286b9b94e6fb1813be9239e3a40863`, as
+`A10_SEM_53_CANONICAL_MEASUREMENT_IMPLEMENTATION_ACCEPTED`.
+
+The implementation remains inside the existing `D5CampaignRunner`, campaign
+custody, canonical provider adapter, and `SemanticPlanner.plan()` path. It
+stops at validated planner-wire output and does not add a runner, provider
+adapter, scorer, semantic engine, worker path, persistence path, or rendering
+path. The final provider-free qualification reported 167 passing tests, with
+Ruff, formatting, compilation, `git diff --check`, and single-engine
+attestation passing. No provider/model/endpoint calls, live smoke, benchmark,
+or holdout access occurred.
+
+The accepted measurement boundary records deterministic
+`request_compilation_*` rejections separately from model structural failures
+and infrastructure failures. Such rejections preserve diagnostic code, trace,
+source provenance, zero generation calls, and zero correction usage while
+remaining visible in campaign accounting; they do not establish model
+understanding.
+
+Prepare, but do not execute, one separately authorized B01-only diagnostic
+using the existing `execute_live_planner_smoke()` entrypoint. The proposed
+namespace is
+`workspace/evaluations/a10-sem-53-b01-diagnostic-20261117-001`, with a fresh
+sibling authorization descriptor, exact `Plot Gamma Ray.` request, approved
+LAS SHA, two-generation/two-attempt maximum, zero SDK retries, and a
+300-second external watchdog. The rolling llama.cpp `/v1/models` and `/props`
+identity must be observed and pinned by the readiness policy before execution.
+This preparation does not authorize that diagnostic or the 53-case campaign.

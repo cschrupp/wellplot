@@ -1029,3 +1029,35 @@ of current authority.
 - **Next decision:** determine how to collect frozen planner observations
   through the canonical planner-smoke path without maintaining a parallel
   runner or semantic-scoring workflow.
+
+### A10-SEM-53 Canonical Measurement Implementation Accepted
+
+- **Status:** `A10_SEM_53_CANONICAL_MEASUREMENT_IMPLEMENTATION_ACCEPTED`;
+  B01 diagnostic live qualification preparation only.
+- **Implementation:** accepted at `8c9612700a55f4f78197b38b1d871b430e35365e`,
+  parent `3409d92816286b9b94e6fb1813be9239e3a40863`.
+- **Finding:** the frozen 53-case population is exposed through the existing
+  `D5CampaignRunner`, `D5CampaignCustody`, `_ObservedLiveAdapter`, and
+  `execute_live_planner_smoke()` path. The planner-only boundary stops after
+  validated `_PlannerWirePlan` output; workers, reconciliation, execution,
+  persistence, rendering, and semantic scoring remain outside the path.
+- **Measurement integrity:** A10 pins zero SDK retries and a two-generation /
+  two-physical-attempt maximum for the one-case diagnostic. Provider structural
+  failures, infrastructure failures, custody/call-cap failures, and
+  deterministic pre-generation `request_compilation_*` rejections remain
+  distinct. Compilation rejections preserve their canonical diagnostic code,
+  trace, source provenance, zero generation calls, and zero correction usage;
+  they are accounted observations and do not imply model understanding.
+- **Evidence:** the final provider-free qualification reported 167 passing
+  tests, with Ruff, formatting, compilation, `git diff --check`, and
+  single-engine attestation passing. No provider/model/endpoint calls, live
+  smoke, 53-case benchmark, or holdout access occurred.
+- **Next gate:** prepare one separately authorized B01-only planner diagnostic
+  using the existing canonical planner-smoke entrypoint. The exact B01 request
+  is `Plot Gamma Ray.` and the approved LAS source SHA is
+  `7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9`.
+  The fresh evidence namespace and runtime authority must be distinct from the
+  frozen 53-case campaign. This preparation does not authorize provider calls.
+- **Boundary:** no benchmark population, holdout, worker, persistence,
+  rendering, scorer, parallel runner, or alternate semantic engine is
+  authorized by this acceptance.
