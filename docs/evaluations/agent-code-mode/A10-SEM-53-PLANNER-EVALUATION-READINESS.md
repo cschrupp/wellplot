@@ -171,15 +171,21 @@ authorized by this record.
 ## Current implementation acceptance
 
 The canonical 53-case measurement implementation is accepted at
-`8c9612700a55f4f78197b38b1d871b430e35365e`. Its provider-free qualification
-reported 167 passing tests and passing static, formatting, compilation, diff,
-and single-engine gates. The implementation uses the existing
+`8c9612700a55f4f78197b38b1d871b430e35365e`. The current execution checkout is
+the documentation-only descendant
+`2b44b77150183547e2f941575426f5c41b5d59ec`; static preflight must bind that
+exact execution `HEAD` separately from the accepted implementation commit. Its
+provider-free qualification reported 167 passing tests and passing static,
+formatting, compilation, diff, and single-engine gates. The implementation uses the existing
 `D5CampaignRunner`/custody/planner-only path and preserves the separation
 between provider structural outcomes, infrastructure failures, and
 pre-generation request-compilation rejections.
 
 The next prepared operation is not the 53-case evaluation. It is a separate,
-B01-only operational diagnostic using the existing planner-smoke entrypoint,
-with at most two logical generations, two physical attempts and zero SDK
-retries. It remains unauthorized until a fresh namespace and current rolling
-llama.cpp readiness identity are independently authorized.
+B01-only operational diagnostic using the existing `execute_live_campaign()`
+entrypoint with `population="a10-53"`, `mode="planner_only"`, and
+`turn_ids=("A10-SEM-53:B01",)`, with at most two logical generations, two
+physical attempts and zero SDK retries. The loader may authenticate the frozen
+corpus internally, but only B01 is selected for provider submission. It remains
+unauthorized until a fresh namespace and current rolling llama.cpp readiness
+identity are independently authorized.

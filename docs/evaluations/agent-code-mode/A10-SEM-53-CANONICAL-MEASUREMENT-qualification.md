@@ -165,14 +165,21 @@ remain at zero/not run.
 
 The provider-free implementation is accepted at checkpoint
 `8c9612700a55f4f78197b38b1d871b430e35365e`, parent
-`3409d92816286b9b94e6fb1813be9239e3a40863`. This acceptance promotes the
+`3409d92816286b9b94e6fb1813be9239e3a40863`. The current execution checkout is
+the documentation-only descendant `2b44b77150183547e2f941575426f5c41b5d59ec`;
+static preflight must require that exact `HEAD` while the accepted production
+implementation remains pinned to `8c9612700a`. This acceptance promotes the
 implementation contract, not a planner-quality result. The existing
-`execute_live_planner_smoke()` path is the only proposed live entrypoint.
+`execute_live_campaign()` path is the only proposed live entrypoint for this
+B01 integration diagnostic.
 
 The next separately authorized operation is one non-scientific B01 diagnostic:
 
 - request: `Plot Gamma Ray.`;
 - case: `B01` only;
+- population: `a10-53`;
+- mode: `planner_only`;
+- turn IDs: `("A10-SEM-53:B01",)`;
 - source: `workspace/data/30-23a-3 8117_d.las`;
 - source SHA-256:
   `7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9`;
@@ -198,6 +205,12 @@ campaign_id=a10-sem-53-b01-diagnostic-20261117-001-b01
 artifact_root=workspace/evaluations/a10-sem-53-b01-diagnostic-20261117-001
 planner_smoke_mode=planner_only
 planner_smoke_case_id=B01
+population=a10-53
+mode=planner_only
+turn_ids=("A10-SEM-53:B01",)
+accepted_implementation_checkpoint=8c9612700a55f4f78197b38b1d871b430e35365e
+execution_head=2b44b77150183547e2f941575426f5c41b5d59ec
+implementation_checkpoint=2b44b77150183547e2f941575426f5c41b5d59ec
 provider=openai_compat
 model=qwen3.6-35b-a3b
 server_origin=http://192.168.2.140:8888
@@ -213,17 +226,38 @@ not guessed here: the existing readiness policy must observe `/v1/models` and
 identity before any generation is authorized. A changed build is therefore a
 new runtime observation, not a silent reuse of historical Smoke 003 identity.
 
-The prepared invocation, to be run only after separate live authorization, is:
+The prepared invocation, to be run only after separate live authorization,
+calls the existing function directly; it does not add a CLI mode, script,
+runner, scorer, or provider path:
 
 ```bash
 cd /home/user/projects/well_log_os
 timeout --signal=TERM --kill-after=10s 300s \
-  .venv/bin/python scripts/nlp_d5_live_semantic_qualification.py \
-  --repo-root /home/user/projects/well_log_os \
-  --execute-planner-smoke \
-  --planner-case-id B01 \
-  --artifact-root /home/user/projects/well_log_os/workspace/evaluations/a10-sem-53-b01-diagnostic-20261117-001 \
-  --authorization-json /home/user/projects/well_log_os/workspace/evaluations/a10-sem-53-b01-diagnostic-20261117-001.authorization.json
+  .venv/bin/python -c '
+import json
+from pathlib import Path
+from scripts.nlp_d5_live_semantic_qualification import (
+    _load_authorization,
+    execute_live_campaign,
+)
+
+repo_root = Path("/home/user/projects/well_log_os")
+authorization = _load_authorization(
+    Path(
+        "/home/user/projects/well_log_os/workspace/evaluations/"
+        "a10-sem-53-b01-diagnostic-20261117-001.authorization.json"
+    )
+)
+result = execute_live_campaign(
+    repo_root=repo_root,
+    authorization=authorization,
+    artifact_root=(repo_root / authorization.artifact_root).resolve(),
+    population="a10-53",
+    mode="planner_only",
+    turn_ids=("A10-SEM-53:B01",),
+)
+print(json.dumps(result, indent=2, sort_keys=True))
+'
 ```
 
 The authorization JSON is a sibling input to the fresh evidence namespace so
@@ -233,7 +267,10 @@ the canonical checkout, branch/checkpoint, exact worktree allowlist, readable
 credential source without disclosure, local source identity, current endpoint
 identity, and exact harness/schema identities before the first generation.
 
-The expected custody includes complete system/user prompts, structured-output
+The existing A10 loader authenticates the frozen 53-case benchmark and source
+inventory internally, but the runner's selected-turn contract admits only
+`A10-SEM-53:B01`; no other case is submitted to the provider or semantically
+evaluated. The expected custody includes complete system/user prompts, structured-output
 schema, raw provider requests and responses, validation diagnostics, native
 correction feedback, stage traces, source before/after identity, call counts,
 terminal verification, and orderly client/process cleanup. A successful run

@@ -534,11 +534,16 @@ remaining visible in campaign accounting; they do not establish model
 understanding.
 
 Prepare, but do not execute, one separately authorized B01-only diagnostic
-using the existing `execute_live_planner_smoke()` entrypoint. The proposed
-namespace is
+using the existing `execute_live_campaign()` entrypoint with
+`population="a10-53"`, `mode="planner_only"`, and
+`turn_ids=("A10-SEM-53:B01",)`. The proposed namespace is
 `workspace/evaluations/a10-sem-53-b01-diagnostic-20261117-001`, with a fresh
 sibling authorization descriptor, exact `Plot Gamma Ray.` request, approved
 LAS SHA, two-generation/two-attempt maximum, zero SDK retries, and a
 300-second external watchdog. The rolling llama.cpp `/v1/models` and `/props`
 identity must be observed and pinned by the readiness policy before execution.
-This preparation does not authorize that diagnostic or the 53-case campaign.
+The invocation must use `population="a10-53"`, `mode="planner_only"`, and
+`turn_ids=("A10-SEM-53:B01",)`. The accepted implementation commit is
+`8c9612700a`; the current execution `HEAD` required by static preflight is its
+documentation-only descendant `2b44b77150`. This preparation does not
+authorize that diagnostic or the 53-case campaign.

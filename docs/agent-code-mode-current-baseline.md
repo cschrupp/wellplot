@@ -1053,8 +1053,10 @@ of current authority.
   single-engine attestation passing. No provider/model/endpoint calls, live
   smoke, 53-case benchmark, or holdout access occurred.
 - **Next gate:** prepare one separately authorized B01-only planner diagnostic
-  using the existing canonical planner-smoke entrypoint. The exact B01 request
-  is `Plot Gamma Ray.` and the approved LAS source SHA is
+  using the existing canonical `execute_live_campaign()` entrypoint with
+  `population="a10-53"`, `mode="planner_only"`, and
+  `turn_ids=("A10-SEM-53:B01",)`. The exact B01 request is `Plot Gamma Ray.`
+  and the approved LAS source SHA is
   `7e6c69c65713dc33303362ab91b767eb06371fd24a31856add8650e6d3bee1a9`.
   The fresh evidence namespace and runtime authority must be distinct from the
   frozen 53-case campaign. This preparation does not authorize provider calls.
