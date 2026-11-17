@@ -165,10 +165,11 @@ remain at zero/not run.
 
 The provider-free implementation is accepted at checkpoint
 `8c9612700a55f4f78197b38b1d871b430e35365e`, parent
-`3409d92816286b9b94e6fb1813be9239e3a40863`. The current execution checkout is
-the documentation-only descendant `2b44b77150183547e2f941575426f5c41b5d59ec`;
-static preflight must require that exact `HEAD` while the accepted production
-implementation remains pinned to `8c9612700a`. This acceptance promotes the
+`3409d92816286b9b94e6fb1813be9239e3a40863`. The execution authority must set
+`implementation_checkpoint` to the exact final repository `HEAD` immediately
+before launch; static preflight must require that exact execution `HEAD` while
+the accepted production implementation remains pinned to `8c9612700a`. This
+acceptance promotes the
 implementation contract, not a planner-quality result. The existing
 `execute_live_campaign()` path is the only proposed live entrypoint for this
 B01 integration diagnostic.
@@ -209,8 +210,8 @@ population=a10-53
 mode=planner_only
 turn_ids=("A10-SEM-53:B01",)
 accepted_implementation_checkpoint=8c9612700a55f4f78197b38b1d871b430e35365e
-execution_head=2b44b77150183547e2f941575426f5c41b5d59ec
-implementation_checkpoint=2b44b77150183547e2f941575426f5c41b5d59ec
+execution_head=<exact repository HEAD recorded immediately before launch>
+implementation_checkpoint=<same exact execution HEAD>
 provider=openai_compat
 model=qwen3.6-35b-a3b
 server_origin=http://192.168.2.140:8888

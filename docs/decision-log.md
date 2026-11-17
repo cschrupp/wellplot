@@ -544,6 +544,7 @@ LAS SHA, two-generation/two-attempt maximum, zero SDK retries, and a
 identity must be observed and pinned by the readiness policy before execution.
 The invocation must use `population="a10-53"`, `mode="planner_only"`, and
 `turn_ids=("A10-SEM-53:B01",)`. The accepted implementation commit is
-`8c9612700a`; the current execution `HEAD` required by static preflight is its
-documentation-only descendant `2b44b77150`. This preparation does not
+`8c9612700a`; the authority must separately record the exact repository `HEAD`
+immediately before launch as `implementation_checkpoint`, because static
+preflight requires that execution identity. This preparation does not
 authorize that diagnostic or the 53-case campaign.
