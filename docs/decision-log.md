@@ -548,3 +548,36 @@ The invocation must use `population="a10-53"`, `mode="planner_only"`, and
 immediately before launch as `implementation_checkpoint`, because static
 preflight requires that execution identity. This preparation does not
 authorize that diagnostic or the 53-case campaign.
+
+## A10-SEM-53 B01 Diagnostic Acceptance and Frozen Evaluation Readiness (2026-11-17)
+
+The B01 canonical campaign integration diagnostic is accepted as an
+engineering observation at `A10_SEM_53_B01_DIAGNOSTIC_PASS`. The canonical
+`execute_live_campaign()` path processed only `A10-SEM-53:B01` in
+`planner_only` mode. The first provider response failed local structured
+validation; the permitted native correction produced a valid planner wire
+plan. The run used two logical/provider calls and two physical attempts and
+stopped before workers, reconciliation, persistence, rendering, numerical
+sample APIs, or semantic grading.
+
+Evidence is sealed under
+`workspace/evaluations/a10-sem-53-b01-diagnostic-20261117-001/`; the terminal
+evidence SHA-256 is
+`b20114416026826678f250bbe46775f5841963ea6de183e0a7bb8781a711ef20` and the
+model-I/O SHA-256 is
+`6293159032c1ead34ee56b5ff3cfdd640a81433f4cda1b215550ae8a2b1cc772`.
+Independent review accepted the diagnostic; this is not semantic-quality
+evidence.
+
+The accepted Knowledge Delta is that the existing canonical campaign runner,
+provider adapter, native correction, planner-wire boundary and custody path
+are operational for the bounded diagnostic, while structural validity remains
+distinct from semantic quality and host execution.
+
+A separate scientific authority is prepared, but not executed, for
+`population="a10-53"`, `mode="planner_only"`, all 53 immutable cases in
+source order, at most 106 logical generations and 106 physical attempts, and
+zero SDK retries. The exposure ledger marks B01 as an exposed diagnostic and
+the other 52 cases as fresh; production-grounded and exploratory cases remain
+separate. No provider call, benchmark execution, worker, persistence,
+rendering, P8, or holdout execution is authorized by this record.

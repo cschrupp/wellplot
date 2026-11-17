@@ -1,6 +1,6 @@
 # A10 Semantic Planner Evaluation Readiness
 
-Status: `A10_SEM_53_CANONICAL_MEASUREMENT_IMPLEMENTATION_ACCEPTED — B01_LIVE_DIAGNOSTIC_PREPARATION_ONLY`
+Status: `A10_SEM_53_B01_DIAGNOSTIC_ACCEPTED — FROZEN_EVALUATION_AUTHORITY_PREPARED`
 
 This is a provider-free readiness audit for the accepted frozen 53-case A10
 semantic planner evaluation. It does not execute the evaluation and does not
@@ -188,3 +188,28 @@ physical attempts and zero SDK retries. The loader may authenticate the frozen
 corpus internally, but only B01 is selected for provider submission. It remains
 unauthorized until a fresh namespace and current rolling llama.cpp readiness
 identity are independently authorized.
+
+## B01 Diagnostic Acceptance and Scientific Authority Preparation
+
+The B01 diagnostic subsequently ran through the canonical campaign entrypoint
+and is accepted as an engineering observation, not a semantic-quality result.
+Its first provider response failed local structured validation; the permitted
+native correction returned a valid `_PlannerWirePlan`. It used two logical
+provider calls and two physical attempts, then stopped at the planner-wire
+boundary. Workers, reconciliation, persistence, rendering, numerical sample
+APIs, and semantic grading were not entered.
+
+The sealed namespace is
+`workspace/evaluations/a10-sem-53-b01-diagnostic-20261117-001/`. Its terminal
+evidence digest is
+`b20114416026826678f250bbe46775f5841963ea6de183e0a7bb8781a711ef20` and its
+model-I/O digest is
+`6293159032c1ead34ee56b5ff3cfdd640a81433f4cda1b215550ae8a2b1cc772`.
+
+The scientific authority prepared from this Knowledge Delta binds the
+immutable 53-case benchmark in original order, with 35 production-grounded
+(`P`) cases and 18 exploratory (`E`) cases. B01 is marked
+`EXPOSED_DIAGNOSTIC_CASE`; the existing non-rediscovery ledger marks the
+remaining 52 cases `FRESH`. The planned ceiling is 106 logical generations
+and 106 physical attempts with zero SDK retries, in a fresh scientific
+namespace. Execution remains pending Human approval.

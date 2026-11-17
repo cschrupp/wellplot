@@ -1063,3 +1063,32 @@ of current authority.
 - **Boundary:** no benchmark population, holdout, worker, persistence,
   rendering, scorer, parallel runner, or alternate semantic engine is
   authorized by this acceptance.
+
+### A10-SEM-53 B01 Diagnostic Accepted; Frozen Evaluation Prepared
+
+- **Disposition:** `A10_SEM_53_B01_DIAGNOSTIC_ACCEPTED`.
+- **Observation:** the canonical `execute_live_campaign()` path processed
+  only `A10-SEM-53:B01` in `planner_only` mode. The first provider response
+  failed local structured validation; the native correction returned a valid
+  `_PlannerWirePlan`. Two logical/provider calls and two physical attempts
+  were used. Workers, reconciliation, persistence, rendering, numerical
+  sample APIs, and semantic grading were not entered.
+- **Custody:** evidence namespace
+  `workspace/evaluations/a10-sem-53-b01-diagnostic-20261117-001/`; terminal
+  evidence SHA-256
+  `b20114416026826678f250bbe46775f5841963ea6de183e0a7bb8781a711ef20`;
+  model-I/O SHA-256
+  `6293159032c1ead34ee56b5ff3cfdd640a81433f4cda1b215550ae8a2b1cc772`.
+  The original evidence remains immutable and is exported separately for
+  independent review.
+- **Knowledge Delta:** the existing canonical campaign path is operational
+  for bounded planner-only observation and preserves the distinction between
+  structural validity, semantic quality, and downstream host execution. B01
+  is not a semantic-quality result.
+- **Scientific readiness:** a separate authority is prepared for the
+  immutable 53-case population in original order: 35 production-grounded
+  (`P`) and 18 exploratory (`E`) cases, with B01 marked
+  `EXPOSED_DIAGNOSTIC_CASE` and the remaining 52 marked `FRESH`. The authority
+  permits at most 106 logical generations and 106 physical attempts with zero
+  SDK retries in a fresh namespace. No provider call or benchmark execution
+  is authorized by this record.

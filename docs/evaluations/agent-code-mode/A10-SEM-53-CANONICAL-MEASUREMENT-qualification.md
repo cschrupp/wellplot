@@ -1,6 +1,6 @@
 # A10-SEM-53 Canonical Measurement Qualification
 
-Status: `A10_SEM_53_CANONICAL_MEASUREMENT_IMPLEMENTATION_ACCEPTED — B01_LIVE_DIAGNOSTIC_PREPARATION_ONLY`
+Status: `A10_SEM_53_B01_DIAGNOSTIC_ACCEPTED — FROZEN_EVALUATION_AUTHORITY_PREPARED`
 
 This record covers a provider-free implementation that makes the accepted
 frozen 53-case A10 planner population available through the existing D5
@@ -278,6 +278,36 @@ terminal verification, and orderly client/process cleanup. A successful run
 stops at the validated planner-wire boundary; it does not execute workers,
 reconciliation, persistence, rendering, the frozen 53-case population, or
 holdouts. This preparation itself performed none of those live operations.
+
+## B01 Diagnostic Result and Frozen Evaluation Authority
+
+The B01 diagnostic was executed once through the canonical
+`execute_live_campaign()` path and is accepted as an engineering observation,
+not a semantic-quality result. The first provider response failed local
+structured validation; the permitted native correction returned a valid
+`_PlannerWirePlan`. The run used two logical/provider calls and two physical
+attempts and stopped at the planner-only wire boundary. Workers,
+reconciliation, persistence, rendering, numerical sample APIs, and semantic
+grading were not entered.
+
+Sealed evidence is retained at
+`workspace/evaluations/a10-sem-53-b01-diagnostic-20261117-001/`. The terminal
+evidence SHA-256 is
+`b20114416026826678f250bbe46775f5841963ea6de183e0a7bb8781a711ef20`; the
+model-I/O SHA-256 is
+`6293159032c1ead34ee56b5ff3cfdd640a81433f4cda1b215550ae8a2b1cc772`.
+
+The next authority is prepared, but not executed, for
+`population="a10-53"`, `mode="planner_only"`, all 53 immutable cases in
+original order, and a fresh scientific namespace. The population is 35
+production-grounded cases and 18 exploratory cases. B01 is explicitly
+`EXPOSED_DIAGNOSTIC_CASE`; the other 52 cases are `FRESH` according to the
+existing exposure ledger. The authority permits at most 106 logical
+generations and 106 physical attempts with zero SDK retries. It preserves
+complete model I/O, prompt/schema, validation, correction, planner-wire,
+stage-trace, source-provenance and campaign-custody evidence. No semantic
+score is inferred from structural output, and no worker, persistence,
+rendering, P8 or holdout activity is included.
 
 ## Changed files
 

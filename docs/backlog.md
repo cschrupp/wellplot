@@ -623,3 +623,29 @@ checkpoint `b3973390` restored the four A10 implementation/test files to their
 original contents. The R1/R2 orchestrator, private campaign state, and partial
 scorer are retired; the frozen benchmark, source inventory, and Smoke 003
 evidence remain immutable. No parallel runner or scorer is authorized.
+
+### A10-SEM-53 — Frozen Planner Evaluation Readiness
+
+**Status:** authority prepared; Human execution approval pending.
+
+The B01 canonical campaign integration diagnostic is accepted as an
+engineering observation, not a semantic-quality result. Its first structured
+response was invalid locally and its one native correction produced a valid
+planner wire plan. The original B01 evidence remains immutable.
+
+The next bounded operation is the existing canonical `D5CampaignRunner` in
+`planner_only` mode over all 53 immutable cases in original order. The
+population contains 35 production-grounded cases and 18 exploratory cases.
+B01 is explicitly `EXPOSED_DIAGNOSTIC_CASE`; the existing exposure ledger
+identifies the remaining 52 cases as `FRESH`. The authority is limited to 106
+logical generations, 106 physical attempts, and zero SDK retries in a fresh
+scientific namespace.
+
+The assessment records observations only: first and eventual schema validity,
+correction behavior, request completeness, channel/capability selection,
+unsupported or ambiguous handling, hallucinated or unauthorized additions,
+multi-operation preservation, deterministic pre-generation rejection,
+latency, and token use. It must not infer semantic correctness or host
+execution from planner-wire output. No workers, persistence, rendering, P8,
+holdout, alternate runner, scorer, semantic engine, or provider adapter is
+authorized.
