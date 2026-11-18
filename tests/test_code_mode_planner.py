@@ -7,6 +7,7 @@ import inspect
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -18,6 +19,7 @@ from wellplot.agent.code_mode.planner import (
     PlannerSemanticFailure,
     ReportTask,
     SectionTask,
+    SemanticOperation,
     SemanticPlan,
     SemanticPlanner,
     _attach_request_obligations,
@@ -39,6 +41,7 @@ from wellplot.agent.providers.base import (
     StructuredGenerationRequest,
     StructuredGenerationResult,
 )
+from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
 from wellplot.agent.providers.response_diagnostics import (
     ProviderResponseFailureReason,
     ProviderSchemaValidationIssue,
@@ -289,6 +292,86 @@ def test_semantic_schema_contains_no_document_identity_fields() -> None:
     assert "span_sha256" not in schema_text
     assert "start_byte" not in schema_text
     assert "end_byte" not in schema_text
+
+
+@pytest.mark.parametrize("scope", ["report", "section"])
+@pytest.mark.parametrize(
+    ("verb", "states", "accepted"),
+    [
+        pytest.param("SET", ("SET",), True, id="set-one"),
+        pytest.param("SET", None, False, id="set-missing"),
+        pytest.param("SET", (), False, id="set-empty"),
+        pytest.param("SET", ("SET", "SET"), False, id="set-multiple"),
+        pytest.param("SET", ("CLEAR",), True, id="set-clear"),
+        pytest.param("CREATE", ("SET", "SET"), True, id="create-multiple"),
+    ],
+)
+def test_provider_advertises_set_cardinality_in_both_task_paths(
+    scope: str, verb: str, states: tuple[str, ...] | None, accepted: bool
+) -> None:
+    """Check the actual adapter schema and the unchanged local validation path."""
+    operation: dict[str, object] = {
+        "local_ref": "set-heading",
+        "scope_ref": scope,
+        "verb": verb,
+        "object_kind": "report_field" if scope == "report" else "section",
+    }
+    if verb == "SET":
+        operation["target_clue"] = "the current heading"
+    else:
+        operation["semantic_ref"] = "new-heading"
+    if states is not None:
+        operation["field_values"] = [
+            {"field": name, "state": state, "value": None if state == "CLEAR" else "Heading"}
+            for name, state in zip(("title", "subtitle"), states, strict=False)
+        ]
+    task = {"goal": "Set a heading.", "operations": [operation]}
+    payload: dict[str, object] = {"version": "wellplot.semantic-plan.v2", "summary": "Heading."}
+    if scope == "report":
+        payload["report_task"] = task
+    else:
+        payload["section_tasks"] = [
+            {
+                **task,
+                "scope_ref": scope,
+                "capability_ids": ["section.log_plot"],
+                "existing_section_hint": "Main Log",
+            }
+        ]
+
+    calls: list[dict[str, object]] = []
+
+    async def create(**arguments: object) -> object:
+        calls.append(arguments)
+        choice = SimpleNamespace(
+            message=SimpleNamespace(role="assistant", content=json.dumps(payload)),
+            finish_reason="stop",
+        )
+        return SimpleNamespace(choices=[choice], usage=None)
+
+    backend = OpenAICompatibleBackendV2(
+        model="local-test",
+        client=SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create))),
+        structured_output="json_schema",
+    )
+    request = StructuredGenerationRequest(
+        system_prompt="System", user_prompt="User", timeout_seconds=5
+    )
+    result = backend.generate_structured(request, response_model=_PlannerWirePlan)
+    if accepted:
+        assert isinstance(asyncio.run(result).value, _PlannerWirePlan)
+    else:
+        with pytest.raises(StructuredResponseProviderError) as caught:
+            asyncio.run(result)
+        assert caught.value.response_reason == ProviderResponseFailureReason.SCHEMA_VALIDATION
+    (call,) = calls
+    response_format = call["response_format"]
+    assert response_format["type"] == "json_schema"
+    assert response_format["json_schema"]["strict"] is True
+    schema = response_format["json_schema"]["schema"]
+    assert schema == _PlannerWirePlan.model_json_schema()
+    assert Draft202012Validator(schema).is_valid(payload) is accepted
+    assert Draft202012Validator(SemanticOperation.model_json_schema()).is_valid(operation)
 
 
 def test_provider_schema_requires_work_unit_and_revision_hint_key() -> None:

@@ -8,7 +8,17 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    GetJsonSchemaHandler,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import CoreSchema
 
 from ...capabilities import CapabilityRegistry
 from ..providers.base import (
@@ -310,6 +320,41 @@ class _PlannerWirePlan(_SemanticModel):
         str_strip_whitespace=True,
         json_schema_extra=lambda schema: _add_work_unit_schema_constraint(schema),
     )
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        """Advertise the existing SET cardinality rule without changing validation."""
+        schema = handler(core_schema)
+        task = handler.resolve_ref_schema(schema["properties"]["section_tasks"]["items"])
+        # Report and section operations share this definition in the wire schema.
+        operation = handler.resolve_ref_schema(task["properties"]["operations"]["items"])
+        properties = operation["properties"]
+        verb = properties["verb"]
+        set_verb = {key: value for key, value in verb.items() if key != "enum"}
+        set_fields = {
+            key: value for key, value in properties["field_values"].items() if key != "default"
+        }
+        other_operation = {
+            **operation,
+            "properties": {
+                **properties,
+                "verb": {**verb, "enum": [value for value in verb["enum"] if value != "SET"]},
+            },
+        }
+        set_operation = {
+            **operation,
+            "properties": {
+                **properties,
+                "verb": {**set_verb, "const": "SET"},
+                "field_values": {**set_fields, "minItems": 1, "maxItems": 1},
+            },
+            "required": [*operation["required"], "field_values"],
+        }
+        operation.clear()
+        operation["anyOf"] = [other_operation, set_operation]
+        return schema
 
     @classmethod
     def model_validate(cls, obj: object, **kwargs: object) -> _PlannerWirePlan:
