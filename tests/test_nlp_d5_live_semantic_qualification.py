@@ -481,7 +481,7 @@ def test_a10_campaign_uses_shared_runner_without_semantic_scoring(tmp_path: Path
 
 
 def test_first_pass_authority_pins_panel_and_request_controls(tmp_path: Path) -> None:
-    """Validate the exact development turn set and forbid wider live admission."""
+    """Validate authorized ordered subsets and forbid wider live admission."""
     authorization = _a10_authorization(
         campaign_id="a10-first-pass-preflight",
         artifact_root=str(tmp_path / "evidence"),
@@ -502,6 +502,55 @@ def test_first_pass_authority_pins_panel_and_request_controls(tmp_path: Path) ->
         "section_worker": 0,
     }
     assert preflight["static"]["planner_first_pass_max_output_tokens"] == 4096
+
+    b01 = ("A10-SEM-53:B01",)
+    remaining_nine = tuple(
+        turn_id for turn_id in d5.A10_FIRST_PASS_TURN_IDS if turn_id != "A10-SEM-53:B01"
+    )
+    for selected, expected_ceiling in ((b01, 1), (remaining_nine, 9)):
+        subset_authority = replace(
+            authorization,
+            planner_first_pass_turn_ids=selected,
+            campaign_id=f"a10-first-pass-preflight-{expected_ceiling}",
+        )
+        subset_preflight = d5.provider_free_preflight(
+            REPO_ROOT,
+            subset_authority,
+            _paths(tmp_path, subset_authority.campaign_id),
+            static_checker=lambda repo, checked, paths: {"status": "PASS"},
+            population=d5.A10_SEM_53_POPULATION,
+            turn_ids=selected,
+        )
+        assert subset_preflight["population"]["turn_ids"] == list(selected)
+        assert subset_preflight["population"]["turns"] == expected_ceiling
+        assert subset_preflight["logical_call_ceiling"] == expected_ceiling
+        assert subset_preflight["physical_attempt_upper_bound"] == expected_ceiling
+
+        adapter = _ProviderFreePlannerPopulationAdapter()
+        adapter.planner_first_pass_max_output_tokens = 4096
+        runner = d5.D5CampaignRunner(
+            repo_root=REPO_ROOT,
+            authorization=subset_authority,
+            paths=_paths(tmp_path, subset_authority.campaign_id),
+            readiness=_ready(),
+            provenance={"population": d5.A10_SEM_53_POPULATION},
+        )
+        result = asyncio.run(
+            runner.run(
+                adapter,
+                mode="planner_only",
+                population=d5.A10_SEM_53_POPULATION,
+                turn_ids=selected,
+            )
+        )
+        state = json.loads(
+            _paths(tmp_path, subset_authority.campaign_id).state.read_text(encoding="utf-8")
+        )
+        assert tuple(row["turn_id"] for row in result["rows"]) == selected
+        assert result["logical_generation_calls"] == expected_ceiling
+        assert result["physical_generation_attempts"] == expected_ceiling
+        assert state["logical_call_ceiling"] == expected_ceiling
+        assert state["physical_attempt_upper_bound"] == expected_ceiling
 
     ledger = d5.D5LogicalCallLedger(
         max_logical_calls=10, max_physical_attempts=10, planner_first_pass=True
@@ -534,6 +583,39 @@ def test_first_pass_authority_pins_panel_and_request_controls(tmp_path: Path) ->
             turn_ids=("A10-SEM-53:A02",),
             api_key_loader=lambda: pytest.fail("credential access before selection rejection"),
         )
+
+    b01_authority = replace(
+        authorization,
+        planner_first_pass_turn_ids=("A10-SEM-53:B01",),
+    )
+    with pytest.raises(d5.D5StaticPreflightError, match="turn selection"):
+        d5.provider_free_preflight(
+            REPO_ROOT,
+            b01_authority,
+            _paths(tmp_path, "a10-first-pass-unauthorized-preflight"),
+            static_checker=lambda repo, checked, paths: {"status": "PASS"},
+            population=d5.A10_SEM_53_POPULATION,
+            turn_ids=("A10-SEM-53:A01",),
+        )
+    unauthorized_runner = d5.D5CampaignRunner(
+        repo_root=REPO_ROOT,
+        authorization=b01_authority,
+        paths=_paths(tmp_path, "a10-first-pass-unauthorized-runner"),
+        readiness=_ready(),
+        provenance={"population": d5.A10_SEM_53_POPULATION},
+    )
+    unauthorized_adapter = _ProviderFreePlannerPopulationAdapter()
+    unauthorized_adapter.planner_first_pass_max_output_tokens = 4096
+    with pytest.raises(d5.D5StaticPreflightError, match="turn selection"):
+        asyncio.run(
+            unauthorized_runner.run(
+                unauthorized_adapter,
+                mode="planner_only",
+                population=d5.A10_SEM_53_POPULATION,
+                turn_ids=("A10-SEM-53:A01",),
+            )
+        )
+    assert unauthorized_adapter.logical_call_count == 0
 
 
 @pytest.mark.parametrize("interrupt", [False, True])

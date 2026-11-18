@@ -595,6 +595,7 @@ class D5Authorization:
     planner_population_benchmark_sha256: str = ""
     planner_population_source_inventory_sha256: str = ""
     planner_first_pass_max_output_tokens: int | None = None
+    planner_first_pass_turn_ids: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
         """Require pinned controls when first-pass development is selected."""
@@ -606,6 +607,17 @@ class D5Authorization:
             or self.sdk_max_retries != 0
         ):
             raise D5StaticPreflightError("invalid A10 first-pass authority")
+        if self.planner_first_pass_turn_ids is not None:
+            selected = self.planner_first_pass_turn_ids
+            if (
+                cap is None
+                or not selected
+                or any(not isinstance(turn_id, str) for turn_id in selected)
+                or len(set(selected)) != len(selected)
+                or selected
+                != tuple(turn_id for turn_id in A10_FIRST_PASS_TURN_IDS if turn_id in selected)
+            ):
+                raise D5StaticPreflightError("invalid A10 first-pass turn selection")
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> D5Authorization:
@@ -637,6 +649,12 @@ class D5Authorization:
         digest = value["thinking_control_options_sha256"]
         if digest != THINKING_CONTROL_OPTIONS_SHA256:
             raise D5StaticPreflightError("thinking-off request control digest drifted")
+        selected_first_pass_turns = value.get("planner_first_pass_turn_ids")
+        if selected_first_pass_turns is not None and (
+            not isinstance(selected_first_pass_turns, list)
+            or any(not isinstance(turn_id, str) for turn_id in selected_first_pass_turns)
+        ):
+            raise D5StaticPreflightError("invalid A10 first-pass turn selection")
         capture_mode = value.get("section_action_capture_mode", "off")
         if not isinstance(capture_mode, str) or capture_mode not in {
             "off",
@@ -706,6 +724,9 @@ class D5Authorization:
                 value.get("planner_population_source_inventory_sha256", "")
             ),
             planner_first_pass_max_output_tokens=value.get("planner_first_pass_max_output_tokens"),
+            planner_first_pass_turn_ids=(
+                tuple(selected_first_pass_turns) if selected_first_pass_turns is not None else None
+            ),
         )
 
 
@@ -720,9 +741,10 @@ def _select_first_pass_turns(
         return turn_ids
     if population != A10_SEM_53_POPULATION or mode != "planner_only":
         raise D5StaticPreflightError("first-pass authority requires the A10 planner population")
-    if turn_ids is not None and tuple(turn_ids) != A10_FIRST_PASS_TURN_IDS:
-        raise D5StaticPreflightError("first-pass turn selection differs from the A10 panel")
-    return A10_FIRST_PASS_TURN_IDS
+    authorized_turns = authorization.planner_first_pass_turn_ids or A10_FIRST_PASS_TURN_IDS
+    if turn_ids is not None and tuple(turn_ids) != authorized_turns:
+        raise D5StaticPreflightError("first-pass turn selection differs from the authority")
+    return authorized_turns
 
 
 def _authorized_artifact_root(repo_root: Path, authorization: D5Authorization) -> Path:
@@ -4690,6 +4712,7 @@ def execute_live_campaign(
         paths,
         static_checker=static_checker,
         population=population,
+        turn_ids=turn_ids,
     )
     load_key = api_key_loader or (lambda: d4.load_d4_api_key(repo_root))
     build_provider = provider_factory or (
@@ -7023,9 +7046,10 @@ def provider_free_preflight(
     *,
     static_checker: Callable[[Path, D5Authorization, EvidencePaths], dict[str, Any]] | None = None,
     population: str = "d4",
+    turn_ids: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """Run static D5-4 checks without credentials, endpoints, or providers."""
-    first_pass_turns = _select_first_pass_turns(authorization, population, "planner_only", None)
+    first_pass_turns = _select_first_pass_turns(authorization, population, "planner_only", turn_ids)
     calls_per_case = 1 if first_pass_turns is not None else MAX_PLANNER_LOGICAL_CALLS
     role_limits = dict(ROLE_LOGICAL_CALL_LIMITS)
     project_config = load_project_config(repo_root)
@@ -7066,6 +7090,7 @@ def provider_free_preflight(
         static_facts["planner_first_pass_max_output_tokens"] = (
             authorization.planner_first_pass_max_output_tokens
         )
+        static_facts["planner_first_pass_turn_ids"] = list(first_pass_turns)
     return {
         "experiment_version": D5_EXPERIMENT_VERSION,
         "status": "PASS",
