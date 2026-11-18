@@ -1902,6 +1902,8 @@ def test_schema_validation_uses_a_bounded_schema_correction_request() -> None:
     assert len(backend.requests) == 2
     initial, retry = backend.requests
     assert initial.user_prompt != retry.user_prompt
+    assert planner_module._INITIAL_OPERATION_CONTRACT in initial.user_prompt
+    assert planner_module._INITIAL_OPERATION_CONTRACT not in retry.user_prompt
     assert "Schema correction context:\n" in retry.user_prompt
     assert "SECRET_SCHEMA_VALIDATION_DETAILS" not in retry.user_prompt
     assert "SECRET_SCHEMA_VALIDATION_DETAILS" not in retry.system_prompt
@@ -2095,6 +2097,29 @@ def test_planner_prompt_states_exclusive_work_ownership() -> None:
     assert "placeholder work units" in prompt
     assert "inside the existing report_task" not in prompt
     assert prompt.count("Report-only requests") == 1
+
+
+def test_initial_operation_examples_match_wire_and_local_validators() -> None:
+    """Examples teach required refs and distinguish SET from field-level CLEAR."""
+    examples = planner_module._INITIAL_OPERATION_CONTRACT.split("\n[", 1)[1]
+    operations = json.loads("[" + examples)
+    payload = {
+        "version": "wellplot.semantic-plan.v2",
+        "summary": "Demonstrate two report operation shapes.",
+        "report_task": {"goal": "Illustrate an ensure and a clear.", "operations": operations},
+    }
+    Draft202012Validator(_PlannerWirePlan.model_json_schema()).validate(payload)
+    report = _PlannerWirePlan.model_validate(payload).report_task
+    assert report is not None
+    ensure, clear = report.operations
+    assert ensure.verb == "ENSURE"
+    assert ensure.semantic_ref is not None
+    assert ensure.field_values[0].value is not None
+    assert clear.verb == "SET"
+    assert clear.target_clue
+    assert len(clear.field_values) == 1
+    assert clear.field_values[0].state == "CLEAR"
+    assert clear.field_values[0].value is None
 
 
 def test_schema_correction_helper_has_no_previous_response_arguments() -> None:

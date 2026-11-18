@@ -480,6 +480,187 @@ def test_a10_campaign_uses_shared_runner_without_semantic_scoring(tmp_path: Path
     assert b01["first_divergence"] == "NONE"
 
 
+def test_first_pass_authority_pins_panel_and_request_controls(tmp_path: Path) -> None:
+    """Validate the exact development turn set and forbid wider live admission."""
+    authorization = _a10_authorization(
+        campaign_id="a10-first-pass-preflight",
+        artifact_root=str(tmp_path / "evidence"),
+    )
+    authorization = replace(authorization, planner_first_pass_max_output_tokens=4096)
+    preflight = d5.provider_free_preflight(
+        REPO_ROOT,
+        authorization,
+        _paths(tmp_path, authorization.campaign_id),
+        static_checker=lambda repo, checked, paths: {"status": "PASS"},
+        population=d5.A10_SEM_53_POPULATION,
+    )
+    assert preflight["population"]["turn_ids"] == list(d5.A10_FIRST_PASS_TURN_IDS)
+    assert preflight["logical_call_ceiling"] == preflight["physical_attempt_upper_bound"] == 10
+    assert preflight["role_logical_call_limits"] == {
+        "planner": 1,
+        "report_worker": 0,
+        "section_worker": 0,
+    }
+    assert preflight["static"]["planner_first_pass_max_output_tokens"] == 4096
+
+    ledger = d5.D5LogicalCallLedger(
+        max_logical_calls=10, max_physical_attempts=10, planner_first_pass=True
+    )
+    ledger.begin_turn(d5.A10_FIRST_PASS_TURN_IDS[0])
+    first_call = ledger.reserve("planner")
+    ledger.physical_attempt(first_call)
+    with pytest.raises(d5.D5CallCapExceeded, match="SDK retries"):
+        ledger.physical_attempt(first_call)
+    with pytest.raises(d5.D5CallCapExceeded, match="planner logical call limit 1"):
+        ledger.reserve("planner")
+    with pytest.raises(d5.D5CallCapExceeded, match="section_worker logical call limit 0"):
+        ledger.reserve("section_worker")
+
+    for overrides in (
+        {"planner_first_pass_max_output_tokens": "4096"},
+        {"sdk_max_retries": 1},
+        {"planner_population": ""},
+    ):
+        with pytest.raises(d5.D5StaticPreflightError, match="first-pass authority"):
+            replace(authorization, **overrides)
+
+    with pytest.raises(d5.D5StaticPreflightError, match="turn selection"):
+        d5.execute_live_campaign(
+            repo_root=REPO_ROOT,
+            authorization=authorization,
+            artifact_root=tmp_path / "evidence",
+            population=d5.A10_SEM_53_POPULATION,
+            mode="planner_only",
+            turn_ids=("A10-SEM-53:A02",),
+            api_key_loader=lambda: pytest.fail("credential access before selection rejection"),
+        )
+
+
+@pytest.mark.parametrize("interrupt", [False, True])
+def test_first_pass_campaign_captures_one_response_per_case(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, interrupt: bool
+) -> None:
+    """Exercise SDK serialization, local validation and actual custody through the runner."""
+    from openai import _base_client
+
+    monkeypatch.setattr(_base_client, "get_platform", lambda: "Linux")
+    authorization = replace(
+        _a10_authorization(
+            campaign_id="a10-first-pass-transport",
+            artifact_root=str(tmp_path / "evidence"),
+        ),
+        planner_first_pass_max_output_tokens=4096,
+    )
+    paths = _paths(tmp_path, authorization.campaign_id)
+    clients = []
+    requests = []
+
+    async def respond(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        requests.append(payload)
+        if interrupt and len(requests) == 2:
+            raise httpx.ReadTimeout("provider-free interruption", request=request)
+        response = _planner_wire_payload()
+        if len(requests) == 1:
+            response = {"version": "wellplot.semantic-plan.v2", "summary": "Invalid fixture."}
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": json.dumps(response)},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
+            },
+            request=request,
+        )
+
+    def client_factory(observer: d5._PhysicalAttemptObserver) -> httpx.AsyncClient:
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(respond),
+            event_hooks={"request": [observer.on_request], "response": [observer.on_response]},
+        )
+        clients.append(client)
+        return client
+
+    def source_context(_repo: Path, case: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "document_summary": {},
+            "source_summary": {"sources": []},
+            "source_asset_identity": {"asset_id": case["source_key"]},
+            "source_channel_count": 1,
+            "numeric_sample_apis_invoked": False,
+        }
+
+    create_adapter = d5.create_live_adapter
+    monkeypatch.setattr(
+        d5,
+        "create_live_adapter",
+        lambda **kwargs: create_adapter(**kwargs, http_client_factory=client_factory),
+    )
+    monkeypatch.setattr(d5, "_build_planner_smoke_inputs", source_context)
+    try:
+        result = d5.execute_live_campaign(
+            repo_root=REPO_ROOT,
+            authorization=authorization,
+            artifact_root=paths.root,
+            endpoint_get=lambda url, token: (
+                {"data": [{"id": d5.EXPECTED_MODEL}]}
+                if url == PROJECT_CONFIG.model_catalog_url
+                else _props()
+            ),
+            api_key_loader=lambda: "provider-free-test-token",
+            static_checker=lambda repo, auth, paths: {"status": "PASS"},
+            population=d5.A10_SEM_53_POPULATION,
+            mode="planner_only",
+        )
+    finally:
+        for client in clients:
+            asyncio.run(client.aclose())
+
+    assert len(requests) == (2 if interrupt else 10)
+    assert (
+        result["logical_generation_calls"]
+        == result["physical_generation_attempts"]
+        == len(requests)
+    )
+    assert all(payload["max_tokens"] == 4096 for payload in requests)
+    assert all("max_completion_tokens" not in payload for payload in requests)
+    assert all("Check these rules" in payload["messages"][1]["content"] for payload in requests)
+    assert all(
+        "Schema correction context:" not in payload["messages"][1]["content"]
+        for payload in requests
+    )
+    rows = result["rows"]
+    assert rows[0]["observation_status"] == "MODEL_STRUCTURAL_FAILURE"
+    assert all(row["correction_usage"]["native_correction"] == 0 for row in rows)
+    assert all(row["authoring_status"] == "NOT_REACHED" for row in rows)
+    assert [row["turn_id"] for row in rows] == list(d5.A10_FIRST_PASS_TURN_IDS[: len(rows)])
+    if interrupt:
+        assert result["decision"] == "INCONCLUSIVE"
+        assert result["attribution"] == "PROVIDER_OR_TRANSPORT_RUNTIME"
+        assert len(rows) == 1
+    else:
+        assert result["decision"] == "PASS"
+        assert len(rows) == 10
+        assert all(row["schema_valid"] for row in rows[1:])
+    assert "PLANNER_GENERATION_FAIL" in paths.stage_trace.read_text(encoding="utf-8")
+    assert "WIRE_TO_CANONICAL_ENTER" not in paths.stage_trace.read_text(encoding="utf-8")
+    model_io = [json.loads(line) for line in paths.model_io.read_text().splitlines()]
+    initial_failure = next(
+        event
+        for event in model_io
+        if event["event"] == "logical_call_result" and event["logical_call_index"] == 1
+    )
+    assert initial_failure["response_reason"] == "schema_validation"
+    assert initial_failure["validation_shape"]["issues"]
+    assert sum("request_body_base64" in event for event in model_io) == len(requests)
+    assert sum("response_body_base64" in event for event in model_io) == (1 if interrupt else 10)
+    assert d5.verify_custody_artifacts(paths) == result["custody_digests"]
+
+
 def test_a10_invalid_after_correction_is_a_structural_observation(tmp_path: Path) -> None:
     """A final invalid response is measured without becoming infrastructure failure."""
     authorization = _a10_authorization(

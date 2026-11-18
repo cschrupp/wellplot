@@ -323,6 +323,7 @@ class CountingBackend:
     calls: list[LogicalCall] = field(default_factory=list)
     ledger: LogicalCallLedger | None = None
     capture_logical_identity: bool = False
+    planner_max_output_tokens: int | None = None
 
     def __post_init__(self) -> None:
         """Give standalone wrappers a ledger while allowing campaign sharing."""
@@ -349,10 +350,11 @@ class CountingBackend:
         except KeyError:
             raise PreflightError("unrecognized structured generation role") from None
 
-    @staticmethod
-    def _validate_controls(request: object, generation_role: str) -> None:
+    def _validate_controls(self, request: object, generation_role: str) -> None:
         """Attest controls emitted by the accepted planner and typed workers."""
-        expected = (0.0, None) if generation_role == "planner" else (None, None)
+        expected = (
+            (0.0, self.planner_max_output_tokens) if generation_role == "planner" else (None, None)
+        )
         temperature = getattr(request, "temperature", None)
         max_output_tokens = getattr(request, "max_output_tokens", None)
         if (temperature, max_output_tokens) != expected:

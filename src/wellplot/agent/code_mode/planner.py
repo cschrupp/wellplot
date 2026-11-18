@@ -1547,12 +1547,14 @@ def _planning_request(
     temperature: float | None,
     max_output_tokens: int | None,
 ) -> StructuredGenerationRequest:
-    """Build the single initial structured planner request."""
+    """Build the first-pass request, also used unchanged by the generic retry."""
     return StructuredGenerationRequest(
         system_prompt=_PLANNER_SYSTEM_PROMPT,
         user_prompt=(
             "Create one SemanticPlan for this request. Return only the supplied "
-            "structured response model.\n\nContext:\n"
+            "structured response model.\n\n"
+            + _INITIAL_OPERATION_CONTRACT
+            + "\n\nContext:\n"
             + json.dumps(context, sort_keys=True, separators=(",", ":"))
         ),
         timeout_seconds=timeout_seconds,
@@ -1946,6 +1948,35 @@ def _require_nonempty_items(values: tuple[str, ...]) -> None:
     """Require each semantic list item to contain meaningful text."""
     if any(not isinstance(value, str) or not value.strip() for value in values):
         raise ValueError("Semantic text collections cannot contain blank items.")
+
+
+_INITIAL_OPERATION_CONTRACT = """Check these rules before returning the plan:
+- CREATE and ENSURE require a non-null request-local semantic_ref. UPDATE, REMOVE,
+  and operation verb=SET require a natural-language target_clue. Verb SET requires
+  exactly one field_values entry.
+- Field-value state=SET requires a non-null value. Field-value state=CLEAR requires
+  a null value and can be used inside an operation with verb=SET.
+- Give operations unique local_ref values and declared objects unique semantic_ref
+  values. An operation's scope_ref must match its owning task (report for report
+  work). parent_ref and anchor_ref point to declared semantic_ref values in the
+  same scope, not to local_ref values. MOVE requires semantic_ref, relation, and
+  anchor_ref; other verbs must not set relation or anchor_ref.
+- Include conditions only for requested conditional work. Channel predicates
+  require evidence_kind=inspected_source and an explicit channel_clue; target
+  predicates require evidence_kind=document_snapshot and no channel_clue. Use
+  a supplied evidence reference, not a made-up one.
+- Preserve every supported requested change and explicit constraint. Do not
+  substitute channels, invent executable work, or add unrequested settings.
+
+Synthetic operation examples (use only as shape examples, never as work items):
+[
+  {"local_ref":"add-note","scope_ref":"report","verb":"ENSURE","object_kind":"remark",
+   "semantic_ref":"note.inspection",
+   "field_values":[{"field":"remark","state":"SET","value":"Inspection pending"}]},
+  {"local_ref":"clear-subtitle","scope_ref":"report","verb":"SET","object_kind":"report_field",
+   "target_clue":"the report subtitle",
+   "field_values":[{"field":"subtitle","state":"CLEAR","value":null}]}
+]"""
 
 
 _PLANNER_SYSTEM_PROMPT = """You are the semantic planning stage of Wellplot Code Mode v2.

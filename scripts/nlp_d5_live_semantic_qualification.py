@@ -102,6 +102,11 @@ A10_SEM_53_SOURCE_INVENTORY_SHA256 = (
     "21f11462696af7a9f1d9b18d625a6a311794912b9ef10a70106f0267e83c19b0"
 )
 A10_SEM_53_CASE_COUNT = 53
+A10_FIRST_PASS_TURN_IDS = tuple(
+    f"A10-SEM-53:{case_id}"
+    for case_id in ("A01", "B01", "C01", "D01", "D05", "E01", "F04", "G01", "G02", "H01")
+)
+A10_FIRST_PASS_MAX_OUTPUT_TOKENS = 4096
 A10_SEM_53_DIAGNOSTIC_CASE_ID = "B01"
 A10_SEM_02_SMOKE_CASE_ID = "B01"
 A10_SEM_02_SMOKE_SOURCE_KEY = "approved_las"
@@ -244,6 +249,10 @@ class D5HarnessError(RuntimeError):
 
 class _PlannerOnlyWireCaptured(Exception):
     """Stop after the production planner's schema-validated wire DTO is captured."""
+
+
+class _PlannerFirstResponseInvalid(Exception):
+    """Stop before correction after the initial provider response fails validation."""
 
 
 class D5StaticPreflightError(D5HarnessError):
@@ -585,6 +594,18 @@ class D5Authorization:
     planner_population: str = ""
     planner_population_benchmark_sha256: str = ""
     planner_population_source_inventory_sha256: str = ""
+    planner_first_pass_max_output_tokens: int | None = None
+
+    def __post_init__(self) -> None:
+        """Require pinned controls when first-pass development is selected."""
+        cap = self.planner_first_pass_max_output_tokens
+        if cap is not None and (
+            type(cap) is not int
+            or cap != A10_FIRST_PASS_MAX_OUTPUT_TOKENS
+            or self.planner_population != A10_SEM_53_POPULATION
+            or self.sdk_max_retries != 0
+        ):
+            raise D5StaticPreflightError("invalid A10 first-pass authority")
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> D5Authorization:
@@ -684,7 +705,24 @@ class D5Authorization:
             planner_population_source_inventory_sha256=str(
                 value.get("planner_population_source_inventory_sha256", "")
             ),
+            planner_first_pass_max_output_tokens=value.get("planner_first_pass_max_output_tokens"),
         )
+
+
+def _select_first_pass_turns(
+    authorization: D5Authorization,
+    population: str,
+    mode: str,
+    turn_ids: Sequence[str] | None,
+) -> Sequence[str] | None:
+    """Constrain the opt-in first-pass authority to the exposed development panel."""
+    if authorization.planner_first_pass_max_output_tokens is None:
+        return turn_ids
+    if population != A10_SEM_53_POPULATION or mode != "planner_only":
+        raise D5StaticPreflightError("first-pass authority requires the A10 planner population")
+    if turn_ids is not None and tuple(turn_ids) != A10_FIRST_PASS_TURN_IDS:
+        raise D5StaticPreflightError("first-pass turn selection differs from the A10 panel")
+    return A10_FIRST_PASS_TURN_IDS
 
 
 def _authorized_artifact_root(repo_root: Path, authorization: D5Authorization) -> Path:
@@ -2956,6 +2994,7 @@ class D5LogicalCallLedger:
     calls: list[dict[str, Any]] = field(default_factory=list)
     active_turn_id: str | None = None
     turn_role_counts: dict[str, int] = field(default_factory=dict)
+    planner_first_pass: bool = False
 
     def begin_turn(self, turn_id: str) -> None:
         """Reset per-turn role accounting at the frozen turn boundary."""
@@ -2969,13 +3008,17 @@ class D5LogicalCallLedger:
         if self.active_turn_id is not None:
             used = self.turn_role_counts.get(role, 0)
             limit = ROLE_LOGICAL_CALL_LIMITS[role]
+            if self.planner_first_pass:
+                limit = 1 if role == "planner" else 0
             if used >= limit:
                 raise D5CallCapExceeded(
                     f"{role} logical call limit {limit} exceeded for turn {self.active_turn_id}"
                 )
         next_index = self.logical_calls + 1
         if next_index > self.max_logical_calls:
-            raise D5CallCapExceeded("logical call 46 rejected before provider delegation")
+            raise D5CallCapExceeded(
+                f"logical call {next_index} rejected before provider delegation"
+            )
         self.logical_calls = next_index
         self.calls.append(
             {
@@ -2993,13 +3036,15 @@ class D5LogicalCallLedger:
         """Record one SDK-level attempt without reserving a new logical call."""
         if logical_index < 1 or logical_index > self.logical_calls:
             raise D5HarnessError("physical attempt references unknown logical call")
+        row = self.calls[logical_index - 1]
+        if self.planner_first_pass and row["physical_attempt_count"] > 0:
+            raise D5CallCapExceeded("first-pass request forbids SDK retries")
         next_attempt = self.physical_attempts + 1
         if next_attempt > self.max_physical_attempts:
             raise D5CallCapExceeded(
                 f"physical attempt {next_attempt} rejected before provider delegation"
             )
         self.physical_attempts += 1
-        row = self.calls[logical_index - 1]
         row["physical_attempt_count"] += 1
 
     def complete(self, logical_index: int, outcome: str) -> None:
@@ -3120,6 +3165,11 @@ class D5CampaignCustody:
             "logical_call_ceiling": logical_limit,
             "physical_attempt_upper_bound": physical_limit,
         }
+        first_pass = authorization.planner_first_pass_max_output_tokens is not None
+        if first_pass:
+            state["planner_first_pass_max_output_tokens"] = (
+                authorization.planner_first_pass_max_output_tokens
+            )
         if not evidence_is_redacted(state):
             raise D5HarnessError("state redaction failure")
         return cls(
@@ -3129,6 +3179,7 @@ class D5CampaignCustody:
             ledger=D5LogicalCallLedger(
                 max_logical_calls=logical_limit,
                 max_physical_attempts=physical_limit,
+                planner_first_pass=first_pass,
             ),
             authorization_id=authorization.authorization_id,
             mode=mode,
@@ -4176,15 +4227,36 @@ class _ObservedLiveAdapter:
 
     observes_physical_attempts = True
 
-    def __init__(self, inner: object, observer: _PhysicalAttemptObserver) -> None:
+    def __init__(
+        self,
+        inner: object,
+        observer: _PhysicalAttemptObserver,
+        *,
+        planner_first_pass_max_output_tokens: int | None = None,
+    ) -> None:
         self.inner = inner
         self.observer = observer
+        self.planner_first_pass_max_output_tokens = planner_first_pass_max_output_tokens
         self._trace_events: list[dict[str, Any]] = []
         self._stop_after_wire = False
 
     def enable_planner_only_boundary(self) -> None:
         """Stop the canonical planner after a validated wire response."""
         self._stop_after_wire = True
+
+    def stop_at_planner_boundary(self, event: Mapping[str, Any]) -> None:
+        """End observation on validated wire or, opt-in, initial structural rejection."""
+        if not self._stop_after_wire:
+            return
+        if event.get("event") == "PLANNER_GENERATION_PASS":
+            raise _PlannerOnlyWireCaptured
+        if (
+            self.planner_first_pass_max_output_tokens is not None
+            and event.get("event") == "PLANNER_GENERATION_FAIL"
+            and event.get("attempt") == 1
+            and event.get("category") == ProviderFailureCategory.INVALID_RESPONSE.value
+        ):
+            raise _PlannerFirstResponseInvalid
 
     def consume_planner_trace_events(self) -> tuple[dict[str, Any], ...]:
         """Return and clear planner trace events collected since the last case."""
@@ -4325,6 +4397,11 @@ class _ObservedLiveAdapter:
             raise D5HarnessError("canonical semantic planner is unavailable")
         self.set_active_turn(str(case["turn_id"]))
         self.enable_planner_only_boundary()
+        source_evidence = {
+            "source_asset_identity": context["source_asset_identity"],
+            "source_channel_count": context["source_channel_count"],
+            "numeric_sample_apis_invoked": context["numeric_sample_apis_invoked"],
+        }
         try:
             await planner.plan(
                 request=str(case["request"]),
@@ -4333,15 +4410,22 @@ class _ObservedLiveAdapter:
                 source_summary=context["source_summary"],
                 timeout_seconds=session.config.timeout_seconds,
                 temperature=session.config.planner_temperature,
-                max_output_tokens=session.config.max_output_tokens,
+                max_output_tokens=(
+                    self.planner_first_pass_max_output_tokens or session.config.max_output_tokens
+                ),
             )
         except _PlannerOnlyWireCaptured:
             return {
                 "observation_status": "SCHEMA_VALID_WIRE_CAPTURED",
                 "schema_valid": True,
-                "source_asset_identity": context["source_asset_identity"],
-                "source_channel_count": context["source_channel_count"],
-                "numeric_sample_apis_invoked": context["numeric_sample_apis_invoked"],
+                **source_evidence,
+            }
+        except _PlannerFirstResponseInvalid:
+            return {
+                "observation_status": "MODEL_STRUCTURAL_FAILURE",
+                "schema_valid": False,
+                "failure_category": "MODEL_STRUCTURAL_INVALID_RESPONSE",
+                **source_evidence,
             }
         except ProviderRequestError as error:
             if error.category is not ProviderFailureCategory.INVALID_RESPONSE:
@@ -4353,9 +4437,7 @@ class _ObservedLiveAdapter:
                 "provider_response_reason": getattr(
                     getattr(error, "response_reason", None), "value", None
                 ),
-                "source_asset_identity": context["source_asset_identity"],
-                "source_channel_count": context["source_channel_count"],
-                "numeric_sample_apis_invoked": context["numeric_sample_apis_invoked"],
+                **source_evidence,
             }
         except PlannerSemanticFailure as error:
             if not error.code.startswith("request_compilation_"):
@@ -4398,6 +4480,7 @@ def create_live_adapter(
     require_thinking_control: bool = False,
     max_retries_override: int | None = None,
     logical_call_ceiling: int | None = None,
+    planner_first_pass_max_output_tokens: int | None = None,
     trace_callback: Callable[[Mapping[str, Any]], None] | None = None,
     compile_result_callback: Callable[[Any], None] | None = None,
     section_action_callback: Callable[[Mapping[str, object]], None] | None = None,
@@ -4421,6 +4504,10 @@ def create_live_adapter(
         if type(max_retries_override) is not int or max_retries_override < 0:
             raise D5StaticPreflightError("max retries override must be a non-negative integer")
         max_retries = max_retries_override
+    if planner_first_pass_max_output_tokens is not None and (
+        planner_first_pass_max_output_tokens != A10_FIRST_PASS_MAX_OUTPUT_TOKENS or max_retries != 0
+    ):
+        raise D5StaticPreflightError("invalid first-pass adapter controls")
     d4_logical_call_ceiling = d4.MAX_LOGICAL_CALLS
     if logical_call_ceiling is not None:
         if type(logical_call_ceiling) is not int or logical_call_ceiling < 1:
@@ -4449,6 +4536,11 @@ def create_live_adapter(
         client=client,
         structured_output=project_config.runtime.structured_output,
         request_options=request_options,
+        max_tokens_parameter=(
+            "max_tokens"
+            if planner_first_pass_max_output_tokens is not None
+            else "max_completion_tokens"
+        ),
     )
     calls: list[Any] = []
     ledger = d4.LogicalCallLedger(max_calls=d4_logical_call_ceiling)
@@ -4460,6 +4552,7 @@ def create_live_adapter(
         calls=calls,
         ledger=ledger,
         capture_logical_identity=section_action_capture_mode != "off",
+        planner_max_output_tokens=planner_first_pass_max_output_tokens,
     )
     trace_events: list[dict[str, Any]] = []
 
@@ -4467,8 +4560,7 @@ def create_live_adapter(
         trace_events.append(dict(event))
         if trace_callback is not None:
             trace_callback(event)
-        if adapter._stop_after_wire and event.get("event") == "PLANNER_GENERATION_PASS":
-            raise _PlannerOnlyWireCaptured
+        adapter.stop_at_planner_boundary(event)
 
     session = d4.build_notebook_session(
         backend=counted,
@@ -4490,7 +4582,11 @@ def create_live_adapter(
         call_source=d4.CampaignCallSource(backends=(counted,), calls=calls, ledger=ledger),
         provider_backed=True,
     )
-    adapter = _ObservedLiveAdapter(inner, observer)
+    adapter = _ObservedLiveAdapter(
+        inner,
+        observer,
+        planner_first_pass_max_output_tokens=planner_first_pass_max_output_tokens,
+    )
     adapter._trace_events = trace_events
     return adapter
 
@@ -4568,6 +4664,8 @@ def execute_live_campaign(
     """Run selected frozen turns after static/readiness interlocks."""
     if population == A10_SEM_53_POPULATION and mode != "planner_only":
         raise D5StaticPreflightError("A10 population requires planner-only campaign mode")
+    turn_ids = _select_first_pass_turns(authorization, population, mode, turn_ids)
+    first_pass_cap = authorization.planner_first_pass_max_output_tokens
     if artifact_root.resolve() != _authorized_artifact_root(repo_root, authorization):
         raise D5StaticPreflightError("artifact root is not authorized")
     project_config = load_project_config(repo_root)
@@ -4583,7 +4681,8 @@ def execute_live_campaign(
             else tuple(str(case["turn_id"]) for case in a10_cases)
         )
         if selected_turns:
-            campaign_logical_call_ceiling = len(selected_turns) * MAX_PLANNER_LOGICAL_CALLS
+            calls_per_case = 1 if first_pass_cap is not None else MAX_PLANNER_LOGICAL_CALLS
+            campaign_logical_call_ceiling = len(selected_turns) * calls_per_case
     paths = EvidencePaths(artifact_root, authorization.campaign_id)
     static = provider_free_preflight(
         repo_root,
@@ -4603,6 +4702,7 @@ def execute_live_campaign(
             require_thinking_control=True,
             max_retries_override=authorization.sdk_max_retries,
             logical_call_ceiling=campaign_logical_call_ceiling,
+            planner_first_pass_max_output_tokens=first_pass_cap,
         )
     )
     readiness = prepare_readiness(
@@ -6590,6 +6690,10 @@ class D5CampaignRunner:
             raise D5HarnessError("campaign cannot be resumed or invoked twice")
         if mode not in {"smoke", "scientific", "planner_only"}:
             raise D5HarnessError("unknown campaign mode")
+        turn_ids = _select_first_pass_turns(self.authorization, population, mode, turn_ids)
+        first_pass_cap = self.authorization.planner_first_pass_max_output_tokens
+        if first_pass_cap != getattr(adapter, "planner_first_pass_max_output_tokens", None):
+            raise D5StaticPreflightError("adapter first-pass controls differ from authority")
         if population == "d4":
             cases = d4.load_cases(self.repo_root)
             gold_cases = {item["turn_id"]: item for item in d4.load_gold(self.repo_root)["cases"]}
@@ -6621,9 +6725,8 @@ class D5CampaignRunner:
         selected_cases = [case for case in cases if case["turn_id"] in selected_ids]
         if tuple(case["turn_id"] for case in selected_cases) != selected_ids:
             raise D5StaticPreflightError("selected turn population drifted")
-        logical_ceiling = (
-            len(selected_ids) * MAX_PLANNER_LOGICAL_CALLS if mode == "planner_only" else None
-        )
+        calls_per_case = 1 if first_pass_cap is not None else MAX_PLANNER_LOGICAL_CALLS
+        logical_ceiling = len(selected_ids) * calls_per_case if mode == "planner_only" else None
         physical_ceiling = (
             logical_ceiling * (1 + self.authorization.sdk_max_retries)
             if logical_ceiling is not None
@@ -6676,14 +6779,19 @@ class D5CampaignRunner:
                 cursor = int(getattr(adapter, "logical_call_count", 0))
                 physical_cursor = custody.ledger.physical_attempts
                 started = time.perf_counter()
-                actual = (
-                    await execute_planner_case(case)
-                    if mode == "planner_only"
-                    else await execute_turn(case, expected)
-                )
                 if mode == "planner_only":
-                    for event in adapter.consume_planner_trace_events():
-                        custody.record_planner_observability(event)
+                    try:
+                        actual = await execute_planner_case(case)
+                    except ProviderRequestError:
+                        if first_pass_cap is not None:
+                            for event in adapter.consume_planner_trace_events():
+                                custody.record_planner_observability(event)
+                        raise
+                    else:
+                        for event in adapter.consume_planner_trace_events():
+                            custody.record_planner_observability(event)
+                else:
+                    actual = await execute_turn(case, expected)
                 observed_failure = _classify_logical_call_failure(custody.ledger.calls[cursor:])
                 if mode == "planner_only":
                     calls = int(getattr(adapter, "logical_call_count", 0)) - cursor
@@ -6917,6 +7025,9 @@ def provider_free_preflight(
     population: str = "d4",
 ) -> dict[str, Any]:
     """Run static D5-4 checks without credentials, endpoints, or providers."""
+    first_pass_turns = _select_first_pass_turns(authorization, population, "planner_only", None)
+    calls_per_case = 1 if first_pass_turns is not None else MAX_PLANNER_LOGICAL_CALLS
+    role_limits = dict(ROLE_LOGICAL_CALL_LIMITS)
     project_config = load_project_config(repo_root)
     _validate_project_config(project_config)
     if authorization.project_config_fingerprint_sha256 != project_config.fingerprint_sha256:
@@ -6934,6 +7045,11 @@ def provider_free_preflight(
         if authorization.sdk_max_retries != 0:
             raise D5StaticPreflightError("A10 planner population requires zero SDK retries")
         cases = _load_a10_planner_population(repo_root)
+        if first_pass_turns is not None:
+            cases = [case for case in cases if case["turn_id"] in first_pass_turns]
+            if tuple(case["turn_id"] for case in cases) != first_pass_turns:
+                raise D5StaticPreflightError("A10 development panel drifted")
+            role_limits = {"planner": 1, "report_worker": 0, "section_worker": 0}
     elif population != "d4":
         raise D5StaticPreflightError("unknown population")
     checker = static_checker or (
@@ -6946,6 +7062,10 @@ def provider_free_preflight(
         raise D5StaticPreflightError("provider-free static preflight failed")
     static_facts = dict(facts)
     static_facts.setdefault("project_config_fingerprint_sha256", project_config.fingerprint_sha256)
+    if first_pass_turns is not None:
+        static_facts["planner_first_pass_max_output_tokens"] = (
+            authorization.planner_first_pass_max_output_tokens
+        )
     return {
         "experiment_version": D5_EXPERIMENT_VERSION,
         "status": "PASS",
@@ -6975,16 +7095,16 @@ def provider_free_preflight(
             ),
         },
         "logical_call_ceiling": (
-            len(cases) * MAX_PLANNER_LOGICAL_CALLS
+            len(cases) * calls_per_case
             if population == A10_SEM_53_POPULATION
             else MAX_LOGICAL_CALLS
         ),
         "physical_attempt_upper_bound": (
-            len(cases) * MAX_PLANNER_LOGICAL_CALLS * (1 + authorization.sdk_max_retries)
+            len(cases) * calls_per_case * (1 + authorization.sdk_max_retries)
             if population == A10_SEM_53_POPULATION
             else MAX_PHYSICAL_ATTEMPTS
         ),
-        "role_logical_call_limits": dict(ROLE_LOGICAL_CALL_LIMITS),
+        "role_logical_call_limits": role_limits,
         "scientific_terminals": sorted(D5I_SCIENTIFIC_TERMINALS),
         "first_divergences": sorted(D5I_FIRST_DIVERGENCES),
         "evidence_dimensions": list(D5I_DIMENSIONS),
@@ -7045,6 +7165,10 @@ def main() -> int:
         parser.error("--planner-case-id requires --execute-planner-smoke")
     repo_root = args.repo_root.resolve()
     authorization = _load_authorization(args.authorization_json.resolve())
+    if authorization.planner_first_pass_max_output_tokens is not None and not (
+        args.provider_free_preflight or args.execute_live
+    ):
+        parser.error("first-pass authority is only for the A10 development panel")
     artifact_root = (
         args.artifact_root.resolve()
         if args.artifact_root is not None
