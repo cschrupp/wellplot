@@ -109,6 +109,7 @@ class SectionWorkScale(BaseModel):
     minimum: float | None = None
     maximum: float | None = None
     reverse: bool | None = None
+    unit: str | None = None
 
 
 class SectionWorkTrack(BaseModel):
@@ -352,6 +353,8 @@ def _scale_from_items(
         "maximum": prefix + "maximum",
         "reverse": prefix + "reverse",
     }
+    if prefix == "track_scale_":
+        fields["unit"] = "track_scale_unit"
     values = {key: _unique_value(items, source) for key, source in fields.items()}
     if not any(value is not None for value in values.values()):
         return None
@@ -967,6 +970,7 @@ def build_section_work_contract(
             item.owner_ref
             for item in obligations
             if item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK}
+            and item.field != "target"
         )
     )
     handles: dict[str, str] = {}
@@ -1343,6 +1347,7 @@ def build_section_operation_contract(
             item.owner_ref
             for item in obligations
             if item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK}
+            and item.field != "target"
         )
     )
     scale_fields = {"scale_kind", "scale_minimum", "scale_maximum", "scale_reverse"}
@@ -2119,7 +2124,7 @@ def _scale_matches(actual: object | None, expected: SectionWorkScale | None) -> 
     """Compare only fields fixed by request obligations."""
     if actual is None or expected is None:
         return False
-    for field in ("kind", "minimum", "maximum", "reverse"):
+    for field in ("kind", "minimum", "maximum", "reverse", "unit"):
         expected_value = getattr(expected, field)
         if expected_value is not None and getattr(actual, field, None) != expected_value:
             return False

@@ -334,8 +334,7 @@ def _track_match_score(
     contradictory_channels = {
         channel
         for channel in channels - family_channels
-        if channel in known_owners
-        and any(owner != entry_id for owner in known_owners[channel])
+        if channel in known_owners and any(owner != entry_id for owner in known_owners[channel])
     }
     if contradictory_channels:
         return 0
@@ -432,12 +431,7 @@ def _infer_track_form(
         _normalize(track.track_id),
         _normalize(track.title) if isinstance(track.title, str) else "",
     }
-    if any(
-        marker in token
-        for token in identity
-        for marker in ("depth", "reference")
-        if token
-    ):
+    if any(marker in token for token in identity for marker in ("depth", "reference") if token):
         return "reference"
     if any(isinstance(binding, AuthoringCurveBindingIntent) for binding in bindings):
         return "normal"
@@ -469,6 +463,19 @@ def _scoped_direct_children(
     return bindings_by_track, annotations_by_track
 
 
+def _form_default(kind: str, catalog: list[dict[str, object]]) -> dict[str, object]:
+    return next(
+        (entry for entry in catalog if str(entry.get("id", "")).strip().lower() == kind),
+        {},
+    )
+
+
+def default_track_width_mm(kind: str) -> float | None:
+    """Return only the generic width for a track form, never a family preset."""
+    width = _form_default(kind, form_default_catalog()).get("default_width_mm")
+    return float(width) if isinstance(width, (int, float)) and width > 0 else None
+
+
 def _add_generic_form_defaults(
     defaults: dict[str, Any],
     matched_families: dict[str, str],
@@ -488,15 +495,8 @@ def _add_generic_form_defaults(
     )
     if form_kind is None:
         return
-    entry = next(
-        (
-            candidate
-            for candidate in form_defaults
-            if str(candidate.get("id", "")).strip().lower() == form_kind
-        ),
-        None,
-    )
-    if entry is None:
+    entry = _form_default(form_kind, form_defaults)
+    if not entry:
         return
     patch = {
         "kind": entry.get("kind", form_kind),
@@ -634,9 +634,7 @@ def generic_authoring_defaults(
     provenance: dict[str, str] = {}
     warnings: list[str] = []
     archetypes = track_archetype_catalog()
-    presets = [
-        preset for preset in style_preset_catalog() if not preset.get("agent_recovery_only")
-    ]
+    presets = [preset for preset in style_preset_catalog() if not preset.get("agent_recovery_only")]
     form_defaults = form_default_catalog()
     direct_bindings, direct_annotations = _scoped_direct_children(intent)
     if not isinstance(intent.sections, list):

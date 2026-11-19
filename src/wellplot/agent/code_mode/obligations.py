@@ -110,6 +110,7 @@ FieldName = Literal[
     "track_scale_kind",
     "track_scale_minimum",
     "track_scale_maximum",
+    "track_scale_unit",
     "vertical_main_visible",
     "vertical_secondary_visible",
     "raster_profile",
@@ -449,6 +450,18 @@ _ADD_TRACK_RE = re.compile(
     r"(?P<kind>normal|reference|array)\s+track\s+"
     r"(?:titled|named)\s+['\"](?P<title>[^'\"]+)['\"](?P<body>[^.;\n]*)",
     re.IGNORECASE,
+)
+_SCALAR_TRACK_SHORTHAND_RE = re.compile(
+    r"\s*(?i:add|append)\s+(?i:a|an)\s+(?:(?i:exact)\s+)?(?:(?i:physical)\s+)?"
+    r"(?P<channel>[A-Z][A-Z0-9_]{1,11})\s+(?i:track)"
+    r"(?:\s+(?i:and set its scale to)\s+(?P<kind>(?i:linear|log))\s+"
+    r"(?P<minimum>-?[0-9]+(?:\.[0-9]+)?)\s*(?:to|\.\.|[-\u2013\u2014])\s*"
+    r"(?P<maximum>-?[0-9]+(?:\.[0-9]+)?)(?:\s+(?P<unit>[A-Za-z][A-Za-z0-9/]*))?)?"
+    r"\s*\.?\s*"
+)
+_EXPLICIT_PHYSICAL_PLOT_RE = re.compile(
+    r"\s*(?i:plot|show)\s+(?:(?i:the)\s+)?(?i:physical)\s+"
+    r"(?P<channel>[A-Z][A-Z0-9_]{1,11})(?:\s+(?i:channel|curve))?\s*\.?\s*"
 )
 _TRACK_LINE_RE = re.compile(
     r"\btrack\s+(?P<owner>[A-Za-z0-9_. -]+?)\s*:\s*"
@@ -1000,6 +1013,24 @@ def extract_supported_obligations(request: str) -> tuple[RequestObligation, ...]
     if not isinstance(request, str) or not request.strip():
         raise ValueError("Authoritative request must be non-empty.")
     _, request_sha256 = _request_identity(request)
+    # These complete clauses cannot authorize a subset of a more complex request.
+    shorthand = _SCALAR_TRACK_SHORTHAND_RE.fullmatch(request)
+    if shorthand is not None:
+        return _scalar_track_shorthand_obligations(request, request_sha256, shorthand)
+    physical = _EXPLICIT_PHYSICAL_PLOT_RE.fullmatch(request)
+    if physical is not None:
+        return (
+            _make_obligation(
+                request=request,
+                request_sha256=request_sha256,
+                match=physical,
+                kind=ObligationKind.EXPLICIT_FIELD,
+                owner_kind=OwnerKind.BINDING,
+                owner_ref="request",
+                field="channel",
+                value=physical.group("channel"),
+            ),
+        )
     obligations: list[RequestObligation] = []
     for match in _REPORT_TITLE_RE.finditer(request):
         obligations.append(
@@ -1225,6 +1256,41 @@ def extract_supported_obligations(request: str) -> tuple[RequestObligation, ...]
         _extract_reviewed_semantic_channel_obligation(request, request_sha256, obligations)
     )
     return _append_conflicts(obligations)
+
+
+def _scalar_track_shorthand_obligations(
+    request: str, request_sha256: str, match: re.Match[str]
+) -> tuple[RequestObligation, ...]:
+    """Bind one literal curve slot and its explicitly requested track scale."""
+    channel = match.group("channel")
+    fields: list[tuple[OwnerKind, FieldName, str | float]] = [
+        (OwnerKind.TRACK, "title", channel),
+        (OwnerKind.TRACK, "kind", "normal"),
+        (OwnerKind.BINDING, "channel", channel),
+    ]
+    if match.group("kind") is not None:
+        fields.extend(
+            (
+                (OwnerKind.TRACK, "track_scale_kind", match.group("kind").casefold()),
+                (OwnerKind.TRACK, "track_scale_minimum", float(match.group("minimum"))),
+                (OwnerKind.TRACK, "track_scale_maximum", float(match.group("maximum"))),
+            )
+        )
+        if match.group("unit") is not None:
+            fields.append((OwnerKind.TRACK, "track_scale_unit", match.group("unit")))
+    return tuple(
+        _make_obligation(
+            request=request,
+            request_sha256=request_sha256,
+            match=match,
+            kind=ObligationKind.EXPLICIT_FIELD,
+            owner_kind=owner_kind,
+            owner_ref=channel,
+            field=field,
+            value=value,
+        )
+        for owner_kind, field, value in fields
+    )
 
 
 def _extract_reviewed_semantic_channel_obligation(
@@ -1771,7 +1837,9 @@ def compile_request_contract(request: str) -> RequestCompilationResult:
     anchors = extract_supported_anchors(request)
     scopes = _request_scope_declarations(request, request_sha256)
     if (
-        any(
+        _EXPLICIT_PHYSICAL_PLOT_RE.fullmatch(request) is not None
+        or _SCALAR_TRACK_SHORTHAND_RE.fullmatch(request) is not None
+        or any(
             item.owner_kind is OwnerKind.BINDING
             and item.field == "channel"
             and item.owner_ref == "request"
@@ -1779,8 +1847,7 @@ def compile_request_contract(request: str) -> RequestCompilationResult:
             and not str(item.value).isupper()
             for item in obligations
         )
-        and not scopes.scopes
-    ):
+    ) and not scopes.scopes:
         scopes = ScopeDeclarationSet(
             scopes=(
                 ScopeDeclaration(
@@ -1911,6 +1978,13 @@ def verify_obligation_spans(request: str, obligations: tuple[RequestObligation, 
             if isinstance(obligation.value, float):
                 literal = literal.rstrip("0").rstrip(".")
             span_text = span.decode("utf-8").casefold()
+            if (
+                obligation.owner_kind is OwnerKind.TRACK
+                and obligation.field == "kind"
+                and obligation.value == "normal"
+                and _SCALAR_TRACK_SHORTHAND_RE.fullmatch(span.decode("utf-8")) is not None
+            ):
+                continue
             if (
                 obligation.field == "alpha"
                 and isinstance(obligation.value, (float, int))
@@ -2135,6 +2209,36 @@ def validate_report_obligations(
             raise ValueError("Requested report title was not satisfied.")
 
 
+def _validate_sparse_binding_context(
+    action: SectionSemanticAction,
+    item: RequestObligation,
+    *,
+    section_context: ResolvedSectionContext | None,
+    section_title: str | None,
+) -> None:
+    """Check context facts on the grounded slot, not on the worker's binding fields."""
+    from .worker_contracts import _existing_track_handle, _source_handle
+
+    if section_context is None or section_context.section_id is None:
+        raise ValueError("Sparse binding context must be grounded before validation.")
+    match (item.owner_kind, item.field):
+        case (OwnerKind.SECTION, "target"):
+            if section_title and _normalize_requirement_key(
+                section_title
+            ) == _normalize_requirement_key(str(item.value)):
+                return
+        case (OwnerKind.TRACK, "target"):
+            if _existing_track_handle(str(item.value), section_context) == action.target.handle:
+                return
+        case (OwnerKind.SOURCE, "source"):
+            if (
+                len(section_context.sources) == 1
+                and _source_handle(item.value, section_context) == section_context.sources[0].handle
+            ):
+                return
+    raise ValueError("Sparse binding context does not satisfy the request obligation.")
+
+
 def validate_section_obligations(
     action: SectionSemanticAction,
     obligations: tuple[RequestObligation, ...],
@@ -2156,7 +2260,11 @@ def validate_section_obligations(
             if item.owner_kind is OwnerKind.BINDING and item.field == "channel":
                 if binding.kind != "curve" or binding.channel != item.value:
                     raise ValueError(f"Requested channel {item.value} was not satisfied.")
-            elif item.owner_kind is not OwnerKind.BINDING:
+            elif item.owner_kind in {OwnerKind.SECTION, OwnerKind.TRACK, OwnerKind.SOURCE}:
+                _validate_sparse_binding_context(
+                    action, item, section_context=section_context, section_title=section_title
+                )
+            else:
                 raise ValueError("Sparse binding cannot satisfy a non-binding obligation.")
         return
     if getattr(action, "action", None) == "update_curve_scale":
@@ -2309,6 +2417,7 @@ def validate_section_obligations(
                         "track_scale_kind": "kind",
                         "track_scale_minimum": "minimum",
                         "track_scale_maximum": "maximum",
+                        "track_scale_unit": "unit",
                     }[item.field],
                     None,
                 )
@@ -2598,6 +2707,7 @@ def verify_document_obligations(
                         "track_scale_kind": "kind",
                         "track_scale_minimum": "minimum",
                         "track_scale_maximum": "maximum",
+                        "track_scale_unit": "unit",
                     }[item.field]
                     scale = track.get("x_scale")
                     actual = scale.get(scale_field) if isinstance(scale, dict) else None

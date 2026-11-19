@@ -31,7 +31,7 @@ from .enrichment import (
     SourceCandidate,
 )
 from .obligations import RequestObligation
-from .planner import CompilationMode, PlannerSemanticFailure, SemanticPlan
+from .planner import CompilationMode, PlannerHostRejection, PlannerSemanticFailure, SemanticPlan
 from .report_boundary_safety import (
     ReportBoundarySafetyEvidence,
     ReportBoundarySafetyFailure,
@@ -422,7 +422,7 @@ def _planner_diagnostic(error: PlannerSemanticFailure) -> CompileDiagnostic:
         stage="planner",
         code=f"planner.{error.code}",
         message=error.safe_message,
-        failure_owner="planner",
+        failure_owner="host_safety" if isinstance(error, PlannerHostRejection) else "planner",
         retryable=False,
     )
 

@@ -21,6 +21,8 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import CoreSchema
 
 from ...capabilities import CapabilityRegistry
+from ...model.authoring import AuthoringScale
+from ...semantic_catalog import normalize_request_term
 from ..providers.base import (
     ModelBackendProtocol,
     ProviderFailureCategory,
@@ -34,6 +36,8 @@ from ..providers.response_diagnostics import (
 )
 from .obligations import (
     FieldName,
+    ObligationState,
+    OwnerKind,
     RequestCompilationResult,
     RequestCompilationStatus,
     RequestObligation,
@@ -267,26 +271,77 @@ class _PlannerWireReportTask(_SemanticModel):
         return values
 
 
+class _PlannerScalarIntent(_SemanticModel):
+    """A scalar curve request, without identifiers or a presentation program."""
+
+    action: Literal["plot_curve", "add_track"]
+    channel_kind: Literal["physical", "semantic"]
+    channel_clue: str = Field(min_length=1)
+    target_clue: str | None = Field(default=None, min_length=1)
+    scale: AuthoringScale | None = None
+
+
+class _PlannerAbstention(_SemanticModel):
+    """A typed non-executing response to an unresolved request."""
+
+    reason: Literal["ambiguous", "unsupported", "missing_context"]
+    unresolved: tuple[str, ...] = Field(min_length=1, max_length=MAX_SEMANTIC_OPERATIONS)
+
+    @field_validator("unresolved")
+    @classmethod
+    def validate_unresolved(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        """Require actual unresolved requirements, not blank placeholders."""
+        _require_nonempty_items(values)
+        return values
+
+
+def _section_wire_schema(schema: dict[str, object]) -> None:
+    """Advertise both work shapes without opening the empty-work case."""
+    _require_section_hint_in_schema(schema)
+    schema["anyOf"] = [
+        {
+            "required": ["operations", "capability_ids", "scope_ref"],
+            "properties": {
+                "operations": {"minItems": 1},
+                "capability_ids": {"minItems": 1},
+                "scope_ref": {"type": "string"},
+                "scalar_intent": {"type": "null"},
+            },
+        },
+        {
+            "required": ["scalar_intent"],
+            "properties": {
+                "scalar_intent": {"type": "object"},
+                "operations": {"maxItems": 0},
+                "capability_ids": {"maxItems": 0},
+                "scope_ref": {"type": "null"},
+                "presentation_constraints": {"maxItems": 0},
+            },
+        },
+    ]
+
+
 class _PlannerWireSectionTask(_SemanticModel):
     """Provider-facing section task without host-owned provenance."""
 
     goal: str = Field(min_length=1)
-    capability_ids: tuple[str, ...] = Field(min_length=1)
+    capability_ids: tuple[str, ...] = ()
     existing_section_hint: str | None = Field(default=None, min_length=1)
     source_hints: tuple[str, ...] = ()
     requirements: tuple[str, ...] = ()
     constraints: tuple[str, ...] = ()
-    scope_ref: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
+    scope_ref: str | None = Field(default=None, pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$")
     operations: tuple[SemanticOperation, ...] = Field(
-        min_length=1, max_length=MAX_SEMANTIC_OPERATIONS
+        default=(), max_length=MAX_SEMANTIC_OPERATIONS
     )
+    scalar_intent: _PlannerScalarIntent | None = None
     presentation_constraints: tuple[PresentationConstraint, ...] = ()
 
     model_config = ConfigDict(
         extra="forbid",
         frozen=True,
         str_strip_whitespace=True,
-        json_schema_extra=_require_section_hint_in_schema,
+        json_schema_extra=_section_wire_schema,
     )
 
     @classmethod
@@ -303,6 +358,21 @@ class _PlannerWireSectionTask(_SemanticModel):
         _require_nonempty_items(values)
         return values
 
+    @model_validator(mode="after")
+    def validate_representation(self) -> _PlannerWireSectionTask:
+        """Admit either compact intent or the existing full operation contract."""
+        if self.scalar_intent is None:
+            if not (self.operations and self.capability_ids and self.scope_ref):
+                raise ValueError("A section task requires a complete operation inventory.")
+        elif (
+            self.operations
+            or self.capability_ids
+            or self.scope_ref
+            or self.presentation_constraints
+        ):
+            raise ValueError("Scalar intent cannot carry operation bookkeeping.")
+        return self
+
 
 class _PlannerWirePlan(_SemanticModel):
     """Provider-facing semantic plan containing no deterministic provenance."""
@@ -313,6 +383,7 @@ class _PlannerWirePlan(_SemanticModel):
     section_tasks: tuple[_PlannerWireSectionTask, ...] = ()
     unresolved_requirements: tuple[str, ...] = ()
     unresolved_semantics: tuple[UnresolvedSemantic, ...] = ()
+    abstention: _PlannerAbstention | None = None
 
     model_config = ConfigDict(
         extra="forbid",
@@ -370,10 +441,14 @@ class _PlannerWirePlan(_SemanticModel):
     @model_validator(mode="after")
     def validate_work_units(self) -> _PlannerWirePlan:
         """Keep the canonical executable-work invariant at the wire boundary."""
-        if self.report_task is None and not self.section_tasks:
-            raise ValueError("SemanticPlan must contain a report task or section tasks.")
         if _contains_path_text(self.model_dump(mode="python")):
             raise ValueError("Planner output cannot contain filesystem paths.")
+        has_work = self.report_task is not None or bool(self.section_tasks)
+        if self.abstention is not None:
+            if has_work:
+                raise ValueError("An abstention cannot contain executable work.")
+        elif not has_work:
+            raise ValueError("SemanticPlan must contain a report task or section tasks.")
         _validate_operation_references(
             self.report_task,
             self.section_tasks,
@@ -414,6 +489,19 @@ class PlannerSemanticFailure(RuntimeError):
         self.code = code
         self.safe_message = safe_message
         super().__init__(safe_message)
+
+
+class PlannerAbstention(PlannerSemanticFailure):
+    """A model-declared non-executing outcome, not a host rejection."""
+
+    def __init__(self, abstention: _PlannerAbstention) -> None:
+        """Retain unresolved material without turning it into work."""
+        self.abstention = abstention
+        super().__init__("model_abstention", "The planner reported unresolved requested work.")
+
+
+class PlannerHostRejection(PlannerSemanticFailure):
+    """The host could not authorize a structurally valid planner proposal."""
 
 
 class SemanticPlan(_SemanticModel):
@@ -468,7 +556,7 @@ class SemanticPlan(_SemanticModel):
 
 
 def _add_work_unit_schema_constraint(schema: dict[str, object]) -> None:
-    """Require an executable report or non-empty section work unit."""
+    """Advertise a work unit or an explicit no-work outcome."""
     constraints = schema.setdefault("allOf", [])
     if not isinstance(constraints, list):
         raise TypeError("SemanticPlan schema allOf must be a list.")
@@ -479,12 +567,22 @@ def _add_work_unit_schema_constraint(schema: dict[str, object]) -> None:
                     "required": ["report_task"],
                     "properties": {
                         "report_task": {"not": {"type": "null"}},
+                        "abstention": {"type": "null"},
                     },
                 },
                 {
                     "required": ["section_tasks"],
                     "properties": {
                         "section_tasks": {"type": "array", "minItems": 1},
+                        "abstention": {"type": "null"},
+                    },
+                },
+                {
+                    "required": ["abstention"],
+                    "properties": {
+                        "abstention": {"type": "object"},
+                        "report_task": {"type": "null"},
+                        "section_tasks": {"type": "array", "maxItems": 0},
                     },
                 },
             ]
@@ -552,9 +650,153 @@ def _validate_operation_references(
             raise ValueError("Unresolved semantics must refer to a declared work-unit scope.")
 
 
-def _canonical_plan_from_wire(wire_plan: _PlannerWirePlan) -> SemanticPlan:
+def _canonical_plan_from_wire(
+    wire_plan: _PlannerWirePlan, compilation: RequestCompilationResult | None = None
+) -> SemanticPlan:
     """Convert one provider DTO into the canonical validated plan exactly once."""
-    return SemanticPlan.model_validate(wire_plan.model_dump(mode="python"))
+    if wire_plan.abstention is not None:
+        raise PlannerAbstention(wire_plan.abstention)
+    if any(task.scalar_intent is not None for task in wire_plan.section_tasks):
+        unresolved = wire_plan.unresolved_requirements + tuple(
+            item.question for item in wire_plan.unresolved_semantics
+        )
+        if unresolved:
+            raise PlannerAbstention(_PlannerAbstention(reason="ambiguous", unresolved=unresolved))
+    payload = wire_plan.model_dump(mode="python", exclude={"abstention"})
+    for index, (task, fields) in enumerate(
+        zip(wire_plan.section_tasks, payload["section_tasks"], strict=True), start=1
+    ):
+        fields.pop("scalar_intent")
+        if task.scalar_intent is not None:
+            fields.update(_canonical_scalar_task(task, compilation, index=index))
+    return SemanticPlan.model_validate(payload)
+
+
+def _canonical_scalar_task(
+    task: _PlannerWireSectionTask,
+    compilation: RequestCompilationResult | None,
+    *,
+    index: int,
+) -> dict[str, object]:
+    """Project a singular scalar intent using independent request facts, not inventory guesses."""
+    intent = task.scalar_intent
+    assert intent is not None
+
+    def reject() -> PlannerHostRejection:
+        return PlannerHostRejection(
+            "scalar_intent_not_authorized",
+            "Scalar intent does not match one authoritatively scoped request.",
+        )
+
+    if (
+        compilation is None
+        or compilation.status is not RequestCompilationStatus.EXTRACTION_COMPLETE
+    ):
+        raise reject()
+    requirements = compilation.requirements
+    if len(requirements.scopes.scopes) != 1 or requirements.shared_scope_rules:
+        raise reject()
+    scope = requirements.scopes.scopes[0]
+    if scope.kind != "EXISTING_SECTION":
+        raise reject()
+    if scope.selector_text and (
+        _scope_key(scope.selector_text) != _scope_key(task.existing_section_hint or "")
+    ):
+        raise reject()
+    facts = tuple(item for item in requirements.requirements if item.owner_kind != OwnerKind.REPORT)
+    if any(item.state != ObligationState.SET for item in facts):
+        raise reject()
+    channels = [
+        item for item in facts if item.owner_kind == OwnerKind.BINDING and item.field == "channel"
+    ]
+    if len(channels) != 1 or not isinstance(channels[0].value, str):
+        raise reject()
+    channel = channels[0].value
+    expected_kind = "physical" if re.fullmatch(r"[A-Z][A-Z0-9_]{1,11}", channel) else "semantic"
+    if intent.channel_kind != expected_kind or normalize_request_term(
+        intent.channel_clue
+    ) != normalize_request_term(channel):
+        raise reject()
+
+    source_facts = [str(item.value) for item in facts if item.owner_kind == OwnerKind.SOURCE]
+    source_labels = tuple(re.split(r"[/\\]", item)[-1] for item in source_facts)
+    if len(source_facts) > 1 or (
+        tuple(map(normalize_request_term, task.source_hints))
+        != tuple(map(normalize_request_term, source_labels))
+    ):
+        raise reject()
+
+    is_track_add = intent.action == "add_track"
+    track_owners = {
+        item.owner_ref
+        for item in facts
+        if item.owner_kind == OwnerKind.TRACK and item.field == "kind"
+    }
+    scale_facts = {
+        item.field.removeprefix("track_scale_"): item.value
+        for item in facts
+        if item.owner_kind == OwnerKind.TRACK and item.field.startswith("track_scale_")
+    }
+    targets = [
+        str(item.value)
+        for item in facts
+        if item.owner_kind == OwnerKind.TRACK and item.field == "target"
+    ]
+    if len(targets) > 1 or (
+        normalize_request_term(intent.target_clue or "")
+        != normalize_request_term(targets[0] if targets else "")
+    ):
+        raise reject()
+    proposed_scale = (
+        {}
+        if intent.scale is None
+        else intent.scale.model_dump(exclude_unset=True, exclude_none=True)
+    )
+    if proposed_scale != scale_facts:
+        raise reject()
+    if is_track_add:
+        if track_owners != {channels[0].owner_ref} or expected_kind != "physical" or targets:
+            raise reject()
+    elif (
+        track_owners
+        or scale_facts
+        or intent.scale is not None
+        or channels[0].owner_ref != "request"
+    ):
+        raise reject()
+
+    # The existing work contract grounds the track and checks the complete
+    # operation against independently compiled obligations and the snapshot.
+    scope_ref = f"host-section-{index}"
+    return {
+        "scope_ref": scope_ref,
+        "existing_section_hint": scope.selector_text,
+        "source_hints": source_labels,
+        "capability_ids": (
+            ("section.log_plot", "track.normal", "binding.curve")
+            if is_track_add
+            else ("section.log_plot",)
+        ),
+        "operations": (
+            SemanticOperation(
+                local_ref=f"{scope_ref}.operation",
+                scope_ref=scope_ref,
+                verb="CREATE",
+                object_kind="track" if is_track_add else "binding",
+                semantic_ref=f"{scope_ref}.object",
+                target_clue=channels[0].owner_ref
+                if is_track_add
+                else (targets[0] if targets else None),
+                field_values=(
+                    SemanticFieldValue(field="channel", state="SET", value=channel),
+                    *(
+                        SemanticFieldValue(field=f"track_scale_{key}", state="SET", value=value)
+                        for key, value in scale_facts.items()
+                    ),
+                ),
+            ),
+        ),
+    }
 
 
 def _missing_section_hint_error(input_value: object) -> ValidationError:
@@ -783,8 +1025,8 @@ class SemanticPlanner:
             generated = await generate(retry_request, attempt=2)
         self._trace("WIRE_TO_CANONICAL_ENTER", attempt=wire_attempt)
         try:
-            plan = _canonical_plan_from_wire(generated.value)
-        except ValidationError as error:
+            plan = _canonical_plan_from_wire(generated.value, compilation)
+        except (ValidationError, PlannerSemanticFailure) as error:
             self._trace(
                 "WIRE_TO_CANONICAL_FAIL",
                 attempt=wire_attempt,
@@ -857,8 +1099,8 @@ class SemanticPlanner:
             )
             self._trace("WIRE_TO_CANONICAL_ENTER", attempt=2)
             try:
-                corrected_plan = _canonical_plan_from_wire(corrected.value)
-            except ValidationError as error:
+                corrected_plan = _canonical_plan_from_wire(corrected.value, compilation)
+            except (ValidationError, PlannerSemanticFailure) as error:
                 self._trace(
                     "WIRE_TO_CANONICAL_FAIL",
                     attempt=2,
@@ -924,8 +1166,8 @@ class SemanticPlanner:
             )
             self._trace("WIRE_TO_CANONICAL_ENTER", attempt=2)
             try:
-                corrected_plan = _canonical_plan_from_wire(corrected.value)
-            except ValidationError as error:
+                corrected_plan = _canonical_plan_from_wire(corrected.value, compilation)
+            except (ValidationError, PlannerSemanticFailure) as error:
                 self._trace(
                     "WIRE_TO_CANONICAL_FAIL",
                     attempt=2,
@@ -2025,29 +2267,40 @@ Synthetic operation examples (use only as shape examples, never as work items):
 
 
 _PLANNER_SYSTEM_PROMPT = """You are the semantic planning stage of Wellplot Code Mode v2.
-Return version `wellplot.semantic-plan.v2`. Propose typed request-local semantic
-operations in the task that owns the requested work. Report-only requests use
+Return version `wellplot.semantic-plan.v2`. For a simple request to plot one
+scalar curve or add one literal scalar track, use a section task with
+scalar_intent. Preserve the requested channel_clue verbatim and distinguish
+physical mnemonics from semantic names. Include only an explicitly requested
+target_clue and, for a new track, the explicit scale kind, limits and unit.
+Do not choose a substitute channel, add a depth track, invent a scale, or emit
+operations, capability_ids, scope_ref or presentation_constraints alongside
+scalar_intent. Set existing_section_hint to null unless a section was named.
+Use the operation form for richer requests, including requested clears,
+conditions and relationships.
+
+Propose typed request-local semantic work in the task that owns it. Report-only requests use
 report_task only. Section-only requests use one or more SectionTasks and set
 report_task to null. Mixed requests use both only when report-wide and section
 work are materially requested. Never create placeholder work units. An
 operation is semantic intent, never a canonical CRUD command.
-Use local_ref, semantic_ref, parent_ref, natural-language target clues,
+In the operation form, use local_ref, semantic_ref, parent_ref, natural-language target clues,
 registered verbs/object kinds, and explicit typed field_values. Do not emit
 canonical document IDs, component trees, source paths, source formats, header
 slot IDs, data-source objects, SDK calls, mutation steps, or host execution
 dependencies. Do not emit request hashes, span hashes, byte offsets, or other
 provenance; the host derives those facts from the authoritative request.
 
-The response must contain at least one executable work unit. A summary alone is
-never an executable plan. Every emitted report_task and SectionTask must contain
-at least one typed semantic operation. For a section edit, include the required
-existing_section_hint key, including explicit null only when reconstruction
-has no existing target.
+Return executable work only if the whole request can be represented. Otherwise
+return abstention with a reason and the unresolved requirements, without work
+units; do not invent a work unit or omit unresolved parts of a mixed request.
+A summary alone is never an executable plan. Every operation-form task must
+contain at least one typed semantic operation. Include existing_section_hint
+for section tasks; on the operation form, follow the revision rules below.
 
 SectionTask cardinality follows the requested section scopes, not the number of
 tracks or object operations. Put all requested edits for the same section in
 that section's single SectionTask; use separate SectionTasks only for distinct
-requested section scopes. Give each task a request-local scope_ref and use it
+requested section scopes. Give each operation-form task a request-local scope_ref and use it
 for every operation and presentation constraint in that task. Report operations
 use scope_ref `report`.
 
@@ -2058,7 +2311,7 @@ constraints may express only user-requested semantic order using local refs;
 they never specify host CRUD/dependency execution order. Existing-section hints
 remain natural-language clues only and are resolved later by host code.
 
-For each work unit, select the complete set of capability types needed to
+For each operation-form work unit, select the complete set of capability types needed to
 represent the requested structure. Capability IDs identify capability types,
 not requested object instances; list each capability ID at most once. When a
 selected capability declares allowed parent capabilities, select an appropriate
@@ -2070,7 +2323,7 @@ input source in natural language, preserve that clue in SectionTask.source_hints
 Source hints are ordered semantic clues for later host resolution. Do not emit
 filesystem paths, source formats, host candidate IDs, or invented source
 identities. Keep source clues attached to the section they describe.
-In revise mode, every SectionTask must include an existing_section_hint. Copy an
+In revise mode, every operation-form SectionTask must include an existing_section_hint. Copy an
 exact supplied section title or subtitle from current_document_summary's
 existing_section_hints; do not leave the hint null and do not invent a section
 identity. Revision workers cannot safely target an existing section without this
@@ -2088,7 +2341,7 @@ explicit values or categorical semantics that a downstream worker needs without
 the original request. Use requirements and constraints for this semantic text;
 do not emit document mechanics or implementation details.
 
-For each supported requested change, emit the corresponding SemanticOperation
+In operation-form tasks, emit the corresponding SemanticOperation for each requested change
 inside its owning task. Use only CREATE, UPDATE, ENSURE, MOVE, REMOVE, and SET
 with their declared meaning; do not substitute one verb for another. Put
 unresolved domain ambiguity in unresolved_semantics with its scope and candidate
@@ -2102,7 +2355,7 @@ stages. Preserve explicit user requirements and constraints verbatim where
 possible. Put unsupported requests in unresolved_requirements instead of
 inventing capabilities or identities. Put semantic ambiguities in the typed
 unresolved_semantics collection, including a request-local scope_ref and safe
-candidate clues. For every supported requested change, emit the corresponding
+candidate clues. For each requested change in an operation-form task, emit the corresponding
 SemanticOperation in its owning task's operations collection. Use only the
 declared verbs CREATE, UPDATE, ENSURE, MOVE, REMOVE, and SET. Operation and
 presentation refs are request-local aliases, never canonical identifiers.

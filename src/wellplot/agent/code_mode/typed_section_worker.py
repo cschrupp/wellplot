@@ -1738,6 +1738,7 @@ def _apply_track_requirements(
                 "track_scale_kind": "kind",
                 "track_scale_minimum": "minimum",
                 "track_scale_maximum": "maximum",
+                "track_scale_unit": "unit",
             }[field]
             scale_values[scale_field] = item.value
         elif field in {"vertical_main_visible", "vertical_secondary_visible"}:
@@ -2051,6 +2052,7 @@ def _semantic_field(field: str) -> str:
         "track_scale_kind": "x_scale.kind",
         "track_scale_minimum": "x_scale.minimum",
         "track_scale_maximum": "x_scale.maximum",
+        "track_scale_unit": "x_scale.unit",
         "color": "style.color",
         "line_width": "style.line_width",
         "line_style": "style.line_style",

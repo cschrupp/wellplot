@@ -6,6 +6,7 @@ from typing import Annotated, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ...authoring_defaults import default_track_width_mm
 from ...model.authoring import AuthoringScale
 from ...model.intent import (
     AuthoringCurveBindingIntent,
@@ -334,6 +335,7 @@ def _lower_added_track(
         raise SemanticActionError("section_missing", "Adding a track requires a grounded section.")
     allocator = allocator if allocator is not None else _allocator(document)
     track_id = allocator.allocate_track(section_id, f"track-{track.semantic_id}")
+    width_mm = track.width_mm if track.width_mm is not None else default_track_width_mm(track.kind)
     bindings: list[object] = []
     for binding in track.bindings:
         expected_kind = "array" if binding.kind == "raster" else "scalar"
@@ -380,7 +382,7 @@ def _lower_added_track(
                                 "kind": track.kind,
                                 "bindings": bindings,
                             },
-                            **({"width_mm": track.width_mm} if track.width_mm is not None else {}),
+                            **({"width_mm": width_mm} if width_mm is not None else {}),
                             **(
                                 {"x_scale": _scale(track.x_scale)}
                                 if track.x_scale is not None

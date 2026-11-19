@@ -379,8 +379,7 @@ def test_provider_schema_requires_work_unit_and_revision_hint_key() -> None:
     schema = _PlannerWirePlan.model_json_schema()
     section_schema = schema["$defs"]["_PlannerWireSectionTask"]
     assert "existing_section_hint" in section_schema["required"]
-    assert "scope_ref" in section_schema["required"]
-    assert "operations" in section_schema["required"]
+    assert {"scope_ref", "operations"} <= set(section_schema["anyOf"][0]["required"])
     assert "version" in schema["required"]
     assert list(Draft202012Validator(schema).iter_errors({"summary": "No work"}))
     assert list(
