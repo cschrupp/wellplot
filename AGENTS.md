@@ -114,6 +114,18 @@ smoke or campaign invocation. An approved readiness probe does not establish
 LAN access for a later runner launched in the default sandbox. If approval
 is unavailable or denied, stop before contacting the endpoint.
 
+All D5 live campaign launches must use the version-controlled
+`scripts/run_d5_live_campaign.sh` launcher from the canonical checkout. Invoke
+it with `preflight` for the existing provider-free preflight or `execute` for
+the separately authorized live run, followed by the population and quoted
+authorization descriptor path. The `execute` invocation itself must run with
+approved LAN execution; do not run readiness under escalation and then launch
+the campaign in the default sandbox. The launcher owns only canonical cwd,
+Python/module invocation, quoting, the standard watchdog, and exit propagation.
+Credential loading, readiness, provider construction, validation, accounting,
+and custody remain in the canonical campaign runner. Do not invoke that runner
+directly or create ad hoc shell wrappers, scripts, or commands for campaigns.
+
 Separate smoke authority and evidence namespace through the canonical live
 harness; do not create a separate live smoke harness or parallel execution
 path. Smoke mode must stop before the canonical scientific campaign runner
