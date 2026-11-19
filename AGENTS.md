@@ -106,6 +106,14 @@ failed or inconclusive smoke does not authorize or consume a scientific
 campaign. Scientific campaigns use fresh namespaces and must not be used for
 infrastructure discovery.
 
+Before contacting a configured LAN inference endpoint, request approval for
+LAN execution through the tool's sandbox escalation mechanism (for Codex,
+`sandbox_permissions: "require_escalated"`). Use approved LAN execution for
+both non-generative readiness requests and any separately authorized live
+smoke or campaign invocation. An approved readiness probe does not establish
+LAN access for a later runner launched in the default sandbox. If approval
+is unavailable or denied, stop before contacting the endpoint.
+
 Separate smoke authority and evidence namespace through the canonical live
 harness; do not create a separate live smoke harness or parallel execution
 path. Smoke mode must stop before the canonical scientific campaign runner
