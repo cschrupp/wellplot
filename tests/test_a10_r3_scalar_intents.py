@@ -372,6 +372,53 @@ def test_missing_or_changed_scale_stops_before_worker(
     assert calls == ["_PlannerWirePlan"]
 
 
+@pytest.mark.parametrize(
+    ("case", "advertised_valid"),
+    [
+        ("missing_goal", False),
+        ("missing_hint", False),
+        ("null_constraints", False),
+        ("invalid_kind", False),
+        ("mixed_forms", True),
+        ("fabricated_operation", False),
+        ("empty_section_work", True),
+        ("invalid_abstention", False),
+    ],
+)
+def test_section_wire_schema_and_local_rejection(case: str, advertised_valid: bool) -> None:
+    """Keep structural restrictions and defer section-form exclusivity to the model."""
+    payload = _wire("plot_curve", "GR")
+    (task,) = payload["section_tasks"]
+    task["source_hints"] = []
+    operation = {
+        "local_ref": "add-gr",
+        "scope_ref": "main",
+        "verb": "CREATE",
+        "object_kind": "binding",
+        "semantic_ref": "gr",
+    }
+    if case == "missing_goal":
+        del task["goal"]
+    elif case == "missing_hint":
+        del task["existing_section_hint"]
+    elif case == "null_constraints":
+        task["presentation_constraints"] = None
+    elif case == "empty_section_work":
+        del task["scalar_intent"]
+    elif case == "invalid_abstention":
+        payload["abstention"] = {"reason": "ambiguous", "unresolved": ["Which curve?"]}
+    else:
+        if case == "invalid_kind":
+            operation["object_kind"] = "binding.curve"
+        elif case == "fabricated_operation":
+            operation["verb"] = "EXECUTE"
+        task.update(scope_ref="main", capability_ids=["binding.curve"], operations=[operation])
+    validator = Draft202012Validator(_PlannerWirePlan.model_json_schema())
+    assert validator.is_valid(payload) is advertised_valid
+    with pytest.raises(ValidationError):
+        _PlannerWirePlan.model_validate(payload)
+
+
 def test_typed_abstention_cannot_turn_into_work(tmp_path: Path) -> None:
     """The unresolved mixed request remains an explicit no-work outcome."""
     payload = {

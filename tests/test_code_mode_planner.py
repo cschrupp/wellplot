@@ -378,8 +378,9 @@ def test_provider_schema_requires_work_unit_and_revision_hint_key() -> None:
     """The emitted schema carries settled structural requirements."""
     schema = _PlannerWirePlan.model_json_schema()
     section_schema = schema["$defs"]["_PlannerWireSectionTask"]
-    assert "existing_section_hint" in section_schema["required"]
-    assert {"scope_ref", "operations"} <= set(section_schema["anyOf"][0]["required"])
+    assert set(section_schema["required"]) == {"goal", "existing_section_hint"}
+    assert "anyOf" not in section_schema
+    assert section_schema["additionalProperties"] is False
     assert "version" in schema["required"]
     assert list(Draft202012Validator(schema).iter_errors({"summary": "No work"}))
     assert list(
@@ -435,7 +436,9 @@ def test_provider_schema_requires_work_unit_and_revision_hint_key() -> None:
     assert not list(Draft202012Validator(schema).iter_errors(section_only))
     missing_operations = json.loads(json.dumps(section_only))
     del missing_operations["section_tasks"][0]["operations"]
-    assert list(Draft202012Validator(schema).iter_errors(missing_operations))
+    assert Draft202012Validator(schema).is_valid(missing_operations)
+    with pytest.raises(ValidationError, match="complete operation inventory"):
+        _PlannerWirePlan.model_validate(missing_operations)
     assert _PlannerWirePlan.model_validate(
         {
             "version": "wellplot.semantic-plan.v2",

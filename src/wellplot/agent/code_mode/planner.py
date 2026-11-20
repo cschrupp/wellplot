@@ -295,32 +295,6 @@ class _PlannerAbstention(_SemanticModel):
         return values
 
 
-def _section_wire_schema(schema: dict[str, object]) -> None:
-    """Advertise both work shapes without opening the empty-work case."""
-    _require_section_hint_in_schema(schema)
-    schema["anyOf"] = [
-        {
-            "required": ["operations", "capability_ids", "scope_ref"],
-            "properties": {
-                "operations": {"minItems": 1},
-                "capability_ids": {"minItems": 1},
-                "scope_ref": {"type": "string"},
-                "scalar_intent": {"type": "null"},
-            },
-        },
-        {
-            "required": ["scalar_intent"],
-            "properties": {
-                "scalar_intent": {"type": "object"},
-                "operations": {"maxItems": 0},
-                "capability_ids": {"maxItems": 0},
-                "scope_ref": {"type": "null"},
-                "presentation_constraints": {"maxItems": 0},
-            },
-        },
-    ]
-
-
 class _PlannerWireSectionTask(_SemanticModel):
     """Provider-facing section task without host-owned provenance."""
 
@@ -341,7 +315,7 @@ class _PlannerWireSectionTask(_SemanticModel):
         extra="forbid",
         frozen=True,
         str_strip_whitespace=True,
-        json_schema_extra=_section_wire_schema,
+        json_schema_extra=_require_section_hint_in_schema,
     )
 
     @classmethod
