@@ -710,7 +710,11 @@ def test_first_pass_campaign_captures_one_response_per_case(
     )
     assert all(payload["max_tokens"] == 4096 for payload in requests)
     assert all("max_completion_tokens" not in payload for payload in requests)
-    assert all("Check these rules" in payload["messages"][1]["content"] for payload in requests)
+    assert all(
+        payload["messages"][1]["content"].startswith("USER REQUEST:\n")
+        and "\n\nPERMITTED CAPABILITIES:\n" in payload["messages"][1]["content"]
+        for payload in requests
+    )
     assert all(
         "Schema correction context:" not in payload["messages"][1]["content"]
         for payload in requests

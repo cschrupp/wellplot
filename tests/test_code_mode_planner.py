@@ -1229,7 +1229,7 @@ def test_duplicate_scope_correction_in_revise_mode_uses_main_log_fixture() -> No
     )
 
     assert len(backend.requests) == 2
-    assert '"mode":"revise"' in backend.requests[0].user_prompt
+    assert "TASK INSTRUCTIONS:\nMode: revise." in backend.requests[0].user_prompt
     assert result.section_tasks[0].existing_section_hint == "Main Log"
     assert len(result.section_tasks) == 1
     assert result.scope_binding is not None
@@ -1486,8 +1486,8 @@ def test_planner_catalog_exposes_only_structural_parent_metadata() -> None:
         )
     )
 
-    context = json.loads(backend.requests[0].user_prompt.split("Context:\n", 1)[1])
-    catalog = {entry["id"]: entry for entry in context["capabilities"]}
+    raw_catalog = backend.requests[0].user_prompt.split("\n\nPERMITTED CAPABILITIES:\n", 1)[1]
+    catalog = {entry["id"]: entry for entry in json.loads(raw_catalog)}
     assert catalog["binding.raster"]["allowed_parents"] == ["track.array"]
     assert catalog["binding.curve"]["allowed_parents"] == [
         "track.normal",
@@ -1551,9 +1551,9 @@ def test_initial_and_correction_catalogs_include_the_same_structural_metadata() 
         )
     )
 
-    initial = json.loads(backend.requests[0].user_prompt.split("Context:\n", 1)[1])
+    raw_catalog = backend.requests[0].user_prompt.split("\n\nPERMITTED CAPABILITIES:\n", 1)[1]
     correction = json.loads(backend.requests[1].user_prompt.split("Correction context:\n", 1)[1])
-    assert correction["capabilities"] == initial["capabilities"]
+    assert correction["capabilities"] == json.loads(raw_catalog)
     assert correction["previous_plan"]["section_tasks"][0]["capability_ids"] == [
         "section.log_plot",
         "binding.curve",
@@ -1574,7 +1574,7 @@ def test_planner_preserves_revise_mode_as_semantic_context() -> None:
         )
     )
 
-    assert '"mode":"revise"' in backend.requests[0].user_prompt
+    assert "TASK INSTRUCTIONS:\nMode: revise." in backend.requests[0].user_prompt
 
 
 def test_revise_plan_correction_receives_existing_section_hints() -> None:
@@ -1984,8 +1984,8 @@ def test_schema_validation_uses_a_bounded_schema_correction_request() -> None:
     assert len(backend.requests) == 2
     initial, retry = backend.requests
     assert initial.user_prompt != retry.user_prompt
-    assert planner_module._INITIAL_OPERATION_CONTRACT in initial.user_prompt
-    assert planner_module._INITIAL_OPERATION_CONTRACT not in retry.user_prompt
+    assert initial.user_prompt.startswith("USER REQUEST:\n")
+    assert "Check these rules" not in initial.user_prompt
     assert "Schema correction context:\n" in retry.user_prompt
     assert "SECRET_SCHEMA_VALIDATION_DETAILS" not in retry.user_prompt
     assert "SECRET_SCHEMA_VALIDATION_DETAILS" not in retry.system_prompt
@@ -1993,7 +1993,15 @@ def test_schema_validation_uses_a_bounded_schema_correction_request() -> None:
     assert initial.timeout_seconds == retry.timeout_seconds == 7.0
     assert initial.temperature == retry.temperature == 0.0
     assert initial.max_output_tokens == retry.max_output_tokens == 2048
-    initial_context = json.loads(initial.user_prompt.split("Context:\n", 1)[1])
+    request, instructions, document, sources, catalog = initial.user_prompt.split("\n\n")
+    assert instructions.startswith("TASK INSTRUCTIONS:\nMode: revise.")
+    initial_context = {
+        "request": json.loads(request.removeprefix("USER REQUEST:\n")),
+        "mode": "revise",
+        "current_document_summary": json.loads(document.removeprefix("DOCUMENT CONTEXT:\n")),
+        "source_summary": json.loads(sources.removeprefix("INSPECTED SOURCES:\n")),
+        "capabilities": json.loads(catalog.removeprefix("PERMITTED CAPABILITIES:\n")),
+    }
     retry_context = json.loads(retry.user_prompt.split("Schema correction context:\n", 1)[1])
     assert retry_context["context"] == initial_context
     assert retry_context["diagnostic"] == {
@@ -2181,27 +2189,60 @@ def test_planner_prompt_states_exclusive_work_ownership() -> None:
     assert prompt.count("Report-only requests") == 1
 
 
-def test_initial_operation_examples_match_wire_and_local_validators() -> None:
-    """Examples teach required refs and distinguish SET from field-level CLEAR."""
-    examples = planner_module._INITIAL_OPERATION_CONTRACT.split("\n[", 1)[1]
-    operations = json.loads("[" + examples)
-    payload = {
-        "version": "wellplot.semantic-plan.v2",
-        "summary": "Demonstrate two report operation shapes.",
-        "report_task": {"goal": "Illustrate an ensure and a clear.", "operations": operations},
+def test_planner_prompt_examples_match_wire_and_local_validators() -> None:
+    """Check every complete response, including intent preservation and abstention."""
+    prompt = planner_module._PLANNER_SYSTEM_PROMPT
+    responses = prompt.split("\nRequest: ")[1:]
+    validator = Draft202012Validator(_PlannerWirePlan.model_json_schema())
+    plans = []
+    permitted = {
+        entry["id"] for entry in planner_module._planning_catalog(create_builtin_registry())
     }
-    Draft202012Validator(_PlannerWirePlan.model_json_schema()).validate(payload)
-    report = _PlannerWirePlan.model_validate(payload).report_task
+    for response in responses:
+        payload = json.loads("{" + response.split("\n{", 1)[1])
+        validator.validate(payload)
+        plan = _PlannerWirePlan.model_validate_json(json.dumps(payload))
+        for task in payload.get("section_tasks", []):
+            assert task["goal"]
+            assert "existing_section_hint" in task
+        assert all(set(task.capability_ids) <= permitted for task in plan.section_tasks)
+        if plan.report_task:
+            assert set(plan.report_task.capability_ids) <= permitted
+        plans.append(plan)
+
+    physical, semantic, add_track, abstain, revision = plans
+    physical_intent = physical.section_tasks[0].scalar_intent
+    assert physical_intent is not None
+    assert (physical_intent.channel_kind, physical_intent.channel_clue) == ("physical", "DTCX")
+    semantic_intent = semantic.section_tasks[0].scalar_intent
+    assert semantic_intent is not None
+    assert (semantic_intent.channel_kind, semantic_intent.channel_clue) == ("semantic", "Gamma Ray")
+    assert semantic.section_tasks[0].existing_section_hint == "Survey"
+    track_intent = add_track.section_tasks[0].scalar_intent
+    assert track_intent is not None and track_intent.scale is not None
+    assert track_intent.action == "add_track"
+    assert (track_intent.scale.minimum, track_intent.scale.maximum, track_intent.scale.unit) == (
+        2,
+        3,
+        "g/cm3",
+    )
+    assert abstain.abstention is not None and abstain.abstention.reason == "ambiguous"
+    assert abstain.report_task is None and not abstain.section_tasks
+
+    report = revision.report_task
     assert report is not None
-    ensure, clear = report.operations
-    assert ensure.verb == "ENSURE"
-    assert ensure.semantic_ref is not None
-    assert ensure.field_values[0].value is not None
+    (clear,) = report.operations
     assert clear.verb == "SET"
     assert clear.target_clue
     assert len(clear.field_values) == 1
     assert clear.field_values[0].state == "CLEAR"
     assert clear.field_values[0].value is None
+    (section,) = revision.section_tasks
+    assert section.scalar_intent is None
+    track, binding = section.operations
+    assert track.object_kind == "track" and binding.object_kind == "binding"
+    assert binding.parent_ref == track.semantic_ref
+    assert binding.field_values[0].value == "RHOB"
 
 
 def test_schema_correction_helper_has_no_previous_response_arguments() -> None:
