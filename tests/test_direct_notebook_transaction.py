@@ -33,6 +33,7 @@ from wellplot.authoring_reconciler import (
 from wellplot.authoring_service import AuthoringService, CreateTrackRequest
 from wellplot.errors import AuthoringPublicationRecoveryError
 from wellplot.mcp import service as mcp_service
+from wellplot.mcp.agentic import _apply_session_result, _request_context
 from wellplot.model import AuthoringDocumentIntent, AuthoringDocumentSpec
 from wellplot.semantic_catalog import ExpectedSemanticBinding, SemanticPublicationContract
 
@@ -130,9 +131,9 @@ def test_notebook_semantic_stage_not_reached_before_verifier() -> None:
         )
 
         with (
-            patch("wellplot.agent.direct_notebook.reconcile_authoring", return_value=blocked_plan),
-            patch("wellplot.agent.direct_notebook.execute_authoring_plan") as execute,
-            patch("wellplot.agent.direct_notebook.verify_document_postconditions") as verify,
+            patch("wellplot.agent._private_apply.reconcile_authoring", return_value=blocked_plan),
+            patch("wellplot.agent._private_apply.execute_authoring_plan") as execute,
+            patch("wellplot.agent._private_apply.verify_document_postconditions") as verify,
             patch(
                 "wellplot.agent.direct_notebook.mcp_service.persist_authoring_document"
             ) as persist,
@@ -201,7 +202,7 @@ def test_notebook_semantic_postcondition_fails_without_persistence() -> None:
 
         with (
             patch(
-                "wellplot.agent.direct_notebook.verify_document_postconditions",
+                "wellplot.agent._private_apply.verify_document_postconditions",
                 side_effect=record_semantic_rejection,
             ),
             patch(
@@ -246,7 +247,7 @@ def test_notebook_apply_rejects_unapproved_candidate_change_before_persist() -> 
 
         with (
             patch(
-                "wellplot.agent.direct_notebook.execute_authoring_plan",
+                "wellplot.agent._private_apply.execute_authoring_plan",
                 side_effect=execute_with_unrequested_section_change,
             ),
             patch(
@@ -299,7 +300,7 @@ def test_notebook_semantic_postcondition_passes_before_persistence() -> None:
 
         with (
             patch(
-                "wellplot.agent.direct_notebook.verify_document_postconditions",
+                "wellplot.agent._private_apply.verify_document_postconditions",
                 side_effect=record_verify,
             ),
             patch(
@@ -432,12 +433,12 @@ def test_notebook_apply_rejects_template_changed_after_snapshot() -> None:
         assert fixture_paths.single_logfile.read_bytes() == original_logfile_bytes
 
 
-def test_notebook_apply_does_not_publish_partial_private_execution() -> None:
+@pytest.mark.parametrize("adapter", ["notebook", "mcp"])
+def test_adapters_do_not_publish_partial_private_execution(adapter: str) -> None:
     """A later CRUD failure discards earlier mutations to the private candidate."""
     with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="notebook-transaction-") as temp_dir:
         root = Path(temp_dir)
         fixture_paths = create_mcp_fixture_paths(root / "fixture")
-        context = _load_document_context(fixture_paths.single_logfile, root=REPO_ROOT)
         original_logfile_bytes = fixture_paths.single_logfile.read_bytes()
         intent = AuthoringDocumentIntent(
             sections=[
@@ -474,12 +475,28 @@ def test_notebook_apply_does_not_publish_partial_private_execution() -> None:
                     raise ValueError("injected second-track failure")
             return original_create(authoring_service, request)
 
-        with patch.object(AuthoringService, "create", fail_second_track_create):
-            success, changed, rolled_back, errors, status, _stages = _apply_result(
-                context=context,
-                result=_successful_result(intent),
-                root=REPO_ROOT,
-            )
+        with (
+            patch.object(AuthoringService, "create", fail_second_track_create),
+            patch.object(mcp_service, "persist_authoring_document") as persist,
+        ):
+            result = _successful_result(intent)
+            if adapter == "notebook":
+                notebook_context = _load_document_context(
+                    fixture_paths.single_logfile, root=REPO_ROOT
+                )
+                success, changed, rolled_back, errors, status, _stages = _apply_result(
+                    context=notebook_context, result=result, root=REPO_ROOT
+                )
+            else:
+                mcp_context = _request_context(str(fixture_paths.single_logfile), root=REPO_ROOT)
+                success, changed, rolled_back, errors, statuses, _section_ids = (
+                    _apply_session_result(
+                        context=mcp_context, session_result=result, root=REPO_ROOT
+                    )
+                )
+                (status,) = statuses
+        persist.assert_not_called()
+        assert create_count == 2
 
         assert success is False
         assert changed is False

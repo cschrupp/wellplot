@@ -10,29 +10,14 @@ from pathlib import Path
 from typing import Literal, TypeVar
 
 from ..api.serialize import report_to_dict
-from ..authoring_executor import execute_authoring_plan
-from ..authoring_reconciler import reconcile_authoring
 from ..authoring_service import AuthoringService
 from ..errors import AuthoringPublicationRecoveryError, AuthoringSnapshotConflictError
 from ..file_revision import file_revision_token
 from ..logfile import load_logfile_text, resolve_section_data_sources_for_logfile
 from ..mcp import service as mcp_service
 from ..model.authoring import AuthoringDocumentSpec
-from ..semantic_catalog import (
-    EMPTY_SEMANTIC_CHANNEL_CATALOG,
-    SemanticCatalogTrustError,
-    load_deployed_catalog_release,
-)
-from .code_mode.enrichment import (
-    bind_semantic_publication_sources,
-    intent_requires_channel_context,
-    reconciliation_channels,
-    validate_enriched_snapshot,
-)
-from .code_mode.obligations import (
-    DocumentPostconditionError,
-    verify_document_postconditions,
-)
+from ._private_apply import _apply_private_authoring
+from .code_mode.enrichment import validate_enriched_snapshot
 from .composition import create_canonical_compile_facade, create_provider_backend
 from .results import AuthoringResult, AuthoringRunState, AuthoringUserReport
 from .session import (
@@ -260,120 +245,26 @@ def _apply_result(
             stages,
         )
 
-    private_service = AuthoringService(context.document)
     inspected = result.inspection_context
-    semantic_catalog = EMPTY_SEMANTIC_CHANNEL_CATALOG
-    semantic_contract = result.semantic_publication_contract
-    if inspected is None:
-        if intent_requires_channel_context(result.intent):
-            return (
-                False,
-                False,
-                False,
-                ["Source inspection snapshot is missing."],
-                "reconciliation_blocked",
-                stages,
-            )
-        available_channels = {}
-    else:
-        try:
-            validate_enriched_snapshot(inspected, private_service.document)
-            available_channels = reconciliation_channels(inspected, result.intent)
-            semantic_contract = result.semantic_publication_contract
-            if semantic_contract is not None and semantic_contract.expected_bindings:
-                semantic_contract = bind_semantic_publication_sources(
-                    semantic_contract,
-                    inspected,
-                )
-            if semantic_contract is not None and semantic_contract.expected_bindings:
-                trusted_release = load_deployed_catalog_release()
-                semantic_catalog = trusted_release.catalog
-                semantic_contract = semantic_contract.model_copy(
-                    update={"trusted_release": trusted_release}
-                )
-        except SemanticCatalogTrustError as error:
-            return (
-                False,
-                False,
-                False,
-                [f"{error.code}: trusted semantic catalog unavailable."],
-                "reconciliation_blocked",
-                stages,
-            )
-        except ValueError as error:
-            return (
-                False,
-                False,
-                False,
-                [f"stale_or_invalid_inspection_snapshot: {error}"],
-                "stale_snapshot_conflict",
-                stages,
-            )
-    try:
-        plan = reconcile_authoring(
-            result.intent,
-            existing=private_service.document,
-            available_channels=available_channels,
-            semantic_catalog=semantic_catalog,
-            semantic_publication_contract=semantic_contract,
-        )
-    except SemanticCatalogTrustError as error:
+    private = _apply_private_authoring(
+        document=context.document,
+        intent=result.intent,
+        obligations=result.obligations,
+        inspected=inspected,
+        semantic_contract=result.semantic_publication_contract,
+    )
+    stages.update(private.stages)
+    accepted = private.candidate
+    if accepted is None:
         return (
             False,
             False,
-            False,
-            [f"{error.code}: trusted semantic catalog unavailable."],
-            "reconciliation_blocked",
+            private.rolled_back,
+            list(private.errors),
+            private.failure_status,
             stages,
         )
-    if not plan.ready:
-        errors = [f"{issue.code}: {issue.message}" for issue in plan.issues]
-        return False, False, False, errors, "reconciliation_blocked", stages
-    if plan.semantic_publication_contract is not None:
-        semantic_contract = plan.semantic_publication_contract
-    stages["reconciliation"] = "PASS"
-
-    execution = execute_authoring_plan(private_service, plan)
-    if not execution.success:
-        return (
-            False,
-            False,
-            True,
-            [str(error) for error in execution.errors],
-            "execution_failed",
-            stages,
-        )
-    stages["private_execution"] = "PASS"
-
-    validation = private_service.validate()
-    if not validation.valid:
-        return False, False, True, list(validation.errors), "validation_failed", stages
-    stages["canonical_validation"] = "PASS"
-
-    accepted = private_service.document
-    try:
-        verify_document_postconditions(
-            context.document,
-            accepted,
-            result.obligations,
-            plan.operations,
-            semantic_contract=semantic_contract,
-            semantic_evidence=plan.semantic_resolutions,
-        )
-        stages["semantic_postcondition"] = "PASS"
-        stages["post_lowering_obligation"] = "PASS"
-        stages["preservation"] = "PASS"
-    except DocumentPostconditionError as error:
-        if error.check == "semantic":
-            stages["semantic_postcondition"] = "FAIL"
-            return False, False, True, [str(error)], "semantic_postcondition_failed", stages
-        if error.check == "obligations":
-            stages["post_lowering_obligation"] = "FAIL"
-        else:
-            stages["post_lowering_obligation"] = "PASS"
-            stages["preservation"] = "FAIL"
-        return False, False, True, [str(error)], "post_lowering_obligation_failed", stages
-    changed = context.document.model_dump(mode="json") != accepted.model_dump(mode="json")
+    changed = private.changed
     if changed:
         try:
             if inspected is not None:

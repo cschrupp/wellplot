@@ -27,7 +27,11 @@ from wellplot.agent.code_mode.planner import _PlannerWirePlan
 from wellplot.agent.code_mode.semantic_actions import UpdateCurveScaleAction
 from wellplot.agent.code_mode.source_loader import LogfileSourceLoader
 from wellplot.agent.composition import create_canonical_compile_facade
-from wellplot.agent.direct_notebook import DirectNotebookSession
+from wellplot.agent.direct_notebook import (
+    DirectNotebookSession,
+    _apply_result,
+    _load_document_context,
+)
 from wellplot.agent.providers.base import ProviderMetrics, StructuredGenerationResult
 from wellplot.agent.session import (
     AgentMetrics,
@@ -330,6 +334,62 @@ def test_notebook_and_mcp_revisions_persist_equivalent_canonical_documents() -> 
     }
 
 
+def test_compile_only_does_not_apply_or_publish() -> None:
+    """A real graph compile returns intent and leaves both source document and YAML alone."""
+    request = "In Main Log, set the GR curve to a linear 5-125 scale using fixture.las."
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="compile-only-") as temp_dir:
+        fixture = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        context = _request_context(str(fixture.single_logfile), root=REPO_ROOT)
+        before = context.document.model_dump(mode="json")
+        original = fixture.single_logfile.read_bytes()
+        session = AgentSession(
+            compiler=create_canonical_compile_facade(
+                backend=_McpSourceContextBackend(), server_root=REPO_ROOT
+            )
+        )
+        with (
+            patch("wellplot.agent._private_apply.execute_authoring_plan") as execute,
+            patch.object(mcp_service, "persist_authoring_document") as persist,
+        ):
+            result = asyncio.run(
+                session.revise(
+                    request=request, document=context.document, sources=context.source_candidates
+                )
+            )
+        assert result.success and result.intent is not None and result.obligations
+        execute.assert_not_called()
+        persist.assert_not_called()
+        assert context.document.model_dump(mode="json") == before
+        assert fixture.single_logfile.read_bytes() == original
+
+
+def test_verified_no_op_does_not_publish_in_either_adapter() -> None:
+    """An unchanged verified candidate is distinct from publication."""
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="adapter-no-op-") as temp_dir:
+        fixture = create_mcp_fixture_paths(Path(temp_dir) / "fixture")
+        before = fixture.single_logfile.read_bytes()
+        notebook_context = _load_document_context(fixture.single_logfile, root=REPO_ROOT)
+        mcp_context = _request_context(str(fixture.single_logfile), root=REPO_ROOT)
+        result = _successful_result(AuthoringDocumentIntent(title=notebook_context.document.title))
+        with (
+            patch(
+                "wellplot.agent._private_apply.verify_document_postconditions",
+                wraps=verify_document_postconditions,
+            ) as verify,
+            patch.object(mcp_service, "persist_authoring_document") as persist,
+        ):
+            notebook = _apply_result(context=notebook_context, result=result, root=REPO_ROOT)
+            mcp = _apply_session_result(context=mcp_context, session_result=result, root=REPO_ROOT)
+
+        assert notebook[:5] == (True, False, False, [], "no_op")
+        assert notebook[5]["semantic_postcondition"] == "PASS"
+        assert notebook[5]["persistence"] == "PASS"
+        assert mcp[:5] == (True, False, False, [], ["no_op"])
+        assert verify.call_count == 2
+        persist.assert_not_called()
+        assert fixture.single_logfile.read_bytes() == before
+
+
 def test_host02_automatic_semantic_contract_reaches_both_adapters() -> None:
     """Notebook and MCP publish the same host-compiled Gamma Ray contract."""
     request = "Plot Gamma Ray."
@@ -366,36 +426,30 @@ def test_host02_automatic_semantic_contract_reaches_both_adapters() -> None:
         )
         mcp = GraphAuthoringMcpOperations.create(session=mcp_session, root=REPO_ROOT)
 
-        with (
-            patch(
-                "wellplot.agent.direct_notebook.verify_document_postconditions",
-                wraps=verify_document_postconditions,
-            ) as notebook_verify,
-            patch(
-                "wellplot.mcp.agentic.verify_document_postconditions",
-                wraps=verify_document_postconditions,
-            ) as mcp_verify,
-        ):
+        with patch(
+            "wellplot.agent._private_apply.verify_document_postconditions",
+            wraps=verify_document_postconditions,
+        ) as verify:
             notebook_result = asyncio.run(
                 notebook.revise(
                     feedback=request,
                     logfile_path=notebook_fixture.single_logfile,
                 )
             )
+            assert verify.call_count == 1
             mcp_result = asyncio.run(
                 mcp.revise(
                     logfile_path=str(mcp_fixture.single_logfile),
                     request=request,
                 )
             )
+            assert verify.call_count == 2
 
         assert notebook_result.report_facts["success"] is True
         assert (
             notebook_result.report_facts["host_stage_evidence"]["semantic_postcondition"] == "PASS"
         )
         assert mcp_result.success is True, mcp_result.errors
-        assert notebook_verify.call_count == 1
-        assert mcp_verify.call_count == 1
         assert notebook_backend.response_models == ["_PlannerWirePlan", "AddBindingAction"]
         assert mcp_backend.response_models == ["_PlannerWirePlan", "AddBindingAction"]
 
@@ -754,7 +808,7 @@ def test_mcp_apply_rejects_unapproved_candidate_change_before_persist() -> None:
 
         with (
             patch(
-                "wellplot.mcp.agentic.execute_authoring_plan",
+                "wellplot.agent._private_apply.execute_authoring_plan",
                 side_effect=execute_with_unrequested_section_change,
             ),
             patch("wellplot.mcp.agentic.service.persist_authoring_document") as persist,
@@ -801,7 +855,7 @@ def test_mcp_shared_verifier_passes_before_persistence() -> None:
 
         with (
             patch(
-                "wellplot.mcp.agentic.verify_document_postconditions",
+                "wellplot.agent._private_apply.verify_document_postconditions",
                 side_effect=record_verify,
             ),
             patch(

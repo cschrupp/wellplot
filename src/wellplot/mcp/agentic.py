@@ -16,31 +16,16 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..agent.code_mode.enrichment import (
-    bind_semantic_publication_sources,
-    intent_requires_channel_context,
-    reconciliation_channels,
-    validate_enriched_snapshot,
-)
-from ..agent.code_mode.obligations import (
-    DocumentPostconditionError,
-    verify_document_postconditions,
-)
+from ..agent._private_apply import _apply_private_authoring
+from ..agent.code_mode.enrichment import validate_enriched_snapshot
 from ..agent.execution_trace import AgentRunTrace, bind_agent_trace
 from ..agent.session import AgentSession, AgentSessionResult, AgentSourceConfig
 from ..api.serialize import report_to_dict
-from ..authoring_executor import execute_authoring_plan
-from ..authoring_reconciler import reconcile_authoring
 from ..authoring_service import AuthoringService
 from ..errors import AuthoringPublicationRecoveryError, AuthoringSnapshotConflictError
 from ..file_revision import file_revision_token
 from ..logfile import load_logfile_text, resolve_section_data_sources_for_logfile
 from ..model.authoring import AuthoringDocumentSpec
-from ..semantic_catalog import (
-    EMPTY_SEMANTIC_CHANNEL_CATALOG,
-    SemanticCatalogTrustError,
-    load_deployed_catalog_release,
-)
 from . import service
 
 
@@ -137,16 +122,6 @@ def _diagnostic_errors(result: object) -> list[str]:
     return [f"{item.code}: {item.message}" for item in getattr(result, "diagnostics", ())]
 
 
-def _plan_errors(plan: object) -> list[str]:
-    """Project deterministic reconciliation issues without exposing internals."""
-    return [f"{item.code}: {item.message}" for item in getattr(plan, "issues", ())]
-
-
-def _execution_errors(execution: object) -> list[str]:
-    """Project deterministic executor errors without retaining snapshots."""
-    return [str(error) for error in getattr(execution, "errors", ())]
-
-
 def _apply_session_result(
     *,
     context: _McpDocumentContext,
@@ -185,129 +160,25 @@ def _apply_session_result(
             [section.id for section in context.document.sections],
         )
 
-    private_service = AuthoringService(context.document)
     inspected = getattr(session_result, "inspection_context", None)
-    semantic_catalog = EMPTY_SEMANTIC_CHANNEL_CATALOG
-    semantic_contract = session_result.semantic_publication_contract
-    if inspected is None:
-        if intent_requires_channel_context(intent):
-            return (
-                False,
-                False,
-                False,
-                ["Source inspection snapshot is missing."],
-                ["reconciliation_blocked"],
-                [section.id for section in context.document.sections],
-            )
-        available_channels = {}
-    else:
-        try:
-            validate_enriched_snapshot(inspected, private_service.document)
-            available_channels = reconciliation_channels(inspected, intent)
-            if semantic_contract is not None and semantic_contract.expected_bindings:
-                semantic_contract = bind_semantic_publication_sources(
-                    semantic_contract,
-                    inspected,
-                )
-                trusted_release = load_deployed_catalog_release()
-                semantic_catalog = trusted_release.catalog
-                semantic_contract = semantic_contract.model_copy(
-                    update={"trusted_release": trusted_release}
-                )
-        except SemanticCatalogTrustError as error:
-            return (
-                False,
-                False,
-                False,
-                [f"{error.code}: trusted semantic catalog unavailable."],
-                ["reconciliation_blocked"],
-                [section.id for section in context.document.sections],
-            )
-        except ValueError as error:
-            return (
-                False,
-                False,
-                False,
-                [f"stale_or_invalid_inspection_snapshot: {error}"],
-                ["stale_snapshot_conflict"],
-                [section.id for section in context.document.sections],
-            )
-    try:
-        plan = reconcile_authoring(
-            intent,
-            existing=private_service.document,
-            available_channels=available_channels,
-            semantic_catalog=semantic_catalog,
-            semantic_publication_contract=semantic_contract,
-        )
-    except SemanticCatalogTrustError as error:
+    private = _apply_private_authoring(
+        document=context.document,
+        intent=intent,
+        obligations=session_result.obligations,
+        inspected=inspected,
+        semantic_contract=session_result.semantic_publication_contract,
+    )
+    accepted = private.candidate
+    if accepted is None:
         return (
             False,
             False,
-            False,
-            [f"{error.code}: trusted semantic catalog unavailable."],
-            ["reconciliation_blocked"],
+            private.rolled_back,
+            list(private.errors),
+            [private.failure_status],
             [section.id for section in context.document.sections],
         )
-    if not plan.ready:
-        return (
-            False,
-            False,
-            False,
-            _plan_errors(plan),
-            ["reconciliation_blocked"],
-            [section.id for section in context.document.sections],
-        )
-    if plan.semantic_publication_contract is not None:
-        semantic_contract = plan.semantic_publication_contract
-
-    execution = execute_authoring_plan(private_service, plan)
-    if not execution.success:
-        return (
-            False,
-            False,
-            True,
-            _execution_errors(execution),
-            ["execution_failed"],
-            [section.id for section in context.document.sections],
-        )
-
-    validation = private_service.validate()
-    if not validation.valid:
-        return (
-            False,
-            False,
-            True,
-            list(validation.errors),
-            ["validation_failed"],
-            [section.id for section in context.document.sections],
-        )
-
-    accepted = private_service.document
-    try:
-        verify_document_postconditions(
-            context.document,
-            accepted,
-            session_result.obligations,
-            plan.operations,
-            semantic_contract=semantic_contract,
-            semantic_evidence=plan.semantic_resolutions,
-        )
-    except DocumentPostconditionError as error:
-        return (
-            False,
-            False,
-            True,
-            [str(error)],
-            [
-                "semantic_postcondition_failed"
-                if error.check == "semantic"
-                else "post_lowering_obligation_failed"
-            ],
-            [section.id for section in context.document.sections],
-        )
-
-    changed = context.document.model_dump(mode="json") != accepted.model_dump(mode="json")
+    changed = private.changed
     if changed:
         try:
             if inspected is not None:
