@@ -426,6 +426,7 @@ def test_final_document_preservation_rejects_unrelated_binding_mutation() -> Non
     operation = SimpleNamespace(
         object_kind="track",
         object_id="gamma",
+        section_id="main",
         action="update",
         payload={"patch": {"width_mm": 30}},
     )

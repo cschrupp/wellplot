@@ -10,8 +10,19 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
+from ...authoring_executor import _omit_undefined, _order_plan_operations, _resolve_clears
+from ...authoring_reconciler import AuthoringOperation, AuthoringReconciliationPlan
+from ...model.authoring import (
+    AnnotationSpec,
+    AuthoringRemarkSpec,
+    AuthoringSectionSpec,
+    CurveBindingSpec,
+    CurveFillSpec,
+    RasterBindingSpec,
+    TrackSpec,
+)
 from ...semantic_catalog import (
     ExpectedSemanticBinding,
     SemanticCatalogTrustError,
@@ -134,6 +145,7 @@ FieldName = Literal[
     "forbidden",
     "preservation",
 ]
+RequestFieldName = FieldName | Literal["baseline"]
 
 
 class RequirementProvenance(BaseModel):
@@ -211,7 +223,7 @@ class RequestObligation(BaseModel):
     kind: ObligationKind
     owner_kind: OwnerKind
     owner_ref: str = Field(min_length=1)
-    field: FieldName
+    field: RequestFieldName
     scope: Literal["task", "global"] = "task"
     value: str | float | int | bool | None = None
     state: ObligationState = ObligationState.SET
@@ -268,7 +280,7 @@ class SupportedAnchor(BaseModel):
     start_byte: int = Field(ge=0)
     end_byte: int = Field(gt=0)
     kind: Literal["explicit", "target", "preservation", "presentation", "scope"]
-    field: FieldName
+    field: RequestFieldName
     family: str | None = None
     required_fields: tuple[FieldName, ...] = ()
 
@@ -306,7 +318,7 @@ class ValidationIssue(BaseModel):
     requirement_id: str = Field(min_length=1)
     owner_kind: OwnerKind
     owner_ref: str = Field(min_length=1)
-    field: FieldName
+    field: RequestFieldName
     slot_key: str | None = None
     code: str = Field(min_length=1)
     expected_value: str | float | int | bool | None = None
@@ -462,6 +474,32 @@ _SCALAR_TRACK_SHORTHAND_RE = re.compile(
 _EXPLICIT_PHYSICAL_PLOT_RE = re.compile(
     r"\s*(?i:plot|show)\s+(?:(?i:the)\s+)?(?i:physical)\s+"
     r"(?P<channel>[A-Z][A-Z0-9_]{1,11})(?:\s+(?i:channel|curve))?\s*\.?\s*"
+)
+_CREATE_PHYSICAL_CURVE = (
+    r"\s*(?i:create|add)\s+(?:(?i:a|the)\s+)?(?P<channel>[A-Z][A-Z0-9_]{1,11})"
+    r"\s+(?i:curve)\b"
+)
+_CREATE_PHYSICAL_CURVE_RE = re.compile(_CREATE_PHYSICAL_CURVE + r"\s*\.?\s*")
+_CURVE_CREATION_START_RE = re.compile(
+    r"\s*(?:create|add)\s+(?:a\s+|the\s+)?"
+    r"(?:(?!report\b|section\b|track\b)[A-Za-z0-9_]+\s+){0,3}curve\b",
+    re.I,
+)
+_EXPLICIT_BASELINE_SPLIT_RE = re.compile(
+    r"\s*(?i:split the)\s+(?P<channel>[A-Z][A-Z0-9_]{1,11})"
+    r"\s+(?i:curve fill at baseline)\s+(?P<baseline>[+-]?\d{1,12}(?:\.\d{1,12})?)\s*\.?\s*"
+)
+_BASELINE_FILL_REQUEST_RE = re.compile(
+    r"(?:\A|[.!?;,\n]|\b(?:and|then)\b)\s*(?:(?:please|also)\s+)*"
+    r"(?:fill\b[^.!?;\n]*\bbaseline\b|"
+    r"(?:add|apply|create|set|split|plot|show|use|change|replace|update)\b"
+    r"[^.!?;:\n]*?(?:\bfill\b[^.!?;\n]*\bbaseline\b|\bbaseline\s+(?:split\s+)?fill\b))",
+    re.I,
+)
+_QUOTED_REQUEST_LITERAL_RE = re.compile(
+    r"""(?<!\w)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'(?!\w)|"""
+    r"\u201c[^\u201d]*\u201d|\u2018[^\u2019]*\u2019)",
+    re.DOTALL,
 )
 _TRACK_LINE_RE = re.compile(
     r"\btrack\s+(?P<owner>[A-Za-z0-9_. -]+?)\s*:\s*"
@@ -786,7 +824,7 @@ def _make_obligation(
     kind: ObligationKind,
     owner_kind: OwnerKind,
     owner_ref: str,
-    field: FieldName,
+    field: RequestFieldName,
     value: str | float | None,
     scope: Literal["task", "global"] = "task",
 ) -> RequestObligation:
@@ -858,6 +896,28 @@ def extract_supported_anchors(request: str) -> tuple[SupportedAnchor, ...]:
     """Return the independent, bounded anchor inventory used for coverage."""
     data = request.encode("utf-8")
     anchors: list[SupportedAnchor] = []
+    split = _EXPLICIT_BASELINE_SPLIT_RE.fullmatch(request)
+    create_curve = _CREATE_PHYSICAL_CURVE_RE.fullmatch(request)
+    if split or create_curve:
+        fields: tuple[tuple[str | int, RequestFieldName], ...] = (
+            (("channel", "target"), (0, "kind"), ("baseline", "baseline"))
+            if split
+            else (("channel", "channel"),)
+        )
+        match = split or create_curve
+        assert match is not None
+        for group, field in fields:
+            start, end = match.span(group)
+            anchors.append(
+                SupportedAnchor(
+                    text=request[start:end],
+                    start_byte=_byte_offset(request, start),
+                    end_byte=_byte_offset(request, end),
+                    kind="explicit",
+                    field=field,
+                )
+            )
+        return tuple(anchors)
     for kind, field, pattern in _INDEPENDENT_ANCHOR_PATTERNS:
         for match in pattern.finditer(request):
             start = _byte_offset(request, match.start())
@@ -1017,7 +1077,9 @@ def extract_supported_obligations(request: str) -> tuple[RequestObligation, ...]
     shorthand = _SCALAR_TRACK_SHORTHAND_RE.fullmatch(request)
     if shorthand is not None:
         return _scalar_track_shorthand_obligations(request, request_sha256, shorthand)
-    physical = _EXPLICIT_PHYSICAL_PLOT_RE.fullmatch(request)
+    physical = _EXPLICIT_PHYSICAL_PLOT_RE.fullmatch(request) or _CREATE_PHYSICAL_CURVE_RE.fullmatch(
+        request
+    )
     if physical is not None:
         return (
             _make_obligation(
@@ -1030,6 +1092,28 @@ def extract_supported_obligations(request: str) -> tuple[RequestObligation, ...]
                 field="channel",
                 value=physical.group("channel"),
             ),
+        )
+    split = _EXPLICIT_BASELINE_SPLIT_RE.fullmatch(request)
+    if split is not None:
+        facts: tuple[tuple[str | int, RequestFieldName, str | float], ...] = (
+            ("channel", "target", split["channel"]),
+            (0, "kind", "baseline_split"),
+            ("baseline", "baseline", float(split["baseline"])),
+        )
+        return tuple(
+            _make_obligation(
+                request=request,
+                request_sha256=request_sha256,
+                match=_re_span_match(request, *split.span(group)),
+                kind=ObligationKind.TARGET_REFERENCE
+                if field == "target"
+                else ObligationKind.EXPLICIT_FIELD,
+                owner_kind=OwnerKind.FILL,
+                owner_ref=split["channel"],
+                field=field,
+                value=value,
+            )
+            for group, field, value in facts
         )
     obligations: list[RequestObligation] = []
     for match in _REPORT_TITLE_RE.finditer(request):
@@ -1732,6 +1816,8 @@ def _request_scope_declarations(
     request_sha256: str,
 ) -> ScopeDeclarationSet:
     """Extract independently named request scopes before planner output exists."""
+    if _CURVE_CREATION_START_RE.match(request) or _EXPLICIT_BASELINE_SPLIT_RE.fullmatch(request):
+        return ScopeDeclarationSet()
     scopes: list[ScopeDeclaration] = []
     seen: set[str] = set()
     creates_sections = bool(
@@ -1833,11 +1919,21 @@ def compile_request_contract(request: str) -> RequestCompilationResult:
     if not isinstance(request, str) or not request.strip():
         raise ValueError("Authoritative request must be non-empty.")
     _, request_sha256 = _request_identity(request)
+    if _has_unsupported_curve_creation_or_baseline_fill(request):
+        return RequestCompilationResult(
+            requirements=CanonicalRequirementSet(
+                request_sha256=request_sha256, language_version="wellplot-request-v1"
+            ),
+            status=RequestCompilationStatus.COVERAGE_FAILURE,
+            diagnostic_codes=("unsupported_curve_creation_or_baseline_fill",),
+        )
     obligations = list(extract_supported_obligations(request))
     anchors = extract_supported_anchors(request)
     scopes = _request_scope_declarations(request, request_sha256)
     if (
         _EXPLICIT_PHYSICAL_PLOT_RE.fullmatch(request) is not None
+        or _CREATE_PHYSICAL_CURVE_RE.fullmatch(request) is not None
+        or _EXPLICIT_BASELINE_SPLIT_RE.fullmatch(request) is not None
         or _SCALAR_TRACK_SHORTHAND_RE.fullmatch(request) is not None
         or any(
             item.owner_kind is OwnerKind.BINDING
@@ -1924,6 +2020,20 @@ def compile_request_contract(request: str) -> RequestCompilationResult:
     )
 
 
+def _has_unsupported_curve_creation_or_baseline_fill(request: str) -> bool:
+    """Do not turn a partial match into authority for either bounded request family."""
+    if _EXPLICIT_BASELINE_SPLIT_RE.fullmatch(request) or _CREATE_PHYSICAL_CURVE_RE.fullmatch(
+        request
+    ):
+        return False
+    # Keep literal text out of this guard without changing request provenance.
+    instruction_text = _QUOTED_REQUEST_LITERAL_RE.sub(" ", request)
+    return bool(
+        _CURVE_CREATION_START_RE.match(request)
+        or _BASELINE_FILL_REQUEST_RE.search(instruction_text)
+    )
+
+
 def _normalize_requirement_key(value: str) -> str:
     """Normalize a request-local display identity for deterministic matching."""
     return "_".join(re.findall(r"[a-z0-9]+", value.casefold()))
@@ -1978,6 +2088,20 @@ def verify_obligation_spans(request: str, obligations: tuple[RequestObligation, 
             if isinstance(obligation.value, float):
                 literal = literal.rstrip("0").rstrip(".")
             span_text = span.decode("utf-8").casefold()
+            if obligation.owner_kind is OwnerKind.FILL and obligation.field == "kind":
+                if obligation.value == "baseline_split" and _EXPLICIT_BASELINE_SPLIT_RE.fullmatch(
+                    span.decode("utf-8")
+                ):
+                    continue
+                raise ValueError("Fill geometry is not present in its request span.")
+            if obligation.owner_kind is OwnerKind.FILL and obligation.field == "baseline":
+                if (
+                    isinstance(obligation.value, (int, float))
+                    and re.fullmatch(r"[+-]?\d{1,12}(?:\.\d{1,12})?", span_text)
+                    and float(span_text) == obligation.value
+                ):
+                    continue
+                raise ValueError("Fill baseline is not present in its request span.")
             if (
                 obligation.owner_kind is OwnerKind.TRACK
                 and obligation.field == "kind"
@@ -2119,10 +2243,25 @@ def _object_paths(
         return []
 
     found: list[tuple[str, ...]] = []
-    if (object_kind == "report" and not path) or _identity_matches(value, object_id):
+    identity = _COLLECTION_OBJECTS.get(object_kind)
+    if identity is not None:
+        collection, key = identity
+        matched = (
+            len(path) >= 2
+            and path[-2] == collection
+            and value.get(key, value.get("id")) == object_id
+            and (
+                not object_kind.endswith("_binding")
+                or value.get("kind", object_kind.removesuffix("_binding"))
+                == object_kind.removesuffix("_binding")
+            )
+        )
+    else:
+        matched = value.get("slot_id") == object_id if object_kind == "header_slot" else False
+    if matched:
         found.append(path)
     for key, child in value.items():
-        if isinstance(child, (Mapping, list, tuple)):
+        if key != "extensions" and isinstance(child, (Mapping, list, tuple)):
             found.extend(
                 _object_paths(
                     child,
@@ -2132,6 +2271,113 @@ def _object_paths(
                 )
             )
     return found
+
+
+_COLLECTION_OBJECTS = {
+    "section": ("sections", "id"),
+    "track": ("tracks", "id"),
+    "curve_binding": ("bindings", "binding_id"),
+    "raster_binding": ("bindings", "binding_id"),
+    "fill": ("fills", "fill_id"),
+    "annotation": ("annotations", "annotation_id"),
+    "remark": ("remarks", "remark_id"),
+}
+_CREATED_OBJECT_MODELS = {
+    "section": AuthoringSectionSpec,
+    "track": TrackSpec,
+    "curve_binding": CurveBindingSpec,
+    "raster_binding": RasterBindingSpec,
+    "fill": CurveFillSpec,
+    "annotation": AnnotationSpec,
+    "remark": AuthoringRemarkSpec,
+}
+_PRESERVATION_ERROR = "Candidate document changed outside the authorized reconciliation envelope."
+
+
+def _scoped_operation_parent(
+    document: dict[str, Any], operation: object
+) -> tuple[dict[str, Any], tuple[str, ...]]:
+    """Locate only the canonical parents declared on an operation."""
+    parent = document
+    path: tuple[str, ...] = ()
+    kind = getattr(operation, "object_kind", "")
+    for name, scope in (("sections", "section_id"), ("tracks", "track_id")):
+        if kind in {"section", "remark"} or (kind == "track" and scope == "track_id"):
+            break
+        object_id = getattr(operation, scope, None)
+        if not object_id:
+            continue
+        matches = [
+            (index, item)
+            for index, item in enumerate(parent.get(name, ()))
+            if item.get("id") == object_id
+        ]
+        if len(matches) != 1:
+            raise ValueError(_PRESERVATION_ERROR)
+        index, parent = matches[0]
+        path += (name, str(index))
+    return parent, path
+
+
+def _project_collection_effects(document: dict[str, Any], operations: Sequence[object]) -> None:
+    """Project only authorized collection changes; never call the executor or service."""
+    for operation in operations:
+        action = getattr(operation, "action", "")
+        if action not in {"create", "remove", "move"}:
+            continue
+        kind = getattr(operation, "object_kind", "")
+        if kind not in _COLLECTION_OBJECTS:
+            raise ValueError(_PRESERVATION_ERROR)
+        collection, key = _COLLECTION_OBJECTS[kind]
+        parent, _ = _scoped_operation_parent(document, operation)
+        items = parent.get(collection)
+        if not isinstance(items, list):
+            raise ValueError(_PRESERVATION_ERROR)
+        object_id = getattr(operation, "object_id", None)
+        matches = [index for index, item in enumerate(items) if item.get(key) == object_id]
+        payload = operation.payload
+        if action == "create":
+            if matches or "object" not in payload:
+                raise ValueError(_PRESERVATION_ERROR)
+            raw = payload["object"]
+            if isinstance(operation, AuthoringOperation):
+                model = TypeAdapter(_CREATED_OBJECT_MODELS[kind])
+                raw = model.validate_python(_omit_undefined(_resolve_clears(raw)))
+            created = _plain_json(raw)
+            if not isinstance(created, dict) or created.get(key) != object_id:
+                raise ValueError(_PRESERVATION_ERROR)
+            items.append(created)
+            continue
+        if len(matches) != 1:
+            raise ValueError(_PRESERVATION_ERROR)
+        item = items.pop(matches[0])
+        if action == "move":
+            index = payload.get("new_index")
+            if not isinstance(index, int) or not 0 <= index <= len(items):
+                raise ValueError(_PRESERVATION_ERROR)
+            items.insert(index, item)
+
+
+def _operation_update_paths(
+    document: dict[str, Any], operation: object, kind: str
+) -> list[tuple[str, ...]]:
+    object_id = getattr(operation, "object_id", "")
+    if kind == "report":
+        return [()]
+    if kind in {"header", "page", "depth", "output", "tail"}:
+        return [(kind,)]
+    if kind == "header_slot":
+        return _object_paths(
+            document.get("header"), object_kind=kind, object_id=object_id, path=("header",)
+        )
+    parent, path = _scoped_operation_parent(document, operation)
+    collection = _COLLECTION_OBJECTS.get(kind)
+    if collection is None:
+        return []
+    name, _ = collection
+    return _object_paths(
+        {name: parent.get(name, [])}, object_kind=kind, object_id=object_id, path=path
+    )
 
 
 def _changed_paths(left: object, right: object, path: tuple[str, ...] = ()) -> set[tuple[str, ...]]:
@@ -2161,38 +2407,55 @@ def verify_document_preservation(
     """Reject candidate changes outside the canonical reconciliation operations."""
     before_json = _plain_json(before)
     after_json = _plain_json(after)
+    if not isinstance(before_json, dict) or not isinstance(after_json, dict):
+        raise ValueError(_PRESERVATION_ERROR)
+    if operations and all(isinstance(op, AuthoringOperation) for op in operations):
+        ordered, errors = _order_plan_operations(
+            AuthoringReconciliationPlan(ready=True, operations=operations)
+        )
+        if errors:
+            raise ValueError(_PRESERVATION_ERROR)
+        operations = tuple(op for group in ordered.values() for op in group)
+    _project_collection_effects(before_json, operations)
     changed = _changed_paths(before_json, after_json)
-    if not changed:
-        return
     allowed: set[tuple[str, ...]] = set()
     for operation in operations:
+        if getattr(operation, "action", "") != "update":
+            continue
         object_kind = str(getattr(operation, "object_kind", "")).casefold()
-        object_kind = object_kind.rsplit(".", 1)[-1]
-        object_id = str(getattr(operation, "object_id", ""))
-        action = str(getattr(operation, "action", "")).casefold().rsplit(".", 1)[-1]
         payload = getattr(operation, "payload", {})
-        prefixes = _object_paths(before_json, object_kind=object_kind, object_id=object_id)
-        prefixes += _object_paths(after_json, object_kind=object_kind, object_id=object_id)
-        if object_kind == "header":
-            prefixes = [("header",)]
-        if object_kind == "report":
-            prefixes = [()]
+        prefixes = _operation_update_paths(before_json, operation, object_kind)
         if not prefixes:
             continue
+        if object_kind == "annotation" and "object" in payload:
+            if len(prefixes) != 1 or prefixes != _operation_update_paths(
+                after_json, operation, object_kind
+            ):
+                raise ValueError(_PRESERVATION_ERROR)
+            (prefix,) = prefixes
+            actual: Any = after_json
+            for key in prefix:
+                actual = actual[int(key)] if isinstance(actual, list) else actual[key]
+            expected = TypeAdapter(AnnotationSpec).validate_python(
+                _resolve_clears(payload["object"])
+            )
+            if actual != _plain_json(expected):
+                raise ValueError(_PRESERVATION_ERROR)
+            allowed.add(prefix)
+            continue
+        if object_kind in _COLLECTION_OBJECTS and (
+            len(prefixes) != 1
+            or prefixes != _operation_update_paths(after_json, operation, object_kind)
+        ):
+            raise ValueError(_PRESERVATION_ERROR)
         patch = payload.get("patch") if isinstance(payload, Mapping) else None
         for prefix in prefixes:
-            if action == "update" and isinstance(patch, Mapping):
+            if isinstance(patch, Mapping):
                 allowed.update(prefix + (str(key),) for key in patch)
-            else:
+            elif object_kind in {"header", "page", "depth", "output", "tail"}:
                 allowed.add(prefix)
-                # Collection creates/removes are represented by a changed list
-                # at the parent path, not by the newly addressed item path.
-                if action in {"create", "remove", "move"} and prefix:
-                    allowed.add(prefix[:-1])
     if any(not any(path[: len(prefix)] == prefix for prefix in allowed) for path in changed):
-        raise ValueError(
-            "Candidate document changed outside the authorized reconciliation envelope."
-        )
+        raise ValueError(_PRESERVATION_ERROR)
 
 
 def validate_report_obligations(
@@ -2481,6 +2744,17 @@ def validate_section_obligations(
         if item.owner_kind is OwnerKind.FILL:
             if fill is None:
                 raise ValueError("Requested fill semantics were not emitted.")
+            if item.field == "target":
+                handle = getattr(getattr(action, "target", None), "handle", "")
+                curves = section_context.existing_curves if section_context is not None else ()
+                if not any(
+                    handle == f"curve-{index}"
+                    and fill.target_binding == handle
+                    and curve.channel == item.value
+                    for index, curve in enumerate(curves, 1)
+                ):
+                    raise ValueError("Requested fill target was not satisfied.")
+                continue
             actual = getattr(fill, item.field, None)
             if actual != item.value:
                 raise ValueError(f"Requested fill {item.field} was not satisfied.")
@@ -2670,6 +2944,11 @@ def verify_document_obligations(
         action = action.rsplit(".", 1)[-1]
         if object_kind == "curve_binding" and action in {"add", "create", "update"}:
             grounded_binding_ids.add(str(getattr(operation, "object_id", "")))
+    split_fill_targets = {
+        (item.scope_key, item.owner_ref): item.value
+        for item in obligations
+        if item.owner_kind is OwnerKind.FILL and item.field == "target"
+    }
     for item in obligations:
         scoped_sections = _document_sections_for_obligation(sections, item)
         if item.state in {ObligationState.CONFLICTING, ObligationState.UNRESOLVED}:
@@ -2827,6 +3106,14 @@ def verify_document_obligations(
         ):
             raise ValueError("Post-lowering section target obligation failed.")
         if item.owner_kind is OwnerKind.FILL:
+            if (item.scope_key, item.owner_ref) in split_fill_targets:
+                _verify_split_fill_obligation(
+                    scoped_sections,
+                    item,
+                    split_fill_targets[(item.scope_key, item.owner_ref)],
+                    grounded_operations,
+                )
+                continue
             fills = [
                 fill
                 for section in scoped_sections
@@ -2835,6 +3122,46 @@ def verify_document_obligations(
             ]
             if not any(fill.get(item.field) == item.value for fill in fills):
                 raise ValueError(f"Post-lowering fill {item.field} obligation failed.")
+
+
+def _verify_split_fill_obligation(
+    sections: list[dict[str, Any]],
+    item: RequestObligation,
+    target: object,
+    operations: Sequence[object],
+) -> None:
+    """Verify the same scoped fill and binding, not facts scattered across curves."""
+    expected = {
+        (op.section_id, op.track_id, op.object_id)
+        for op in operations
+        if isinstance(op, AuthoringOperation) and op.object_kind == "fill" and op.action == "create"
+    }
+    matches = [
+        (track, fill)
+        for section in sections
+        for track in section.get("tracks", ())
+        for fill in track.get("fills", ())
+        if (section.get("id"), track.get("id"), fill.get("fill_id")) in expected
+        and any(
+            binding.get("kind") == "curve"
+            and binding.get("binding_id") == fill.get("binding_id")
+            and binding.get("channel") == target
+            for binding in track.get("bindings", ())
+        )
+    ]
+    if len(matches) != 1:
+        raise ValueError("Post-lowering fill target is not one grounded physical binding.")
+    _, fill = matches[0]
+    if item.field == "target":
+        return
+    baseline = fill.get("baseline")
+    value = (
+        (baseline.get("value") if isinstance(baseline, dict) else None)
+        if item.field == "baseline"
+        else fill.get(item.field)
+    )
+    if value != item.value:
+        raise ValueError(f"Post-lowering fill {item.field} obligation failed.")
 
 
 class DocumentPostconditionError(ValueError):

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
@@ -208,7 +209,7 @@ class WorkerOperationContractEntry(BaseModel):
 
     operation_id: str = Field(min_length=1)
     operation_ref: str = Field(min_length=1)
-    operation_type: Literal["ADD_TRACK", "ADD_BINDING", "UPDATE_CURVE_SCALE"]
+    operation_type: Literal["ADD_TRACK", "ADD_BINDING", "UPDATE_CURVE_SCALE", "ADD_FILL"]
     scope_ref: str = Field(min_length=1)
     target_handle: str | None = None
     requested_scale: SectionWorkScale | None = None
@@ -245,6 +246,20 @@ class WorkerOperationContractEntry(BaseModel):
                 raise ValueError("Binding-create operations require request evidence.")
             if self.requested_scale is not None:
                 raise ValueError("Binding-create operations cannot carry presentation scale.")
+        elif self.operation_type == "ADD_FILL":
+            if (
+                not all(
+                    (
+                        self.target_handle,
+                        self.binding_id,
+                        self.requested_channel,
+                        self.source_handle,
+                        self.requirement_ids,
+                    )
+                )
+                or self.requested_scale is not None
+            ):
+                raise ValueError("Fill creation requires a scoped, source-bound curve target.")
         elif self.requested_scale is not None:
             raise ValueError("Only scale-update operations may carry a requested scale.")
         return self
@@ -614,6 +629,55 @@ def _exact_existing_curve_handle(
         code = "section_work_target_missing" if not matches else "section_work_target_ambiguous"
         raise SectionWorkContractError(code, "Existing curve target is not uniquely grounded.")
     return f"curve-{matches[0] + 1}"
+
+
+def _baseline_fill_target(
+    facts: Sequence[RequestObligation], context: ResolvedSectionContext
+) -> tuple[str, ExistingCurveContext]:
+    """Bind one explicit split fill to an exact inspected physical curve."""
+    values = {item.field: item.value for item in facts}
+    channel = values.get("target")
+    if (
+        len(facts) != 3
+        or values.get("kind") != "baseline_split"
+        or not isinstance(values.get("baseline"), (int, float))
+        or not isinstance(channel, str)
+    ):
+        raise SectionWorkContractError(
+            "section_operation_fill_unsupported",
+            "Fill requires explicit split geometry and baseline.",
+        )
+    matches = [
+        (index, curve)
+        for index, curve in enumerate(context.existing_curves)
+        if curve.channel == channel
+    ]
+    if len(matches) == 1:
+        index, curve = matches[0]
+        sources = [source for source in context.sources if source.handle == curve.source_handle]
+        if (
+            len(sources) == 1
+            and context.section_id is not None
+            and context.snapshot_id is not None
+            and curve.snapshot_id == context.snapshot_id
+        ):
+            source = sources[0]
+            channels = [item for item in source.channels if item.mnemonic == channel]
+            if (
+                source.inspection_state == "inspected"
+                and source.revision_token is not None
+                and source.revision_token == curve.source_revision
+                and len(channels) == 1
+                and channels[0].kind == "scalar"
+                and channels[0].addressability == "ADDRESSABLE"
+                and curve.physical_identity
+                and channels[0].physical_identity == curve.physical_identity
+            ):
+                return f"curve-{index + 1}", curve
+    raise SectionWorkContractError(
+        "section_operation_fill_target_unresolved",
+        "Split fill target is not one exact, inspected curve on the bound source snapshot.",
+    )
 
 
 def _binding_id_for_slot(
@@ -1236,26 +1300,34 @@ def build_section_work_contract(
                 "section_work_scale_incomplete", "Scale update lacks explicit numeric bounds."
             )
     elif required_action == "add_fill":
-        target_obligation = next(
-            (
-                item
-                for item in obligations
-                if item.owner_kind is OwnerKind.BINDING and item.field == "target"
-            ),
-            None,
-        )
-        if target_obligation is None:
-            if len(section_context.existing_curves) != 1:
-                raise SectionWorkContractError(
-                    "section_work_target_ambiguous",
-                    "Fill target is not uniquely grounded by the existing context.",
-                )
-            target_handle = "curve-1"
+        if any(item.field == "baseline" for item in fill_facts):
+            target_handle, _ = _baseline_fill_target(fill_facts, section_context)
+            required_fill = {
+                item.field: item.value for item in fill_facts if item.field != "target"
+            }
         else:
-            target_handle = _existing_curve_handle(str(target_obligation.value), section_context)
-        required_fill = {
-            item.field: item.value for item in fill_facts if item.field in {"color", "alpha"}
-        }
+            target_obligation = next(
+                (
+                    item
+                    for item in obligations
+                    if item.owner_kind is OwnerKind.BINDING and item.field == "target"
+                ),
+                None,
+            )
+            if target_obligation is None:
+                if len(section_context.existing_curves) != 1:
+                    raise SectionWorkContractError(
+                        "section_work_target_ambiguous",
+                        "Fill target is not uniquely grounded by the existing context.",
+                    )
+                target_handle = "curve-1"
+            else:
+                target_handle = _existing_curve_handle(
+                    str(target_obligation.value), section_context
+                )
+            required_fill = {
+                item.field: item.value for item in fill_facts if item.field in {"color", "alpha"}
+            }
 
     source_handle = (
         selected_source_handle
@@ -1414,6 +1486,7 @@ def build_section_operation_contract(
     assigned_track_owners: set[str] = set()
     assigned_scale_owners: set[str] = set()
     assigned_scale_targets: set[str] = set()
+    fill_facts = [item for item in obligations if item.owner_kind is OwnerKind.FILL]
     for operation in task.operations:
         if operation.scope_ref != task.scope_ref:
             raise SectionWorkContractError(
@@ -1429,7 +1502,25 @@ def build_section_operation_contract(
         requested_channel: str | None = None
         source_handle: str | None = None
         operation_facts: list[RequestObligation] = []
-        if operation_type == "ADD_BINDING":
+        if operation_type == "ADD_FILL":
+            if len(task.operations) != 1 or operation.parent_ref is not None:
+                raise SectionWorkContractError(
+                    "section_operation_unsupported",
+                    "A split fill must target one existing curve.",
+                )
+            target_handle, curve = _baseline_fill_target(fill_facts, section_context)
+            if operation.target_clue is not None and operation.target_clue != curve.channel:
+                raise SectionWorkContractError(
+                    "section_operation_fill_target_unresolved",
+                    "Fill proposal differs from the request's exact curve target.",
+                )
+            binding_id, requested_channel, source_handle = (
+                curve.binding_id,
+                curve.channel,
+                curve.source_handle,
+            )
+            operation_facts = fill_facts
+        elif operation_type == "ADD_BINDING":
             if len(task.operations) != 1:
                 raise SectionWorkContractError(
                     "binding_cardinality_unsupported",
@@ -1525,7 +1616,7 @@ def build_section_operation_contract(
             and item.owner_ref == owner
             and item.owner_kind in {OwnerKind.TRACK, OwnerKind.ARRAY_TRACK, OwnerKind.BINDING}
         ]
-        if operation_type == "ADD_BINDING":
+        if operation_type in {"ADD_BINDING", "ADD_FILL"}:
             facts = operation_facts
         for proposal in operation.field_values:
             matching_facts = [item for item in facts if item.field == proposal.field]
@@ -1587,6 +1678,12 @@ def build_section_operation_contract(
         raise SectionWorkContractError(
             "section_operation_coverage_incomplete",
             "Operation inventory does not cover every request-owned scale update exactly once.",
+        )
+    if any(item.field == "baseline" for item in fill_facts) and not any(
+        item.operation_type == "ADD_FILL" for item in entries
+    ):
+        raise SectionWorkContractError(
+            "section_operation_coverage_incomplete", "Operation inventory omits the requested fill."
         )
     ordering: list[tuple[str, str, str]] = []
     for item in task.operations:
@@ -1799,8 +1896,8 @@ def build_report_operation_contract(
 
 def _section_operation_type(
     operation: SemanticOperation,
-) -> Literal["ADD_TRACK", "ADD_BINDING", "UPDATE_CURVE_SCALE"]:
-    """Accept canonical track-add, scalar-binding-add, and scale operations."""
+) -> Literal["ADD_TRACK", "ADD_BINDING", "UPDATE_CURVE_SCALE", "ADD_FILL"]:
+    """Recognize operation families before binding them to request authority."""
     if operation.verb == "CREATE" and operation.object_kind == "track":
         return "ADD_TRACK"
     if operation.verb == "CREATE" and operation.object_kind == "binding":
@@ -1812,6 +1909,8 @@ def _section_operation_type(
         return "ADD_BINDING"
     if operation.verb == "SET" and operation.object_kind == "binding":
         return "UPDATE_CURVE_SCALE"
+    if operation.verb == "CREATE" and operation.object_kind == "fill":
+        return "ADD_FILL"
     raise SectionWorkContractError(
         "section_operation_unsupported",
         "The section operation contract does not support this operation kind.",
@@ -1976,6 +2075,18 @@ def validate_section_action_contract(
             )
         return
     else:
+        if "baseline" in (contract.required_fill or {}) and (
+            operation_contract is None
+            or operation_contract.snapshot_id != contract.snapshot_id
+            or operation_contract.omitted_operations
+            or len(operation_contract.operations) != 1
+            or operation_contract.operations[0].operation_type != "ADD_FILL"
+            or operation_contract.operations[0].target_handle != contract.target_handle
+        ):
+            raise SectionWorkContractError(
+                "worker_operation_contract_identity_mismatch",
+                "Split fill requires one grounded, current fill operation.",
+            )
         if action.target.handle != contract.target_handle:
             raise SectionWorkContractError(
                 "worker_contract_target_mismatch", "Fill response changed the required target."
@@ -1983,6 +2094,12 @@ def validate_section_action_contract(
         if action.fill.target_binding != contract.target_handle:
             raise SectionWorkContractError(
                 "worker_contract_target_mismatch", "Fill binding target differs from the contract."
+            )
+        if "baseline" in (contract.required_fill or {}) and (
+            action.fill.color is not None or action.fill.alpha is not None
+        ):
+            raise SectionWorkContractError(
+                "worker_contract_fill_mismatch", "Split fill adds unrequested styling."
             )
         for field, expected_value in (contract.required_fill or {}).items():
             actual_value = getattr(action.fill, field, None)
