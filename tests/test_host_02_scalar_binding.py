@@ -321,7 +321,7 @@ def test_preworker_failure_uses_canonical_compile_envelope() -> None:
     """Host contract failures must not escape as adapter-specific exceptions."""
 
     class FailingGraph:
-        async def ainvoke(self, state: object) -> object:
+        async def ainvoke(self, state: object, *, context: object) -> object:
             raise SectionWorkContractError(
                 "semantic_catalog_unavailable",
                 "untrusted detail that must not cross the boundary",

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -13,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ...model.authoring import AuthoringDocumentSpec
 from ...model.intent import AuthoringDocumentIntent
-from ...semantic_catalog import SemanticPublicationContract
+from ...semantic_catalog import SemanticCatalogTrustError, SemanticPublicationContract
 from ..providers.base import ProviderFailureCategory, ProviderRequestError
 from ..providers.response_diagnostics import (
     ProviderResponseFailureReason,
@@ -40,7 +41,12 @@ from .section_leaf_safety import (
     SectionLeafSafetyEvidence,
     SectionLeafSafetyFailure,
 )
-from .state import CodeModeGraphState, ConditionalOmissionEvidence, WorkerOutcome
+from .state import (
+    CodeModeGraphState,
+    ConditionalOmissionEvidence,
+    SemanticReleaseCustody,
+    WorkerOutcome,
+)
 from .worker_contracts import SectionWorkContractError
 from .workflow import CodeModeGraphDependencies, build_compile_graph
 
@@ -204,8 +210,29 @@ class CodeModeCompileFacade:
             "diagnostics": [],
             "merged_intent": {},
         }
+        custody = SemanticReleaseCustody(hashlib.sha256(request.encode("utf-8")).hexdigest())
         try:
-            result = await self._graph.ainvoke(state)
+            result = await self._graph.ainvoke(state, context=custody)
+            projected_result = _project_graph_result(result, custody=custody)
+            retained = projected_result.semantic_publication_contract
+            if (
+                semantic_publication_contract is not None
+                and (retained is not None or semantic_publication_contract.expected_bindings)
+                and retained != semantic_publication_contract
+            ):
+                raise SemanticCatalogTrustError("semantic_release_custody_mismatch")
+        except SemanticCatalogTrustError as error:
+            return self._observe_result(
+                _failure_result(
+                    (
+                        CompileDiagnostic(
+                            stage="semantic_publication",
+                            code=error.code,
+                            message="Original semantic release authority could not be retained.",
+                        ),
+                    )
+                )
+            )
         except ProviderRequestError as error:
             return self._observe_result(_failure_result((_provider_diagnostic(error),)))
         except PlannerSemanticFailure as error:
@@ -228,13 +255,10 @@ class CodeModeCompileFacade:
             )
         except SemanticEnrichmentError as error:
             return self._observe_result(_failure_result((_enrichment_diagnostic(error),)))
-        projected_result = _project_graph_result(result)
         projected = projected_result.model_copy(
             update={
                 "semantic_publication_contract": (
-                    semantic_publication_contract
-                    if semantic_publication_contract is not None
-                    else projected_result.semantic_publication_contract
+                    retained if retained is not None else semantic_publication_contract
                 )
             }
         )
@@ -247,16 +271,30 @@ class CodeModeCompileFacade:
         return result
 
 
-def _project_graph_result(state: dict[str, object]) -> CodeModeCompileResult:
+def _project_graph_result(
+    state: dict[str, object],
+    *,
+    custody: SemanticReleaseCustody | None = None,
+) -> CodeModeCompileResult:
     """Project validated graph state into the stable host-facing result."""
     plan = SemanticPlan.model_validate(state["plan"])
     enriched_context = EnrichedSemanticContext.model_validate(state["enriched_context"])
     semantic_payload = state.get("semantic_publication_contract")
-    semantic_contract = (
-        None
-        if not isinstance(semantic_payload, dict) or not semantic_payload
-        else SemanticPublicationContract.model_validate(semantic_payload)
-    )
+    try:
+        semantic_contract = (
+            None
+            if semantic_payload is None or semantic_payload == {}
+            else SemanticPublicationContract.model_validate(semantic_payload)
+        )
+    except ValueError as error:
+        raise SemanticCatalogTrustError("semantic_release_custody_mismatch") from error
+    if custody is not None:
+        request = state.get("request")
+        semantic_contract = custody.restore(
+            semantic_contract, request if isinstance(request, str) else ""
+        )
+    elif semantic_contract is not None:
+        raise SemanticCatalogTrustError("semantic_original_release_missing")
     outcomes = tuple(
         WorkerOutcome.model_validate(json.loads(payload))
         for payload in state.get("worker_outcomes", [])

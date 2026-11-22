@@ -2,14 +2,62 @@
 
 from __future__ import annotations
 
+import hashlib
 import operator
+from dataclasses import dataclass, field
 from typing import Annotated, Any, Literal, NotRequired, TypedDict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ...model.intent import AuthoringDocumentIntent
+from ...semantic_catalog import (
+    SemanticCatalogTrustError,
+    SemanticPublicationContract,
+    TrustedCatalogRelease,
+)
 from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
 from .planner import CompilationMode
+
+
+@dataclass(slots=True)
+class SemanticReleaseCustody:
+    """Host-only, capture-once authority for one in-memory graph invocation."""
+
+    request_sha256: str
+    _release: TrustedCatalogRelease | None = field(default=None, init=False, repr=False)
+    _contract_json: str | None = field(default=None, init=False, repr=False)
+
+    def capture(self, contract: SemanticPublicationContract) -> None:
+        """Retain original authority independently of the JSON graph handoff."""
+        if self._release is not None or self._contract_json is not None:
+            raise SemanticCatalogTrustError("semantic_release_custody_duplicate")
+        if (
+            not contract.expected_bindings
+            or contract.trusted_release is None
+            or any(
+                item.request_sha256 != self.request_sha256 for item in contract.expected_bindings
+            )
+        ):
+            raise SemanticCatalogTrustError("semantic_release_custody_mismatch")
+        self._release = contract.trusted_release
+        self._contract_json = contract.model_dump_json()
+
+    def restore(
+        self, contract: SemanticPublicationContract | None, request: str
+    ) -> SemanticPublicationContract | None:
+        """Join the unchanged graph result to its original live host authority."""
+        if self._release is None:
+            if contract is not None:
+                raise SemanticCatalogTrustError("semantic_original_release_missing")
+            return None
+        if (
+            contract is None
+            or hashlib.sha256(request.encode("utf-8")).hexdigest() != self.request_sha256
+            or contract.trusted_release is not None
+            or contract.model_dump_json() != self._contract_json
+        ):
+            raise SemanticCatalogTrustError("semantic_release_custody_mismatch")
+        return contract.model_copy(update={"trusted_release": self._release})
 
 
 def replace_merged_intent(

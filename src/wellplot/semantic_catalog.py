@@ -350,6 +350,14 @@ class SemanticPublicationContract(_CatalogModel):
     source_bindings: tuple[SemanticSourceBinding, ...] = ()
     trusted_release: TrustedCatalogRelease | None = Field(default=None, exclude=True)
 
+    @field_validator("trusted_release", mode="before")
+    @classmethod
+    def require_live_release(cls, value: object) -> object:
+        """Never reconstruct the excluded host authority from a JSON payload."""
+        if value is not None and not isinstance(value, TrustedCatalogRelease):
+            raise ValueError("Trusted release requires live host authority.")
+        return value
+
     @model_validator(mode="after")
     def validate_unique_host_keys(self) -> SemanticPublicationContract:
         """Reject duplicate expected slots and ambiguous source scope mappings."""

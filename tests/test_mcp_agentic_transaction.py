@@ -8,6 +8,7 @@ import shutil
 import tempfile
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, Never
 from unittest.mock import patch
 
 import pytest
@@ -26,6 +27,7 @@ from wellplot.agent.code_mode.obligations import (
 from wellplot.agent.code_mode.planner import _PlannerWirePlan
 from wellplot.agent.code_mode.semantic_actions import UpdateCurveScaleAction
 from wellplot.agent.code_mode.source_loader import LogfileSourceLoader
+from wellplot.agent.code_mode.state import SemanticReleaseCustody
 from wellplot.agent.composition import create_canonical_compile_facade
 from wellplot.agent.direct_notebook import (
     DirectNotebookSession,
@@ -457,6 +459,9 @@ def test_host02_automatic_semantic_contract_reaches_both_adapters() -> None:
         mcp_contract = mcp_compilations[0].semantic_publication_contract
         assert notebook_contract is not None
         assert mcp_contract is not None
+        assert notebook_contract.trusted_release is not None
+        assert notebook_contract.trusted_release == mcp_contract.trusted_release
+        assert "trusted_release" not in notebook_contract.model_dump(mode="json")
         assert notebook_contract.model_dump(mode="json") == mcp_contract.model_dump(mode="json")
         expected = notebook_contract.expected_bindings[0]
         assert expected.requested_term == "Gamma Ray"
@@ -477,6 +482,88 @@ def test_host02_automatic_semantic_contract_reaches_both_adapters() -> None:
             ]
             assert len(gamma_bindings) == 1
             assert gamma_bindings[0]["track_id"] == "gr"
+
+
+@pytest.mark.parametrize(
+    ("defect", "code"),
+    [
+        ("lost", "semantic_release_custody_mismatch"),
+        ("changed_snapshot", "semantic_release_custody_mismatch"),
+        ("changed_request", "semantic_release_custody_mismatch"),
+        ("injected_release", "semantic_release_custody_mismatch"),
+        ("duplicate", "semantic_release_custody_duplicate"),
+        ("deployment_changed", "semantic_catalog_stale"),
+        ("deployment_unavailable", "semantic_catalog_pin_missing"),
+    ],
+)
+def test_real_graph_release_custody_rejects_alteration(
+    defect: str, code: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Exercise the real handoff, then prove custody failures cannot publish."""
+    import wellplot.semantic_catalog as catalog
+
+    with tempfile.TemporaryDirectory(dir=REPO_ROOT, prefix="gate2a-rc-") as temp_dir:
+        fixture = create_approved_gamma_fixture_paths(Path(temp_dir) / "fixture")
+        before = fixture.single_logfile.read_bytes()
+        facade = create_canonical_compile_facade(
+            backend=Host02GammaBackend(),
+            server_root=REPO_ROOT,
+        )
+        real_invoke = facade._graph.ainvoke
+        original = catalog.load_deployed_catalog_release()
+        replacement = original.model_copy(
+            update={"pin": original.pin.model_copy(update={"approval_record_ref": "replacement"})}
+        )
+        assert original.pin != replacement.pin
+        assert original.pin.catalog_artifact_sha256 == replacement.pin.catalog_artifact_sha256
+        assert original.pin.content_sha256 == replacement.pin.content_sha256
+
+        async def intercept(
+            state: dict[str, Any], *, context: SemanticReleaseCustody
+        ) -> dict[str, Any]:
+            result = await real_invoke(state, context=context)
+            payload = result["semantic_publication_contract"]
+            assert "trusted_release" not in payload
+            contract = SemanticPublicationContract.model_validate(payload)
+            assert contract.trusted_release is None
+            if defect == "lost":
+                result.pop("semantic_publication_contract")
+            elif defect == "changed_snapshot":
+                payload["expected_bindings"][0]["inspection_snapshot_id"] = "new-snapshot"
+            elif defect == "changed_request":
+                result["request"] = "Plot a different channel."
+            elif defect == "injected_release":
+                payload["trusted_release"] = replacement.model_dump(mode="json")
+            elif defect == "duplicate":
+                restored = context.restore(contract, state["request"])
+                assert restored is not None
+                context.capture(restored)
+            elif defect == "deployment_changed":
+                monkeypatch.setattr(catalog, "load_deployed_catalog_release", lambda: replacement)
+            else:
+
+                def unavailable() -> Never:
+                    raise catalog.SemanticCatalogTrustError("semantic_catalog_pin_missing")
+
+                monkeypatch.setattr(catalog, "load_deployed_catalog_release", unavailable)
+            return result
+
+        monkeypatch.setattr(facade._graph, "ainvoke", intercept)
+        operations = GraphAuthoringMcpOperations.create(
+            session=AgentSession(compiler=facade, config=AgentSessionConfig()),
+            root=REPO_ROOT,
+        )
+        with patch("wellplot.mcp.agentic.service.persist_authoring_document") as persist:
+            result = asyncio.run(
+                operations.revise(
+                    logfile_path=str(fixture.single_logfile),
+                    request="Plot Gamma Ray.",
+                )
+            )
+        assert not result.success
+        assert code in repr(result)
+        persist.assert_not_called()
+        assert fixture.single_logfile.read_bytes() == before
 
 
 def test_host02_notebook_ignores_planner_hint_for_host_context_scope() -> None:

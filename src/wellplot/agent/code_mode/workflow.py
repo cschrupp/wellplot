@@ -11,11 +11,13 @@ from typing import Any, cast
 
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.runtime import Runtime
 from langgraph.types import Send
 
 from ...capabilities import create_builtin_registry
 from ...model.authoring import AuthoringDocumentSpec
 from ...model.intent import AuthoringDocumentIntent
+from ...semantic_catalog import SemanticCatalogTrustError
 from ..inspection import AuthoringInspectionFacade
 from ..providers.base import ProviderFailureCategory, ProviderRequestError
 from ..providers.response_diagnostics import (
@@ -44,6 +46,7 @@ from .state import (
     CodeModeGraphState,
     CodeModeWorkerState,
     ConditionalOmissionEvidence,
+    SemanticReleaseCustody,
     WorkerOutcome,
 )
 from .worker_contracts import (
@@ -188,11 +191,17 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
             "report_boundary_safety": result.evidence().model_dump(mode="json"),
         }
 
-    async def prepare_semantic_publication_node(state: CodeModeGraphState) -> dict[str, object]:
+    async def prepare_semantic_publication_node(
+        state: CodeModeGraphState, runtime: Runtime[SemanticReleaseCustody]
+    ) -> dict[str, object]:
         """Freeze semantic binding expectations before dispatching workers."""
         plan = SemanticPlan.model_validate(state["plan"])
         context = EnrichedSemanticContext.model_validate(state["enriched_context"])
         contract = build_preworker_semantic_publication_contract(plan, context)
+        if contract is not None:
+            if not isinstance(runtime.context, SemanticReleaseCustody):
+                raise SemanticCatalogTrustError("semantic_original_release_missing")
+            runtime.context.capture(contract)
         return {
             "semantic_publication_contract": (
                 {} if contract is None else contract.model_dump(mode="json")
@@ -584,7 +593,7 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
         merged = merge_v2_intents(typed_fragments)
         return {"merged_intent": merged.model_dump(mode="json", exclude_unset=True)}
 
-    builder = StateGraph(CodeModeGraphState)
+    builder = StateGraph(CodeModeGraphState, context_schema=SemanticReleaseCustody)
     builder.add_node("plan_v2", plan_node)
     builder.add_node("capability_safety", capability_safety_node)
     builder.add_node("report_boundary_safety", report_boundary_safety_node)

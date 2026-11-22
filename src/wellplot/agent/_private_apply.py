@@ -14,7 +14,7 @@ from ..semantic_catalog import (
     EMPTY_SEMANTIC_CHANNEL_CATALOG,
     SemanticCatalogTrustError,
     SemanticPublicationContract,
-    load_deployed_catalog_release,
+    revalidate_deployed_catalog_release,
 )
 from .code_mode.enrichment import (
     EnrichedSemanticContext,
@@ -76,9 +76,10 @@ def _apply_private_authoring(
             available_channels = reconciliation_channels(inspected, intent)
             if semantic_contract is not None and semantic_contract.expected_bindings:
                 semantic_contract = bind_semantic_publication_sources(semantic_contract, inspected)
-                trusted_release = (
-                    semantic_contract.trusted_release or load_deployed_catalog_release()
-                )
+                trusted_release = semantic_contract.trusted_release
+                if trusted_release is None:
+                    raise SemanticCatalogTrustError("semantic_original_release_missing")
+                revalidate_deployed_catalog_release(trusted_release)
                 semantic_catalog = trusted_release.catalog
                 semantic_contract = semantic_contract.model_copy(
                     update={"trusted_release": trusted_release}
