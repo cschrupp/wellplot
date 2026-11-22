@@ -6,6 +6,7 @@ import hashlib
 import json
 from copy import deepcopy
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from pydantic import ValidationError
@@ -1263,6 +1264,133 @@ def test_executor_checks_applicable_semantics_before_next_operation(
     assert not result.success
     assert "semantic_source_route_mismatch" in result.errors[0]
     assert result.outcomes[0].after_document_sha256 is None
+
+
+@pytest.mark.parametrize(
+    "defect", ["none", "switch", "transient", "approval", "final_approval", "missing_release"]
+)
+def test_ordered_private_apply_preserves_original_scientific_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    defect: str,
+) -> None:
+    """Verify original source and approval through the real ordered private path."""
+    import wellplot.semantic_catalog as catalog
+    from wellplot.agent._private_apply import _OrderedPrivateApply, _PrivateStepAdmission
+    from wellplot.agent.code_mode.obligations import compile_request_contract
+    from wellplot.authoring_executor import _document_digest
+    from wellplot.authoring_service import SectionPatch, UpdateReportRequest, UpdateSectionRequest
+    from wellplot.model.intent import AuthoringTailIntent
+
+    document, contract, evidence, release = _publication_case(tmp_path)
+    current = release
+    monkeypatch.setattr(catalog, "load_deployed_catalog_release", lambda: current)
+    request = (
+        "Rename the report 'Gamma Study'. Set the report subtitle to 'Run 02'. "
+        "Keep the report tail."
+    )
+    facts = compile_request_contract(request).requirements.requirements
+    if defect == "missing_release":
+        contract = contract.model_copy(update={"trusted_release": None})
+        with pytest.raises(DocumentPostconditionError, match="semantic_original_release_missing"):
+            _OrderedPrivateApply(
+                request=request,
+                document=document,
+                step_ids=("first", "second"),
+                obligations=facts,
+                semantic_contract=contract,
+                semantic_evidence=(evidence,),
+                source_allowed_root=tmp_path,
+            )
+        return
+    ledger = _OrderedPrivateApply(
+        request=request,
+        document=document,
+        step_ids=("first", "second"),
+        obligations=facts,
+        semantic_contract=contract,
+        semantic_evidence=(evidence,),
+        source_allowed_root=tmp_path,
+    )
+
+    def admit(
+        step: str, intent: AuthoringDocumentIntent, fields: set[str]
+    ) -> _PrivateStepAdmission:
+        before = ledger.candidate
+        return _PrivateStepAdmission(
+            step_id=step,
+            outcome_id=step,
+            request_sha256=hashlib.sha256(request.encode()).hexdigest(),
+            before_sha256=_document_digest(before),
+            plan=reconcile_authoring(intent, existing=before),
+            obligations=tuple(item for item in facts if item.field in fields),
+        )
+
+    first_intent = AuthoringDocumentIntent(title="Gamma Study")
+    first = ledger.apply(admit("first", first_intent, {"title"}), first_intent)
+    assert first.semantic_contract == contract and first.semantic_evidence == (evidence,)
+    original = ledger.candidate
+    second_intent = AuthoringDocumentIntent(
+        subtitle="Run 02", tail=AuthoringTailIntent(enabled=True)
+    )
+    other = tmp_path / "other.dlis"
+    other.write_bytes((tmp_path / "inspected.dlis").read_bytes())
+    replacement = AuthoringDataSource(source_path=str(other), source_format="dlis")
+    if defect == "switch":
+        second_intent.sections = [
+            AuthoringSectionIntent(section_id="main", data_source=replacement)
+        ]
+    elif defect == "approval":
+        current = release.model_copy(
+            update={
+                "pin": release.pin.model_copy(update={"approval_record_ref": "different-approval"})
+            }
+        )
+    second = admit("second", second_intent, {"subtitle", "tail_enabled"})
+    if defect in {"none", "final_approval"}:
+        verified = ledger.apply(second, second_intent)
+        assert verified.semantic_contract.trusted_release.pin == release.pin
+        if defect == "final_approval":
+            current = release.model_copy(
+                update={"pin": release.pin.model_copy(update={"approval_record_ref": "different"})}
+            )
+            with pytest.raises(DocumentPostconditionError, match="semantic_catalog_stale"):
+                ledger.finish(ledger.occurrences, ledger.candidate)
+            return
+        assert ledger.finish(ledger.occurrences, ledger.candidate).title == "Gamma Study"
+        return
+    if defect == "transient":
+        real_update = AuthoringService.update
+        calls = []
+
+        def inject(service: AuthoringService, op: object) -> object:
+            calls.append(op)
+            result = real_update(service, op)
+            source = (
+                replacement
+                if isinstance(op, UpdateReportRequest)
+                else original.sections[0].data_source
+            )
+            real_update(
+                service,
+                UpdateSectionRequest(section_id="main", patch=SectionPatch(data_source=source)),
+            )
+            return result
+
+        with (
+            patch.object(AuthoringService, "update", inject),
+            pytest.raises(ValueError, match="outside the authorized reconciliation envelope"),
+        ):
+            ledger.apply(second, second_intent)
+        assert len(calls) == 1
+    else:
+        code = (
+            "semantic_catalog_stale" if defect == "approval" else "semantic_source_route_mismatch"
+        )
+        with pytest.raises(ValueError, match=code):
+            ledger.apply(second, second_intent)
+    assert ledger.candidate == original
+    assert len(ledger.occurrences) == 1
 
 
 @pytest.mark.parametrize(

@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
+import hashlib
+from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
+from uuid import uuid4
 
-from ..authoring_executor import execute_authoring_plan
-from ..authoring_reconciler import reconcile_authoring
+from ..authoring_executor import (
+    AuthoringExecutionResult,
+    _document_digest,
+    _order_plan_operations,
+    execute_authoring_plan,
+)
+from ..authoring_reconciler import AuthoringReconciliationPlan, reconcile_authoring
 from ..authoring_service import AuthoringService
 from ..model.authoring import AuthoringDocumentSpec
 from ..model.intent import AuthoringDocumentIntent
@@ -14,12 +23,14 @@ from ..semantic_catalog import (
     EMPTY_SEMANTIC_CHANNEL_CATALOG,
     SemanticCatalogTrustError,
     SemanticPublicationContract,
+    SemanticResolutionEvidence,
     _document_has_semantic_binding,
     _semantic_evidence_key,
     revalidate_deployed_catalog_release,
 )
 from .code_mode.enrichment import (
     EnrichedSemanticContext,
+    ReportContext,
     bind_semantic_publication_sources,
     intent_requires_channel_context,
     reconciliation_channels,
@@ -27,9 +38,238 @@ from .code_mode.enrichment import (
 )
 from .code_mode.obligations import (
     DocumentPostconditionError,
+    ObligationState,
     RequestObligation,
+    verify_document_obligations,
     verify_document_postconditions,
+    verify_document_preservation,
+    verify_obligation_spans,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class _PrivateStepAdmission:
+    """Exact effects selected by the host, not a worker success assertion."""
+
+    step_id: str
+    outcome_id: str
+    request_sha256: str
+    before_sha256: str
+    plan: AuthoringReconciliationPlan
+    obligations: tuple[RequestObligation, ...] = ()
+    depends_on: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class _PrivateStepOccurrence:
+    """One successful private execution; canonical operation IDs remain local."""
+
+    occurrence_id: str
+    admission: _PrivateStepAdmission
+    after_sha256: str
+    execution: AuthoringExecutionResult
+    report_context: ReportContext | None
+    inspection: EnrichedSemanticContext | None
+    semantic_contract: SemanticPublicationContract | None
+    semantic_evidence: tuple[SemanticResolutionEvidence, ...]
+    verified_checks: tuple[str, ...]
+
+
+class _OrderedPrivateApply:
+    """Provider-free host qualification over the existing private apply boundary."""
+
+    def __init__(
+        self,
+        *,
+        request: str,
+        document: AuthoringDocumentSpec,
+        step_ids: tuple[str, ...],
+        obligations: tuple[RequestObligation, ...],
+        semantic_contract: SemanticPublicationContract | None = None,
+        semantic_evidence: tuple[SemanticResolutionEvidence, ...] = (),
+        source_base_dir: Path | None = None,
+        source_allowed_root: Path | None = None,
+    ) -> None:
+        verify_obligation_spans(request, obligations)
+        ids = {item.requirement_id for item in obligations}
+        if len(ids) != len(obligations) or not all(ids):
+            raise ValueError("Ordered request requires unique obligation identities.")
+        if not step_ids or not all(step_ids) or len(set(step_ids)) != len(step_ids):
+            raise ValueError("Ordered request requires unique host step identities.")
+        self._request_sha256 = hashlib.sha256(request.encode("utf-8")).hexdigest()
+        self._original = document.model_copy(deep=True)
+        self._candidate = self._original
+        self._step_ids = step_ids
+        self._restrictions = tuple(
+            item for item in obligations if item.state is ObligationState.FORBIDDEN
+        )
+        self._pending = {
+            item.requirement_id: item for item in obligations if item not in self._restrictions
+        }
+        self._original_semantic_contract = semantic_contract
+        self._original_semantic_evidence = semantic_evidence
+        self._source_base_dir = source_base_dir
+        self._source_allowed_root = source_allowed_root
+        self._records: list[_PrivateStepOccurrence] = []
+        self._closed = False
+        self._verify_retained(self._candidate)
+
+    @property
+    def candidate(self) -> AuthoringDocumentSpec:
+        """Return a defensive copy of the latest verified private state."""
+        return self._candidate.model_copy(deep=True)
+
+    @property
+    def occurrences(self) -> tuple[_PrivateStepOccurrence, ...]:
+        """Expose copies; only the host can append verified occurrences."""
+        return tuple(deepcopy(self._records))
+
+    def _verify_retained(self, candidate: AuthoringDocumentSpec) -> None:
+        verify_document_postconditions(
+            candidate,
+            candidate,
+            self._restrictions,
+            (),
+            semantic_contract=self._original_semantic_contract,
+            semantic_evidence=self._original_semantic_evidence,
+            source_base_dir=self._source_base_dir,
+            source_allowed_root=self._source_allowed_root,
+        )
+        for record in self._records:
+            verify_document_obligations(
+                candidate,
+                record.admission.obligations,
+                grounded_operations=record.admission.plan.operations,
+                before=candidate,
+                report_context=record.report_context,
+            )
+
+    def apply(
+        self,
+        admission: _PrivateStepAdmission,
+        intent: AuthoringDocumentIntent,
+        *,
+        inspected: EnrichedSemanticContext | None = None,
+    ) -> _PrivateStepOccurrence:
+        """Advance only after the admitted plan and all retained authority verify."""
+        if self._closed:
+            raise ValueError("Ordered private execution is closed.")
+        try:
+            return self._apply(admission, intent, inspected)
+        except Exception:
+            self._closed = True
+            raise
+
+    def _apply(
+        self,
+        admission: _PrivateStepAdmission,
+        intent: AuthoringDocumentIntent,
+        inspected: EnrichedSemanticContext | None,
+    ) -> _PrivateStepOccurrence:
+        index = len(self._records)
+        if (
+            index >= len(self._step_ids)
+            or self._step_ids[index] != admission.step_id
+            or not admission.outcome_id
+            or not set(admission.depends_on) <= set(self._step_ids[:index])
+            or len(set(admission.depends_on)) != len(admission.depends_on)
+        ):
+            raise ValueError("Invalid ordered admission or dependency.")
+        if admission.request_sha256 != self._request_sha256:
+            raise ValueError("Admission belongs to a different original request.")
+        if admission.before_sha256 != _document_digest(self._candidate):
+            raise ValueError("Host admission snapshot is stale.")
+        facts = {item.requirement_id: item for item in admission.obligations}
+        if len(facts) != len(admission.obligations) or any(
+            self._pending.get(key) != value for key, value in facts.items()
+        ):
+            raise ValueError("Admission claims a missing, repeated or altered obligation.")
+        result = _apply_private_authoring(
+            document=self._candidate,
+            intent=intent,
+            obligations=admission.obligations,
+            inspected=inspected,
+            semantic_contract=None,
+            source_base_dir=self._source_base_dir,
+            source_allowed_root=self._source_allowed_root,
+            _admitted_plan=admission.plan,
+            _retained_verifier=self._verify_retained,
+        )
+        if result.candidate is None or result.plan is None or result.execution is None:
+            raise ValueError(f"{result.failure_status}: {', '.join(result.errors)}")
+        record = _PrivateStepOccurrence(
+            occurrence_id=uuid4().hex,
+            admission=admission,
+            after_sha256=_document_digest(result.candidate),
+            execution=result.execution,
+            report_context=None if inspected is None else inspected.report,
+            inspection=inspected,
+            semantic_contract=self._original_semantic_contract,
+            semantic_evidence=self._original_semantic_evidence,
+            verified_checks=tuple(key for key, value in result.stages.items() if value == "PASS"),
+        )
+        self._verify_operation_chain(record)
+        self._records.append(deepcopy(record))
+        self._candidate = result.candidate
+        for key in facts:
+            del self._pending[key]
+        return deepcopy(record)
+
+    @staticmethod
+    def _verify_operation_chain(record: _PrivateStepOccurrence) -> None:
+        ordered, errors = _order_plan_operations(record.admission.plan)
+        expected = [op.operation_id for group in ordered.values() for op in group]
+        actual = record.execution.outcomes
+        if (
+            errors
+            or not record.execution.success
+            or [item.operation_id for item in actual] != expected
+        ):
+            raise ValueError("Incomplete canonical operation evidence.")
+        digest = record.admission.before_sha256
+        for outcome in actual:
+            if (
+                not outcome.postcondition_verified
+                or outcome.before_document_sha256 != digest
+                or not outcome.after_document_sha256
+            ):
+                raise ValueError("Broken operation snapshot chain.")
+            digest = outcome.after_document_sha256
+        if digest != record.after_sha256 or _document_digest(record.execution.document) != digest:
+            raise ValueError("Operation evidence does not match the verified readback.")
+
+    def finish(
+        self,
+        occurrences: tuple[_PrivateStepOccurrence, ...],
+        candidate: AuthoringDocumentSpec,
+    ) -> AuthoringDocumentSpec:
+        """Recheck the retained chain and final private state without replaying writes."""
+        if self._closed:
+            raise ValueError("Ordered private execution is closed.")
+        self._closed = True
+        if (
+            self._pending
+            or len(self._records) != len(self._step_ids)
+            or tuple(self._records) != occurrences
+        ):
+            raise ValueError("Missing, altered or reordered private occurrence evidence.")
+        if len({item.occurrence_id for item in occurrences}) != len(occurrences):
+            raise ValueError("Repeated execution occurrence identity.")
+        previous = self._original
+        for occurrence in occurrences:
+            if occurrence.admission.before_sha256 != _document_digest(previous):
+                raise ValueError("Broken private step snapshot chain.")
+            self._verify_operation_chain(occurrence)
+            if occurrence.inspection is not None:
+                validate_enriched_snapshot(occurrence.inspection, previous)
+            verify_document_preservation(
+                previous, occurrence.execution.document, occurrence.admission.plan.operations
+            )
+            previous = occurrence.execution.document
+        if _document_digest(candidate) != _document_digest(previous):
+            raise ValueError("Final candidate differs from the cumulative verified readback.")
+        self._verify_retained(candidate)
+        return candidate.model_copy(deep=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,6 +282,8 @@ class _PrivateApplyResult:
     errors: tuple[str, ...] = ()
     rolled_back: bool = False
     changed: bool = False
+    plan: AuthoringReconciliationPlan | None = None
+    execution: AuthoringExecutionResult | None = None
 
 
 def _apply_private_authoring(
@@ -53,6 +295,8 @@ def _apply_private_authoring(
     semantic_contract: SemanticPublicationContract | None,
     source_base_dir: Path | None = None,
     source_allowed_root: Path | None = None,
+    _admitted_plan: AuthoringReconciliationPlan | None = None,
+    _retained_verifier: Callable[[AuthoringDocumentSpec], None] | None = None,
 ) -> _PrivateApplyResult:
     """Reconcile, execute on a private service, and verify the candidate."""
     stages: dict[str, str] = {}
@@ -110,6 +354,10 @@ def _apply_private_authoring(
         return rejected(
             "reconciliation_blocked", *(f"{issue.code}: {issue.message}" for issue in plan.issues)
         )
+    if _admitted_plan is not None and plan != _admitted_plan:
+        return rejected(
+            "reconciliation_blocked", "Canonical plan differs from host-admitted effects."
+        )
     if plan.semantic_publication_contract is not None:
         semantic_contract = plan.semantic_publication_contract
     stages["reconciliation"] = "PASS"
@@ -138,6 +386,8 @@ def _apply_private_authoring(
         )
 
         def verify_retained(after: AuthoringDocumentSpec) -> None:
+            if _retained_verifier is not None:
+                _retained_verifier(after)
             verify_document_postconditions(
                 after,
                 after,
@@ -151,6 +401,10 @@ def _apply_private_authoring(
 
         execution = execute_authoring_plan(
             private_service, plan, _retained_postcondition=verify_retained
+        )
+    elif _retained_verifier is not None:
+        execution = execute_authoring_plan(
+            private_service, plan, _retained_postcondition=_retained_verifier
         )
     else:
         execution = execute_authoring_plan(private_service, plan)
@@ -195,4 +449,6 @@ def _apply_private_authoring(
         candidate=candidate,
         stages=stages,
         changed=document.model_dump(mode="json") != candidate.model_dump(mode="json"),
+        plan=plan if _admitted_plan is not None else None,
+        execution=execution if _admitted_plan is not None else None,
     )

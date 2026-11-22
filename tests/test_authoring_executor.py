@@ -2,13 +2,29 @@
 
 from __future__ import annotations
 
+import hashlib
+from dataclasses import replace
 from unittest.mock import patch
 
 import pytest
 
-from wellplot.agent._private_apply import _apply_private_authoring
+from wellplot.agent._private_apply import (
+    _apply_private_authoring,
+    _OrderedPrivateApply,
+    _PrivateStepAdmission,
+)
+from wellplot.agent.code_mode.canonical_workers import (
+    ReportSemanticResponse,
+    _lower_report,
+    _validate_report_operation_contract,
+)
+from wellplot.agent.code_mode.enrichment import inspect_report_context
+from wellplot.agent.code_mode.obligations import compile_request_contract
+from wellplot.agent.code_mode.planner import ReportTask, SemanticFieldValue, SemanticOperation
+from wellplot.agent.code_mode.worker_contracts import build_report_operation_contract
 from wellplot.authoring_executor import (
     AuthoringExecutionStatus,
+    _document_digest,
     execute_authoring_plan,
 )
 from wellplot.authoring_reconciler import (
@@ -57,6 +73,157 @@ def _document() -> AuthoringDocumentSpec:
             }
         ],
     )
+
+
+_ORDERED_REQUEST = (
+    "Rename the report 'Gamma Study'. Set the report subtitle to 'Run 02'. Keep the report tail."
+)
+
+
+def _ordered_report() -> _OrderedPrivateApply:
+    facts = compile_request_contract(_ORDERED_REQUEST).requirements.requirements
+    assert {item.field for item in facts} == {"title", "subtitle", "tail_enabled"}
+    return _OrderedPrivateApply(
+        request=_ORDERED_REQUEST,
+        document=_document(),
+        step_ids=("one", "two", "noop"),
+        obligations=facts,
+    )
+
+
+def _admit_report(
+    before: AuthoringDocumentSpec,
+    step: str,
+    fields: tuple[str, ...],
+    *,
+    depends: tuple[str, ...] = (),
+) -> tuple[_PrivateStepAdmission, AuthoringDocumentIntent]:
+    facts = tuple(
+        item
+        for item in compile_request_contract(_ORDERED_REQUEST).requirements.requirements
+        if item.field in fields
+    )
+    digest = _document_digest(before)
+    context = inspect_report_context(before, digest)
+    task = ReportTask(
+        goal="Apply exact request-owned report facts.",
+        capability_ids=("report.standard",),
+        obligations=facts,
+        operations=tuple(
+            SemanticOperation(
+                local_ref=item.field,
+                scope_ref="report",
+                verb="SET",
+                object_kind="report_field",
+                target_clue=item.field,
+                field_values=(SemanticFieldValue(field=item.field, state="SET", value=item.value),),
+            )
+            for item in facts
+        ),
+    )
+    if facts:
+        admitted = build_report_operation_contract(task, context)
+        response = ReportSemanticResponse.model_validate({item.field: item.value for item in facts})
+        _validate_report_operation_contract(response, admitted)
+        intent = _lower_report(response, context)
+    else:
+        intent = AuthoringDocumentIntent(title=before.title)
+    return _PrivateStepAdmission(
+        step_id=step,
+        outcome_id=step,
+        request_sha256=hashlib.sha256(_ORDERED_REQUEST.encode()).hexdigest(),
+        before_sha256=digest,
+        plan=reconcile_authoring(intent, existing=before),
+        obligations=facts,
+        depends_on=depends,
+    ), intent
+
+
+def _complete_ordered_report() -> _OrderedPrivateApply:
+    ledger = _ordered_report()
+    for name, fields, prerequisites in (
+        ("one", ("title", "tail_enabled"), ()),
+        ("two", ("subtitle",), ("one",)),
+        ("noop", (), ("two",)),
+    ):
+        ledger.apply(*_admit_report(ledger.candidate, name, fields, depends=prerequisites))
+    return ledger
+
+
+def test_ordered_private_execution_keeps_intact_plans_and_cumulative_state() -> None:
+    """Exercise host report admission and real private apply over refreshed readback."""
+    ledger = _complete_ordered_report()
+    first, second, noop = ledger.occurrences
+    assert [op.operation_id for op in first.admission.plan.operations] == [
+        "update:report:report",
+        "update:tail:tail",
+    ]
+    assert [op.operation_id for op in second.admission.plan.operations] == ["update:report:report"]
+    assert first.occurrence_id != second.occurrence_id
+    assert first.after_sha256 == second.admission.before_sha256
+    assert second.after_sha256 == noop.admission.before_sha256 == noop.after_sha256
+    assert noop.execution.outcomes == ()
+    assert first.execution.phase_summaries and first.execution.outcomes[0].postcondition_verified
+    final = ledger.finish(ledger.occurrences, ledger.candidate)
+    assert (final.title, final.subtitle, final.tail.enabled) == ("Gamma Study", "Run 02", True)
+
+
+@pytest.mark.parametrize(
+    "defect", ["duplicate", "missing", "reordered", "operation", "digest", "final"]
+)
+def test_ordered_private_execution_rejects_tampered_readback(defect: str) -> None:
+    """Do not authorize a final JSON match with incomplete or altered history."""
+    ledger = _complete_ordered_report()
+    first, second, noop = ledger.occurrences
+    candidate = ledger.candidate
+    match = "Missing, altered or reordered"
+    if defect == "duplicate":
+        second = replace(second, occurrence_id=first.occurrence_id)
+    elif defect == "missing":
+        with pytest.raises(ValueError, match=match):
+            ledger.finish((first, noop), candidate)
+        return
+    elif defect == "reordered":
+        first, second = second, first
+    elif defect == "operation":
+        first.execution.outcomes = first.execution.outcomes[1:]
+    elif defect == "digest":
+        first = replace(first, after_sha256="0" * 64)
+    else:
+        candidate.subtitle = "Unauthorized"
+        match = "differs from the cumulative verified readback"
+    with pytest.raises(ValueError, match=match):
+        ledger.finish((first, second, noop), candidate)
+
+
+@pytest.mark.parametrize(
+    "defect", ["request", "snapshot", "dependency", "extra", "overwrite", "duplicate"]
+)
+def test_failed_ordered_step_never_advances_or_allows_continuation(defect: str) -> None:
+    """Reject stale admission or failed retained outcome before advancing."""
+    ledger = _ordered_report()
+    ledger.apply(*_admit_report(ledger.candidate, "one", ("title", "tail_enabled")))
+    previous = ledger.candidate
+    admission, intent = _admit_report(previous, "two", ("subtitle",), depends=("one",))
+    if defect == "request":
+        admission = replace(admission, request_sha256="0" * 64)
+    elif defect == "snapshot":
+        admission = replace(admission, before_sha256="0" * 64)
+    elif defect == "dependency":
+        admission = replace(admission, depends_on=("noop",))
+    elif defect == "extra":
+        intent.title = "Unpermitted extra effect"
+    elif defect == "overwrite":
+        intent.title = "Invalidates a prior outcome"
+        admission = replace(admission, plan=reconcile_authoring(intent, existing=previous))
+    else:
+        admission.plan.operations += admission.plan.operations
+    with pytest.raises(ValueError):
+        ledger.apply(admission, intent)
+    assert ledger.candidate == previous
+    assert len(ledger.occurrences) == 1
+    with pytest.raises(ValueError, match="closed"):
+        ledger.apply(*_admit_report(previous, "two", ("subtitle",), depends=("one",)))
 
 
 def test_executor_applies_typed_operations_and_captures_phase_previews() -> None:
