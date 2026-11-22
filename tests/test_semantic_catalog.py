@@ -33,8 +33,8 @@ from wellplot.authoring_reconciler import (
 )
 from wellplot.authoring_service import AuthoringService
 from wellplot.file_revision import file_revision_token
-from wellplot.model.authoring import AuthoringDocumentSpec, AuthoringScale
-from wellplot.model.intent import AuthoringDocumentIntent
+from wellplot.model.authoring import AuthoringDataSource, AuthoringDocumentSpec, AuthoringScale
+from wellplot.model.intent import AuthoringDocumentIntent, AuthoringSectionIntent
 from wellplot.semantic_catalog import (
     EMPTY_SEMANTIC_CHANNEL_CATALOG,
     ExpectedSemanticBinding,
@@ -234,6 +234,7 @@ def _trusted_release(
 
 
 def _publication_case(
+    tmp_path: Path,
     *,
     scope_key: str = "existing:main",
     section_id: str = "main",
@@ -242,7 +243,6 @@ def _publication_case(
     source_candidate_id: str = "candidate-1",
     source_handle: str = "source-1",
     snapshot_id: str = "snapshot-1",
-    source_revision: str = "revision-1",
     channel: str = "GR_STGC",
     frame: int = 0,
     addressability: str = "ADDRESSABLE",
@@ -256,9 +256,16 @@ def _publication_case(
     TrustedCatalogRelease,
 ]:
     """Build one synthetic, fully joined semantic publication fixture."""
+    if source_path is None:
+        fixture = tmp_path / "inspected.dlis"
+        fixture.write_bytes(b"fixture source identity")
+        source_path = str(fixture)
+    source_revision = file_revision_token(Path(source_path))
     release = _trusted_release(catalog or _reviewed_catalog())
     identity_json = json.dumps(
-        _dlis_identity(channel, frame=frame),
+        {"format": "LAS", "curve_index": 7}
+        if Path(source_path).suffix == ".las"
+        else _dlis_identity(channel, frame=frame),
         sort_keys=True,
         separators=(",", ":"),
     )
@@ -332,6 +339,7 @@ def _publication_case(
             {
                 "id": section_id,
                 "title": "Main",
+                "data_source": {"source_path": source_path, "source_format": "auto"},
                 "tracks": [
                     {
                         "id": track_id,
@@ -1014,10 +1022,11 @@ def test_catalog_release_revalidation_rejects_a_replaced_transaction_pin(
 
 
 def test_shared_semantic_publication_verifier_checks_exact_binding_scope(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The shared verifier accepts only one exact expected/source/document join."""
-    document, contract, evidence, release = _publication_case()
+    document, contract, evidence, release = _publication_case(tmp_path)
     _verify_publication_case(document, contract, (evidence,), release)
 
     import wellplot.semantic_catalog as semantic_catalog_module
@@ -1037,6 +1046,175 @@ def test_shared_semantic_publication_verifier_checks_exact_binding_scope(
     )
 
 
+@pytest.mark.parametrize("route_kind", ("section", "legacy_section", "default"))
+def test_shared_verifier_resolves_effective_relative_source(
+    tmp_path: Path, route_kind: str
+) -> None:
+    """Use production logfile routing precedence with a host-owned relative base."""
+    base = tmp_path / "logs"
+    base.mkdir()
+    document, contract, evidence, release = _publication_case(tmp_path)
+    route = {"source_path": "../inspected.dlis", "source_format": "auto"}
+    compatibility = {"legacy_data": {"source_path": "../other.dlis", "source_format": "dlis"}}
+    document.sections[0].data_source = None
+    if route_kind == "section":
+        document.sections[0].data_source = AuthoringDataSource.model_validate(route)
+    elif route_kind == "legacy_section":
+        compatibility["legacy_document"] = {
+            "layout": {"log_sections": [{"id": "main", "data": route}]},
+        }
+    else:
+        compatibility["legacy_data"] = route
+    document.extensions["compatibility"] = compatibility
+
+    verify_semantic_publication(
+        document,
+        observed=(evidence,),
+        contract=contract,
+        release=release,
+        source_base_dir=base,
+        source_allowed_root=tmp_path,
+    )
+    with pytest.raises(ValueError, match="semantic_source_route_unresolved"):
+        _verify_publication_case(document, contract, (evidence,), release)
+    with pytest.raises(ValueError, match="semantic_source_route_unresolved"):
+        verify_semantic_publication(
+            document,
+            observed=(evidence,),
+            contract=contract,
+            release=release,
+            source_base_dir=base,
+            source_allowed_root=base,
+        )
+
+
+@pytest.mark.parametrize(
+    ("defect", "error"),
+    [
+        ("missing", "semantic_source_route_unresolved"),
+        ("unsupported_format", "semantic_source_route_mismatch"),
+        ("pathless_evidence", "semantic_source_path_missing"),
+        ("revision_changed", "semantic_source_revision_mismatch"),
+        ("revision_unavailable", "semantic_source_revision_unavailable"),
+        ("ambiguous_section", "semantic_binding_document_mismatch"),
+    ],
+)
+def test_shared_verifier_fails_closed_on_source_identity(
+    tmp_path: Path,
+    defect: str,
+    error: str,
+) -> None:
+    """Require a verifiable route and fresh revision of the original file."""
+    document, contract, evidence, release = _publication_case(tmp_path)
+    source = contract.source_bindings[0]
+    if defect == "missing":
+        document.sections[0].data_source = None
+    elif defect == "unsupported_format":
+        document.sections[0].data_source.source_format = "las"
+    elif defect == "pathless_evidence":
+        contract = contract.model_copy(
+            update={"source_bindings": (source.model_copy(update={"source_path": None}),)}
+        )
+    elif defect == "revision_changed":
+        (tmp_path / "inspected.dlis").write_bytes(b"changed revision and size")
+    elif defect == "ambiguous_section":
+        duplicate = document.sections[0].model_copy(deep=True)
+        duplicate.tracks[0].bindings.clear()
+        document.sections.append(duplicate)
+    else:
+        (tmp_path / "inspected.dlis").unlink()
+    with pytest.raises(ValueError, match=error):
+        _verify_publication_case(document, contract, (evidence,), release)
+
+
+def test_shared_verifier_revalidates_original_release(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The current deployment cannot replace the original released authority."""
+    import wellplot.semantic_catalog as semantic_catalog_module
+
+    document, contract, evidence, release = _publication_case(tmp_path)
+    changed_pin = release.pin.model_copy(update={"approval_record_ref": "replacement"})
+    replacement = release.model_copy(update={"pin": changed_pin})
+    monkeypatch.setattr(
+        semantic_catalog_module, "load_deployed_catalog_release", lambda: replacement
+    )
+    with pytest.raises(DocumentPostconditionError, match="semantic_catalog_stale"):
+        verify_document_postconditions(
+            document, document, (), (), semantic_contract=contract, semantic_evidence=(evidence,)
+        )
+    with pytest.raises(DocumentPostconditionError, match="semantic_original_release_missing"):
+        verify_document_postconditions(
+            document,
+            document,
+            (),
+            (),
+            semantic_contract=contract.model_copy(update={"trusted_release": None}),
+            semantic_evidence=(evidence,),
+        )
+
+
+def test_canonical_source_switch_rejects_retained_semantic_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A valid local source edit cannot use semantic evidence from another file."""
+    import wellplot.semantic_catalog as semantic_catalog_module
+
+    document, contract, evidence, release = _publication_case(tmp_path)
+    source_a = tmp_path / "inspected.dlis"
+    source_b = tmp_path / "other.dlis"
+    source_b.write_bytes(source_a.read_bytes())
+    monkeypatch.setattr(semantic_catalog_module, "load_deployed_catalog_release", lambda: release)
+    unrelated = document.sections[0].model_copy(deep=True)
+    unrelated.id = "other"
+    unrelated.tracks[0].bindings[0].binding_id = "other-binding"
+    document.sections.append(unrelated)
+
+    def apply_and_verify(
+        before: AuthoringDocumentSpec, intent: AuthoringDocumentIntent
+    ) -> AuthoringDocumentSpec:
+        plan = reconcile_authoring(intent, existing=before)
+        assert plan.ready, plan.issues
+        service = AuthoringService(before)
+        result = execute_authoring_plan(service, plan)
+        assert result.success, result.errors
+        verify_document_postconditions(
+            before,
+            service.document,
+            (),
+            plan.operations,
+            semantic_contract=contract,
+            semantic_evidence=(evidence,),
+            source_allowed_root=tmp_path,
+        )
+        return service.document
+
+    unchanged = apply_and_verify(
+        document, AuthoringDocumentIntent(title="Gamma Study", subtitle="Run 02")
+    )
+    assert unchanged.title == "Gamma Study" and unchanged.subtitle == "Run 02"
+    replacement = AuthoringDataSource(source_path=str(source_b), source_format="dlis")
+    other_changed = apply_and_verify(
+        unchanged,
+        AuthoringDocumentIntent(
+            sections=[
+                AuthoringSectionIntent(section_id="other", data_source=replacement),
+            ]
+        ),
+    )
+    with pytest.raises(DocumentPostconditionError, match="semantic_source_route_mismatch") as error:
+        apply_and_verify(
+            other_changed,
+            AuthoringDocumentIntent(
+                sections=[
+                    AuthoringSectionIntent(section_id="main", data_source=replacement),
+                ]
+            ),
+        )
+    assert error.value.check == "semantic"
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     (
@@ -1048,11 +1226,12 @@ def test_shared_semantic_publication_verifier_checks_exact_binding_scope(
     ),
 )
 def test_shared_verifier_rejects_evidence_source_chain_mismatch(
+    tmp_path: Path,
     field: str,
     value: str,
 ) -> None:
     """Each evidence-side source join field is independently enforced."""
-    document, contract, evidence, release = _publication_case()
+    document, contract, evidence, release = _publication_case(tmp_path)
     expected_error = (
         "semantic_evidence_set_mismatch" if field == "scope_key" else "semantic_evidence_mismatch"
     )
@@ -1077,11 +1256,12 @@ def test_shared_verifier_rejects_evidence_source_chain_mismatch(
     ),
 )
 def test_shared_verifier_rejects_inspection_source_chain_mismatch(
+    tmp_path: Path,
     field: str,
     value: str,
 ) -> None:
     """Inspection-side source assignment must match the host expectation."""
-    document, contract, evidence, release = _publication_case()
+    document, contract, evidence, release = _publication_case(tmp_path)
     source = contract.source_bindings[0].model_copy(update={field: value})
     changed_contract = SemanticPublicationContract(
         expected_bindings=contract.expected_bindings,
@@ -1093,9 +1273,9 @@ def test_shared_verifier_rejects_inspection_source_chain_mismatch(
         _verify_publication_case(document, changed_contract, (evidence,), release)
 
 
-def test_identical_physical_identity_in_two_sources_cannot_cross_bind() -> None:
+def test_identical_physical_identity_in_two_sources_cannot_cross_bind(tmp_path: Path) -> None:
     """Equal channel identities remain owned by their exact source handle."""
-    document, contract, evidence, release = _publication_case()
+    document, contract, evidence, release = _publication_case(tmp_path)
     source_a = contract.source_bindings[0]
     source_b = source_a.model_copy(
         update={"candidate_id": "candidate-2", "source_handle": "source-2"}
@@ -1123,18 +1303,19 @@ def test_identical_physical_identity_in_two_sources_cannot_cross_bind() -> None:
         _verify_publication_case(document, source_b_only, (evidence,), release)
 
 
-def test_shared_verifier_accepts_new_section_scope_join() -> None:
+def test_shared_verifier_accepts_new_section_scope_join(tmp_path: Path) -> None:
     """A new section scope joins its source slot to the final section identity."""
     document, contract, evidence, release = _publication_case(
+        tmp_path,
         scope_key="new:main-slot",
         section_id="created-main",
     )
     _verify_publication_case(document, contract, (evidence,), release)
 
 
-def test_shared_verifier_rejects_missing_or_duplicate_source_assignment() -> None:
+def test_shared_verifier_rejects_missing_or_duplicate_source_assignment(tmp_path: Path) -> None:
     """Source assignment must be present and unique for one expected scope."""
-    document, contract, evidence, release = _publication_case()
+    document, contract, evidence, release = _publication_case(tmp_path)
     missing_source = SemanticPublicationContract(
         expected_bindings=contract.expected_bindings,
         source_bindings=(),
@@ -1152,9 +1333,10 @@ def test_shared_verifier_rejects_missing_or_duplicate_source_assignment() -> Non
         )
 
 
-def test_new_section_cannot_join_expected_source_to_another_candidate() -> None:
+def test_new_section_cannot_join_expected_source_to_another_candidate(tmp_path: Path) -> None:
     """A new-section source slot cannot be rebound to another source candidate."""
     document, contract, evidence, release = _publication_case(
+        tmp_path,
         scope_key="new:main-slot",
         section_id="created-main",
     )
@@ -1178,11 +1360,12 @@ def test_new_section_cannot_join_expected_source_to_another_candidate() -> None:
     ),
 )
 def test_shared_verifier_rejects_extra_duplicate_and_unexpected_evidence(
+    tmp_path: Path,
     observed: str,
     error: str,
 ) -> None:
     """Observed semantic evidence must be a one-to-one exact expected set."""
-    document, contract, evidence, release = _publication_case()
+    document, contract, evidence, release = _publication_case(tmp_path)
     if observed == "extra":
         other = evidence.model_copy(
             update={
@@ -1201,9 +1384,9 @@ def test_shared_verifier_rejects_extra_duplicate_and_unexpected_evidence(
         _verify_publication_case(document, contract, evidence_set, release)
 
 
-def test_nonempty_observed_evidence_cannot_match_empty_expected_set() -> None:
+def test_nonempty_observed_evidence_cannot_match_empty_expected_set(tmp_path: Path) -> None:
     """An empty host expectation cannot authorize semantic evidence."""
-    document, contract, evidence, release = _publication_case()
+    document, contract, evidence, release = _publication_case(tmp_path)
     empty_contract = SemanticPublicationContract(
         source_bindings=contract.source_bindings,
         trusted_release=release,
@@ -1224,11 +1407,12 @@ def test_nonempty_observed_evidence_cannot_match_empty_expected_set() -> None:
     ),
 )
 def test_shared_verifier_rejects_mutated_final_document(
+    tmp_path: Path,
     mutation: str,
     error: str,
 ) -> None:
     """Publication checks inspect the final canonical document itself."""
-    document, contract, evidence, release = _publication_case()
+    document, contract, evidence, release = _publication_case(tmp_path)
     payload = document.model_dump(mode="json")
     section = payload["sections"][0]
     track = section["tracks"][0]
@@ -1249,9 +1433,9 @@ def test_shared_verifier_rejects_mutated_final_document(
         _verify_publication_case(changed_document, contract, (evidence,), release)
 
 
-def test_shared_verifier_rejects_physical_identity_not_in_bound_source() -> None:
+def test_shared_verifier_rejects_physical_identity_not_in_bound_source(tmp_path: Path) -> None:
     """Evidence cannot borrow a matching mnemonic from a different identity."""
-    document, contract, evidence, release = _publication_case()
+    document, contract, evidence, release = _publication_case(tmp_path)
     wrong_identity = json.dumps(
         _dlis_identity("GR_STGC", frame=1),
         sort_keys=True,
@@ -1269,10 +1453,13 @@ def test_shared_verifier_rejects_physical_identity_not_in_bound_source() -> None
 
 @pytest.mark.parametrize("addressability", ("UNKNOWN", "UNADDRESSABLE"))
 def test_shared_verifier_rejects_nonaddressable_source_channel(
+    tmp_path: Path,
     addressability: str,
 ) -> None:
     """Unknown or unavailable renderer addressability cannot be published."""
-    document, contract, evidence, release = _publication_case(addressability=addressability)
+    document, contract, evidence, release = _publication_case(
+        tmp_path, addressability=addressability
+    )
 
     with pytest.raises(ValueError, match="semantic_channel_not_addressable"):
         _verify_publication_case(document, contract, (evidence,), release)
@@ -1615,6 +1802,7 @@ def test_shared_postcondition_rejects_source_changed_after_resolution(
     digest = hashlib.sha256(source.read_bytes()).hexdigest()
     catalog = _content_bound_gamma_catalog(source, digest)
     document, contract, evidence, release = _publication_case(
+        tmp_path,
         channel="GR",
         catalog=catalog,
         source_path=str(source),
@@ -1727,6 +1915,7 @@ def test_pinned_content_bound_rule_reaches_canonical_in_memory_transaction(
             {
                 "id": "main",
                 "title": "Main",
+                "data_source": {"source_path": str(source), "source_format": "las"},
                 "tracks": [
                     {
                         "id": "track-1",
@@ -1877,6 +2066,7 @@ def test_multichannel_source_binding_enriches_and_verifies_exact_gr(
             {
                 "id": "main",
                 "title": "Main",
+                "data_source": {"source_path": str(source), "source_format": "las"},
                 "tracks": [
                     {
                         "id": "track-1",

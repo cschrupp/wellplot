@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -42,7 +43,8 @@ from wellplot.authoring_context import AuthoringChannelCandidate, AuthoringConte
 from wellplot.authoring_executor import execute_authoring_plan
 from wellplot.authoring_reconciler import reconcile_authoring
 from wellplot.authoring_service import AuthoringService
-from wellplot.model.authoring import AuthoringDocumentSpec
+from wellplot.file_revision import file_revision_token
+from wellplot.model.authoring import AuthoringDataSource, AuthoringDocumentSpec
 from wellplot.semantic_catalog import (
     EMPTY_SEMANTIC_CHANNEL_CATALOG,
     SemanticCatalogTrustError,
@@ -385,6 +387,15 @@ def test_host02_flagship_chain_reaches_canonical_resolution_reconcile_and_verify
         ],
     )
     context = _context()
+    source = context.sources[0]
+    assert source.canonical_path is not None
+    revision = file_revision_token(Path(source.canonical_path))
+    context = context.model_copy(
+        update={"sources": (source.model_copy(update={"revision_token": revision}),)}
+    )
+    document.sections[0].data_source = AuthoringDataSource(
+        source_path=source.canonical_path, source_format="las"
+    )
     task = _task()
     plan = SemanticPlan(
         summary="HOST-02R flagship",
@@ -417,13 +428,14 @@ def test_host02_flagship_chain_reaches_canonical_resolution_reconcile_and_verify
         source_candidate_id="candidate-1",
         source_handle="source-1",
         inspection_snapshot_id=context.snapshot_id,
-        source_revision="revision-1",
+        source_revision=revision,
     )
     semantic_contract = build_preworker_semantic_publication_contract(
         plan,
         SimpleNamespace(sections=(context,)),
     )
     assert semantic_contract is not None
+    semantic_contract = semantic_contract.model_copy(update={"trusted_release": release})
     resolution = AuthoringContextResolver(
         semantic_catalog=release.catalog,
         catalog_artifact_sha256=release.pin.catalog_artifact_sha256,

@@ -18,6 +18,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 from importlib.resources import files
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -401,6 +402,8 @@ def verify_semantic_publication(
     observed: Sequence[SemanticResolutionEvidence],
     contract: SemanticPublicationContract,
     release: TrustedCatalogRelease,
+    source_base_dir: Path | None = None,
+    source_allowed_root: Path | None = None,
 ) -> None:
     """Require exact expected/evidence/source/document agreement before publish."""
     if not release.catalog.verify_digest():
@@ -431,6 +434,7 @@ def verify_semantic_publication(
         source_map[key] = source
 
     expected_by_key = {_semantic_evidence_key(item): item for item in expected}
+    routes = None
     for evidence in observed:
         key = _semantic_evidence_key(evidence)
         expectation = expected_by_key[key]
@@ -448,14 +452,6 @@ def verify_semantic_publication(
         ]
         if len(channels) != 1 or channels[0].addressability != "ADDRESSABLE":
             raise ValueError("semantic_channel_not_addressable")
-        _verify_source_applicability(
-            release.catalog,
-            family_id=evidence.family_id,
-            requested_term=evidence.requested_term,
-            channel=channels[0],
-            source=source,
-        )
-
         if not _document_has_semantic_binding(
             document,
             section_id=expectation.section_id,
@@ -464,6 +460,82 @@ def verify_semantic_publication(
             channel=evidence.physical_mnemonic or "",
         ):
             raise ValueError("semantic_binding_document_mismatch")
+        if routes is None:
+            routes = _publication_source_routes(document)
+        path = _require_effective_source(
+            routes.get(expectation.section_id),
+            source,
+            channels[0],
+            base_dir=source_base_dir,
+            allowed_root=source_allowed_root,
+        )
+        _verify_source_applicability(
+            release.catalog,
+            family_id=evidence.family_id,
+            requested_term=evidence.requested_term,
+            channel=channels[0],
+            source=source,
+        )
+        _verify_source_revision(path, source.source_revision)
+
+
+def _publication_source_routes(document: object) -> dict[str, tuple[str, str]]:
+    """Use the same projected logfile routing precedence as publication."""
+    from .authoring import authoring_document_to_logfile_mapping
+    from .errors import TemplateValidationError
+    from .logfile import _section_data_sources_for_logfile, logfile_from_mapping
+    from .model.authoring import AuthoringDocumentSpec
+
+    if not isinstance(document, AuthoringDocumentSpec):
+        raise ValueError("semantic_source_route_unresolved")
+    try:
+        logfile = logfile_from_mapping(authoring_document_to_logfile_mapping(document))
+        return _section_data_sources_for_logfile(logfile)
+    except (TemplateValidationError, ValueError) as exc:
+        raise ValueError("semantic_source_route_unresolved") from exc
+
+
+def _require_effective_source(
+    route: tuple[str, str] | None,
+    source: SemanticSourceBinding,
+    channel: SemanticSourceChannel,
+    *,
+    base_dir: Path | None,
+    allowed_root: Path | None,
+) -> Path:
+    from .errors import PathAccessError, TemplateValidationError
+    from .logfile import resolve_data_source
+
+    if source.source_path is None or not Path(source.source_path).is_absolute():
+        raise ValueError("semantic_source_path_missing")
+    if route is None or (base_dir is None and not Path(route[0]).is_absolute()):
+        raise ValueError("semantic_source_route_unresolved")
+    try:
+        path, source_format = resolve_data_source(
+            *route, base_dir=base_dir, allowed_root=allowed_root
+        )
+    except (PathAccessError, TemplateValidationError, OSError, RuntimeError, ValueError) as exc:
+        raise ValueError("semantic_source_route_unresolved") from exc
+    expected_format = json.loads(channel.physical_identity_json).get("format")
+    if (
+        path != Path(source.source_path)
+        or source_format not in {"las", "dlis"}
+        or not isinstance(expected_format, str)
+        or source_format != expected_format.casefold()
+    ):
+        raise ValueError("semantic_source_route_mismatch")
+    return path
+
+
+def _verify_source_revision(path: Path, expected_revision: str) -> None:
+    from .file_revision import file_revision_token
+
+    try:
+        revision = file_revision_token(path)
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise ValueError("semantic_source_revision_unavailable") from exc
+    if revision != expected_revision:
+        raise ValueError("semantic_source_revision_mismatch")
 
 
 def _verify_source_applicability(
@@ -613,28 +685,19 @@ def _document_has_semantic_binding(
     value = document.model_dump(mode="json") if isinstance(document, BaseModel) else document
     if not isinstance(value, Mapping):
         return False
-    sections = value.get("sections")
-    if not isinstance(sections, list):
-        return False
-    matches: list[Mapping[str, object]] = []
-    for section in sections:
-        if not isinstance(section, Mapping) or section.get("id") != section_id:
-            continue
-        tracks = section.get("tracks")
-        if not isinstance(tracks, list):
-            continue
-        for track in tracks:
-            if not isinstance(track, Mapping) or track.get("id") != track_id:
-                continue
-            bindings = track.get("bindings")
-            if not isinstance(bindings, list):
-                continue
-            matches.extend(
-                binding
-                for binding in bindings
-                if isinstance(binding, Mapping) and binding.get("binding_id") == binding_id
-            )
-    return len(matches) == 1 and matches[0].get("channel") == channel
+
+    def unique(items: object, key: str, identity: str) -> Mapping[str, object]:
+        if not isinstance(items, list):
+            return {}
+        matches = [
+            item for item in items if isinstance(item, Mapping) and item.get(key) == identity
+        ]
+        return matches[0] if len(matches) == 1 else {}
+
+    section = unique(value.get("sections"), "id", section_id)
+    track = unique(section.get("tracks"), "id", track_id)
+    binding = unique(track.get("bindings"), "binding_id", binding_id)
+    return binding.get("channel") == channel and bool(channel)
 
 
 def canonical_physical_identity(identity: Mapping[str, object]) -> str:

@@ -252,6 +252,8 @@ def _apply_result(
         obligations=result.obligations,
         inspected=inspected,
         semantic_contract=result.semantic_publication_contract,
+        source_base_dir=context.logfile_path.parent,
+        source_allowed_root=root,
     )
     stages.update(private.stages)
     accepted = private.candidate

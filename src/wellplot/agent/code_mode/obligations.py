@@ -8,6 +8,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
@@ -3366,6 +3367,8 @@ def verify_document_postconditions(
     semantic_contract: SemanticPublicationContract | None = None,
     semantic_evidence: Sequence[SemanticResolutionEvidence] = (),
     report_context: ReportContext | None = None,
+    source_base_dir: Path | None = None,
+    source_allowed_root: Path | None = None,
 ) -> None:
     """Verify request, preservation, and optional semantic trust before publish."""
     expected = () if semantic_contract is None else semantic_contract.expected_bindings
@@ -3389,15 +3392,19 @@ def verify_document_postconditions(
     if semantic_contract is None:
         raise DocumentPostconditionError("semantic", "semantic_expected_set_missing")
     try:
+        if expected and not semantic_evidence:
+            raise ValueError("semantic_evidence_set_mismatch")
         release = semantic_contract.trusted_release
         if release is None:
-            release = load_deployed_catalog_release()
+            raise ValueError("semantic_original_release_missing")
         release = revalidate_deployed_catalog_release(release)
         verify_semantic_publication(
             after,
             observed=semantic_evidence,
             contract=semantic_contract,
             release=release,
+            source_base_dir=source_base_dir,
+            source_allowed_root=source_allowed_root,
         )
     except SemanticCatalogTrustError as error:
         raise DocumentPostconditionError("semantic", error.code) from error

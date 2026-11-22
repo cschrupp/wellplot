@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from ..authoring_executor import execute_authoring_plan
 from ..authoring_reconciler import reconcile_authoring
@@ -48,6 +49,8 @@ def _apply_private_authoring(
     obligations: tuple[RequestObligation, ...],
     inspected: EnrichedSemanticContext | None,
     semantic_contract: SemanticPublicationContract | None,
+    source_base_dir: Path | None = None,
+    source_allowed_root: Path | None = None,
 ) -> _PrivateApplyResult:
     """Reconcile, execute on a private service, and verify the candidate."""
     stages: dict[str, str] = {}
@@ -73,7 +76,9 @@ def _apply_private_authoring(
             available_channels = reconciliation_channels(inspected, intent)
             if semantic_contract is not None and semantic_contract.expected_bindings:
                 semantic_contract = bind_semantic_publication_sources(semantic_contract, inspected)
-                trusted_release = load_deployed_catalog_release()
+                trusted_release = (
+                    semantic_contract.trusted_release or load_deployed_catalog_release()
+                )
                 semantic_catalog = trusted_release.catalog
                 semantic_contract = semantic_contract.model_copy(
                     update={"trusted_release": trusted_release}
@@ -128,6 +133,8 @@ def _apply_private_authoring(
             semantic_contract=semantic_contract,
             semantic_evidence=plan.semantic_resolutions,
             **({"report_context": inspected.report} if inspected is not None else {}),
+            source_base_dir=source_base_dir,
+            source_allowed_root=source_allowed_root,
         )
     except DocumentPostconditionError as error:
         if error.check == "semantic":

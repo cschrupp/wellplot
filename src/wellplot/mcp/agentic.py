@@ -167,6 +167,8 @@ def _apply_session_result(
         obligations=session_result.obligations,
         inspected=inspected,
         semantic_contract=session_result.semantic_publication_contract,
+        source_base_dir=context.logfile_path.parent,
+        source_allowed_root=root,
     )
     accepted = private.candidate
     if accepted is None:
