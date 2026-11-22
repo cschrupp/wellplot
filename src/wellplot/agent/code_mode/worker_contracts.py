@@ -32,7 +32,13 @@ from .enrichment import (
     SourceContext,
     bind_semantic_publication_sources,
 )
-from .obligations import _REPORT_METADATA_LABELS, ObligationState, OwnerKind, RequestObligation
+from .obligations import (
+    _REPORT_METADATA_LABELS,
+    ObligationState,
+    OwnerKind,
+    ReportMetadataBinding,
+    RequestObligation,
+)
 from .planner import (
     MAX_SEMANTIC_OPERATIONS,
     ReportTask,
@@ -293,22 +299,6 @@ class ReportOperationContractEntry(BaseModel):
     value: str | float | int | bool | None = None
     requirement_id: str | None = None
     order_index: int | None = Field(default=None, ge=1)
-
-
-class ReportMetadataBinding(BaseModel):
-    """Host-owned resolution of one request-bound metadata fact."""
-
-    model_config = ConfigDict(frozen=True)
-
-    fact: RequestObligation
-    semantic_field: str
-    snapshot_id: str | None
-    slot_id: str | None = None
-    group: Literal["general", "detail"] | None = None
-    status: Literal[
-        "resolved", "absent", "ambiguous", "conflict", "unsupported", "stale", "uninspected"
-    ]
-    diagnostic: str
 
 
 class ReportOperationContract(BaseModel):
@@ -1842,7 +1832,7 @@ def resolve_report_metadata(
             claims.setdefault(result.slot_id, set()).add(
                 (result.semantic_field, str(result.fact.value))
             )
-    return tuple(
+    resolved = tuple(
         result.model_copy(
             update={
                 "status": "conflict",
@@ -1853,6 +1843,11 @@ def resolve_report_metadata(
         else result
         for result in results
     )
+    if context.metadata_bindings is None or stale:
+        return resolved
+    if context.metadata_bindings != resolved:
+        return resolve_report_metadata(obligations, context, stale=True)
+    return context.metadata_bindings
 
 
 def build_report_operation_contract(

@@ -127,6 +127,7 @@ def _apply_private_authoring(
             plan.operations,
             semantic_contract=semantic_contract,
             semantic_evidence=plan.semantic_resolutions,
+            **({"report_context": inspected.report} if inspected is not None else {}),
         )
     except DocumentPostconditionError as error:
         if error.check == "semantic":

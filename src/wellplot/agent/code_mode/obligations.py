@@ -38,7 +38,7 @@ from ...semantic_catalog import (
 
 if TYPE_CHECKING:
     from ...model.intent import AuthoringDocumentIntent
-    from .enrichment import ResolvedSectionContext
+    from .enrichment import ReportContext, ResolvedSectionContext
     from .semantic_actions import SectionSemanticAction
 
 
@@ -285,6 +285,22 @@ class SupportedAnchor(BaseModel):
     required_fields: tuple[FieldName, ...] = ()
 
 
+class ReportMetadataBinding(BaseModel):
+    """Host-owned resolution of one request-bound metadata fact."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    fact: RequestObligation
+    semantic_field: str
+    snapshot_id: str | None
+    slot_id: str | None = None
+    group: Literal["general", "detail"] | None = None
+    status: Literal[
+        "resolved", "absent", "ambiguous", "conflict", "unsupported", "stale", "uninspected"
+    ]
+    diagnostic: str
+
+
 class CanonicalRequirementSet(BaseModel):
     """Single value-bearing, versioned compilation of request semantics."""
 
@@ -391,6 +407,10 @@ class RepairContract(BaseModel):
 
 _REPORT_TITLE_RE = re.compile(
     r"\b(?:rename|set|change)\s+(?:this|the)?\s*report\s+['\"](?P<value>[^'\"]+)['\"]",
+    re.IGNORECASE,
+)
+_REPORT_SUBTITLE_RE = re.compile(
+    r"\bset\s+the\s+report\s+subtitle\s+to\s+['\"](?P<value>[^'\"]+)['\"]",
     re.IGNORECASE,
 )
 _REPORT_METADATA_BLOCK_RE = re.compile(
@@ -695,6 +715,7 @@ _PRESENTATION_ANCHOR_PATTERNS = (
 # extraction templates.  An explicit request fact must not disappear merely
 # because the semantic parser does not recognize its sentence form.
 _INDEPENDENT_ANCHOR_PATTERNS = (
+    ("explicit", "subtitle", _REPORT_SUBTITLE_RE),
     (
         "explicit",
         "title",
@@ -1116,19 +1137,20 @@ def extract_supported_obligations(request: str) -> tuple[RequestObligation, ...]
             for group, field, value in facts
         )
     obligations: list[RequestObligation] = []
-    for match in _REPORT_TITLE_RE.finditer(request):
-        obligations.append(
-            _make_obligation(
-                request=request,
-                request_sha256=request_sha256,
-                match=match,
-                kind=ObligationKind.EXPLICIT_FIELD,
-                owner_kind=OwnerKind.REPORT,
-                owner_ref="report",
-                field="title",
-                value=match.group("value"),
+    for report_field, pattern in (("title", _REPORT_TITLE_RE), ("subtitle", _REPORT_SUBTITLE_RE)):
+        for match in pattern.finditer(request):
+            obligations.append(
+                _make_obligation(
+                    request=request,
+                    request_sha256=request_sha256,
+                    match=match,
+                    kind=ObligationKind.EXPLICIT_FIELD,
+                    owner_kind=OwnerKind.REPORT,
+                    owner_ref="report",
+                    field=report_field,
+                    value=match.group("value"),
+                )
             )
-        )
     for pattern in (_ADD_TRACK_RE, _TRACK_LINE_RE):
         for match in pattern.finditer(request):
             owner_text = match.groupdict().get("title") or match.group("owner")
@@ -2462,14 +2484,15 @@ def validate_report_obligations(
     response: object, obligations: tuple[RequestObligation, ...]
 ) -> None:
     """Require report-owned obligations to be represented by the worker response."""
-    title = getattr(response, "title", None)
     for item in obligations:
         if (
             item.owner_kind is OwnerKind.REPORT
-            and item.field == "title"
-            and (item.state is ObligationState.CONFLICTING or title != item.value)
+            and item.field in {"title", "subtitle"}
+            and (
+                item.state is not ObligationState.SET or getattr(response, item.field) != item.value
+            )
         ):
-            raise ValueError("Requested report title was not satisfied.")
+            raise ValueError(f"Requested report {item.field} was not satisfied.")
 
 
 def _validate_sparse_binding_context(
@@ -2922,12 +2945,117 @@ def verify_worker_correction_scope(
     walk(before.model_dump(mode="json"), after.model_dump(mode="json"))
 
 
+def _verify_report_obligations(
+    document: object,
+    dump: dict[str, Any],
+    obligations: tuple[RequestObligation, ...],
+    *,
+    before: object | None,
+    report_context: ReportContext | None,
+) -> None:
+    report = tuple(item for item in obligations if item.owner_kind is OwnerKind.REPORT)
+    metadata: list[RequestObligation] = []
+    ordered: dict[str, dict[int, str]] = {"service_title": {}, "remark": {}}
+    for item in report:
+        if item.state is not ObligationState.SET:
+            raise ValueError(f"Unsupported report obligation state: {item.state.value}.")
+        if item.field in {"depth_presentation_allowed", "page_presentation_allowed"}:
+            if item.kind is not ObligationKind.PRESERVATION or item.value is not True:
+                raise ValueError("Invalid report preservation permission.")
+        elif item.kind is ObligationKind.PRESERVATION:
+            raise ValueError(f"Unhandled report preservation permission: {item.field}.")
+        elif item.field in {"title", "subtitle"}:
+            if not isinstance(item.value, str) or dump.get(item.field) != item.value:
+                raise ValueError(f"Post-lowering report {item.field} obligation failed.")
+        elif item.field == "tail_enabled":
+            if (
+                not isinstance(item.value, bool)
+                or (dump.get("tail") or {}).get("enabled") is not item.value
+            ):
+                raise ValueError("Post-lowering report tail obligation failed.")
+        elif item.field == "metadata":
+            metadata.append(item)
+        elif item.field in ordered:
+            match = re.fullmatch(rf"{item.field}\.([1-9][0-9]*)", item.slot_key or "")
+            if match is None or not isinstance(item.value, str):
+                raise ValueError("Invalid ordered report obligation.")
+            index = int(match[1])
+            if index in ordered[item.field]:
+                raise ValueError("Duplicate ordered report obligation.")
+            ordered[item.field][index] = item.value
+        else:
+            raise ValueError(f"Unhandled executable report obligation: {item.field}.")
+
+    for field, expectations in ordered.items():
+        if not expectations:
+            continue
+        if set(expectations) != set(range(1, len(expectations) + 1)):
+            raise ValueError(f"Invalid report {field} ordering.")
+        expected = [expectations[index] for index in range(1, len(expectations) + 1)]
+        if field == "remark":
+            actual = [
+                {"title": item["title"], "text": item["text"] if not item["lines"] else None}
+                for item in dump["remarks"]
+            ]
+            matched = actual == [json.loads(value) for value in expected]
+        else:
+            titles = (dump.get("header") or {}).get("service_titles", [])
+            matched = [item["value"]["value"] for item in titles] == expected
+            if before is not None:
+                original = (_plain_json(before).get("header") or {}).get("service_titles", [])
+                matched = matched and [item["slot_id"] for item in titles] == [
+                    item["slot_id"] for item in original
+                ]
+        if not matched:
+            raise ValueError(f"Post-lowering report {field} value, order, or cardinality failed.")
+
+    if metadata or (report_context is not None and report_context.metadata_bindings):
+        _verify_bound_report_metadata(before, document, tuple(metadata), report_context)
+
+
+def _verify_bound_report_metadata(
+    before: object | None,
+    after: object,
+    metadata: tuple[RequestObligation, ...],
+    context: ReportContext | None,
+) -> None:
+    from ...authoring_reconciler import _current_header_slot
+    from .enrichment import inspect_report_context
+    from .worker_contracts import resolve_report_metadata
+
+    if (
+        before is None
+        or context is None
+        or not context.snapshot_id
+        or not context.metadata_bindings
+    ):
+        raise ValueError("Required report metadata binding evidence is missing.")
+    inspected = context.model_copy(update={"metadata_bindings": None})
+    if (
+        inspect_report_context(before, context.snapshot_id) != inspected
+        or inspect_report_context(after, context.snapshot_id) != inspected
+        or resolve_report_metadata(metadata, context) != context.metadata_bindings
+        or any(binding.status != "resolved" for binding in context.metadata_bindings)
+    ):
+        raise ValueError("Stale or mismatched report metadata bindings.")
+    expected = {binding.slot_id: str(binding.fact.value) for binding in context.metadata_bindings}
+    for slot_id in (*context.general_slot_ids, *context.detail_slot_ids):
+        actual = _plain_json(_current_header_slot(after.header, slot_id))
+        if slot_id in expected:
+            if actual["value"]["value"] != expected[slot_id]:
+                raise ValueError("Post-lowering report metadata value failed at its bound slot.")
+        elif actual != _plain_json(_current_header_slot(before.header, slot_id)):
+            raise ValueError("Unrequested sibling report metadata slot changed.")
+
+
 def verify_document_obligations(
     document: object,
     obligations: tuple[RequestObligation, ...],
     *,
     grounded_operations: Sequence[object] = (),
     semantic_requirement_ids: frozenset[str] = frozenset(),
+    before: object | None = None,
+    report_context: ReportContext | None = None,
 ) -> None:
     """Verify the reconciled candidate before persistence."""
     dump = document.model_dump(mode="json")
@@ -2936,6 +3064,9 @@ def verify_document_obligations(
     sections = dump.get("sections", ())
     if not isinstance(sections, list):
         raise ValueError("Candidate document has no section inventory.")
+    _verify_report_obligations(
+        document, dump, obligations, before=before, report_context=report_context
+    )
     grounded_binding_ids = set()
     for operation in grounded_operations:
         object_kind = str(getattr(operation, "object_kind", "")).casefold()
@@ -2950,6 +3081,8 @@ def verify_document_obligations(
         if item.owner_kind is OwnerKind.FILL and item.field == "target"
     }
     for item in obligations:
+        if item.owner_kind is OwnerKind.REPORT:
+            continue
         scoped_sections = _document_sections_for_obligation(sections, item)
         if item.state in {ObligationState.CONFLICTING, ObligationState.UNRESOLVED}:
             raise ValueError("Candidate contains unresolved request obligations.")
@@ -2964,12 +3097,6 @@ def verify_document_obligations(
                 if item.value in channels:
                     raise ValueError(f"Forbidden channel {item.value} was persisted.")
             continue
-        if (
-            item.owner_kind is OwnerKind.REPORT
-            and item.field == "title"
-            and dump.get("title") != item.value
-        ):
-            raise ValueError("Post-lowering report title obligation failed.")
         if item.owner_kind is OwnerKind.TRACK:
             tracks = [track for section in scoped_sections for track in section.get("tracks", ())]
             matches = [
@@ -3238,6 +3365,7 @@ def verify_document_postconditions(
     *,
     semantic_contract: SemanticPublicationContract | None = None,
     semantic_evidence: Sequence[SemanticResolutionEvidence] = (),
+    report_context: ReportContext | None = None,
 ) -> None:
     """Verify request, preservation, and optional semantic trust before publish."""
     expected = () if semantic_contract is None else semantic_contract.expected_bindings
@@ -3247,6 +3375,8 @@ def verify_document_postconditions(
             obligations,
             grounded_operations=operations,
             semantic_requirement_ids=frozenset(item.requirement_id for item in expected),
+            before=before,
+            report_context=report_context,
         )
     except ValueError as error:
         raise DocumentPostconditionError("obligations", str(error)) from error

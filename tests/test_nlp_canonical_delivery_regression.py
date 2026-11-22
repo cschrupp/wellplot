@@ -15,6 +15,7 @@ from scripts import nlp_d4_live_acceptance as d4
 from scripts.verify_cbl_packet import _check_remarks
 from tests._mcp_fixtures import REPO_ROOT
 
+from wellplot.agent._private_apply import _apply_private_authoring
 from wellplot.agent.code_mode import typed_section_worker as section_worker
 from wellplot.agent.code_mode.canonical_workers import (
     CanonicalReportWorker,
@@ -28,16 +29,20 @@ from wellplot.agent.code_mode.enrichment import (
     HeaderSlotInspectionSummary,
     ReportContext,
     ResolvedSectionContext,
+    SemanticEnricher,
     SourceContext,
     inspect_report_context,
 )
 from wellplot.agent.code_mode.obligations import (
+    DocumentPostconditionError,
+    ObligationState,
     OwnerKind,
     ValidationIssue,
     ValidationIssueSet,
     compile_request_contract,
     validate_section_obligations,
     verify_document_obligations,
+    verify_document_postconditions,
 )
 from wellplot.agent.code_mode.planner import (
     ReportTask,
@@ -736,6 +741,194 @@ def test_report_operation_admission_and_worker_share_datum_binding() -> None:
     assert field.slot_id == transmitted.metadata_bindings[0].slot_id == "datum"
     assert field.value.value == "Kelly Bushing"
     assert len(backend.requests) == 1
+
+
+@pytest.mark.parametrize(
+    ("field", "variant"),
+    [
+        ("subtitle", "missing"),
+        ("subtitle", "wrong"),
+        ("remark", "missing"),
+        ("remark", "wrong"),
+        ("remark", "reversed"),
+        ("remark", "extra"),
+        ("tail", "disabled"),
+        ("service_title", "wrong"),
+        ("service_title", "reversed"),
+        ("unhandled", "state"),
+        ("title", "CLEAR"),
+        ("title", "FORBIDDEN"),
+    ],
+)
+def test_shared_report_postconditions_reject_incomplete_state(field: str, variant: str) -> None:
+    """Accept exact existing state, then reject a single report-contract violation."""
+    request = (
+        "Rename the report 'Gamma Study'. Set the report subtitle to 'Run 02'.\n\n"
+        'Use these service titles, in order: "First", "Second"\n\n'
+        "Include the remarks:\n1. A — First text\n2. B — Second text\n\n"
+        "Keep the report tail."
+    )
+    compiled = compile_request_contract(request)
+    assert compiled.status.value == "EXTRACTION_COMPLETE"
+    facts = compiled.requirements.requirements
+    assert {fact.field for fact in facts} == {
+        "title",
+        "subtitle",
+        "service_title",
+        "remark",
+        "tail_enabled",
+    }
+    data = _document().model_dump(mode="json")
+    data.update(
+        title="Gamma Study",
+        subtitle="Run 02",
+        tail={"enabled": True},
+        header={
+            "service_titles": [
+                {"slot_id": "first", "value": {"value": "First"}},
+                {"slot_id": "second", "value": {"value": "Second"}},
+            ]
+        },
+        remarks=[{"title": "A", "text": "First text"}, {"title": "B", "text": "Second text"}],
+    )
+    before = AuthoringDocumentSpec.model_validate(data)
+    verify_document_postconditions(before, before, facts, ())
+    for report_field in ("title", "subtitle"):
+        (fact,) = (item for item in facts if item.field == report_field)
+        assert fact.value.encode() in request.encode()[fact.start_byte : fact.end_byte]
+        verify_document_postconditions(before, before, (fact,), ())
+
+    if field == "subtitle":
+        data["subtitle"] = None if variant == "missing" else "Wrong"
+    elif field == "remark":
+        if variant == "missing":
+            data["remarks"].pop()
+        elif variant == "wrong":
+            data["remarks"][0]["text"] = "Wrong"
+        elif variant == "reversed":
+            data["remarks"].reverse()
+        else:
+            data["remarks"].append({"title": "Extra", "text": "Unrequested"})
+    elif field == "tail":
+        data["tail"]["enabled"] = False
+    elif field == "service_title":
+        if variant == "wrong":
+            data["header"]["service_titles"][0]["value"]["value"] = "Wrong"
+        else:
+            data["header"]["service_titles"].reverse()
+    else:
+        title = next(item for item in facts if item.field == "title")
+        bad = (
+            title.model_copy(update={"field": "target"})
+            if field == "unhandled"
+            else title.model_copy(update={"state": ObligationState(variant)})
+        )
+        facts = (bad,)
+    with pytest.raises(DocumentPostconditionError) as error:
+        verify_document_postconditions(
+            before, AuthoringDocumentSpec.model_validate(data), facts, ()
+        )
+    assert error.value.check == "obligations"
+
+
+@pytest.mark.parametrize("has_state", [True, False])
+def test_bound_state_and_country_reach_shared_private_verifier(has_state: bool) -> None:
+    """Use enrichment, admission, worker, canonical execution, and shared checks."""
+    request = "State: Utah\nCountry: USA"
+    facts = compile_request_contract(request).requirements.requirements
+    before = _document()
+    before.header = AuthoringHeaderSpec.model_validate(
+        {
+            "general_fields": [
+                {"slot_id": name, "key": name, "label": name.title()}
+                for name in (("state", "country", "well") if has_state else ("country", "well"))
+            ],
+        }
+    )
+    task = ReportTask(
+        goal="Set State and Country",
+        capability_ids=("report.standard",),
+        obligations=facts,
+        operations=tuple(
+            SemanticOperation(
+                local_ref=f"set_{fact.owner_ref}",
+                scope_ref="report",
+                verb="SET",
+                object_kind="report_field",
+                target_clue=fact.owner_ref,
+                field_values=(SemanticFieldValue(field="metadata", state="SET", value=fact.value),),
+            )
+            for fact in facts
+        ),
+    )
+    plan = SemanticPlan(summary="Set State and Country", report_task=task, obligations=facts)
+    context = SemanticEnricher(loader=None, allowed_roots={"fixture": REPO_ROOT}).enrich(
+        plan=plan,
+        request=request,
+        document=before,
+        source_candidates=(),
+    )
+    if not has_state:
+        with pytest.raises(ValueError, match="lacks the requested metadata destination"):
+            build_report_operation_contract(task, context.report)
+        with pytest.raises(DocumentPostconditionError, match="Stale or mismatched"):
+            verify_document_postconditions(before, before, facts, (), report_context=context.report)
+        return
+    contract = build_report_operation_contract(task, context.report)
+    backend = _StructuredFixtureBackend(
+        [{"general_fields": [{"slot_id": "country", "value": "USA"}]}]
+    )
+    worker = asyncio.run(
+        CanonicalReportWorker(backend=backend).compile(
+            task=task,
+            report_context=context.report,
+            document=before,
+            authoritative_request=request,
+            operation_contract=contract,
+            timeout_seconds=10,
+        )
+    )
+    assert worker.success and worker.intent_fragment is not None
+    result = _apply_private_authoring(
+        document=before,
+        intent=worker.intent_fragment,
+        obligations=facts,
+        inspected=context,
+        semantic_contract=None,
+    )
+    assert result.candidate is not None, result.errors
+    assert result.stages["post_lowering_obligation"] == "PASS"
+    assert [field.value.value for field in result.candidate.header.general_fields] == [
+        "Utah",
+        "USA",
+        None,
+    ]
+    verify_document_postconditions(
+        result.candidate,
+        result.candidate,
+        facts,
+        (),
+        report_context=context.report,
+    )
+    for defect in ("wrong_slot", "redirect", "stale", "missing", "identity", "sibling"):
+        candidate = result.candidate.model_copy(deep=True)
+        report = context.report
+        state, country, well = candidate.header.general_fields
+        if defect == "wrong_slot":
+            state.value.value, country.value.value = country.value.value, state.value.value
+        elif defect == "redirect":
+            state.value.value, country.value.value = None, "Utah"
+        elif defect == "stale":
+            report = report.model_copy(update={"snapshot_id": "other"})
+        elif defect == "missing":
+            report = report.model_copy(update={"metadata_bindings": None})
+        elif defect == "identity":
+            state.slot_id = "new-state"
+        else:
+            well.value.value = "Unrequested"
+        with pytest.raises(DocumentPostconditionError) as error:
+            verify_document_postconditions(before, candidate, facts, (), report_context=report)
+        assert error.value.check == "obligations"
 
 
 def test_canonical_report_worker_preserves_depth_for_section_track_requests() -> None:

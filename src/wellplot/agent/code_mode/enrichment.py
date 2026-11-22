@@ -30,7 +30,7 @@ from ..inspection import (
     ChannelInspectionSummary,
     HeaderSlotInspectionSummary,
 )
-from .obligations import ObligationKind
+from .obligations import ObligationKind, ReportMetadataBinding
 from .planner import CompilationMode, SectionTask, SemanticPlan
 
 SourceFormat = Literal["las", "dlis"]
@@ -168,6 +168,7 @@ class ReportContext(_EnrichmentModel):
     general_slot_ids: tuple[str, ...] = ()
     service_title_slot_ids: tuple[str, ...] = ()
     detail_slot_ids: tuple[str, ...] = ()
+    metadata_bindings: tuple[ReportMetadataBinding, ...] | None = None
 
 
 class SnapshotSource(_EnrichmentModel):
@@ -405,10 +406,21 @@ class SemanticEnricher:
             )
             for task_index, task in enumerate(plan.section_tasks)
         )
+        from .worker_contracts import resolve_report_metadata
+
+        report = inspect_report_context(document, snapshot_id)
+        if plan.report_task is not None:
+            report = report.model_copy(
+                update={
+                    "metadata_bindings": resolve_report_metadata(
+                        plan.report_task.obligations, report
+                    )
+                }
+            )
         context = EnrichedSemanticContext(
             plan=plan,
             sections=sections,
-            report=inspect_report_context(document, snapshot_id),
+            report=report,
             snapshot=snapshot,
             warnings=tuple(warnings),
         )

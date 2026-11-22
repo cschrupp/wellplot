@@ -31,6 +31,7 @@ from .enrichment import ReportContext, ResolvedSectionContext, inspect_report_co
 from .obligations import (
     ObligationState,
     OwnerKind,
+    ReportMetadataBinding,
     RequestObligation,
     validate_report_obligations,
     verify_obligation_spans,
@@ -40,7 +41,6 @@ from .planner import ReportTask
 from .semantic_actions import SectionSemanticAction
 from .worker_contracts import (
     CanonicalWorkerResult,
-    ReportMetadataBinding,
     ReportOperationContract,
     resolve_report_metadata,
 )
@@ -188,9 +188,9 @@ class CanonicalReportWorker:
                     "report_metadata_request_mismatch",
                     "Report metadata facts do not belong to the authoritative request.",
                 )
-        if metadata and report_context != inspect_report_context(
-            document, report_context.snapshot_id
-        ):
+        if metadata and report_context.model_copy(
+            update={"metadata_bindings": None}
+        ) != inspect_report_context(document, report_context.snapshot_id):
             metadata = resolve_report_metadata(task.obligations, report_context, stale=True)
         for binding in metadata:
             if binding.status != "resolved":
