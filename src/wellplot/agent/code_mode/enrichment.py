@@ -408,13 +408,7 @@ class SemanticEnricher:
         context = EnrichedSemanticContext(
             plan=plan,
             sections=sections,
-            report=ReportContext(
-                snapshot_id=snapshot_id,
-                header_slots=_report_header_slots(document, inspection.header_slots()),
-                general_slot_ids=_general_slot_ids(document),
-                service_title_slot_ids=_service_title_slot_ids(document),
-                detail_slot_ids=_detail_slot_ids(document),
-            ),
+            report=inspect_report_context(document, snapshot_id),
             snapshot=snapshot,
             warnings=tuple(warnings),
         )
@@ -1274,6 +1268,21 @@ def _detail_slot_ids(document: AuthoringDocumentSpec) -> tuple[str, ...]:
         for column in row.columns:
             slot_ids.extend(cell.slot_id for cell in column.cells)
     return tuple(slot_ids)
+
+
+def inspect_report_context(
+    document: AuthoringDocumentSpec, snapshot_id: str | None
+) -> ReportContext:
+    """Project the canonical report slot inventory for the supplied snapshot."""
+    return ReportContext(
+        snapshot_id=snapshot_id,
+        header_slots=_report_header_slots(
+            document, AuthoringInspectionFacade(document).header_slots()
+        ),
+        general_slot_ids=_general_slot_ids(document),
+        service_title_slot_ids=_service_title_slot_ids(document),
+        detail_slot_ids=_detail_slot_ids(document),
+    )
 
 
 def _report_header_slots(

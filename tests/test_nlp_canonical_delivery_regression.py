@@ -19,7 +19,6 @@ from wellplot.agent.code_mode import typed_section_worker as section_worker
 from wellplot.agent.code_mode.canonical_workers import (
     CanonicalReportWorker,
     ReportSemanticResponse,
-    _apply_compiled_report_requirements,
     _normalize_report_slot_groups,
 )
 from wellplot.agent.code_mode.enrichment import (
@@ -30,6 +29,7 @@ from wellplot.agent.code_mode.enrichment import (
     ReportContext,
     ResolvedSectionContext,
     SourceContext,
+    inspect_report_context,
 )
 from wellplot.agent.code_mode.obligations import (
     OwnerKind,
@@ -60,8 +60,11 @@ from wellplot.agent.code_mode.typed_section_worker import (
     apply_compiled_requirements,
 )
 from wellplot.agent.code_mode.worker_contracts import (
+    ReportOperationContract,
+    build_report_operation_contract,
     build_section_operation_contract,
     build_section_work_contract,
+    resolve_report_metadata,
 )
 from wellplot.agent.providers.base import (
     ProviderMetrics,
@@ -72,6 +75,7 @@ from wellplot.authoring import load_authoring_document
 from wellplot.model.authoring import (
     AuthoringDataSource,
     AuthoringDocumentSpec,
+    AuthoringHeaderSpec,
     AuthoringScale,
     AuthoringSectionSpec,
     CurveBindingSpec,
@@ -531,6 +535,34 @@ def test_canonical_report_worker_retries_unknown_slot_response() -> None:
     assert len(backend.requests) == 2
 
 
+def _inspected_report_fixture(
+    context: ReportContext,
+) -> tuple[AuthoringDocumentSpec, ReportContext]:
+    document = _document()
+    slots = {slot.slot_id: slot for slot in context.header_slots}
+    document.header = AuthoringHeaderSpec.model_validate(
+        {
+            "general_fields": [slots[slot_id].model_dump() for slot_id in context.general_slot_ids],
+            "service_titles": [{"slot_id": slot_id} for slot_id in context.service_title_slot_ids],
+            "detail": {
+                "kind": "report-test",
+                "rows": [
+                    {
+                        "row_id": slot_id,
+                        "key": slots[slot_id].key,
+                        "label": slots[slot_id].label,
+                        "values": [{"slot_id": slot_id}],
+                    }
+                    for slot_id in context.detail_slot_ids
+                ],
+            }
+            if context.detail_slot_ids
+            else None,
+        }
+    )
+    return document, inspect_report_context(document, "report-test")
+
+
 def test_canonical_report_worker_prefers_explicit_planner_slot_values() -> None:
     """Compiled report facts replace conflicting values in valid inspected slots."""
     authoritative_request = (
@@ -547,7 +579,7 @@ def test_canonical_report_worker_prefers_explicit_planner_slot_values() -> None:
     report_context = ReportContext(
         header_slots=(
             HeaderSlotInspectionSummary(slot_id="general.company", key="company", label="Company"),
-            HeaderSlotInspectionSummary(slot_id="general.country", key="country", label="Country"),
+            HeaderSlotInspectionSummary(slot_id="general.state", key="state", label="State"),
             HeaderSlotInspectionSummary(
                 slot_id="detail.logged_depth",
                 key="logged_depth",
@@ -555,10 +587,11 @@ def test_canonical_report_worker_prefers_explicit_planner_slot_values() -> None:
             ),
             HeaderSlotInspectionSummary(slot_id="service_title.1"),
         ),
-        general_slot_ids=("general.company", "general.country"),
+        general_slot_ids=("general.company", "general.state"),
         service_title_slot_ids=("service_title.1",),
         detail_slot_ids=("detail.logged_depth",),
     )
+    document, report_context = _inspected_report_fixture(report_context)
     backend = _StructuredFixtureBackend(
         [
             {
@@ -585,7 +618,7 @@ def test_canonical_report_worker_prefers_explicit_planner_slot_values() -> None:
                 obligations=report_obligations,
             ),
             report_context=report_context,
-            document=_document(),
+            document=document,
             authoritative_request=authoritative_request,
             timeout_seconds=10,
         )
@@ -599,8 +632,110 @@ def test_canonical_report_worker_prefers_explicit_planner_slot_values() -> None:
     detail = {
         field.slot_id: field.value.value for field in result.intent_fragment.header.detail_fields
     }
-    assert general == {"general.company": "University of Utah", "general.country": "Utah"}
+    assert general == {"general.company": "University of Utah", "general.state": "Utah"}
     assert detail == {"detail.logged_depth": "TD Not Tag"}
+
+
+@pytest.mark.parametrize(
+    ("request_text", "scenario", "expected_code", "expected_calls"),
+    [
+        ("State: Utah\nCountry: USA", "missing", "report_metadata_absent", 0),
+        ("State: Utah", "missing", "report_metadata_absent", 0),
+        ("Country: USA", "changed", "report_metadata_stale", 0),
+        ("Country: USA", "redirect", "semantic_context_validation_failure", 2),
+        ("Country: USA\nCountry: Canada", "missing", "report_metadata_conflict", 0),
+    ],
+)
+def test_report_metadata_rejection_never_returns_an_intent(
+    request_text: str, scenario: str, expected_code: str, expected_calls: int
+) -> None:
+    """Reject incomplete, conflicting, stale, or redirected metadata before lowering."""
+    context = ReportContext(
+        header_slots=(
+            HeaderSlotInspectionSummary(slot_id="country", key="country", label="Country"),
+            HeaderSlotInspectionSummary(slot_id="well", key="well", label="Well"),
+        ),
+        general_slot_ids=("country", "well"),
+    )
+    document, context = _inspected_report_fixture(context)
+    if scenario == "changed":
+        assert document.header is not None
+        document.header.general_fields[0].slot_id = "moved-country"
+    before = document.model_dump(mode="json")
+    backend = _StructuredFixtureBackend(
+        [{"general_fields": [{"slot_id": "well", "value": "USA"}]}] * expected_calls
+    )
+    result = asyncio.run(
+        CanonicalReportWorker(backend=backend).compile(
+            task=ReportTask(
+                goal="Set report metadata.",
+                capability_ids=("report.standard",),
+                obligations=compile_request_contract(request_text).requirements.requirements,
+            ),
+            report_context=context,
+            document=document,
+            authoritative_request=request_text,
+            timeout_seconds=10,
+        )
+    )
+    assert not result.success
+    assert result.intent_fragment is None
+    assert result.diagnostics[0].code == expected_code
+    assert len(backend.requests) == expected_calls
+    assert document.model_dump(mode="json") == before
+
+
+def test_report_operation_admission_and_worker_share_datum_binding() -> None:
+    """Carry an alias-bound requirement across the real worker contract boundary."""
+    request = "Drilling and Log Datum: Kelly Bushing"
+    document, context = _inspected_report_fixture(
+        ReportContext(
+            header_slots=(
+                HeaderSlotInspectionSummary(
+                    slot_id="datum", key="log_measured_from", label="Log Measured From"
+                ),
+            ),
+            general_slot_ids=("datum",),
+        )
+    )
+    task = ReportTask(
+        goal="Set the datum.",
+        capability_ids=("report.standard",),
+        obligations=compile_request_contract(request).requirements.requirements,
+        operations=(
+            SemanticOperation(
+                local_ref="set_datum",
+                scope_ref="report",
+                verb="SET",
+                object_kind="report_field",
+                target_clue="log measured from",
+                field_values=(
+                    SemanticFieldValue(field="metadata", state="SET", value="Kelly Bushing"),
+                ),
+            ),
+        ),
+    )
+    contract = build_report_operation_contract(task, context)
+    transmitted = ReportOperationContract.model_validate(contract.model_dump(mode="json"))
+    backend = _StructuredFixtureBackend(
+        [{"general_fields": [{"slot_id": "datum", "value": "Kelly Bushing"}]}]
+    )
+    result = asyncio.run(
+        CanonicalReportWorker(backend=backend).compile(
+            task=task,
+            report_context=context,
+            document=document,
+            authoritative_request=request,
+            operation_contract=transmitted,
+            timeout_seconds=10,
+        )
+    )
+    assert result.success and result.intent_fragment is not None
+    assert result.intent_fragment.header is not None
+    (field,) = result.intent_fragment.header.general_fields
+    assert field.slot_id == transmitted.metadata_bindings[0].slot_id == "datum"
+    assert field.value.value == "Kelly Bushing"
+    assert len(backend.requests) == 1
 
 
 def test_canonical_report_worker_preserves_depth_for_section_track_requests() -> None:
@@ -623,6 +758,7 @@ def test_canonical_report_worker_preserves_depth_for_section_track_requests() ->
     report_obligations = tuple(
         item for item in compilation.requirements.requirements if item.owner_kind.value == "report"
     )
+    document, report_context = _inspected_report_fixture(report_context)
     backend = _StructuredFixtureBackend(
         [
             {
@@ -640,7 +776,7 @@ def test_canonical_report_worker_preserves_depth_for_section_track_requests() ->
                 obligations=report_obligations,
             ),
             report_context=report_context,
-            document=_document(),
+            document=document,
             authoritative_request=authoritative_request,
             timeout_seconds=10,
         )
@@ -670,13 +806,14 @@ def test_canonical_report_worker_merges_planner_metadata_with_raw_request() -> N
                 label="Company",
             ),
             HeaderSlotInspectionSummary(
-                slot_id="general.country",
-                key="country",
-                label="Country",
+                slot_id="general.state",
+                key="state",
+                label="State",
             ),
         ),
-        general_slot_ids=("general.company", "general.country"),
+        general_slot_ids=("general.company", "general.state"),
     )
+    document, report_context = _inspected_report_fixture(report_context)
     backend = _StructuredFixtureBackend([{"title": "CBL", "general_fields": []}])
     result = asyncio.run(
         CanonicalReportWorker(backend=backend).compile(
@@ -690,7 +827,7 @@ def test_canonical_report_worker_merges_planner_metadata_with_raw_request() -> N
                 obligations=report_obligations,
             ),
             report_context=report_context,
-            document=_document(),
+            document=document,
             authoritative_request=authoritative_request,
             timeout_seconds=10,
         )
@@ -703,7 +840,7 @@ def test_canonical_report_worker_merges_planner_metadata_with_raw_request() -> N
     }
     assert values == {
         "general.company": "University of Utah",
-        "general.country": "Utah",
+        "general.state": "Utah",
     }
 
 
@@ -734,6 +871,7 @@ def test_canonical_report_worker_uses_generic_labeled_report_requirements() -> N
         general_slot_ids=("general.company",),
         service_title_slot_ids=("service_title.1",),
     )
+    document, report_context = _inspected_report_fixture(report_context)
     backend = _StructuredFixtureBackend([{"title": "Provider Draft"}])
     result = asyncio.run(
         CanonicalReportWorker(backend=backend).compile(
@@ -749,7 +887,7 @@ def test_canonical_report_worker_uses_generic_labeled_report_requirements() -> N
                 obligations=report_obligations,
             ),
             report_context=report_context,
-            document=_document(),
+            document=document,
             authoritative_request=authoritative_request,
             timeout_seconds=10,
         )
@@ -764,15 +902,15 @@ def test_canonical_report_worker_uses_generic_labeled_report_requirements() -> N
     )
 
 
-def test_cbl_captured_report_uses_compiled_request_requirements() -> None:
-    """Captured CBL report semantics are applied from the compiled contract."""
+def test_cbl_captured_report_rejects_missing_state_without_country_substitution() -> None:
+    """Keep the original capture immutable and reject its missing State destination."""
     request = next(
         case["request"] for case in d4.load_cases(REPO_ROOT) if case["turn_id"] == "D4-C01:C01"
     )
     captured = json.loads(
         (REPO_ROOT / "tests/fixtures/d5_5j_qwen_smoke_003_report_sections.json").read_text()
     )
-    response = ReportSemanticResponse.model_validate(captured["report"])
+    ReportSemanticResponse.model_validate(captured["report"])
     general = (
         ("company", "Company"),
         ("well", "Well"),
@@ -818,6 +956,7 @@ def test_cbl_captured_report_uses_compiled_request_requirements() -> None:
         )
     )
     context = ReportContext(
+        snapshot_id="historical-cbl-fixture",
         header_slots=header_slots,
         general_slot_ids=tuple(f"general.{key}" for key, _ in general),
         service_title_slot_ids=("service_title.1", "service_title.2", "service_title.3"),
@@ -829,31 +968,12 @@ def test_cbl_captured_report_uses_compiled_request_requirements() -> None:
     report_obligations = tuple(
         item for item in compilation.requirements.requirements if item.owner_kind.value == "report"
     )
-    normalized = _apply_compiled_report_requirements(
-        response,
-        context,
-        report_obligations,
-    )
-    normalized = _normalize_report_slot_groups(normalized, context)
-
-    values = {field.slot_id: field.value for field in normalized.general_fields}
-    assert values["general.company"] == "University of Utah"
-    assert values["general.country"] == "Utah"
-    assert values["general.measured_from"] == "Kelly Bushing"
-    assert len(normalized.detail_fields) == 7
-    assert [item.value for item in normalized.service_titles] == [
-        "Cement Bond Log",
-        "Variable Density Log",
-        "Gamma Ray - CCL",
-    ]
-    assert [item.title for item in normalized.remarks] == [
-        "Supported Reconstruction Scope",
-        "Data Sources",
-        "Public Data and IP Notice",
-    ]
-    assert normalized.page_size is None
-    assert normalized.page_orientation is None
-    assert normalized.tail_enabled is True
+    bindings = resolve_report_metadata(report_obligations, context)
+    by_field = {item.semantic_field: item for item in bindings}
+    assert by_field["state"].status == "absent"
+    assert by_field["state"].slot_id is None
+    assert by_field["maximumtemperature"].status == "absent"
+    assert by_field["measuredfrom"].slot_id == "general.measured_from"
 
 
 def _compiled_cbl_capture() -> tuple[object, ...]:

@@ -32,7 +32,7 @@ from .enrichment import (
     SourceContext,
     bind_semantic_publication_sources,
 )
-from .obligations import ObligationState, OwnerKind, RequestObligation
+from .obligations import _REPORT_METADATA_LABELS, ObligationState, OwnerKind, RequestObligation
 from .planner import (
     MAX_SEMANTIC_OPERATIONS,
     ReportTask,
@@ -295,6 +295,22 @@ class ReportOperationContractEntry(BaseModel):
     order_index: int | None = Field(default=None, ge=1)
 
 
+class ReportMetadataBinding(BaseModel):
+    """Host-owned resolution of one request-bound metadata fact."""
+
+    model_config = ConfigDict(frozen=True)
+
+    fact: RequestObligation
+    semantic_field: str
+    snapshot_id: str | None
+    slot_id: str | None = None
+    group: Literal["general", "detail"] | None = None
+    status: Literal[
+        "resolved", "absent", "ambiguous", "conflict", "unsupported", "stale", "uninspected"
+    ]
+    diagnostic: str
+
+
 class ReportOperationContract(BaseModel):
     """Host-owned binding from report planner refs to obligation-backed slots."""
 
@@ -308,6 +324,7 @@ class ReportOperationContract(BaseModel):
     snapshot_id: str = Field(min_length=1)
     entries: tuple[ReportOperationContractEntry, ...]
     ordering_constraints: tuple[tuple[str, str, str], ...] = ()
+    metadata_bindings: tuple[ReportMetadataBinding, ...] = ()
 
 
 # The planner and worker schema share this finite batch bound. It caps a
@@ -1711,6 +1728,133 @@ def build_section_operation_contract(
     )
 
 
+def _report_field_key(value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(value).casefold())
+
+
+_REPORT_FIELD_ALIASES = {
+    "drillingandlogdatum": "measuredfrom",
+    "logmeasuredfrom": "measuredfrom",
+    "kb": "elevationkb",
+    "gl": "elevationgl",
+    "df": "elevationdf",
+    "density": "fluiddensity",
+    "topinterval": "toploginterval",
+    "bottominterval": "bottomloginterval",
+    "fluid": "fluidtype",
+    "run": "runnumber",
+}
+_REPORT_FIELD_KEYS = {
+    *(_report_field_key(label) for label in _REPORT_METADATA_LABELS),
+    *_REPORT_FIELD_ALIASES.values(),
+}
+
+
+def resolve_report_metadata(
+    obligations: tuple[RequestObligation, ...],
+    context: ReportContext,
+    *,
+    stale: bool = False,
+) -> tuple[ReportMetadataBinding, ...]:
+    """Resolve facts independently, then reject incompatible claims on one slot."""
+    results: list[ReportMetadataBinding] = []
+    for fact in obligations:
+        if fact.owner_kind is not OwnerKind.REPORT or fact.field != "metadata":
+            continue
+        key = _report_field_key(fact.owner_ref)
+        field = _REPORT_FIELD_ALIASES.get(key, key)
+        result = ReportMetadataBinding(
+            fact=fact,
+            semantic_field=field,
+            snapshot_id=context.snapshot_id,
+            status="unsupported",
+            diagnostic="Report metadata field or state is unsupported.",
+        )
+        if stale:
+            result = result.model_copy(
+                update={"status": "stale", "diagnostic": "Report slot inspection is stale."}
+            )
+        elif fact.state is ObligationState.CONFLICTING:
+            result = result.model_copy(
+                update={
+                    "status": "conflict",
+                    "diagnostic": "Request contains conflicting report facts.",
+                }
+            )
+        elif field not in _REPORT_FIELD_KEYS or fact.state is not ObligationState.SET:
+            pass
+        elif not context.snapshot_id or not context.header_slots:
+            result = result.model_copy(
+                update={
+                    "status": "uninspected",
+                    "diagnostic": "Report metadata lacks sufficient bound header inspection.",
+                }
+            )
+        else:
+            matches = []
+            for slot in context.header_slots:
+                slot_key = _report_field_key(slot.key)
+                # A known canonical key takes precedence over its display label.
+                identity = (
+                    slot_key if slot_key in _REPORT_FIELD_KEYS else _report_field_key(slot.label)
+                )
+                if _REPORT_FIELD_ALIASES.get(identity, identity) == field:
+                    matches.append(slot)
+            if not matches:
+                result = result.model_copy(
+                    update={
+                        "status": "absent",
+                        "diagnostic": "Inspected header lacks the requested metadata destination.",
+                    }
+                )
+            elif len(matches) != 1:
+                result = result.model_copy(
+                    update={
+                        "status": "ambiguous",
+                        "diagnostic": "Multiple inspected slots match the report metadata field.",
+                    }
+                )
+            else:
+                slot_id = matches[0].slot_id
+                general = slot_id in context.general_slot_ids
+                detail = slot_id in context.detail_slot_ids
+                if general != detail:
+                    result = result.model_copy(
+                        update={
+                            "status": "resolved",
+                            "slot_id": slot_id,
+                            "group": "general" if general else "detail",
+                            "diagnostic": "Report metadata is bound to one inspected slot.",
+                        }
+                    )
+                else:
+                    result = result.model_copy(
+                        update={
+                            "slot_id": slot_id,
+                            "diagnostic": "Inspected slot has no unique authorized metadata group.",
+                        }
+                    )
+        results.append(result)
+
+    claims: dict[str, set[tuple[str, str]]] = {}
+    for result in results:
+        if result.status == "resolved" and result.slot_id is not None:
+            claims.setdefault(result.slot_id, set()).add(
+                (result.semantic_field, str(result.fact.value))
+            )
+    return tuple(
+        result.model_copy(
+            update={
+                "status": "conflict",
+                "diagnostic": "Conflicting report facts claim the same inspected slot.",
+            }
+        )
+        if result.slot_id is not None and len(claims.get(result.slot_id, ())) > 1
+        else result
+        for result in results
+    )
+
+
 def build_report_operation_contract(
     task: ReportTask,
     report_context: ReportContext,
@@ -1730,6 +1874,10 @@ def build_report_operation_contract(
         for item in task.obligations
         if item.owner_kind is OwnerKind.REPORT and item.state is ObligationState.SET
     )
+    metadata_bindings = resolve_report_metadata(task.obligations, report_context)
+    for binding in metadata_bindings:
+        if binding.status != "resolved":
+            raise SectionWorkContractError(f"report_metadata_{binding.status}", binding.diagnostic)
     request_hashes = {item.request_sha256 for item in obligations}
     if len(request_hashes) != 1:
         raise SectionWorkContractError(
@@ -1738,35 +1886,12 @@ def build_report_operation_contract(
         )
     request_sha256 = next(iter(request_hashes))
 
-    def normalized(value: object) -> str:
-        return re.sub(r"[^a-z0-9]+", "", str(value).casefold())
+    normalized = _report_field_key
 
     def target_for(item: RequestObligation) -> str:
         if item.field == "metadata":
-            key = normalized(item.owner_ref)
-            matches = [
-                slot
-                for slot in report_context.header_slots
-                if key
-                in {
-                    normalized(slot.key),
-                    normalized(slot.label),
-                }
-            ]
-            if len(matches) != 1:
-                raise SectionWorkContractError(
-                    "report_operation_slot_ambiguous",
-                    "Report metadata does not resolve to exactly one inspected slot.",
-                )
-            slot = matches[0]
-            if slot.slot_id in report_context.general_slot_ids:
-                return f"general.{slot.slot_id}"
-            if slot.slot_id in report_context.detail_slot_ids:
-                return f"detail.{slot.slot_id}"
-            raise SectionWorkContractError(
-                "report_operation_slot_unsupported",
-                "Report metadata resolved outside an authorized slot group.",
-            )
+            binding = next(binding for binding in metadata_bindings if binding.fact == item)
+            return f"{binding.group}.{binding.slot_id}"
         if item.field == "service_title":
             if not item.slot_key or item.slot_key not in {
                 f"service_title.{index}"
@@ -1891,6 +2016,7 @@ def build_report_operation_contract(
         snapshot_id=report_context.snapshot_id,
         entries=tuple(entries),
         ordering_constraints=tuple(ordering),
+        metadata_bindings=metadata_bindings,
     )
 
 

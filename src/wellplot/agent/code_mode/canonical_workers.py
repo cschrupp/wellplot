@@ -9,6 +9,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, ValidationError, model_validator
 
+from ...model.authoring import AuthoringDocumentSpec
 from ...model.intent import (
     AuthoringDepthIntent,
     AuthoringDocumentIntent,
@@ -26,17 +27,23 @@ from ..providers.base import (
     StructuredGenerationRequest,
 )
 from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
-from .enrichment import ReportContext, ResolvedSectionContext
+from .enrichment import ReportContext, ResolvedSectionContext, inspect_report_context
 from .obligations import (
     ObligationState,
     OwnerKind,
     RequestObligation,
     validate_report_obligations,
+    verify_obligation_spans,
     verify_worker_correction_scope,
 )
 from .planner import ReportTask
 from .semantic_actions import SectionSemanticAction
-from .worker_contracts import CanonicalWorkerResult, ReportOperationContract
+from .worker_contracts import (
+    CanonicalWorkerResult,
+    ReportMetadataBinding,
+    ReportOperationContract,
+    resolve_report_metadata,
+)
 
 
 class _SemanticModel(BaseModel):
@@ -162,7 +169,7 @@ class CanonicalReportWorker:
         *,
         task: ReportTask,
         report_context: ReportContext,
-        document: object,
+        document: AuthoringDocumentSpec,
         authoritative_request: str,
         operation_contract: ReportOperationContract | None = None,
         timeout_seconds: float,
@@ -170,10 +177,35 @@ class CanonicalReportWorker:
         max_output_tokens: int | None = None,
     ) -> CanonicalWorkerResult:
         """Generate exactly one report semantic response."""
+        metadata = resolve_report_metadata(task.obligations, report_context)
+        if metadata:
+            try:
+                verify_obligation_spans(
+                    authoritative_request, tuple(item.fact for item in metadata)
+                )
+            except ValueError:
+                return _failure(
+                    "report_metadata_request_mismatch",
+                    "Report metadata facts do not belong to the authoritative request.",
+                )
+        if metadata and report_context != inspect_report_context(
+            document, report_context.snapshot_id
+        ):
+            metadata = resolve_report_metadata(task.obligations, report_context, stale=True)
+        for binding in metadata:
+            if binding.status != "resolved":
+                return _failure(f"report_metadata_{binding.status}", binding.diagnostic)
+        if operation_contract is not None and (
+            operation_contract.snapshot_id != report_context.snapshot_id
+            or operation_contract.metadata_bindings != metadata
+        ):
+            return _failure(
+                "report_metadata_stale", "Report operation bindings no longer match inspection."
+            )
         payload = {
             "report_task": task.model_dump(mode="json"),
             "operation_contract": (
-                operation_contract.model_dump(mode="json")
+                operation_contract.model_dump(mode="json", exclude={"metadata_bindings"})
                 if operation_contract is not None
                 else None
             ),
@@ -249,12 +281,10 @@ class CanonicalReportWorker:
                     "Report output did not match the canonical semantic schema.",
                 )
             try:
+                response = _normalize_report_slot_groups(generated.value, report_context)
                 response = _apply_compiled_report_requirements(
-                    generated.value,
-                    report_context,
-                    task.obligations,
+                    response, report_context, task.obligations, metadata
                 )
-                response = _normalize_report_slot_groups(response, report_context)
                 if previous_response is not None and allowed_fields:
                     verify_worker_correction_scope(
                         previous_response,
@@ -388,8 +418,8 @@ def _lower_report(
     header = None
     if fields or service_titles:
         header_values: dict[str, object] = {}
-        general_fields = [item for item in fields if item.slot_id.startswith("general.")]
-        detail_fields = [item for item in fields if item.slot_id.startswith("detail.")]
+        general_fields = [item for item in fields if item.slot_id in general_ids]
+        detail_fields = [item for item in fields if item.slot_id in detail_ids]
         if general_fields:
             header_values["general_fields"] = general_fields
         if detail_fields:
@@ -617,72 +647,36 @@ def _apply_compiled_report_requirements(
     response: ReportSemanticResponse,
     context: ReportContext,
     obligations: tuple[RequestObligation, ...],
+    metadata: tuple[ReportMetadataBinding, ...],
 ) -> ReportSemanticResponse:
     """Apply host-compiled report values without reparsing request or planner prose."""
-    metadata_items = [
-        item
-        for item in obligations
-        if item.owner_kind is OwnerKind.REPORT
-        and item.field == "metadata"
-        and item.state is ObligationState.SET
-    ]
-    slots = {slot.slot_id: slot for slot in context.header_slots}
-    aliases_by_slot: dict[str, set[str]] = {}
-    for slot_id, slot in slots.items():
-        aliases = {
-            _slot_alias(str(value))
-            for value in (getattr(slot, "key", None), getattr(slot, "label", None))
-            if value
-        }
-        key = getattr(slot, "key", None)
-        if key:
-            aliases.add(_slot_alias(str(key).replace("_", " ")))
-        aliases.update(
-            {
-                "country": {"state"},
-                "measured_from": {"drillingandlogdatum"},
-                "log_measured_from": {"drillingandlogdatum"},
-                "elevation_kb": {"kb"},
-                "elevation_gl": {"gl"},
-                "elevation_df": {"df"},
-                "bottom_temperature": {"maximumtemperature"},
-                "fluid_density": {"density"},
-                "top_log_interval": {"topinterval"},
-                "bottom_log_interval": {"bottominterval"},
-                "fluid_type": {"fluid"},
-                "run_number": {"run"},
-            }.get(str(key), set())
-        )
-        aliases_by_slot[slot_id] = aliases
-
-    metadata_values: dict[str, str] = {}
-    for item in metadata_items:
-        matching_slots = [
-            slot_id
-            for slot_id, aliases in aliases_by_slot.items()
-            if _slot_alias(item.owner_ref) in aliases
-        ]
-        if not matching_slots:
-            raise ValueError("Compiled report metadata does not resolve to an inspected slot.")
-        for slot_id in matching_slots:
-            metadata_values[slot_id] = str(item.value)
-
     updates: dict[str, object] = {}
-    if metadata_values:
-        general_ids = set(context.general_slot_ids)
-        detail_ids = set(context.detail_slot_ids)
-        current_general = {item.slot_id: item for item in response.general_fields}
-        current_detail = {item.slot_id: item for item in response.detail_fields}
-        for slot_id, value in metadata_values.items():
-            target = current_general if slot_id in general_ids else current_detail
-            if slot_id in general_ids or slot_id in detail_ids:
-                target[slot_id] = ReportSlotValue(slot_id=slot_id, value=value)
-            else:
-                raise ValueError(
-                    "Compiled report metadata resolved outside an authorized slot group."
-                )
-        updates["general_fields"] = tuple(current_general.values())
-        updates["detail_fields"] = tuple(current_detail.values())
+    if metadata:
+        allowed_general = {item.slot_id for item in metadata if item.group == "general"}
+        allowed_detail = {item.slot_id for item in metadata if item.group == "detail"}
+        if any(
+            item.slot_id not in allowed_general
+            and item.slot_id not in context.service_title_slot_ids
+            for item in response.general_fields
+        ) or any(item.slot_id not in allowed_detail for item in response.detail_fields):
+            raise ValueError(
+                "Report worker proposed a metadata destination outside its host binding."
+            )
+        general: dict[str, ReportSlotValue] = {}
+        detail: dict[str, ReportSlotValue] = {}
+        for item in metadata:
+            assert item.slot_id is not None
+            target = general if item.group == "general" else detail
+            target[item.slot_id] = ReportSlotValue(slot_id=item.slot_id, value=str(item.fact.value))
+        updates["general_fields"] = (
+            *general.values(),
+            *(
+                item
+                for item in response.general_fields
+                if item.slot_id in context.service_title_slot_ids
+            ),
+        )
+        updates["detail_fields"] = tuple(detail.values())
 
     service_items = sorted(
         (
@@ -758,49 +752,24 @@ def _apply_explicit_report_request(
     """Prefer explicit report clauses over ambiguous model slot synonyms."""
     response = _preserve_unrequested_report_depth(response, authoritative_request)
     response = _preserve_unrequested_report_presentation(response, authoritative_request)
-    metadata_parts: list[str] = []
     services: str | None = None
     remark_parts: list[str] = []
     if task_requirements:
-        requirement_metadata, services, requirement_remarks = _report_requirement_fragments(
-            task_requirements
-        )
-        metadata_parts.extend(requirement_metadata)
+        _, services, requirement_remarks = _report_requirement_fragments(task_requirements)
         remark_parts.extend(requirement_remarks)
-    request_metadata, request_services, request_remarks = _generic_report_request_fragments(
-        authoritative_request
-    )
-    metadata_parts.extend(request_metadata)
+    _, request_services, request_remarks = _generic_report_request_fragments(authoritative_request)
     if services is None:
         services = request_services
     if request_remarks:
         remark_parts = list(request_remarks)
-    metadata = "; ".join(metadata_parts) or None
     remarks = "\n".join(f"{index}. {value}" for index, value in enumerate(remark_parts, 1)) or None
     tail_requested = _explicit_tail_requested(authoritative_request)
-    if metadata is None and services is None and remarks is None and not tail_requested:
+    if services is None and remarks is None and not tail_requested:
         return response
 
-    slots = {slot.slot_id: slot for slot in context.header_slots}
-    general_ids = set(context.general_slot_ids)
-    detail_ids = set(context.detail_slot_ids)
-    assignments = _explicit_report_slot_values(metadata, slots)
-    general_fields = tuple(
-        ReportSlotValue(slot_id=slot_id, value=value)
-        for slot_id, value in assignments.items()
-        if slot_id in general_ids
-    )
-    detail_fields = tuple(
-        ReportSlotValue(slot_id=slot_id, value=value)
-        for slot_id, value in assignments.items()
-        if slot_id in detail_ids
-    )
     service_titles = _explicit_service_titles(services, context.service_title_slot_ids)
     parsed_remarks = _explicit_remarks(remarks)
     updates: dict[str, object] = {}
-    if assignments:
-        updates["general_fields"] = general_fields
-        updates["detail_fields"] = detail_fields
     if service_titles:
         updates["service_titles"] = service_titles
     if parsed_remarks:
@@ -926,75 +895,6 @@ def _generic_report_request_fragments(
         elif re.fullmatch(r"[a-z][a-z _-]*", normalized_label):
             metadata.append(f"{label.strip()}: {value}")
     return tuple(metadata), services, tuple(remarks)
-
-
-def _explicit_report_slot_values(
-    metadata: str | None,
-    slots: dict[str, object],
-) -> dict[str, str]:
-    """Parse explicit metadata clauses and map them to inspected slot IDs."""
-    if metadata is None:
-        return {}
-    values: dict[str, str] = {}
-    aliases_by_slot: dict[str, tuple[str, ...]] = {}
-    for slot_id, slot in slots.items():
-        key = getattr(slot, "key", None)
-        label = getattr(slot, "label", None)
-        aliases = [item for item in (key, label) if item]
-        if key:
-            aliases.append(key.replace("_", " "))
-        if key == "country":
-            aliases.append("state")
-        if key == "bottom_temperature":
-            aliases.append("maximum temperature")
-        if key == "fluid_density":
-            aliases.append("density")
-        if key == "top_log_interval":
-            aliases.append("top interval")
-        if key == "bottom_log_interval":
-            aliases.append("bottom interval")
-        if key == "fluid_type":
-            aliases.append("fluid")
-        aliases_by_slot[slot_id] = tuple(
-            sorted({item for item in aliases if item}, key=len, reverse=True)
-        )
-
-    datum_match = re.search(
-        r"drilling\s+and\s+log\s+datum\s*:?\s+(?P<value>[^;]+)",
-        metadata,
-        flags=re.IGNORECASE,
-    )
-    if datum_match:
-        datum = datum_match.group("value").strip().rstrip(".")
-        for slot_id, slot in slots.items():
-            if getattr(slot, "key", None) in {"measured_from", "log_measured_from"}:
-                values[slot_id] = datum
-
-    for clause in (item.strip() for item in metadata.split(";") if item.strip()):
-        colon_match = re.match(r"^(?P<label>[^:]+):\s*(?P<value>.+)$", clause)
-        clause_label = clause if colon_match is None else colon_match.group("label")
-        clause_value = None if colon_match is None else colon_match.group("value")
-        for slot_id, aliases in aliases_by_slot.items():
-            if slot_id in values:
-                continue
-            for alias in aliases:
-                if colon_match:
-                    if _slot_alias(clause_label) != _slot_alias(alias):
-                        continue
-                    value = str(clause_value).strip()
-                else:
-                    match = re.match(
-                        rf"^\s*{re.escape(alias)}\s+(?P<value>.+)$",
-                        clause_label,
-                        flags=re.IGNORECASE,
-                    )
-                    if match is None:
-                        continue
-                    value = match.group("value").strip()
-                if value:
-                    values[slot_id] = value.rstrip(".")
-                break
-    return values
 
 
 def _explicit_service_titles(

@@ -17,7 +17,83 @@ from wellplot.agent.code_mode.worker_contracts import (
     ReportOperationContractEntry,
     SectionWorkContractError,
     build_report_operation_contract,
+    resolve_report_metadata,
 )
+
+
+@pytest.mark.parametrize(
+    ("request_text", "keys", "expected"),
+    [
+        ("Country: USA", ("country",), {"country": ("resolved", "slot.0")}),
+        (
+            "State: Utah\nCountry: USA",
+            ("state", "country"),
+            {"state": ("resolved", "slot.0"), "country": ("resolved", "slot.1")},
+        ),
+        (
+            "Country: USA\nState: Utah",
+            ("state", "country"),
+            {"state": ("resolved", "slot.0"), "country": ("resolved", "slot.1")},
+        ),
+        (
+            "State: Utah\nCountry: USA",
+            ("country",),
+            {"state": ("absent", None), "country": ("resolved", "slot.0")},
+        ),
+        ("State: Utah", ("country",), {"state": ("absent", None)}),
+        ("State: Utah", (), {"state": ("uninspected", None)}),
+        ("State: Utah", ("state", "state"), {"state": ("ambiguous", None)}),
+        (
+            "Drilling and Log Datum: Kelly Bushing",
+            ("log_measured_from",),
+            {"measuredfrom": ("resolved", "slot.0")},
+        ),
+        ("KB: 1000", ("elevation_kb",), {"elevationkb": ("resolved", "slot.0")}),
+    ],
+)
+def test_report_metadata_binding_retains_request_and_inspection_identity(
+    request_text: str,
+    keys: tuple[str, ...],
+    expected: dict[str, tuple[str, str | None]],
+) -> None:
+    """Keep original facts while resolving only inspected canonical destinations."""
+    facts = compile_request_contract(request_text).requirements.requirements
+    slots = tuple(
+        HeaderSlotInspectionSummary(
+            slot_id=f"slot.{index}", key=key, label="State" if key == "country" else key
+        )
+        for index, key in enumerate(keys)
+    )
+    context = ReportContext(
+        snapshot_id="snapshot",
+        header_slots=slots,
+        general_slot_ids=tuple(slot.slot_id for slot in slots),
+    )
+
+    bindings = resolve_report_metadata(facts, context)
+
+    assert {item.semantic_field: (item.status, item.slot_id) for item in bindings} == expected
+    assert tuple(item.fact for item in bindings) == facts
+    assert all(item.fact.requirement_id and item.snapshot_id == "snapshot" for item in bindings)
+    assert all(item.group == "general" for item in bindings if item.status == "resolved")
+
+
+def test_report_metadata_rejects_unknown_fields_and_alias_collisions() -> None:
+    """Reject incompatible alias claims and an unsupported metadata identity."""
+    facts = compile_request_contract(
+        "Drilling and Log Datum: Kelly Bushing\nMeasured From: Ground Level"
+    ).requirements.requirements
+    context = ReportContext(
+        snapshot_id="snapshot",
+        header_slots=(HeaderSlotInspectionSummary(slot_id="datum", key="measured_from"),),
+        general_slot_ids=("datum",),
+    )
+    assert [item.status for item in resolve_report_metadata(facts, context)] == [
+        "conflict",
+        "conflict",
+    ]
+    unknown = facts[0].model_copy(update={"owner_ref": "unknown"})
+    assert resolve_report_metadata((unknown,), context)[0].status == "unsupported"
 
 
 def _report_contract_fixture() -> tuple[ReportTask, ReportContext]:
@@ -73,6 +149,10 @@ def test_report_operation_contract_binds_request_ref_to_existing_slot() -> None:
     assert entry.field == "metadata"
     assert entry.target == "general.general.company"
     assert entry.value == "University of Utah"
+    (binding,) = contract.metadata_bindings
+    assert binding.fact.requirement_id == entry.requirement_id
+    assert binding.slot_id == "general.company"
+    assert ReportOperationContract.model_validate(contract.model_dump(mode="json")) == contract
 
     response = ReportSemanticResponse(
         general_fields=(ReportSlotValue(slot_id="general.company", value="University of Utah"),)
@@ -84,7 +164,7 @@ def test_report_operation_contract_rejects_missing_or_ambiguous_slot() -> None:
     """Fail closed when two inspected slots could own one metadata fact."""
     task, context = _report_contract_fixture()
 
-    with pytest.raises(SectionWorkContractError, match="exactly one inspected slot"):
+    with pytest.raises(SectionWorkContractError, match="Multiple inspected slots") as error:
         build_report_operation_contract(
             task,
             context.model_copy(
@@ -104,6 +184,7 @@ def test_report_operation_contract_rejects_missing_or_ambiguous_slot() -> None:
                 }
             ),
         )
+    assert error.value.code == "report_metadata_ambiguous"
 
 
 def test_report_operation_contract_rejects_output_value_drift() -> None:
@@ -215,6 +296,15 @@ def test_report_operation_contract_requires_full_report_obligation_coverage() ->
         }
     )
     task = task.model_copy(update={"obligations": (*task.obligations, unrepresented)})
+    context = context.model_copy(
+        update={
+            "header_slots": (
+                *context.header_slots,
+                HeaderSlotInspectionSummary(slot_id="general.field", key="field", label="Field"),
+            ),
+            "general_slot_ids": (*context.general_slot_ids, "general.field"),
+        }
+    )
 
     with pytest.raises(SectionWorkContractError) as error:
         build_report_operation_contract(task, context)
