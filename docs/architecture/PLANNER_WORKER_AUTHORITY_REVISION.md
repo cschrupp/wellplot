@@ -100,9 +100,10 @@ interpretation and its request reference, and record uncertainty rather than
 claim independent coverage. Absence of an extractor match is neither a
 rejection nor proof that all work was captured. Allow a bounded repair of an
 identified omission or contradiction using the original request and existing
-correction budget. If a material coverage discrepancy remains, block the
-turn or ask a consequential clarification; do not save a verified subset as
-successful completion. No second general-purpose parser or deterministic
+correction budget. Keep remaining discrepancies in the outcome record.
+Block affected work and clarify consequential ambiguity. Block publication
+if the discrepancy obscures dependencies or a turn-wide restriction.
+Never report a verified subset as full completion. No second general-purpose parser or deterministic
 proof of arbitrary English equivalence is assumed.
 
 The worker observes the verified private document and relevant source
@@ -131,7 +132,9 @@ proposed four-step/task and sixteen-step/turn ceilings, at most one optional
 selection per step and one correction per task, within existing deadlines.
 An invalid recoverable proposal can be corrected on a clean private copy
 using authoritative diagnostics; unknown effects, stale dependencies, failed
-trust, ambiguity, exhaustion or no progress stop without publication. Report
+trust stop the turn without publication. Ambiguity, exhaustion or no progress
+can stop just the affected outcome if verified containment permits independent
+continuation. Report
 draft verification separately from saved changes. The host, not the worker,
 decides whether the outcome is complete.
 
@@ -148,13 +151,9 @@ unless explicit supersession was established from the request.
 
 Extend the existing shared postconditions, not a second verifier. Require
 each accepted typed outcome or restriction to have a deterministic check;
-unhandled requirements block apply in the migrated path. Record completion
-as **satisfied by verified execution**, **satisfied by verified existing
-state** (no-op), or **blocked, unresolved or unsupported**. Only the first
-two count toward success. Before final publication, require every admitted
-outcome to be satisfied and no known material coverage gap, rejection or
-clarification to remain. Honest reporting of unsupported work is not
-completion, and verified draft work is not a published success.
+unhandled requirements block affected work. Apply the partial-completion
+policy below. Honest reporting of unsupported work is not completion, and
+verified draft work is not a published success.
 Check exact report values and identities (including
 remark and tail), exact scoped binding and source identity, fill geometry,
 baseline and target relationship, and earlier necessary effects against the
@@ -173,9 +172,78 @@ correctly rejects duplicates *within one plan*. Do not flatten plans,
 rename IDs or treat an otherwise valid final document as evidence of
 whole-turn intent satisfaction.
 
+## Conversational Partial Completion
+
+**Design amendment, not current runtime behavior.** The prior all-outcomes
+publication rule is replaced by best-effort execution of a verified independent
+subset. Outcome admission still bounds what may execute.
+
+| Host outcome state | Continuation and publication |
+|---|---|
+| Satisfied by verified execution | Can satisfy dependencies; effects are eligible for final publication, not yet saved. |
+| Satisfied by verified existing state | Can satisfy dependencies without a write; report as already satisfied. |
+| Unavailable | Trusted, sufficiently complete inspection confirms a required object/channel is absent, or capability inventory confirms it is unavailable. Block dependents; independent work may proceed. |
+| Unresolved | Information or authority is insufficient, ambiguous, unknown or uninspected. Never claim absence. Block dependents and ask for the missing information where actionable. |
+| Blocked by dependency | Do not attempt it; retain the failed or unresolved predecessor and its reason. |
+| Rejected | Unsupported or out-of-envelope work has no execution authority; independent work may proceed if the rejection does not undermine the turn's meaning or safety. |
+| Failed | A known local operational failure may permit independent work only after verified discard of its effects. Unknown mutation, stale publication state, compromised evidence or integrity failure blocks the whole turn. |
+
+In the existing graph, execute admitted work in dependency order against the
+latest verified private candidate. An uncertain dependency is not independence.
+Keep known omissions in the coverage record and assign dispositions; never
+count them as completed. On contained failure, discard the affected private
+subtree and all dependent effects, including prerequisites used only by that
+work. Shared prerequisites may survive only if independently necessary for
+retained outcomes. Do not persist intermediate steps, retain orphans, reuse
+stale selectors, or rescue work through scientific substitution. If safe
+discard or coherent evidence for the retained candidate cannot be proved,
+do not publish. Respect explicit all-or-nothing instructions and coupled
+scientific or document constraints.
+
+**One final publication.** The host must prove the retained subset conforms
+to the immutable request and restrictions, is dependency-closed, and has
+complete verified effects through canonical typed API, readback, and the
+shared final verifier. Check cumulative preservation from the original
+document and exact scientific source, binding, and trusted semantic evidence.
+Keep discarded attempts in the outcome record without treating them as
+authorization for retained effects. Recheck publication snapshot and integrity;
+no unresolved transaction-level issue may survive. If the verified subset
+changes nothing, do not write. If any retained change is saved, report only
+that subset as saved; whole-turn completion remains partial if work remains.
+
+**Canonical conversation.** Project a host-owned report through the existing
+Notebook/MCP conversation boundary: outcome and scope; terminal disposition;
+verified reason and supporting stage/source coverage; whether it was saved,
+already satisfied, unsaved, or not attempted; and the next useful action or
+information needed. Continue using the existing result contracts at cutover
+unless a separately reviewed compatibility change is required. Workers can
+supply structured diagnostics, not declare publication. Wording must not
+claim searches, API calls or saves that evidence does not show. A follow-up
+starts a fresh turn from the actual persisted state, not an old private draft.
+
+### Partial-completion design traces
+
+The save language below assumes final verification and persistence succeeded.
+
+| Scenario | Continue, stop and publish | Canonical feedback |
+|---|---|---|
+| GR and SP; only GR found in the inspected LAS | Save verified GR; SP unavailable. | “GR was added. No SP channel was found in the inspected LAS. Choose another source or identify the intended channel.” |
+| State and Country; only Country slot exists | Independently bind and save Country. No State substitution or header restructuring. | “Country was updated to USA. No State field was found in the inspected header, so Utah was not applied. Use a template with a State field.” |
+| Three independent report edits; one unsupported | Save the two verified edits; reject the third. | “I saved the title and subtitle. The requested header layout change is unsupported; choose a template with that layout.” |
+| Curve unavailable; dependent fill | Record curve unavailable and fill blocked; no orphan track or fill, no write for this pair. | “The requested curve was not found in the inspected source. I did not attempt its fill. Choose a source containing the curve.” |
+| Two equally plausible sources or channels | Unresolved; do not guess. Only independently verified unrelated work may save. | “Two inspected sources have GR. Which source should I use? I did not add the curve.” |
+| Unsupported fixed-baseline geometry plus independent title | Save the verified title; reject the fill, with no split substitution. | “The title was saved. This fixed-baseline fill is unsupported. If you want a split fill instead, specify that explicitly.” |
+| Invalid API parameter; safe correction | Retry once within the existing budget from the verified state. Save only if corrected and verified. | “The requested change was saved after correcting an invalid parameter,” or identify the unresolved parameter and say that change was not saved. |
+| Stale snapshot or unknown mutation | Stop the whole turn. Do not publish or assert unchanged state if the actual result is unknown. | “The document changed during editing, so this draft was not saved. Reload and retry,” or “The operation result could not be verified. Check the current document before retrying.” |
+| User requires all-or-nothing | A missing outcome blocks publication of all private edits. | “Nothing was saved because you requested all-or-nothing completion and SP was not found in the inspected LAS.” |
+| Later turn supplies missing source, selector or template | Inspect fresh persisted state, bind the new information, execute only still-requested effects, and save once if verified. | “I added SP from the source you selected. The previously saved GR curve was left unchanged.” |
+
 ## Nine Conceptual Traces
 
 These describe the proposed behavior, not results on the current runtime.
+For a blocked single outcome, “no publication” applies to that outcome;
+independent work follows the policy above, never overrides a turn-wide stop,
+and remains subject to the single final publication gate.
 
 | Request or event | Planner output | Worker and host decision | Compiler and canonical API | Verification and publication |
 |---|---|---|---|---|
@@ -198,7 +266,7 @@ verification; no blocked case may publish.
 | Request and proposed outcome | Expected result |
 |---|---|
 | User asks for title and subtitle; planner proposes only title. | A qualified explicit-field check identifies the missing subtitle. Correct or block; a verified title alone is not whole-turn success. The current subtitle extraction gap must be closed before this case is qualified. |
-| User requests GR only; planner adds deletion of resistivity. | Reject the deletion as surplus, destructive work. Do not dispatch it or publish a partial turn around the unresolved mismatch. |
+| User requests GR only; planner adds deletion of resistivity. | Reject the deletion as surplus, destructive work. Never dispatch it. GR may proceed only if independently grounded and unaffected by the rejected proposal. |
 | User requests fixed-baseline fill; planner proposes `baseline_split`. | Reject the geometry substitution. Report unsupported or clarify; schema validity and a matching baseline number do not make the geometries equivalent. |
 | User specifies an exact source or numeric constraint; planner omits it. | Detect a missing recognized selector, value or unit; require repair or block. A coincidentally matching default or source is not proof of coverage. |
 | User says “Could you get the GR trace onto this plot?” without a matching legacy regex. | Admit a bounded literal GR outcome when the inspected scope and source are unambiguous and no material uncertainty remains. Verify the effect (or an exact no-op); do not reject solely for unfamiliar wording. |
@@ -210,6 +278,17 @@ verification; no blocked case may publish.
    compile-only callers. Qualify title/subtitle, remark and tail verification,
    fail-closed unhandled outcomes, and unchanged legacy public behavior.
    Stop if a proposed check makes missing work look successful.
+   **Gate 1A: report facts to slots.** Qualify one deterministic host binding
+   used by report operation admission, worker normalization, and final
+   verification. Resolve facts on the inspected snapshot and retain stable
+   slot IDs. Never collapse distinct State and Country requirements onto
+   one slot or take the last assignment. A known missing State slot leaves
+   State unavailable; an ambiguous assignment is unresolved. Admit Country
+   only if its own unique slot is independently grounded and unaffected.
+   Reject colliding assignments without writes to that slot; unrelated
+   outcomes can proceed only under the later partial-publication gate.
+   First prove this isolation provider-free without changing current live
+   publication policy or treating unresolved items as satisfied.
 2. **Qualify the shared boundary provider-free.** Prove locally scoped plan IDs,
    original-request and source custody, ordered consecutive snapshots,
    transient unauthorized change rejection, independent report edits, and
@@ -223,6 +302,9 @@ verification; no blocked case may publish.
    Require the admission and coverage adversarial matrix above, including
    omission, substitution, surplus work and a valid unfamiliar paraphrase.
    Prove known unresolved work cannot be counted as success or published.
+   Qualify dependency-closed partial publication, discard of failed/private
+   prerequisites, no-op reporting, and hard-stop integrity/atomicity cases
+   before cutover; no independent publication path.
    Compare accepted D4/D5/A09/A10 behavior, worker budgets and Notebook/MCP
    parity. Do not remove current compiler authority checks until replacement
    checks demonstrably cover their consuming paths. No runtime fallback.
@@ -237,10 +319,12 @@ verification; no blocked case may publish.
 **Open decisions:** the minimum complete typed outcome vocabulary; which
 independent request checks are retained once extraction is nonblocking;
 how exact source and expected semantic evidence span successive snapshots;
-and whether the proposed budgets cover protected workloads. Unsupported
-geometry, incomplete report verification, ambiguous interpretation, or
-unverifiable cumulative evidence are stop conditions, not reasons to bypass
-the verifier.
+and whether the proposed budgets cover protected workloads. Also qualify
+how the graph proves independence when scope overlaps, how discarded step
+evidence is separated from admitted final effects, and how both adapters
+project identical partial-completion facts. Unsupported or ambiguous work
+blocks affected outcomes; unverifiable cumulative evidence, shared integrity
+failures or unresolvable turn-wide constraints block publication.
 
 **DRIFT_CHECK: PASS.** This document is the only deliverable change. No
 runtime, test, schema, prompt, catalog, routing or sealed evidence change.
