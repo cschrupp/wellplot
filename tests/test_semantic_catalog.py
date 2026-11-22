@@ -1215,6 +1215,56 @@ def test_canonical_source_switch_rejects_retained_semantic_evidence(
     assert error.value.check == "semantic"
 
 
+def test_executor_checks_applicable_semantics_before_next_operation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A locally authorized route edit still cannot invalidate retained evidence."""
+    import wellplot.semantic_catalog as catalog
+
+    document, contract, evidence, release = _publication_case(tmp_path)
+    original = tmp_path / "inspected.dlis"
+    different = tmp_path / "same-bytes.dlis"
+    different.write_bytes(original.read_bytes())
+    monkeypatch.setattr(catalog, "load_deployed_catalog_release", lambda: release)
+    checked = []
+
+    def check(candidate: AuthoringDocumentSpec) -> None:
+        verify_document_postconditions(
+            candidate,
+            candidate,
+            (),
+            (),
+            semantic_contract=contract,
+            semantic_evidence=(evidence,),
+            source_allowed_root=tmp_path,
+        )
+        checked.append(candidate.title)
+
+    report = reconcile_authoring(AuthoringDocumentIntent(title="Revised"), existing=document)
+    service = AuthoringService(document)
+    assert execute_authoring_plan(service, report, _retained_postcondition=check).success
+    assert checked == ["Synthetic", "Revised"]
+    route = reconcile_authoring(
+        AuthoringDocumentIntent(
+            sections=[
+                AuthoringSectionIntent(
+                    section_id="main",
+                    data_source=AuthoringDataSource(
+                        source_path=str(different), source_format="dlis"
+                    ),
+                )
+            ]
+        ),
+        existing=service.document,
+    )
+    assert route.ready and len(route.operations) == 1
+    result = execute_authoring_plan(service, route, _retained_postcondition=check)
+    assert not result.success
+    assert "semantic_source_route_mismatch" in result.errors[0]
+    assert result.outcomes[0].after_document_sha256 is None
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     (

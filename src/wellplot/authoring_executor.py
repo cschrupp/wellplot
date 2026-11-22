@@ -21,6 +21,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
@@ -115,6 +117,8 @@ class AuthoringOperationOutcome(_ExecutorModel):
     postcondition_verified: bool = False
     message: str = ""
     error: str | None = None
+    before_document_sha256: str | None = None
+    after_document_sha256: str | None = None
 
 
 class AuthoringPhaseCheckpoint(_ExecutorModel):
@@ -142,6 +146,14 @@ class AuthoringExecutionResult(_ExecutorModel):
 
 
 PreviewCallback = Callable[[AuthoringDocumentSpec, AuthoringOperationPhase], bytes | None]
+_RetainedPostcondition = Callable[[AuthoringDocumentSpec], None]
+
+
+def _document_digest(document: AuthoringDocumentSpec) -> str:
+    payload = document.model_dump(mode="json")
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -393,8 +405,11 @@ class AuthoringExecutor:
         plan: AuthoringReconciliationPlan,
         *,
         preview_callback: PreviewCallback | None = None,
+        _retained_postcondition: _RetainedPostcondition | None = None,
     ) -> AuthoringExecutionResult:
         """Apply operations until the first failed precondition or postcondition."""
+        from .agent.code_mode.obligations import verify_document_preservation
+
         document = self.service.document
         if not plan.ready:
             errors = tuple(f"{issue.code}: {issue.message}" for issue in plan.issues)
@@ -412,12 +427,20 @@ class AuthoringExecutor:
                 document=document,
                 errors=tuple(plan_errors),
             )
+        if _retained_postcondition is not None:
+            try:
+                _retained_postcondition(document)
+            except ValueError as exc:
+                return AuthoringExecutionResult(
+                    success=False, stopped=True, document=document, errors=(str(exc),)
+                )
 
         outcomes: list[AuthoringOperationOutcome] = []
         checkpoints: list[AuthoringPhaseCheckpoint] = []
         errors: list[str] = []
         warnings: list[str] = []
         applied_ids: set[str] = set()
+        verified_digest = _document_digest(document)
         for phase in AuthoringOperationPhase:
             phase_operations = ordered_operations[phase]
             if not phase_operations:
@@ -425,6 +448,14 @@ class AuthoringExecutor:
             phase_status = AuthoringExecutionStatus.COMPLETED
             phase_applied = 0
             for operation in phase_operations:
+                before = self.service.document
+                before_digest = _document_digest(before)
+                if before_digest != verified_digest:
+                    message = "Private document drifted before the next operation."
+                    outcomes.append(self._failed_outcome(operation, message))
+                    errors.append(f"{operation.operation_id}: {message}")
+                    phase_status = AuthoringExecutionStatus.BLOCKED
+                    break
                 missing_dependencies = [
                     dependency
                     for dependency in operation.depends_on
@@ -448,6 +479,13 @@ class AuthoringExecutor:
                     expected = self._apply(operation)
                     if not self._verify(operation, expected):
                         raise RuntimeError("Read-after-write postcondition did not match.")
+                    after = self.service.document
+                    verify_document_preservation(
+                        before, after, (operation,), operation_boundary=True
+                    )
+                    if _retained_postcondition is not None:
+                        _retained_postcondition(after)
+                    verified_digest = _document_digest(after)
                 except Exception as exc:  # noqa: BLE001 - report deterministic boundary errors
                     message = str(exc) or exc.__class__.__name__
                     outcomes.append(self._failed_outcome(operation, message))
@@ -464,6 +502,8 @@ class AuthoringExecutor:
                         status=AuthoringExecutionStatus.COMPLETED,
                         postcondition_verified=True,
                         message="Applied and verified.",
+                        before_document_sha256=before_digest,
+                        after_document_sha256=verified_digest,
                     )
                 )
                 applied_ids.add(operation.operation_id)
@@ -487,10 +527,13 @@ class AuthoringExecutor:
             )
             if phase_status == AuthoringExecutionStatus.BLOCKED:
                 break
+        final_document = self.service.document
+        if not errors and _document_digest(final_document) != verified_digest:
+            errors.append("Private document drifted after the last verified operation.")
         return AuthoringExecutionResult(
             success=not errors,
             stopped=bool(errors),
-            document=self.service.document,
+            document=final_document,
             outcomes=tuple(outcomes),
             phase_summaries=tuple(checkpoints),
             errors=tuple(errors),
@@ -881,9 +924,12 @@ def execute_authoring_plan(
     plan: AuthoringReconciliationPlan,
     *,
     preview_callback: PreviewCallback | None = None,
+    _retained_postcondition: _RetainedPostcondition | None = None,
 ) -> AuthoringExecutionResult:
     """Execute one G4 plan with deterministic checkpoints and read-back checks."""
-    return AuthoringExecutor(service).execute(plan, preview_callback=preview_callback)
+    return AuthoringExecutor(service).execute(
+        plan, preview_callback=preview_callback, _retained_postcondition=_retained_postcondition
+    )
 
 
 __all__ = [

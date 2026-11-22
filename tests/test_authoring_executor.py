@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
+import pytest
+
+from wellplot.agent._private_apply import _apply_private_authoring
 from wellplot.authoring_executor import (
     AuthoringExecutionStatus,
     execute_authoring_plan,
@@ -14,8 +19,15 @@ from wellplot.authoring_reconciler import (
     AuthoringReconciliationPlan,
     reconcile_authoring,
 )
-from wellplot.authoring_service import AuthoringService
+from wellplot.authoring_service import (
+    AuthoringService,
+    SectionPatch,
+    UpdateReportRequest,
+    UpdateSectionRequest,
+)
 from wellplot.model import AuthoringDocumentIntent, AuthoringDocumentSpec
+from wellplot.model.authoring import AuthoringDataSource
+from wellplot.model.intent import AuthoringTailIntent
 
 
 def _document() -> AuthoringDocumentSpec:
@@ -89,6 +101,11 @@ def test_executor_applies_typed_operations_and_captures_phase_previews() -> None
     assert result.success is True
     assert result.stopped is False
     assert all(item.postcondition_verified for item in result.outcomes)
+    assert all(item.before_document_sha256 for item in result.outcomes)
+    assert all(item.after_document_sha256 for item in result.outcomes)
+    assert [item.after_document_sha256 for item in result.outcomes[:-1]] == [
+        item.before_document_sha256 for item in result.outcomes[1:]
+    ]
     assert [item.phase for item in result.phase_summaries] == [
         AuthoringOperationPhase.REPORT,
         AuthoringOperationPhase.TRACKS,
@@ -101,6 +118,176 @@ def test_executor_applies_typed_operations_and_captures_phase_previews() -> None
     assert track.width_mm == 25
     assert [binding.binding_id for binding in track.bindings] == ["gr-1", "gr-2"]
     assert track.bindings[0].style.color == "blue"
+
+
+@pytest.mark.parametrize(
+    "defect", ["source", "sibling", "compatibility", "future_tail", "extra_null"]
+)
+def test_executor_blocks_transient_unapproved_operation_effect(defect: str) -> None:
+    """Reject the first bad boundary even if the next operation would restore it."""
+    document = _document()
+    source_a = AuthoringDataSource(source_path="a.las")
+    source_b = AuthoringDataSource(source_path="b.las")
+    document.sections[0].data_source = source_a if defect != "compatibility" else None
+    document.extensions["compatibility"] = {"legacy_data": {"source_path": "a.las"}}
+    service = AuthoringService(document)
+    intent = AuthoringDocumentIntent(title="Revised", tail=AuthoringTailIntent(enabled=True))
+    plan = reconcile_authoring(intent, existing=document)
+    assert [item.operation_id for item in plan.operations] == [
+        "update:report:report",
+        "update:tail:tail",
+    ]
+    clean = execute_authoring_plan(AuthoringService(document), plan)
+    assert clean.success and len(clean.outcomes) == 2
+    real_update = service.update
+    calls = []
+
+    def update(request: object) -> object:
+        calls.append(request)
+        value = real_update(request)
+        if isinstance(request, UpdateReportRequest):
+            if defect == "source":
+                real_update(
+                    UpdateSectionRequest(
+                        section_id="main", patch=SectionPatch(data_source=source_b)
+                    )
+                )
+            else:
+                changed = service.document
+                if defect == "sibling":
+                    changed.subtitle = "Unapproved"
+                elif defect == "compatibility":
+                    changed.extensions["compatibility"]["legacy_data"]["source_path"] = "b.las"
+                elif defect == "extra_null":
+                    changed.extensions["unapproved"] = None
+                else:
+                    changed.tail.enabled = True
+                service.replace_document(changed)
+        elif defect == "source":
+            real_update(
+                UpdateSectionRequest(section_id="main", patch=SectionPatch(data_source=source_a))
+            )
+        return value
+
+    with patch.object(service, "update", side_effect=update):
+        rejected = execute_authoring_plan(service, plan)
+    assert not rejected.success and rejected.stopped
+    assert len(calls) == len(rejected.outcomes) == 1
+    assert rejected.outcomes[0].after_document_sha256 is None
+    assert "outside the authorized reconciliation envelope" in rejected.errors[0]
+
+
+def test_executor_rejects_snapshot_drift_between_phases() -> None:
+    """Drift after one verified operation cannot become the next baseline."""
+    document = _document()
+    service = AuthoringService(document)
+    intent = AuthoringDocumentIntent(
+        title="Revised",
+        sections=[{"section_id": "main", "tracks": [{"track_id": "curves", "width_mm": 25}]}],
+    )
+    plan = reconcile_authoring(intent, existing=document)
+
+    def drift(_document: AuthoringDocumentSpec, _phase: AuthoringOperationPhase) -> None:
+        changed = service.document
+        changed.subtitle = "Unapproved"
+        service.replace_document(changed)
+
+    result = execute_authoring_plan(service, plan, preview_callback=drift)
+    assert not result.success and result.stopped
+    assert "drifted before the next operation" in result.errors[0]
+    assert result.outcomes[0].postcondition_verified
+    assert not result.outcomes[1].postcondition_verified
+    assert service.document.sections[0].tracks[0].width_mm == 20
+
+
+def test_private_apply_does_not_return_candidate_after_operation_failure() -> None:
+    """A failed target readback after mutation is not a publishable candidate."""
+    document = _document()
+    original = AuthoringService.update
+
+    def update(service: AuthoringService, request: object) -> object:
+        value = original(service, request)
+        changed = service.document
+        changed.title = "Incorrect"
+        service.replace_document(changed)
+        return value
+
+    with patch.object(AuthoringService, "update", update):
+        result = _apply_private_authoring(
+            document=document,
+            intent=AuthoringDocumentIntent(title="Expected"),
+            obligations=(),
+            inspected=None,
+            semantic_contract=None,
+        )
+    assert result.candidate is None and result.rolled_back
+    assert result.failure_status == "execution_failed"
+    assert "Read-after-write postcondition" in result.errors[0]
+    assert document.title == "Original"
+
+
+def test_executor_keeps_plan_local_ids_and_accepts_noop() -> None:
+    """Independent report edits keep their IDs and a verified no-op performs no writes."""
+    service = AuthoringService(_document())
+    previous = None
+    for intent in (AuthoringDocumentIntent(title="Study"), AuthoringDocumentIntent(subtitle="Run")):
+        plan = reconcile_authoring(intent, existing=service.document)
+        duplicate = plan.model_copy(update={"operations": (*plan.operations, *plan.operations)})
+        rejected = execute_authoring_plan(service, duplicate)
+        assert not rejected.success and "Duplicate operation id" in rejected.errors[0]
+        result = execute_authoring_plan(service, plan)
+        assert result.success
+        (outcome,) = result.outcomes
+        assert outcome.operation_id == "update:report:report"
+        if previous is not None:
+            assert outcome.before_document_sha256 == previous
+        previous = outcome.after_document_sha256
+    assert service.document.title == "Study" and service.document.subtitle == "Run"
+    noop = execute_authoring_plan(
+        service,
+        reconcile_authoring(AuthoringDocumentIntent(title="Study"), existing=service.document),
+    )
+    assert noop.success and noop.outcomes == ()
+
+
+def test_executor_observes_move_and_remove_as_separate_effects() -> None:
+    """Validate exact collection changes at distinct operation boundaries."""
+    document = _document()
+    tracks = document.sections[0].tracks
+    second = tracks[0].model_copy(deep=True, update={"id": "second", "bindings": []})
+    third = second.model_copy(deep=True, update={"id": "third"})
+    tracks.extend((second, third))
+    service = AuthoringService(document)
+    plan = AuthoringReconciliationPlan(
+        ready=True,
+        operations=[
+            AuthoringOperation(
+                operation_id="move-third",
+                phase=AuthoringOperationPhase.TRACKS,
+                action=AuthoringOperationAction.MOVE,
+                object_kind=AuthoringOperationObjectKind.TRACK,
+                section_id="main",
+                object_id="third",
+                payload={"new_index": 0},
+                reason="Test move.",
+            ),
+            AuthoringOperation(
+                operation_id="remove-second",
+                phase=AuthoringOperationPhase.TRACKS,
+                action=AuthoringOperationAction.REMOVE,
+                object_kind=AuthoringOperationObjectKind.TRACK,
+                section_id="main",
+                object_id="second",
+                depends_on=["move-third"],
+                reason="Test remove.",
+            ),
+        ],
+    )
+    result = execute_authoring_plan(service, plan)
+    assert result.success, result.errors
+    first, second = result.outcomes
+    assert first.after_document_sha256 == second.before_document_sha256
+    assert [track.id for track in service.document.sections[0].tracks] == ["third", "curves"]
 
 
 def test_executor_does_not_preview_a_blocked_phase() -> None:

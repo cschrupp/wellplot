@@ -14,6 +14,8 @@ from ..semantic_catalog import (
     EMPTY_SEMANTIC_CHANNEL_CATALOG,
     SemanticCatalogTrustError,
     SemanticPublicationContract,
+    _document_has_semantic_binding,
+    _semantic_evidence_key,
     revalidate_deployed_catalog_release,
 )
 from .code_mode.enrichment import (
@@ -112,7 +114,46 @@ def _apply_private_authoring(
         semantic_contract = plan.semantic_publication_contract
     stages["reconciliation"] = "PASS"
 
-    execution = execute_authoring_plan(private_service, plan)
+    retained = tuple(
+        item
+        for item in plan.semantic_resolutions
+        if _document_has_semantic_binding(
+            document,
+            section_id=item.section_id,
+            track_id=item.track_id,
+            binding_id=item.binding_id,
+            channel=item.physical_mnemonic or "",
+        )
+    )
+    if retained and semantic_contract is not None:
+        keys = {_semantic_evidence_key(item) for item in retained}
+        retained_contract = semantic_contract.model_copy(
+            update={
+                "expected_bindings": tuple(
+                    item
+                    for item in semantic_contract.expected_bindings
+                    if _semantic_evidence_key(item) in keys
+                )
+            }
+        )
+
+        def verify_retained(after: AuthoringDocumentSpec) -> None:
+            verify_document_postconditions(
+                after,
+                after,
+                (),
+                (),
+                semantic_contract=retained_contract,
+                semantic_evidence=retained,
+                source_base_dir=source_base_dir,
+                source_allowed_root=source_allowed_root,
+            )
+
+        execution = execute_authoring_plan(
+            private_service, plan, _retained_postcondition=verify_retained
+        )
+    else:
+        execution = execute_authoring_plan(private_service, plan)
     if not execution.success:
         return rejected(
             "execution_failed", *(str(error) for error in execution.errors), rolled_back=True

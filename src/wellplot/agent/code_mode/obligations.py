@@ -2315,6 +2315,11 @@ _CREATED_OBJECT_MODELS = {
     "remark": AuthoringRemarkSpec,
 }
 _PRESERVATION_ERROR = "Candidate document changed outside the authorized reconciliation envelope."
+_MERGED_OPERATION_FIELDS = {
+    "curve_binding": {"style", "value_labels", "header_display"},
+    "raster_binding": {"style", "colorbar", "sample_axis", "waveform"},
+    "header_slot": {"value"},
+}
 
 
 def _scoped_operation_parent(
@@ -2408,7 +2413,11 @@ def _changed_paths(left: object, right: object, path: tuple[str, ...] = ()) -> s
     if isinstance(left, Mapping) and isinstance(right, Mapping):
         changed: set[tuple[str, ...]] = set()
         for key in set(left) | set(right):
-            changed |= _changed_paths(left.get(key), right.get(key), path + (str(key),))
+            child = path + (str(key),)
+            if key not in left or key not in right:
+                changed.add(child)
+            else:
+                changed |= _changed_paths(left[key], right[key], child)
         return changed
     if isinstance(left, list) and isinstance(right, list):
         if len(left) != len(right):
@@ -2426,13 +2435,19 @@ def verify_document_preservation(
     before: object,
     after: object,
     operations: Sequence[object],
+    *,
+    operation_boundary: bool = False,
 ) -> None:
     """Reject candidate changes outside the canonical reconciliation operations."""
     before_json = _plain_json(before)
     after_json = _plain_json(after)
     if not isinstance(before_json, dict) or not isinstance(after_json, dict):
         raise ValueError(_PRESERVATION_ERROR)
-    if operations and all(isinstance(op, AuthoringOperation) for op in operations):
+    if operation_boundary:
+        # The executor already validates the intact plan and completed dependencies.
+        if len(operations) != 1 or not isinstance(operations[0], AuthoringOperation):
+            raise ValueError(_PRESERVATION_ERROR)
+    elif operations and all(isinstance(op, AuthoringOperation) for op in operations):
         ordered, errors = _order_plan_operations(
             AuthoringReconciliationPlan(ready=True, operations=operations)
         )
@@ -2474,7 +2489,17 @@ def verify_document_preservation(
         patch = payload.get("patch") if isinstance(payload, Mapping) else None
         for prefix in prefixes:
             if isinstance(patch, Mapping):
-                allowed.update(prefix + (str(key),) for key in patch)
+                for key, value in patch.items():
+                    path = prefix + (str(key),)
+                    if (
+                        operation_boundary
+                        and key in _MERGED_OPERATION_FIELDS.get(object_kind, ())
+                        and isinstance(value, Mapping)
+                        and value.get("operation") != "clear"
+                    ):
+                        allowed.update(path + (str(child),) for child in value)
+                    else:
+                        allowed.add(path)
             elif object_kind in {"header", "page", "depth", "output", "tail"}:
                 allowed.add(prefix)
     if any(not any(path[: len(prefix)] == prefix for prefix in allowed) for path in changed):
