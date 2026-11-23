@@ -83,6 +83,40 @@ evidence/configuration or a fixture path, its proximate classification is also
 The group counts total 102. The full-suite run did not complete the remaining
 392 collected nodes, so those nodes have no result in this triage.
 
+### Captured Traceback Signatures
+
+The first ten current-HEAD failures and their parent replays produced these
+same terminal frames/messages:
+
+1. `test_agent_reachability.py:135`, `main(...)` returned 1; stderr:
+   `Required migration module 'wellplot.agent.core' was not discovered.`
+2. `test_agent_reachability.py:197` -> `_validate_classifications` at
+   `check_agent_reachability.py:470`: `InventoryError: Required migration
+   module 'wellplot.agent.core' was not discovered.`
+3. `test_agent_tool_contract.py:49`: assertion `45297 <= 40000` failed.
+4. `test_capability_plugin_extensibility.py:110` -> `Path.read_text`:
+   `FileNotFoundError` for
+   `src/wellplot/agent/graph/workflow.py`.
+5-6. `test_cm56r7_semantic_failure_decomposition.py:151,162` ->
+   `verify_evidence_integrity`: `EvidenceIntegrityError: R6 evidence is
+   missing: /tmp/cm56r6-authoritative-qwen-rerun.jsonl`.
+7. `test_cm57p10_final_promotion.py:190` -> `verify_frozen_contract` at
+   `scripts/cm57p10_final_promotion.py:681`: `RuntimeError: CM-57P10 frozen
+   artifact drifted: .../src/wellplot/agent/providers/base.py`.
+8. `test_cm57p10_final_promotion.py:247` -> `planner.plan` ->
+   `_canonical_plan_from_wire`: `AttributeError: 'SemanticPlan' object has no
+   attribute 'abstention'`.
+9. `test_cm57p2_planner_shadow.py:117` -> `verify_frozen_contract`:
+   `RuntimeError: CM-57P1 planner prompt drifted.`
+10. `test_cm57p2_planner_shadow.py:133` expected
+    `CM-57P1 planner source drifted`, but received
+    `CM-57P1 planner prompt drifted.`
+
+The separate D5-5I test
+`test_static_preflight_binds_tooling_and_target_checkpoints` failed
+independently at both checkpoints: `_static_preflight` raised
+`MetadataStaticPreflightError: configured server origin mismatch`.
+
 ### Exact Failed Node IDs
 
 ```text
