@@ -265,11 +265,13 @@ class RequestObligation(BaseModel):
                 ),
             )
         if not self.requirement_id:
-            identity = f"{self.owner_kind}:{self.owner_ref}:{self.field}:{self.start_byte}"
-            object.__setattr__(
-                self, "requirement_id", hashlib.sha256(identity.encode()).hexdigest()[:24]
-            )
+            object.__setattr__(self, "requirement_id", _requirement_identity(self))
         return self
+
+
+def _requirement_identity(item: RequestObligation) -> str:
+    identity = f"{item.owner_kind}:{item.owner_ref}:{item.field}:{item.start_byte}"
+    return hashlib.sha256(identity.encode()).hexdigest()[:24]
 
 
 class SupportedAnchor(BaseModel):
@@ -302,6 +304,18 @@ class ReportMetadataBinding(BaseModel):
     diagnostic: str
 
 
+class RequestDependency(BaseModel):
+    """Request-grounded relation between an explicit fill target and curve."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    request_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    predecessor_requirement_id: str = Field(min_length=1)
+    dependent_requirement_id: str = Field(min_length=1)
+    relation: Literal["FILL_TARGET_SATISFIED_BY"]
+    provenance: tuple[RequirementProvenance, ...] = Field(min_length=2, max_length=2)
+
+
 class CanonicalRequirementSet(BaseModel):
     """Single value-bearing, versioned compilation of request semantics."""
 
@@ -310,6 +324,7 @@ class CanonicalRequirementSet(BaseModel):
     request_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     language_version: str = Field(min_length=1)
     requirements: tuple[RequestObligation, ...] = ()
+    dependencies: tuple[RequestDependency, ...] = ()
     scopes: ScopeDeclarationSet = ScopeDeclarationSet()
     shared_scope_rules: tuple[SharedScopeRule, ...] = ()
     track_collection: CollectionSemantics = CollectionSemantics.ORDERED_ASSOCIATIVE
@@ -2191,11 +2206,22 @@ def verify_obligation_spans(request: str, obligations: tuple[RequestObligation, 
 
 def verify_anchor_coverage(
     request: str,
-    obligations: tuple[RequestObligation, ...],
+    obligations: tuple[RequestObligation, ...] | CanonicalRequirementSet,
     *,
     anchors: tuple[SupportedAnchor, ...] | None = None,
 ) -> None:
     """Require every independently recognized anchor to have an obligation."""
+    has_dependencies = isinstance(obligations, CanonicalRequirementSet) and bool(
+        obligations.dependencies
+    )
+    if not has_dependencies and _has_unsupported_curve_creation_or_baseline_fill(request):
+        raise ValueError("Canonical requirement set lacks supported request coverage.")
+    if isinstance(obligations, CanonicalRequirementSet):
+        if obligations.request_sha256 != _request_identity(request)[1]:
+            raise ValueError("Canonical requirement set request identity mismatch.")
+        if obligations.dependencies:
+            _verify_request_dependencies(request, obligations)
+        obligations = obligations.requirements
     anchors = anchors if anchors is not None else extract_supported_anchors(request)
     for anchor in anchors:
         if anchor.kind == "scope":
@@ -2207,6 +2233,145 @@ def verify_anchor_coverage(
             for item in obligations
         ):
             raise ValueError("Supported request anchor was not converted to an obligation.")
+
+
+def _verify_request_dependencies(
+    request: str,
+    requirement_set: CanonicalRequirementSet,
+) -> None:
+    """Validate a finite joint form against original bytes, not repeated names alone."""
+    pattern = re.compile(
+        r"\s*(?i:plot physical)\s+(?P<channel>[A-Z][A-Z0-9_]{1,11})\."
+        r"\s*(?P<sequence>(?i:then))\s+(?P<geometry>(?i:split)\s+"
+        r"(?P<target>(?i:the)\s+(?P<fill_channel>[A-Z][A-Z0-9_]{1,11})\s+(?i:curve))"
+        r"\s+(?i:fill at baseline)\s+(?P<baseline>[+-]?\d{1,12}(?:\.\d{1,12})?)\.)\s*"
+    )
+    match = pattern.fullmatch(request)
+    if match is None:
+        raise ValueError("Dependency lacks complete supported request coverage.")
+    data, digest = _request_identity(request)
+    obligations = requirement_set.requirements
+    dependencies = requirement_set.dependencies
+    scope = ScopeDeclaration(
+        declaration_id="scope.existing.request.1", kind="EXISTING_SECTION", origin="HOST_CONTEXT"
+    )
+    if (
+        requirement_set.scopes != ScopeDeclarationSet(scopes=(scope,))
+        or requirement_set.shared_scope_rules
+        or any(
+            item.scope_key != scope.declaration_id or item.scope != "task" for item in obligations
+        )
+    ):
+        raise ValueError("Dependency requires the original authoritative scope declaration.")
+    if len(obligations) != 4:
+        raise ValueError("Dependency requires exactly four explicit facts.")
+    for item in obligations:
+        if (
+            item.requirement_id != _requirement_identity(item)
+            or item.state is not ObligationState.SET
+            or not 0 <= item.start_byte < item.end_byte <= len(data)
+            or item.provenance
+            != (
+                RequirementProvenance(
+                    request_sha256=digest,
+                    start_byte=item.start_byte,
+                    end_byte=item.end_byte,
+                    span_sha256=item.span_sha256,
+                ),
+            )
+        ):
+            raise ValueError("Dependency requirement identity or provenance is invalid.")
+    verify_obligation_spans(request, obligations)
+    by_id = {item.requirement_id: item for item in obligations}
+    if len(by_id) != len(obligations) or any(not key for key in by_id):
+        raise ValueError("Dependency requirements must have unique identities.")
+    if len(dependencies) != 1:
+        raise ValueError("Dependency target must have exactly one predecessor.")
+    dependency = dependencies[0]
+    predecessor = by_id.get(dependency.predecessor_requirement_id)
+    dependent = by_id.get(dependency.dependent_requirement_id)
+    if predecessor is None or dependent is None or predecessor is dependent:
+        raise ValueError("Dependency references invalid requirements.")
+    if (
+        dependency.request_sha256 != digest
+        or dependency.relation != "FILL_TARGET_SATISFIED_BY"
+        or len(dependency.provenance) != 2
+        or predecessor.request_sha256 != digest
+        or dependent.request_sha256 != digest
+        or predecessor.state is not ObligationState.SET
+        or dependent.state is not ObligationState.SET
+        or predecessor.kind is not ObligationKind.EXPLICIT_FIELD
+        or predecessor.owner_kind is not OwnerKind.BINDING
+        or predecessor.owner_ref != "request"
+        or predecessor.field != "channel"
+        or dependent.kind is not ObligationKind.TARGET_REFERENCE
+        or dependent.owner_kind is not OwnerKind.FILL
+        or dependent.field != "target"
+        or predecessor.value != match["channel"]
+        or dependent.value != match["fill_channel"]
+        or predecessor.value != dependent.value
+        or predecessor.scope_key != dependent.scope_key
+        or not predecessor.scope_key
+        or (predecessor.start_byte, predecessor.end_byte)
+        != (
+            _byte_offset(request, match.start("channel")),
+            _byte_offset(request, match.end("channel")),
+        )
+        or (dependent.start_byte, dependent.end_byte)
+        != (
+            _byte_offset(request, match.start("fill_channel")),
+            _byte_offset(request, match.end("fill_channel")),
+        )
+    ):
+        raise ValueError("Dependency requirements do not identify the same scoped curve outcome.")
+    fill_facts = [
+        item
+        for item in obligations
+        if item.owner_kind is OwnerKind.FILL and item.owner_ref == dependent.owner_ref
+    ]
+    if (
+        dependent.owner_ref != match["fill_channel"]
+        or len(fill_facts) != 3
+        or {item.field for item in fill_facts} != {"target", "kind", "baseline"}
+        or any(item.scope_key != dependent.scope_key for item in fill_facts)
+        or len(
+            [
+                item
+                for item in obligations
+                if item.owner_kind is OwnerKind.BINDING and item.field == "channel"
+            ]
+        )
+        != 1
+        or not any(item.field == "kind" and item.value == "baseline_split" for item in fill_facts)
+        or not any(
+            item.field == "baseline" and item.value == float(match["baseline"])
+            for item in fill_facts
+        )
+    ):
+        raise ValueError("Dependency lacks complete explicit fill geometry.")
+    for item in fill_facts:
+        if item.field == "target":
+            continue
+        group = "geometry" if item.field == "kind" else "baseline"
+        if item.kind is not ObligationKind.EXPLICIT_FIELD or (
+            item.start_byte,
+            item.end_byte,
+        ) != tuple(_byte_offset(request, offset) for offset in match.span(group)):
+            raise ValueError("Dependency geometry does not match its exact request span.")
+    expected_spans = tuple(
+        (_byte_offset(request, match.start(group)), _byte_offset(request, match.end(group)))
+        for group in ("sequence", "target")
+    )
+    for provenance, (start, end) in zip(dependency.provenance, expected_spans, strict=True):
+        if (
+            provenance.request_sha256 != digest
+            or provenance.start_byte != start
+            or provenance.end_byte != end
+            or end > len(data)
+            or provenance.derivation != "DIRECT"
+            or provenance.span_sha256 != hashlib.sha256(data[start:end]).hexdigest()
+        ):
+            raise ValueError("Dependency provenance does not match the original request.")
 
 
 def _plain_json(value: object) -> object:

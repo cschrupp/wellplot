@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from types import SimpleNamespace
 
 import pytest
@@ -13,10 +14,16 @@ from wellplot.agent.code_mode.enrichment import (
     SourceContext,
 )
 from wellplot.agent.code_mode.obligations import (
+    CanonicalRequirementSet,
     ObligationKind,
     ObligationState,
     OwnerKind,
     RepairOperation,
+    RequestDependency,
+    RequestObligation,
+    RequirementProvenance,
+    ScopeDeclaration,
+    ScopeDeclarationSet,
     compile_request_contract,
     extract_supported_anchors,
     extract_supported_obligations,
@@ -947,3 +954,223 @@ def test_correction_scope_rejects_unrelated_mutation() -> None:
 
     with pytest.raises(ValueError, match="unauthorized"):
         verify_worker_correction_scope(before, after, frozenset({"width_mm"}))
+
+
+def _dependency_fixture() -> tuple[str, tuple[RequestObligation, ...], RequestDependency]:
+    request = "Plot physical GR. Then split the GR curve fill at baseline 0."
+    digest = hashlib.sha256(request.encode()).hexdigest()
+
+    def fact(
+        owner: OwnerKind,
+        field: str,
+        value: str | float,
+        text: str,
+        start: int = 0,
+        kind: ObligationKind = ObligationKind.EXPLICIT_FIELD,
+    ) -> RequestObligation:
+        begin = request.index(text, start)
+        return RequestObligation(
+            kind=kind,
+            owner_kind=owner,
+            owner_ref="GR" if owner == OwnerKind.FILL else "request",
+            field=field,
+            value=value,
+            request_sha256=digest,
+            start_byte=begin,
+            end_byte=begin + len(text),
+            span_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            scope_key="scope.existing.request.1",
+        )
+
+    split = request.index("split")
+    predecessor = fact(OwnerKind.BINDING, "channel", "GR", "GR")
+    target = fact(OwnerKind.FILL, "target", "GR", "GR", split, ObligationKind.TARGET_REFERENCE)
+    geometry = fact(OwnerKind.FILL, "kind", "baseline_split", request[split:], split)
+    baseline = fact(OwnerKind.FILL, "baseline", 0.0, "0", split)
+    provenance = []
+    for text in ("Then", "the GR curve"):
+        begin = request.index(text)
+        provenance.append(
+            RequirementProvenance(
+                request_sha256=digest,
+                start_byte=begin,
+                end_byte=begin + len(text),
+                span_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            )
+        )
+    dependency = RequestDependency(
+        request_sha256=digest,
+        predecessor_requirement_id=predecessor.requirement_id,
+        dependent_requirement_id=target.requirement_id,
+        relation="FILL_TARGET_SATISFIED_BY",
+        provenance=tuple(provenance),
+    )
+    return request, (predecessor, target, geometry, baseline), dependency
+
+
+def _dependency_set(
+    request: str, facts: tuple[RequestObligation, ...], *dependencies: RequestDependency
+) -> CanonicalRequirementSet:
+    return CanonicalRequirementSet(
+        request_sha256=hashlib.sha256(request.encode()).hexdigest(),
+        language_version="wellplot-request-v1",
+        requirements=facts,
+        dependencies=dependencies,
+        scopes=ScopeDeclarationSet(
+            scopes=(
+                ScopeDeclaration(
+                    declaration_id="scope.existing.request.1",
+                    kind="EXISTING_SECTION",
+                    origin="HOST_CONTEXT",
+                ),
+            )
+        ),
+    )
+
+
+def test_request_dependency_original_provenance_and_roundtrip() -> None:
+    """The host coverage boundary validates an original-byte relationship."""
+    request, facts, dependency = _dependency_fixture()
+    values = _dependency_set(request, facts, dependency)
+    verify_anchor_coverage(
+        request, CanonicalRequirementSet.model_validate_json(values.model_dump_json())
+    )
+    assert CanonicalRequirementSet.model_validate_json(values.model_dump_json()) == values
+    assert not compile_request_contract("Plot physical GR.").requirements.dependencies
+    assert compile_request_contract(request).status.value == "COVERAGE_FAILURE"
+
+
+@pytest.mark.parametrize("index", range(4))
+def test_dependency_rejects_forged_fact_and_matching_pointer(index: int) -> None:
+    """Matching pointers do not legitimize forged deterministic identities."""
+    request, facts, dependency = _dependency_fixture()
+    changes = (
+        {"predecessor_requirement_id": "forged"}
+        if index == 0
+        else {"dependent_requirement_id": "forged"}
+        if index == 1
+        else {}
+    )
+    facts = tuple(
+        item.model_copy(update={"requirement_id": "forged"}) if offset == index else item
+        for offset, item in enumerate(facts)
+    )
+    with pytest.raises(ValueError, match="requirement identity"):
+        verify_anchor_coverage(
+            request, _dependency_set(request, facts, dependency.model_copy(update=changes))
+        )
+
+
+@pytest.mark.parametrize("defect", ["missing", "unknown", "duplicate", "request", "kind"])
+def test_dependency_rejects_unauthoritative_scope(defect: str) -> None:
+    """Matching fact keys cannot substitute for a legitimate declaration."""
+    request, facts, dependency = _dependency_fixture()
+    values = _dependency_set(request, facts, dependency)
+    (scope,) = values.scopes.scopes
+    variants = {
+        "missing": (),
+        "unknown": (scope.model_copy(update={"declaration_id": "unrelated"}),),
+        "duplicate": (scope, scope),
+        "request": (scope.model_copy(update={"origin": "REQUEST", "selector_text": "Invented"}),),
+        "kind": (scope.model_copy(update={"kind": "NEW_SECTION"}),),
+    }
+    values = values.model_copy(update={"scopes": ScopeDeclarationSet(scopes=variants[defect])})
+    with pytest.raises(ValueError, match="authoritative scope"):
+        verify_anchor_coverage(request, values)
+
+
+def test_dependency_relation_and_evidence_cannot_be_replaced_or_stripped() -> None:
+    """Reject runtime copies, invalid wire values and missing dependency evidence."""
+    request, facts, dependency = _dependency_fixture()
+    bad = dependency.model_copy(update={"relation": "ORDER_ONLY"})
+    values = _dependency_set(request, facts, bad)
+    with pytest.raises(ValueError):
+        verify_anchor_coverage(request, values)
+    with pytest.raises(ValueError):
+        CanonicalRequirementSet.model_validate_json(values.model_dump_json())
+    for evidence in ((), (dependency.provenance[0],), dependency.provenance[::-1]):
+        bad = dependency.model_copy(update={"provenance": evidence})
+        with pytest.raises(ValueError):
+            verify_anchor_coverage(request, _dependency_set(request, facts, bad))
+    with pytest.raises(ValueError, match="lacks supported"):
+        verify_anchor_coverage(request, _dependency_set(request, facts))
+
+
+@pytest.mark.parametrize(
+    ("index", "change"),
+    [
+        (0, {"owner_kind": OwnerKind.REPORT, "field": "title"}),
+        (1, {"owner_kind": OwnerKind.BINDING, "field": "channel"}),
+        (1, {"end_byte": 1000}),
+        (2, {"value": "fixed_baseline"}),
+        (3, {"value": 1.0}),
+        (3, {"state": ObligationState.CONFLICTING}),
+        (0, {"request_sha256": "0" * 64}),
+    ],
+)
+def test_dependency_rejects_altered_endpoint_or_geometry(
+    index: int, change: dict[str, object]
+) -> None:
+    """The trusted check rejects corrupted facts even after serialization."""
+    request, facts, dependency = _dependency_fixture()
+    mutated = (*facts[:index], facts[index].model_copy(update=change), *facts[index + 1 :])
+    values = _dependency_set(request, mutated, dependency)
+    with pytest.raises(ValueError):
+        verify_anchor_coverage(
+            request, CanonicalRequirementSet.model_validate_json(values.model_dump_json())
+        )
+
+
+@pytest.mark.parametrize(
+    "defect",
+    [
+        "unknown",
+        "duplicate",
+        "self",
+        "digest",
+        "span",
+        "scope",
+        "wrong_channel",
+        "missing_target",
+        "duplicate_fact",
+        "unresolved",
+        "missing_geometry",
+        "changed_request",
+    ],
+)
+def test_request_dependency_rejects_fabricated_authority(defect: str) -> None:
+    """The same coverage boundary fails closed for altered relationship evidence."""
+    request, facts, dependency = _dependency_fixture()
+    if defect == "unknown":
+        dependency = dependency.model_copy(update={"dependent_requirement_id": "missing"})
+    elif defect == "duplicate":
+        with pytest.raises(ValueError):
+            verify_anchor_coverage(request, _dependency_set(request, facts, dependency, dependency))
+        return
+    elif defect == "self":
+        dependency = dependency.model_copy(
+            update={"dependent_requirement_id": dependency.predecessor_requirement_id}
+        )
+    elif defect == "digest":
+        dependency = dependency.model_copy(update={"request_sha256": "0" * 64})
+    elif defect == "span":
+        provenance = dependency.provenance[0].model_copy(update={"span_sha256": "0" * 64})
+        dependency = dependency.model_copy(
+            update={"provenance": (provenance, dependency.provenance[1])}
+        )
+    elif defect == "scope":
+        facts = (facts[0], facts[1].model_copy(update={"scope_key": "different"}), *facts[2:])
+    elif defect == "wrong_channel":
+        facts = (facts[0].model_copy(update={"value": "SP"}), *facts[1:])
+    elif defect == "missing_target":
+        facts = (facts[0], *facts[2:])
+    elif defect == "duplicate_fact":
+        facts = (*facts, facts[0])
+    elif defect == "unresolved":
+        facts = (facts[0].model_copy(update={"state": ObligationState.FORBIDDEN}), *facts[1:])
+    elif defect == "missing_geometry":
+        facts = facts[:2]
+    else:
+        request = request.replace("Then", "Also")
+    with pytest.raises(ValueError):
+        verify_anchor_coverage(request, _dependency_set(request, facts, dependency))
