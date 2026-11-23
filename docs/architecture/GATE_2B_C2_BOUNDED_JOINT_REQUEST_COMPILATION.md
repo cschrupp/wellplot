@@ -1,4 +1,4 @@
-# Gate 2B-C2 — Bounded Joint Request Compilation (Revision 1)
+# Gate 2B-C2 — Bounded Joint Request Compilation (Revision 2)
 
 **Status:** Design candidate for SOL independent architectural review. No C2
 implementation or production activation is authorized by this document.
@@ -7,13 +7,16 @@ implementation or production activation is authorized by this document.
 <br>
 **C1 accepted implementation baseline:** `fe5b750d05e07585c902e61d1f39bc0b0f6e292c`
 <br>
-**Revised from:** `0ae8d57e7b8f05cd2357a92f7224c6bf654dd0ed`
+**Revised from:** `9b6d635c226df7f0e167829e51ac2656a4405f73`
 
 **SOL decisions incorporated:** retain `wellplot-request-v1`; approve optional
 excluded host-only compilation/scope fields subject to exact custody and public
 serialization parity; limit named scope to existing recognized request
 syntax; defer necessary-parent admission, dependent execution, scheduling and
-publication.
+publication; reject unmatched members of the bounded compound family before
+legacy partial extraction; retain distinct named-clause, selector and scope
+anchor provenance; fail closed before worker dispatch and again at private
+apply until a later execution gate.
 **Branch:** `design/planner-worker-responsibility-realignment`
 
 ## 1. Decision and scope
@@ -100,6 +103,50 @@ Minimum lexical limits:
   negation, exclusions, another action, conflicting values, extra punctuation,
   a different fill target, or unsupported geometry fail closed.
 
+### Compound-family candidate classifier
+
+The two productions are the only newly accepted joint forms, but failure to
+match them must not intercept unrelated requests. Use a bounded classifier
+only after the exact fullmatch attempt fails and before legacy fragment
+extraction:
+
+1. Remove quoted literals using the existing `_QUOTED_REQUEST_LITERAL_RE` so
+   quoted report text is not interpreted as an instruction.
+2. Ignore at most one leading scope prefix recognized by the existing
+   request-scope extractor. In the remaining text, require both (a) an
+   explicit physical-plot action recognized by `_EXPLICIT_PHYSICAL_PLOT_RE`
+   at a top-level start boundary and (b) a non-overlapping baseline-fill
+   action recognized by `_BASELINE_FILL_REQUEST_RE`. Top-level boundaries are
+   input edges or the existing delimiters (`.`, `!`, `?`, `;`, `,`, newline,
+   or `and`/`then`, case-insensitive). The baseline-fill action may follow
+   within the same sentence; both matches must be outside quoted literals.
+   They may appear in either order.
+3. If both markers exist, classify as a candidate of this compound family.
+   Since fullmatch has already failed, return the existing coverage rejection
+   before legacy extraction. Do not salvage the plot fact or fill fragment.
+4. If either marker is absent, this classifier does not claim the request.
+   Continue through the original compiler behavior, including its existing
+   unsupported-request guard. The classifier must not become a general
+   compound-request detector.
+
+Examples: standalone physical GR and standalone split-fill remain on their
+existing paths; an unrelated report-title request whose quoted literal
+contains “split ... curve fill at baseline” remains on the original compiler
+path. A reversed, mismatched-target, additional-action, or unsupported-geometry
+request containing both top-level markers is a compound candidate and must be
+rejected rather than partially compiled.
+
+The regression boundary is deliberately asymmetric: the candidate classifier
+is tested to claim only text containing both independently recognized,
+unquoted family markers; once claimed, a failed fullmatch must reject before
+legacy fact extraction. For example, `Set the report title to 'split the GR
+curve fill at baseline 0'.` is not a C2 candidate because its only fill
+marker is quoted, and must retain the legacy compiler result. Conversely,
+`Plot physical GR. Then split the GR curve fill at baseline 0 and delete
+resistivity.` is a C2 candidate and must return coverage failure with no
+salvaged plot or fill requirements. These cases make non-interception and
+no-partial-fallback independently observable.
+
 This is a finite command grammar inside the existing compiler, not a general
 English parser. A true full-input match plus exact coverage is important: a
 parser that extracts the two familiar fragments while ignoring a third action
@@ -172,10 +219,12 @@ Proposed changes remain in the existing path:
    apply Unicode normalization, case folding, newline rewriting, or another
    trim. Request SHA-256 and all byte spans refer to those bytes.
 2. Attempt full-input recognition against only the two productions in
-   Section 3. If neither matches, do not extract facts from fragments. Run the
-   existing unsupported curve/fill geometry rejection; reject unsupported
-   fixed-baseline forms and any unrecognized compound instruction through the
-   existing `COVERAGE_FAILURE` path, before generic fragment extraction.
+   Section 3. If neither matches, run the bounded compound-family classifier
+   from Section 3 before legacy extraction. Reject a positive candidate with
+   `COVERAGE_FAILURE` (or the existing unsupported-geometry diagnostic where
+   applicable); do not extract either fragment. For a noncandidate, continue
+   the original compiler flow and original unsupported-request guard without
+   changing unrelated behavior.
 3. For a recognized production, validate its captured geometry against the
    sole supported `baseline_split` form. Reject unsupported geometry before
    extracting facts. Then extract exactly the four facts and one dependency,
@@ -186,13 +235,23 @@ Proposed changes remain in the existing path:
    fill-target, fill-geometry and numeric-baseline. The named arm additionally
    requires both (a) one target-kind `section_scope_target` anchor extracted
    using the existing `_SECTION_TARGET_RE` and (b) one scope-kind anchor from
-   existing `_SCOPE_NAME_RE` extraction. Both must exactly match the selector span
-   and text in the independently recovered request-owned `ScopeDeclaration`
-   (ID, selector, kind, origin, exact byte span and digest). The narrowly
-   identified `section_scope_target` anchor is checked against that scope
-   declaration rather than requiring a fifth `RequestObligation`; no other
-   target anchor receives this treatment. Scope anchors are not scientific
-   requirement facts.
+   existing `_SCOPE_NAME_RE` extraction. Keep three byte ranges distinct:
+   (i) the complete clause anchor is `_SECTION_TARGET_RE`'s full match, from
+   `In` through `section` (excluding the following comma); (ii) the captured
+   selector is its `target` group, e.g. `Main Pass`; and (iii) the scope anchor
+   is the independently extracted `_SCOPE_NAME_RE` match, also exactly
+   `Main Pass`. Verify all three by slicing the original canonical UTF-8
+   request bytes: the selector and scope-anchor slices must be byte-identical,
+   and that selector slice must lie exactly within the complete clause slice.
+   Re-extract clause and selector independently, compare their text and
+   offsets, and verify the `ScopeDeclaration` ID, selector, kind, origin,
+   request digest, selector byte span and selector span digest against those
+   bytes. Do not collapse the declaration provenance to the whole clause or
+   expand it to include punctuation. The narrowly identified
+   `section_scope_target` anchor is checked against that scope declaration
+   rather than requiring a fifth `RequestObligation`; no other target anchor
+   receives this treatment. Scope anchors are not scientific requirement
+   facts.
 5. Construct the complete `CanonicalRequirementSet` with the existing
    `wellplot-request-v1` marker, `dependencies`, and original scope keys on all
    four facts. Verify request digest, fact IDs/spans, dependency endpoint
@@ -229,6 +288,47 @@ Proposed changes remain in the existing path:
    scope ID is a separate host assignment; the actual canonical section ID is
    established by the existing resolver/enrichment against the current
    document. A hint alone never establishes that canonical identity.
+
+### Production non-execution boundary
+
+The reviewed graph route is `SemanticPlanner.plan()` in `plan_node` → safety
+nodes → enrichment and semantic-publication preparation → `dispatch_workers()`
+→ `compile_worker_node()` → `merge_node()` → facade result projection. Notebook
+and MCP adapters invoke `_apply_private_authoring()` only for a successful
+session result; private reconciliation/execution and postconditions precede
+adapter persistence. Therefore C2 dependency metadata must not be allowed to
+flow through this route as executable work.
+
+Until a later separately authorized gate enables dependency-aware execution,
+the existing `plan_node` boundary must fail closed immediately after
+`SemanticPlanner.plan()` returns a fully validated/attached plan and before
+returning graph state. If its original `RequestCompilationResult` contains a
+nonempty dependency tuple, return/raise the existing typed planner failure
+with a stable `dependency_execution_not_authorized` code. The failure must
+propagate out of the graph; it must not create worker `Send`s, call
+`dispatch_workers`, merge intent, project a successful facade/session result,
+or reach either adapter's private apply. This adds a condition to an existing
+node, not a node, edge, graph, worker contract or alternate route. Empty or
+legacy dependency sets continue normally.
+
+For defense at the shared mutation boundary, `_apply_private_authoring()` must
+also reject a received host-only compilation with dependencies before
+constructing/reconciling the private authoring plan. This does not replace the
+pre-dispatch guard: it prevents any future internal bypass from mutating or
+publishing a dependency-bearing result. Both checks remain unconditionally
+closed in C2. Removing either requires a later explicit authorization; no
+configuration flag, planner output, or model-provided value may open them.
+
+Provider-free qualification stops before any production worker runs. It uses
+the real compiler, full dependency validator, planner conversion/attachment,
+and existing graph pre-dispatch boundary with a synthetic planner response
+fixture. Spies assert zero worker dispatch/compilation, zero merge, zero
+`_apply_private_authoring`, and zero persistence/render calls. Separate pure
+host-envelope tests validate exact custody and serialization parity without
+calling worker compilers or private execution. No test-only success path or
+second graph is introduced. The existing graph, workers, shared verifier and
+publication implementation remain unchanged apart from the fail-closed
+conditions above.
 
 ### Narrow dependency-validator change
 
@@ -314,11 +414,16 @@ stop rather than move authority into provider-visible task data.
 
 ## 6. Decision matrix
 
-| Input | Compiler result | Scope result | Mutation/admission result in C2 |
+| Input | Compiler result | Scope result | Execution/publication result in C2 |
 | --- | --- | --- | --- |
-| Exact anonymous reference request | Four facts + one relation; `EXTRACTION_COMPLETE` | Existing anonymous HOST_CONTEXT | None; C2 is not an execution gate. |
-| Exact supported named-section form with matching planner hint | Four facts + one relation; `EXTRACTION_COMPLETE` | One REQUEST declaration; named-arm attachment check precedes the existing fallback | None; symbolic selector, attached task scope and canonical section ID remain distinct. |
+| Exact anonymous reference request | Four facts + one relation; `EXTRACTION_COMPLETE` | Existing anonymous HOST_CONTEXT; four scientific anchors | Production graph fails closed before graph state reaches safety/enrichment/dispatch; no worker or publication. |
+| Exact supported named-section form with matching planner hint | Four facts + one relation; `EXTRACTION_COMPLETE` | One REQUEST declaration; four scientific anchors plus clause, selector and scope-anchor ranges | Same pre-dispatch rejection; symbolic selector, attached task scope and canonical section ID remain distinct. |
 | Exact supported named-section form with missing/mismatched hint | Compilation may be valid; named-arm attachment rejects before `_resolve_section_scope_ids()` can use its one-scope fallback | No attached scope | Rejected before enrichment/reconciliation; legacy fallback remains unchanged outside the new form. |
+| Failed grammar match with both physical-plot and baseline-fill family markers | Existing `COVERAGE_FAILURE`; no legacy partial extraction | No attached scope | Rejected before workers, intent merge, private apply or persistence. |
+| Failed grammar match without both compound-family markers | Original compiler/unsupported-guard behavior | Existing legacy result | Unrelated requests are not intercepted by C2. |
+| Quoted report-title text contains the fill wording, but no unquoted fill action | Original compiler result | Existing scope policy | Positive non-interception case; quoted data is not classified as C2 syntax. |
+| Both unquoted family markers plus an extra delete instruction | `COVERAGE_FAILURE`, with no partial facts | No attached scope | Negative candidate case; legacy extraction cannot salvage the two familiar fragments. |
+| Exact/dependency-free standalone or legacy request | Existing result | Existing scope policy | Existing graph/worker/adapter behavior unchanged. |
 | Existing standalone `Plot physical GR.` | Existing standalone facts, empty dependencies | Existing current scope behavior | Unchanged legacy behavior. |
 | Existing standalone `split the GR curve fill at baseline 0.` | Existing standalone fill facts, empty dependencies | Existing current scope behavior | Unchanged legacy behavior. |
 | Different target (`GR` plotted, `CGR` fill), multiple relation candidates, or a second outcome | `COVERAGE_FAILURE` | No planner assignment can repair it | Rejected before provider output can be attached. |
@@ -338,10 +443,14 @@ test.
 | --- | --- |
 | Exact anonymous reference request | Four facts, one dependency, exact spans/IDs/digests, anonymous HOST_CONTEXT; complete set verifies. |
 | Exact `In the Main Pass section, ...` request | Same facts/relation; one REQUEST scope independently derived from canonical normalized bytes; exact declaration identity, selector, origin, kind, span and request/span digests verify. |
+| Named clause/selector/scope anchor provenance | Independently slice the complete section-target clause, captured selector group, and scope extractor's anchor from the exact canonical UTF-8 request bytes. Verify each anchor's own start/end and bytes; verify selector is contained in clause and selector bytes equal scope-anchor/declaration-selector bytes. The clause range/digest must never substitute for the selector's provenance range/digest. |
 | Standalone physical GR and standalone supported split | Existing result remains identical; dependencies empty. |
 | `GR` plotted but `CGR` filled; case-changed or otherwise different mnemonic | Coverage failure; no relation. |
 | Missing plot outcome, missing fill target, missing geometry/baseline, or extra outcome | Coverage failure; never return a usable partial set. |
-| Extra delete/style/source/depth/scale instruction, negation, or second compound clause | Full-input rejection before planner/provider call. |
+| Extra delete/style/source/depth/scale instruction, negation, or second compound clause within the candidate family | Candidate classifier catches both family markers; full-input rejection before legacy extraction. |
+| Unrelated request lacking either family marker | Candidate classifier does not intercept; existing compiler path and result remain unchanged. |
+| Quoted fill phrase inside a report-title literal | Positive R5 non-interception regression; classifier removes the quoted literal and original compiler behavior is preserved. |
+| Both unquoted family markers with an extra delete/style action | Negative R5 interception regression; candidate is rejected before legacy extraction and no familiar fragment survives as an obligation. |
 | Swapped predecessor/dependent IDs; duplicate or unknown endpoint; changed relation kind | Dependency validation failure. |
 | Altered fact value, owner, field, original ID, duplicate ID, or swapped fact span | Dependency/span validation failure. |
 | Stale request digest; wrong UTF-8 byte offsets/span digest; changed `Then` or target relation span | Coverage failure, including non-ASCII prefix offsets. |
@@ -351,10 +460,16 @@ test.
 | Original dependency valid but task copies rewrite scope key/IDs | Exact lookup by original endpoint IDs, exact `model_copy` derivation of the two permitted attachment fields from the verified task scope, complete object equality, and unique `requirement_refs` check at attachment succeed; no suffix-only or mnemonic join. |
 | Missing, duplicate, altered, conditionally omitted or wrong-scope fact copy at the adapter boundary | Host-only transport rejects before reconciliation, including when the original relation remains intact. |
 | Empty, fabricated, altered or selectively omitted compilation anchors | Fresh extraction requires all four fact anchors and, for named scope, both the section-target and scope anchors matching the recovered declaration; stored anchors alone cannot establish coverage. |
-| Named section-target anchor or scope anchor independently missing, duplicated, or span-mismatched | Complete-set validation rejects; neither anchor substitutes for the other and neither becomes a fifth scientific fact. |
+| Named section-target clause anchor, captured selector, or independent scope anchor independently missing, duplicated, or span-mismatched | Complete-set validation rejects; each range is checked against original UTF-8 bytes; neither anchor substitutes for another and none becomes a fifth scientific fact. |
+| Clause, selector, or scope-anchor offsets shifted by punctuation, multibyte text, or whitespace | Independently sliced original-byte ranges disagree, or selector is not contained in the clause; scope/dependency validation rejects. |
 | Named scope hint omitted, mismatched, duplicated, or replaced by a planner-selected selector | Named-form host attachment check rejects before the generic one-scope fallback; unrelated legacy attachment behavior remains unchanged. |
 | Session input has outer whitespace, changed interior bytes, or mismatched request digest | `request.strip()` defines canonical compiler bytes; receiver recomputes the exact UTF-8 digest and rejects any mismatch. |
 | Host-only result fields accidentally enter public JSON/inspection | Serialization-parity regression fails; the optional excluded fields are not accepted until parity is demonstrated. |
+| Dependency-bearing plan reaches the existing `plan_node` return boundary | Stable `dependency_execution_not_authorized` failure before graph state is returned; worker dispatch and merge spies remain at zero. |
+| Canonical graph receives a dependency-bearing synthetic planner result | Exercise the existing graph/`plan_node` boundary; assert the typed fail-closed terminal and zero calls to worker dispatch/compilation, intent merge, adapter private apply, persistence, and render. No worker node executes. |
+| Dependency-bearing `AgentSessionResult` is injected at the shared private-apply boundary | Entry guard rejects before `AuthoringService`, reconciliation, executor, verifier, persistence or rendering. |
+| Adapter receives the planner failure | Notebook/MCP do not call `_apply_private_authoring`; persistence and render spies remain at zero. |
+| Legacy empty-dependency plan | Fail-closed dependency guard does not trigger; normal accepted path remains unchanged. |
 | Graph serialization/model validation round-trip | Full original compilation survives, then request/fact/relation/scope/anchor and copy-derivation checks run; serialization alone does not pass the trust check. |
 | No publication/mutation | C2 compile/attachment/transport qualification never invokes a worker, private execution, persistence or renderer. |
 
