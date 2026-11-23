@@ -1,4 +1,4 @@
-# Gate 2B-C2 — Bounded Joint Request Compilation
+# Gate 2B-C2 — Bounded Joint Request Compilation (Revision 1)
 
 **Status:** Design candidate for SOL independent architectural review. No C2
 implementation or production activation is authorized by this document.
@@ -6,6 +6,14 @@ implementation or production activation is authorized by this document.
 **Reviewed baseline:** `fdfb9ae346cebdcd3664502a679f7b195a350d3e`
 <br>
 **C1 accepted implementation baseline:** `fe5b750d05e07585c902e61d1f39bc0b0f6e292c`
+<br>
+**Revised from:** `0ae8d57e7b8f05cd2357a92f7224c6bf654dd0ed`
+
+**SOL decisions incorporated:** retain `wellplot-request-v1`; approve optional
+excluded host-only compilation/scope fields subject to exact custody and public
+serialization parity; limit named scope to existing recognized request
+syntax; defer necessary-parent admission, dependent execution, scheduling and
+publication.
 **Branch:** `design/planner-worker-responsibility-realignment`
 
 ## 1. Decision and scope
@@ -55,8 +63,8 @@ preserves that invariant.
 
 ## 3. Bounded grammar
 
-Accept exactly two forms, with the same single compound outcome and no trailing
-instruction:
+Accept exactly these two full-input productions, with the same single
+compound outcome and no trailing instruction:
 
 ```text
 Plot physical <MNEMONIC>. Then split the <MNEMONIC> curve fill at baseline <NUMBER>.
@@ -82,9 +90,11 @@ Minimum lexical limits:
   value is retained; no unit conversion or rounding is introduced.
 - Keywords may follow the existing case-insensitive keyword behavior. The
   physical mnemonic remains case-sensitive/exact as in C1.
-- The named form uses the existing recognized section-target syntax and must
-  produce exactly one request-derived `EXISTING_SECTION` declaration. No
-  created section, inferred title, or multiple scope is permitted.
+- The named form uses only the existing recognized request-scope syntax and
+  must independently recover exactly one request-derived
+  `EXISTING_SECTION` declaration. The example uses the existing `Main Pass`
+  scope name; this does not introduce a grammar for arbitrary section titles.
+  No created section, inferred title, or multiple scope is permitted.
 - The full request must match one form from start to end. Only bounded
   whitespace variation is allowed. Additional clauses, multiple channels,
   negation, exclusions, another action, conflicting values, extra punctuation,
@@ -156,34 +166,84 @@ remain outside C2.
 
 Proposed changes remain in the existing path:
 
-1. `compile_request_contract(request)` recognizes the exact compound form
-   before legacy fragment extraction can return partial facts. It extracts
-   facts, scope and relation through the existing canonical models.
-2. It constructs the full `CanonicalRequirementSet`, including
-   `dependencies`, before calling the existing span/dependency/anchor coverage
-   validators. The complete set—not a tuple with the dependency absent—must
-   pass `verify_anchor_coverage(request, requirement_set, anchors=...)`. The
-   independent anchor inventory must account for both clauses, baseline token
-   and (for the named arm) section target. Missing or extra anchor coverage
-   returns the existing `COVERAGE_FAILURE` path; no subset compilation is
-   returned as usable authority.
-3. `SemanticPlanner.plan()` continues to compile before provider construction
+1. Canonical compiler input is the exact string passed to
+   `compile_request_contract()` after the existing `AgentSession._compile()`
+   normalization `request.strip()`. Encode that string as strict UTF-8; do not
+   apply Unicode normalization, case folding, newline rewriting, or another
+   trim. Request SHA-256 and all byte spans refer to those bytes.
+2. Attempt full-input recognition against only the two productions in
+   Section 3. If neither matches, do not extract facts from fragments. Run the
+   existing unsupported curve/fill geometry rejection; reject unsupported
+   fixed-baseline forms and any unrecognized compound instruction through the
+   existing `COVERAGE_FAILURE` path, before generic fragment extraction.
+3. For a recognized production, validate its captured geometry against the
+   sole supported `baseline_split` form. Reject unsupported geometry before
+   extracting facts. Then extract exactly the four facts and one dependency,
+   and derive scope from existing request-scope extraction (named arm) or the
+   exact anonymous HOST_CONTEXT rule.
+4. Independently run anchor extraction over the whole canonical request. The
+   expected inventory is exactly four scientific anchors: plot-channel,
+   fill-target, fill-geometry and numeric-baseline. The named arm additionally
+   requires both (a) one target-kind `section_scope_target` anchor extracted
+   using the existing `_SECTION_TARGET_RE` and (b) one scope-kind anchor from
+   existing `_SCOPE_NAME_RE` extraction. Both must exactly match the selector span
+   and text in the independently recovered request-owned `ScopeDeclaration`
+   (ID, selector, kind, origin, exact byte span and digest). The narrowly
+   identified `section_scope_target` anchor is checked against that scope
+   declaration rather than requiring a fifth `RequestObligation`; no other
+   target anchor receives this treatment. Scope anchors are not scientific
+   requirement facts.
+5. Construct the complete `CanonicalRequirementSet` with the existing
+   `wellplot-request-v1` marker, `dependencies`, and original scope keys on all
+   four facts. Verify request digest, fact IDs/spans, dependency endpoint
+   identities and exact relation spans, then exact anchor inventory and
+   coverage. `verify_anchor_coverage()` receives the complete set, never only
+   its facts tuple. It compares freshly extracted anchors with the expected
+   field/span inventory: four fact anchors plus, for the named arm, the
+   section-target and scope anchors both tied to the independently extracted
+   declaration. Empty, fabricated, altered, duplicated or selectively omitted
+   anchors cannot establish coverage. Any failure returns the existing
+   `COVERAGE_FAILURE` path; a partial set is never usable authority.
+6. `SemanticPlanner.plan()` continues to compile before provider construction
    or generation. For accepted compound syntax it gives the unchanged planner
    wire only the ordinary request/context/capabilities; the dependency model
    is never added to provider input or schema.
-4. Before `_attach_compiled_requirements()` rewrites task-copy scope keys and
-   requirement IDs, that boundary revalidates the original request against
-   the original complete set and its independent anchors. The attachment
-   helper therefore needs the original request as an argument. It preserves
-   `RequestCompilationResult` unchanged on `SemanticPlan`; its assigned task
-   obligations remain derived copies.
-5. Existing scope binding remains authoritative. For the anonymous arm, one
+7. Before `_attach_compiled_requirements()` rewrites task-copy scope keys and
+   requirement IDs, that boundary revalidates the original normalized request
+   against the original complete set and freshly recovered anchors. The
+   helper therefore receives the canonical request as an argument. It
+   preserves `RequestCompilationResult` unchanged on `SemanticPlan`; assigned
+   task obligations are derived copies. At this attachment boundary, verify
+   every generated `requirement_refs` entry against the exact derived copy
+   ID, with one reference per original fact and no extras.
+8. Existing scope binding remains authoritative. For the anonymous arm, one
    eligible section is host-selected and ambiguity fails closed. For the named
-   arm, the planner's existing-section hint must match the request-derived
-   selector under current exact scope normalization; the existing resolver
-   then resolves it against the document and rejects absent/ambiguous targets.
-   A planner hint cannot create a declaration or override a different request
-   selector.
+   joint arm only, `_attach_compiled_requirements()` must reject unless there
+   is exactly one section task whose nonempty `existing_section_hint` matches
+   the independently recovered request selector under existing exact scope
+   normalization. This check must run before `_resolve_section_scope_ids()`:
+   its existing one-scope/one-task fallback can otherwise assign the only
+   request scope when the model omits the hint. Do not change that fallback
+   for legacy requests outside these two dependency-bearing productions. The
+   matched request selector is still only a symbolic scope; the attached task
+   scope ID is a separate host assignment; the actual canonical section ID is
+   established by the existing resolver/enrichment against the current
+   document. A hint alone never establishes that canonical identity.
+
+### Narrow dependency-validator change
+
+Section 8's prior blanket prohibition on validator changes was too broad and
+conflicted with this contract. The one authorized validator change is a narrow
+extension of the existing `_verify_request_dependencies()` in
+`obligations.py`; do not add a parallel validator. It continues to validate
+the anonymous HOST_CONTEXT arm exactly as accepted by C1 and adds only the
+named REQUEST arm for the existing recognized scope syntax. For that arm it
+independently re-extracts and compares the one declaration's ID, selector,
+`REQUEST` origin, `EXISTING_SECTION` kind, exact UTF-8 selector span, span
+SHA-256 and original request SHA-256. The validator accepts exactly the two
+complete productions in Section 3 and rejects every other dependency-bearing
+request, extra dependency, scope, fact, or relation span. Typed Pydantic
+validators and all unrelated validation rules remain unchanged.
 
 ### Internal transport to later host admission
 
@@ -198,20 +258,48 @@ The narrowest compatible transport proposal is to reuse the existing internal
 result envelopes and existing types:
 
 - Add optional host-only `RequestCompilationResult` and `ScopeBindingResult`
-  fields to `CodeModeCompileResult` and `AgentSessionResult`, marked excluded
-  from public JSON/inspection serialization like the existing inspection and
-  semantic-publication fields.
+  fields to `CodeModeCompileResult` and `AgentSessionResult`, excluded from
+  public JSON and inspection serialization like the existing inspection and
+  semantic-publication fields. Acceptance is conditional on regression tests
+  proving the existing public `model_dump(mode="json")` and inspection output
+  remain value-identical to their pre-C2 contract, with no new exposed fields.
 - Project them from the validated `SemanticPlan`; preserve the original
   compilation object, not a reconstructed dependency from task copies.
 - At the existing Notebook/MCP adapter call to `_apply_private_authoring`,
-  pass the original request string already in that adapter's call frame, the
-  original compilation, and the existing scope binding. Before reconciliation
-  or any mutation admission, re-run the exact request hash, span/dependency,
-  anchor-coverage and scope-to-bound-copy checks. Each original relation
-  endpoint must map to exactly one attached obligation copy in the one bound
-  task/scope; both endpoints must map to the same resolved section in the
-  existing inspection context. A missing, duplicate, stale, or mismatched
-  mapping rejects before reconciliation.
+  pass the exact canonical compiler input (`request.strip()` as used by
+  `AgentSession._compile()`), original compilation and existing scope binding.
+  This means trim only the leading/trailing characters removed by Python
+  `str.strip()` at the session boundary, then hash the strict UTF-8 encoding;
+  do not Unicode-normalize, case-fold, or rewrite interior bytes. At receipt,
+  independently check the exact request SHA, complete four-fact
+  set, dependency, scope declaration and freshly extracted anchors against
+  that request before reconciliation or mutation admission. Do not trust the
+  compilation's own stored anchors as the expected anchors.
+- Resolve dependency endpoint IDs only by exact lookup in the independently
+  verified original requirement set; require each ID to identify one unique
+  fact. Verify that `ScopeBindingResult` has exactly one expected, assigned
+  and task scope ID, all equal to the host-derived `_scope_id()` for the
+  recovered declaration; require exactly one attached section task with that
+  symbolic scope ID. For each exact original fact derive only the existing
+  host attachment transform:
+  `scope_key = assigned_scope_id` and
+  `requirement_id = original_id + "." + _scope_key(assigned_scope_id)`.
+  Compare the complete expected `RequestObligation` (all unchanged fields,
+  provenance and value/state plus those two exact changes) with exactly one
+  item in the returned bound obligations. `requirement_refs` are checked at
+  planner attachment against that complete derived ID, where the task is
+  available; do not claim they are transported in the session result.
+  Require exactly one copy of each of the four original facts in the one
+  matching scope, with no duplicate or wrong-scope copy. A conditionally
+  omitted fact is missing from the returned obligations and must be rejected
+  just like any other omission. Reject missing, altered, duplicated, or
+  wrong-scope copies. Require `inspection_context.sections` to contain exactly
+  one entry with `task_index == 0`; its section ID must identify exactly one
+  section in the current canonical document and match the existing resolved
+  snapshot. Both original dependency endpoints map through that same task and
+  section. Do not
+  join by mnemonic, owner text, ID suffix alone, or a relationship
+  reconstructed from attached copies.
 - The relation is carried as host-only provenance. This transport does not
   admit an operation, alter the current operation contract, authorize a
   prerequisite, or add execution order. C2 does not change
@@ -229,7 +317,8 @@ stop rather than move authority into provider-visible task data.
 | Input | Compiler result | Scope result | Mutation/admission result in C2 |
 | --- | --- | --- | --- |
 | Exact anonymous reference request | Four facts + one relation; `EXTRACTION_COMPLETE` | Existing anonymous HOST_CONTEXT | None; C2 is not an execution gate. |
-| Exact supported named-section form | Four facts + one relation; `EXTRACTION_COMPLETE` | One REQUEST declaration with exact request provenance | None; later host resolution remains existing behavior. |
+| Exact supported named-section form with matching planner hint | Four facts + one relation; `EXTRACTION_COMPLETE` | One REQUEST declaration; named-arm attachment check precedes the existing fallback | None; symbolic selector, attached task scope and canonical section ID remain distinct. |
+| Exact supported named-section form with missing/mismatched hint | Compilation may be valid; named-arm attachment rejects before `_resolve_section_scope_ids()` can use its one-scope fallback | No attached scope | Rejected before enrichment/reconciliation; legacy fallback remains unchanged outside the new form. |
 | Existing standalone `Plot physical GR.` | Existing standalone facts, empty dependencies | Existing current scope behavior | Unchanged legacy behavior. |
 | Existing standalone `split the GR curve fill at baseline 0.` | Existing standalone fill facts, empty dependencies | Existing current scope behavior | Unchanged legacy behavior. |
 | Different target (`GR` plotted, `CGR` fill), multiple relation candidates, or a second outcome | `COVERAGE_FAILURE` | No planner assignment can repair it | Rejected before provider output can be attached. |
@@ -248,7 +337,7 @@ test.
 | Test | Expected result |
 | --- | --- |
 | Exact anonymous reference request | Four facts, one dependency, exact spans/IDs/digests, anonymous HOST_CONTEXT; complete set verifies. |
-| Exact `In the Main Pass section, ...` request | Same facts/relation; one REQUEST scope derived from original bytes; selector and provenance verify. |
+| Exact `In the Main Pass section, ...` request | Same facts/relation; one REQUEST scope independently derived from canonical normalized bytes; exact declaration identity, selector, origin, kind, span and request/span digests verify. |
 | Standalone physical GR and standalone supported split | Existing result remains identical; dependencies empty. |
 | `GR` plotted but `CGR` filled; case-changed or otherwise different mnemonic | Coverage failure; no relation. |
 | Missing plot outcome, missing fill target, missing geometry/baseline, or extra outcome | Coverage failure; never return a usable partial set. |
@@ -259,9 +348,14 @@ test.
 | Anonymous declaration changed to REQUEST, selector added, or HOST_CONTEXT given invented provenance | Scope validation failure. |
 | Named scope forged, missing, duplicated, mismatched selector, wrong origin/kind, or span from a different request | Scope/coverage failure; planner hint cannot repair it. |
 | Same named selector absent or ambiguous in document | Existing host resolver rejects; no mutation admission. |
-| Original dependency valid but task copies rewrite scope key/IDs | Original set remains byte-for-byte/model-equal; unique endpoint-to-copy join succeeds only for the one exact host-assigned scope. |
-| Missing, duplicate, wrong-scope or forged task copy at the adapter boundary | Host-only relation transport rejects before reconciliation. |
-| Graph serialization/model validation round-trip | Full original compilation survives, then validators still run; serialization alone does not pass the trust check. |
+| Original dependency valid but task copies rewrite scope key/IDs | Exact lookup by original endpoint IDs, exact `model_copy` derivation of the two permitted attachment fields from the verified task scope, complete object equality, and unique `requirement_refs` check at attachment succeed; no suffix-only or mnemonic join. |
+| Missing, duplicate, altered, conditionally omitted or wrong-scope fact copy at the adapter boundary | Host-only transport rejects before reconciliation, including when the original relation remains intact. |
+| Empty, fabricated, altered or selectively omitted compilation anchors | Fresh extraction requires all four fact anchors and, for named scope, both the section-target and scope anchors matching the recovered declaration; stored anchors alone cannot establish coverage. |
+| Named section-target anchor or scope anchor independently missing, duplicated, or span-mismatched | Complete-set validation rejects; neither anchor substitutes for the other and neither becomes a fifth scientific fact. |
+| Named scope hint omitted, mismatched, duplicated, or replaced by a planner-selected selector | Named-form host attachment check rejects before the generic one-scope fallback; unrelated legacy attachment behavior remains unchanged. |
+| Session input has outer whitespace, changed interior bytes, or mismatched request digest | `request.strip()` defines canonical compiler bytes; receiver recomputes the exact UTF-8 digest and rejects any mismatch. |
+| Host-only result fields accidentally enter public JSON/inspection | Serialization-parity regression fails; the optional excluded fields are not accepted until parity is demonstrated. |
+| Graph serialization/model validation round-trip | Full original compilation survives, then request/fact/relation/scope/anchor and copy-derivation checks run; serialization alone does not pass the trust check. |
 | No publication/mutation | C2 compile/attachment/transport qualification never invokes a worker, private execution, persistence or renderer. |
 
 No test may assert that a dependency causes the compiler, planner or host to
@@ -282,10 +376,12 @@ create a parent binding. That behavior is explicitly deferred.
   expose the new field as a public or persisted contract. Any future persisted,
   cross-process, or mixed-version transport requires an explicit versioned
   migration first.
-- Do not change planner wire schema/prompts, validators, worker or operation
-  contracts, capability authority, resolver/reconciler/executor, private apply
-  semantics, persistence, shared postconditions, semantic catalog, source
-  authority, or adapters' public behavior.
+- Do not change planner wire schema/prompts, typed Pydantic validators, worker
+  or operation contracts, capability authority, resolver/reconciler/executor,
+  private-apply execution semantics, persistence, shared postconditions,
+  semantic catalog, source authority, or adapters' public behavior. The sole
+  permitted validator extension is the two-production
+  `_verify_request_dependencies()` change specified in Section 5.
 - Do not introduce general conjunction parsing, arbitrary action lists,
   expression evaluation, aliases, fuzzy channel selection, unit conversion,
   source substitution, task-order inference, dependency scheduling, retries,
@@ -293,27 +389,14 @@ create a parent binding. That behavior is explicitly deferred.
 - Do not claim the complete C1 matrix is closed. Named REQUEST support remains
   open outside this one positively qualified bounded scope form.
 
-## 9. Decisions still open for SOL
+## 9. Decisions still deferred
 
-1. **Requirement language version:** `CanonicalRequirementSet.language_version`
-   currently uses `wellplot-request-v1`. Decide whether dependency-bearing
-   sets are still v1 (additive representation of the same bounded language) or
-   require a v2 marker. This choice must align with the no-cross-version
-   serialization promise; implementation must not silently choose.
-2. **Host-only result envelope:** approve or reject the proposed excluded
-   compilation/scope fields on `CodeModeCompileResult` and
-   `AgentSessionResult`, plus passing the original request to the existing
-   `_private_apply` boundary. If rejected, identify an existing carrier that
-   preserves original request bytes, dependency, and scope without provider or
-   public serialization; do not add a parallel path.
-3. **Named REQUEST extent:** this design positively supports the compound
-   form with an already recognized explicit section selector (example: Main
-   Pass). Whether arbitrary existing-section titles and other request-scope
-   syntaxes enter the C1/C2 grammar is deferred and requires separate review.
-4. **Dependency semantics after compilation:** whether and how a later gate
-   may admit a necessary parent, map request outcomes to operations, and
-   sequence dependent work is expressly undecided and excluded here. A valid
-   compile result is not execution permission.
+Whether and how a later gate may admit a necessary parent, map request
+outcomes to operations, or sequence dependent work is expressly undecided and
+excluded here. A valid compile result is not execution permission. General
+section-title grammar and the complete C1 named-REQUEST matrix also remain
+deferred; this design uses only existing recognized request-scope syntax and
+does not claim C1 closure.
 
 ## 10. Independent-review disposition requested
 
