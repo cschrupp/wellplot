@@ -35,6 +35,10 @@ authority. No runtime changes or scientific execution are authorized here.
 
 ### S02 Draft for S03 (H1)
 
+The [S01–S02 evidence and proposed freeze](research/WELLPLOT_V2_S01_S02_H1.md)
+supersedes the preliminary cases and call-budget options below. It proposes
+one reduced-contract condition and no fresh current-contract control arm.
+
 Open question: can the same model state complete, scientifically grounded
 outcomes with less implementation bookkeeping? A09 proves deterministic
 authoring/rendering can work, not that the model understands requests.
