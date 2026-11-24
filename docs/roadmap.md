@@ -25,6 +25,9 @@ The [S03 instruction recovery and H1a package](research/WELLPLOT_V2_S03_IMPLEMEN
 defines the next single intervention. Beads children `well_log_os-bdn.4.1`
 → `well_log_os-bdn.4.2` → `well_log_os-bdn.4.3` cover instruction recovery,
 informed interpretation, and conditional scientific planning/delegation.
+H1a is independently accepted at 9/10 on the exposed panel; S03.2 is closed.
+[H1b preparation](research/WELLPLOT_V2_H1B_DESIGN.md) tests fresh scientific
+planning and delegation without executing a plan. S04 remains gated.
 H2 (S04) measures specialist action choice, not filling a predetermined DTO;
 H3 (S05) measures private completion using verified feedback. S06 decides
 KEEP, ADAPT, SIMPLIFY, REPLACE, REMOVE or DEFER. A failed hypothesis is

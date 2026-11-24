@@ -70,6 +70,35 @@ attempt, no correction or SDK retry, same thinking-off and output controls.
 No live call, scientific result, holdout execution, mutation, activation
 or merge was authorized in this implementation slice.
 
+## Accepted H1a measured closeout
+
+SOL and Human Authority accept H1a at
+`ed87f7c2d84ea57733cb51200fa1ef7a638e8e2f`, campaign
+`wellplot-v2-h1a-measured-20261124-001`. Paired ZIP SHA-256
+`29b47b5528ea61e8d3f05ec74057c248144f0b6519d957ed78e0502e712e242c`;
+authority `a309ae597f851ec12e389d757f327e1aeaf1e043183d6c5ddcb83ba1964084e1`;
+terminal `31d4e63eb4887adf587f40d1eb21fa951319ed20dca054efc956453e11f5fc0b`.
+
+Both conditions collected ten typed-valid first responses, ten logical and
+physical attempts, no corrections, retries or authoring. Only system-message
+content differed in the actual paired payloads. Scientific progression:
+**PASS, 9/10 versus H1-R1 1/10**, for this exposed panel only. H02 falsely
+asserted GR and resistivity shared one track. H01/H04 called Main Pass a track
+but preserved the uniquely grounded target and pass under the frozen scoring.
+False unavailability fell from nine to zero. No consequential substitution,
+explicit scope violation or invented destructive outcome was identified.
+
+| Verified totals | H1-R1 | H1a |
+| --- | ---: | ---: |
+| Input / cached / uncached tokens | 3,624 / 590 / 3,034 | 9,694 / 6,660 / 3,034 |
+| Output tokens | 1,387 | 561 |
+| Server prompt / generation seconds | 21.362 / 72.341 | 21.506 / 23.813 |
+
+Equal uncached input here motivates testing stable instruction prefixes and
+scoped dynamic context. It does not establish general caching equivalence,
+causal latency improvement, or fresh scientific generalization. Both
+conditions are consumed and immutable. Next: [H1b design](WELLPLOT_V2_H1B_DESIGN.md).
+
 ## Provider-free qualification
 
 Python 3.12, existing virtualenv, `PYTHONPATH=src`:
