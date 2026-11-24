@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "well_log_os",
+  "project_id": "e5d722b0-3915-49db-aafe-68318bdc65f4"
+}
