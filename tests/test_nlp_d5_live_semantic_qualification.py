@@ -480,6 +480,53 @@ def test_a10_campaign_uses_shared_runner_without_semantic_scoring(tmp_path: Path
     assert b01["first_divergence"] == "NONE"
 
 
+def test_h1_planner_fails_closed_without_observation_callback() -> None:
+    """Success without a callback must stop, and tampered inputs must never generate."""
+    from types import SimpleNamespace
+
+    from wellplot.agent.code_mode.planner import SemanticPlanner
+    from wellplot.capabilities import create_builtin_registry
+
+    class Backend:
+        calls = 0
+
+        async def generate_structured(
+            self, request: object, *, response_model: type[d5._H1ObservationResponse]
+        ) -> SimpleNamespace:
+            self.calls += 1
+            assert response_model is d5._H1ObservationResponse
+            return SimpleNamespace(
+                value=response_model.model_validate(
+                    {
+                        "outcomes": [{"disposition": "requested", "statement": "Fixture"}],
+                    }
+                )
+            )
+
+    backend = Backend()
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+    case = d5._load_planner_population(REPO_ROOT, d5.H1_POPULATION)[3]
+    options = {
+        "mode": "revise",
+        "timeout_seconds": 5,
+        "temperature": 0,
+        "max_output_tokens": 4096,
+    }
+    with pytest.raises(d5.PlannerSemanticFailure) as failure:
+        asyncio.run(planner.plan(request=case["request"], **options))
+    assert failure.value.code == "request_compilation_coverage_failure"
+    for request, fixture in (
+        (case["request"], {**case, "context": {}}),
+        ("Plot physical GR. Then split the GR curve fill at baseline 0.", case),
+    ):
+        with pytest.raises(d5.PlannerSemanticFailure):
+            asyncio.run(planner.plan(request=request, _h1_case=fixture, **options))
+    assert backend.calls == 0
+    with pytest.raises(d5._H1ObservationComplete):
+        asyncio.run(planner.plan(request=case["request"], _h1_case=case, **options))
+    assert backend.calls == 1
+
+
 def test_first_pass_authority_pins_panel_and_request_controls(tmp_path: Path) -> None:
     """Validate authorized ordered subsets and forbid wider live admission."""
     authorization = _a10_authorization(
@@ -619,8 +666,9 @@ def test_first_pass_authority_pins_panel_and_request_controls(tmp_path: Path) ->
 
 
 @pytest.mark.parametrize("interrupt", [False, True])
+@pytest.mark.parametrize("population", [d5.A10_SEM_53_POPULATION, d5.H1_POPULATION])
 def test_first_pass_campaign_captures_one_response_per_case(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, interrupt: bool
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, interrupt: bool, population: str
 ) -> None:
     """Exercise SDK serialization, local validation and actual custody through the runner."""
     from openai import _base_client
@@ -633,6 +681,20 @@ def test_first_pass_campaign_captures_one_response_per_case(
         ),
         planner_first_pass_max_output_tokens=4096,
     )
+    is_h1 = population == d5.H1_POPULATION
+    if is_h1:
+        authorization = replace(
+            authorization,
+            planner_population=population,
+            planner_population_benchmark_sha256=d5.H1_PANEL_SHA256,
+            planner_population_source_inventory_sha256=d5.H1_PANEL_SHA256,
+            planner_first_pass_turn_ids=d5.H1_TURN_IDS,
+            planner_smoke_wire_schema_sha256=d5._sha256_json(
+                d5._H1ObservationResponse.model_json_schema()
+            ),
+        )
+        with pytest.raises(d5.D5StaticPreflightError):
+            d5._select_first_pass_turns(authorization, population, "planner_only", ("H04",))
     paths = _paths(tmp_path, authorization.campaign_id)
     clients = []
     requests = []
@@ -643,6 +705,8 @@ def test_first_pass_campaign_captures_one_response_per_case(
         if interrupt and len(requests) == 2:
             raise httpx.ReadTimeout("provider-free interruption", request=request)
         response = _planner_wire_payload()
+        if is_h1:
+            response = {"outcomes": [{"disposition": "requested", "statement": "Test fixture"}]}
         if len(requests) == 1:
             response = {"version": "wellplot.semantic-plan.v2", "summary": "Invalid fixture."}
         return httpx.Response(
@@ -695,7 +759,7 @@ def test_first_pass_campaign_captures_one_response_per_case(
             ),
             api_key_loader=lambda: "provider-free-test-token",
             static_checker=lambda repo, auth, paths: {"status": "PASS"},
-            population=d5.A10_SEM_53_POPULATION,
+            population=population,
             mode="planner_only",
         )
     finally:
@@ -712,7 +776,8 @@ def test_first_pass_campaign_captures_one_response_per_case(
     assert all("max_completion_tokens" not in payload for payload in requests)
     assert all(
         payload["messages"][1]["content"].startswith("USER REQUEST:\n")
-        and "\n\nPERMITTED CAPABILITIES:\n" in payload["messages"][1]["content"]
+        and ("\n\nINSPECTED CONTEXT:\n" if is_h1 else "\n\nPERMITTED CAPABILITIES:\n")
+        in payload["messages"][1]["content"]
         for payload in requests
     )
     assert all(
@@ -723,7 +788,8 @@ def test_first_pass_campaign_captures_one_response_per_case(
     assert rows[0]["observation_status"] == "MODEL_STRUCTURAL_FAILURE"
     assert all(row["correction_usage"]["native_correction"] == 0 for row in rows)
     assert all(row["authoring_status"] == "NOT_REACHED" for row in rows)
-    assert [row["turn_id"] for row in rows] == list(d5.A10_FIRST_PASS_TURN_IDS[: len(rows)])
+    expected_ids = d5.H1_TURN_IDS if is_h1 else d5.A10_FIRST_PASS_TURN_IDS
+    assert [row["turn_id"] for row in rows] == list(expected_ids[: len(rows)])
     if interrupt:
         assert result["decision"] == "INCONCLUSIVE"
         assert result["attribution"] == "PROVIDER_OR_TRANSPORT_RUNTIME"
@@ -732,6 +798,36 @@ def test_first_pass_campaign_captures_one_response_per_case(
         assert result["decision"] == "PASS"
         assert len(rows) == 10
         assert all(row["schema_valid"] for row in rows[1:])
+        if is_h1:
+            contexts = [
+                json.loads(payload["messages"][1]["content"].split("INSPECTED CONTEXT:\n")[1])
+                for payload in requests
+            ]
+            assert contexts[7]["sources"][0]["inventory_complete"]
+            assert len(contexts[7]["sources"][0]["channels"]) == 4
+            assert contexts[8]["equally_eligible_sources"] == ["Survey A", "Survey B"]
+            assert contexts[8]["source_preference"] is None
+            assert len(contexts[8]["sources"]) == 2
+            assert [
+                row["turn_id"] for row in rows if row["compiler_status"] == "COVERAGE_FAILURE"
+            ] == [
+                "H04",
+                "H05",
+                "H07",
+            ]
+            assert all(payload["temperature"] == 0 for payload in requests)
+            assert all(
+                payload["response_format"]["json_schema"]["schema"]
+                == d5._H1ObservationResponse.model_json_schema()
+                for payload in requests
+            )
+            trace_rows = [json.loads(line) for line in paths.stage_trace.read_text().splitlines()]
+            assert [
+                row["turn_id"]
+                for row in trace_rows
+                if row["event"] == "REQUEST_COMPILATION_PASS"
+                and row["result"]["status"] == "COVERAGE_FAILURE"
+            ] == ["H04", "H05", "H07"]
     assert "PLANNER_GENERATION_FAIL" in paths.stage_trace.read_text(encoding="utf-8")
     assert "WIRE_TO_CANONICAL_ENTER" not in paths.stage_trace.read_text(encoding="utf-8")
     model_io = [json.loads(line) for line in paths.model_io.read_text().splitlines()]

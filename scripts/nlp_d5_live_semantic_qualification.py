@@ -43,7 +43,11 @@ from wellplot.agent.code_mode.obligations import (
     RequestCompilationResult,
     compile_request_contract,
 )
-from wellplot.agent.code_mode.planner import PlannerSemanticFailure
+from wellplot.agent.code_mode.planner import (
+    PlannerSemanticFailure,
+    _H1ObservationComplete,
+    _H1ObservationResponse,
+)
 from wellplot.agent.providers.base import (
     ProviderFailureCategory,
     ProviderRequestError,
@@ -97,6 +101,11 @@ A10_SEM_01_ROOT = "workspace/evaluations/a10-sem-01-20261110"
 A10_SEM_01_BENCHMARK = f"{A10_SEM_01_ROOT}/benchmark.json"
 A10_SEM_01_SOURCE_INVENTORY = f"{A10_SEM_01_ROOT}/source-inventory.json"
 A10_SEM_53_POPULATION = "a10-53"
+H1_POPULATION = "h1-development"
+H1_PANEL_PATH = "docs/research/WELLPLOT_V2_H1_PANEL.json"
+H1_PANEL_SHA256 = "967b3f670e4d5763b8aaa37cdbf9805ef76a8e7f831ea5106567895126391402"
+H1_TURN_IDS = tuple(f"H{index:02d}" for index in range(1, 11))
+PLANNER_POPULATIONS = (A10_SEM_53_POPULATION, H1_POPULATION)
 A10_SEM_53_BENCHMARK_SHA256 = "595839779e9ca59d9ce8ff20cbbdaf006ad41138b4510acc0ea26733e080067a"
 A10_SEM_53_SOURCE_INVENTORY_SHA256 = (
     "21f11462696af7a9f1d9b18d625a6a311794912b9ef10a70106f0267e83c19b0"
@@ -122,6 +131,10 @@ A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN = (
     " M examples/notebooks/user/agent_las_step_by_step.ipynb\n"
     "?? examples/families/FamiliesList.json\n"
     "?? examples/families/FamilyAssignment.json\n"
+)
+H1_EXPECTED_WORKTREE_PORCELAIN = (
+    " M docs/architecture/PLANNER_WORKER_RESPONSIBILITY_REALIGNMENT_DESIGN.md\n"
+    + A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN
 )
 SMOKE_BINDING_REQUEST = (
     "In the Main Log section, add two normal tracks while preserving the existing tracks.\n"
@@ -603,11 +616,21 @@ class D5Authorization:
         if cap is not None and (
             type(cap) is not int
             or cap != A10_FIRST_PASS_MAX_OUTPUT_TOKENS
-            or self.planner_population != A10_SEM_53_POPULATION
+            or self.planner_population not in PLANNER_POPULATIONS
             or self.sdk_max_retries != 0
         ):
             raise D5StaticPreflightError("invalid A10 first-pass authority")
-        if self.planner_first_pass_turn_ids is not None:
+        if self.planner_population == H1_POPULATION:
+            if (
+                cap is None
+                or self.planner_first_pass_turn_ids != H1_TURN_IDS
+                or self.planner_population_benchmark_sha256 != H1_PANEL_SHA256
+                or self.planner_population_source_inventory_sha256 != H1_PANEL_SHA256
+                or self.planner_smoke_wire_schema_sha256
+                != _sha256_json(_H1ObservationResponse.model_json_schema())
+            ):
+                raise D5StaticPreflightError("invalid frozen H1 observation authority")
+        elif self.planner_first_pass_turn_ids is not None:
             selected = self.planner_first_pass_turn_ids
             if (
                 cap is None
@@ -737,6 +760,14 @@ def _select_first_pass_turns(
     turn_ids: Sequence[str] | None,
 ) -> Sequence[str] | None:
     """Constrain the opt-in first-pass authority to the exposed development panel."""
+    if population == H1_POPULATION or authorization.planner_population == H1_POPULATION:
+        if (
+            population != authorization.planner_population
+            or mode != "planner_only"
+            or (turn_ids is not None and tuple(turn_ids) != H1_TURN_IDS)
+        ):
+            raise D5StaticPreflightError("H1 requires the complete authorized planner-only panel")
+        return H1_TURN_IDS
     if authorization.planner_first_pass_max_output_tokens is None:
         return turn_ids
     if population != A10_SEM_53_POPULATION or mode != "planner_only":
@@ -1053,6 +1084,12 @@ def _default_smoke_static_checks(
     elif mode == "canonical_schema_behavior_probe":
         if _git_porcelain_raw(repo_root) != expected_worktree_porcelain:
             raise D5StaticPreflightError("working tree differs from schema-probe authorization")
+    elif mode == "h1_planner_observation":
+        if (
+            expected_worktree_porcelain != H1_EXPECTED_WORKTREE_PORCELAIN
+            or _git_porcelain_raw(repo_root) != expected_worktree_porcelain
+        ):
+            raise D5StaticPreflightError("H1 worktree differs from the reviewed allowlist")
     else:
         _require_exact_planner_worktree(repo_root, expected_worktree_porcelain)
     project_config = load_project_config(repo_root)
@@ -1084,6 +1121,7 @@ def _default_smoke_static_checks(
     expected_mode_schema = {
         "canonical_live_smoke": SMOKE_SCHEMA_SHA256,
         "canonical_planner_only_smoke": _planner_wire_schema_sha256(),
+        "h1_planner_observation": _sha256_json(_H1ObservationResponse.model_json_schema()),
         "canonical_schema_behavior_probe": _schema_probe_bundle_sha256(),
     }.get(mode)
     if expected_mode_schema is None or expected_schema_sha256 != expected_mode_schema:
@@ -1283,6 +1321,17 @@ def _planner_smoke_case(
         "sdk_max_retries": authorization.planner_smoke_sdk_max_retries,
         "physical_attempt_limit": SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS,
     }
+
+
+def _load_planner_population(repo_root: Path, population: str) -> list[dict[str, Any]]:
+    if population == H1_POPULATION:
+        path = repo_root / H1_PANEL_PATH
+        _assert_hash(path, H1_PANEL_SHA256, "H1 request and inspection panel")
+        cases = json.loads(path.read_text(encoding="utf-8"))
+        if tuple(case["turn_id"] for case in cases) != H1_TURN_IDS:
+            raise D5StaticPreflightError("H1 panel order drifted")
+        return cases
+    return _load_a10_planner_population(repo_root)
 
 
 def _load_a10_planner_population(repo_root: Path) -> list[dict[str, Any]]:
@@ -4410,7 +4459,25 @@ class _ObservedLiveAdapter:
 
     async def execute_planner_case(self, case: Mapping[str, Any]) -> Mapping[str, Any]:
         """Observe one planner-only case through the canonical SemanticPlanner."""
-        context = _build_planner_smoke_inputs(self.inner.repo_root, case)
+        is_h1 = str(case["turn_id"]) in H1_TURN_IDS
+        if is_h1:
+            frozen = _load_planner_population(self.inner.repo_root, H1_POPULATION)
+            if self.planner_first_pass_max_output_tokens != 4096 or case not in frozen:
+                raise D5HarnessError("H1 observation case custody drifted")
+            context = {
+                "document_summary": {},
+                "source_summary": {},
+                "source_asset_identity": {
+                    "kind": "synthetic_inspection",
+                    "context_sha256": _sha256_json(case["context"]),
+                },
+                "source_channel_count": sum(
+                    len(source["channels"]) for source in case["context"]["sources"]
+                ),
+                "numeric_sample_apis_invoked": False,
+            }
+        else:
+            context = _build_planner_smoke_inputs(self.inner.repo_root, case)
         session = self.inner.session.session
         planner = session.compiler.dependencies.planner
         from wellplot.agent.code_mode.planner import SemanticPlanner
@@ -4431,12 +4498,15 @@ class _ObservedLiveAdapter:
                 current_document_summary=context["document_summary"],
                 source_summary=context["source_summary"],
                 timeout_seconds=session.config.timeout_seconds,
-                temperature=session.config.planner_temperature,
+                temperature=0 if is_h1 else session.config.planner_temperature,
                 max_output_tokens=(
                     self.planner_first_pass_max_output_tokens or session.config.max_output_tokens
                 ),
+                **({"_h1_case": case} if is_h1 else {}),
             )
-        except _PlannerOnlyWireCaptured:
+            if is_h1:
+                raise D5HarnessError("H1 planner unexpectedly returned an executable result")
+        except (_PlannerOnlyWireCaptured, _H1ObservationComplete):
             return {
                 "observation_status": "SCHEMA_VALID_WIRE_CAPTURED",
                 "schema_valid": True,
@@ -4684,8 +4754,8 @@ def execute_live_campaign(
     population: str = "d4",
 ) -> dict[str, Any]:
     """Run selected frozen turns after static/readiness interlocks."""
-    if population == A10_SEM_53_POPULATION and mode != "planner_only":
-        raise D5StaticPreflightError("A10 population requires planner-only campaign mode")
+    if population in PLANNER_POPULATIONS and mode != "planner_only":
+        raise D5StaticPreflightError("Planner population requires planner-only campaign mode")
     turn_ids = _select_first_pass_turns(authorization, population, mode, turn_ids)
     first_pass_cap = authorization.planner_first_pass_max_output_tokens
     if artifact_root.resolve() != _authorized_artifact_root(repo_root, authorization):
@@ -4695,12 +4765,12 @@ def execute_live_campaign(
     if authorization.project_config_fingerprint_sha256 != project_config.fingerprint_sha256:
         raise D5StaticPreflightError("project configuration fingerprint mismatch")
     campaign_logical_call_ceiling: int | None = None
-    if population == A10_SEM_53_POPULATION and mode == "planner_only":
-        a10_cases = _load_a10_planner_population(repo_root)
+    if population in PLANNER_POPULATIONS and mode == "planner_only":
+        planner_cases = _load_planner_population(repo_root, population)
         selected_turns = (
             tuple(turn_ids)
             if turn_ids is not None
-            else tuple(str(case["turn_id"]) for case in a10_cases)
+            else tuple(str(case["turn_id"]) for case in planner_cases)
         )
         if selected_turns:
             calls_per_case = 1 if first_pass_cap is not None else MAX_PLANNER_LOGICAL_CALLS
@@ -6187,16 +6257,22 @@ def _bounded_planner_observation_row(
     source_identity = actual.get("source_asset_identity")
     if not isinstance(source_identity, Mapping):
         source_identity = {}
+    is_h1 = case["turn_id"] in H1_TURN_IDS
     return {
         "experiment_version": D5_EXPERIMENT_VERSION,
-        "case_id": case["case_id"],
+        "case_id": case["turn_id"] if is_h1 else case["case_id"],
         "turn_id": case["turn_id"],
         "execution_index": execution_index,
-        "request_sha256": case["request_sha256"],
-        "source_key": case["source_key"],
-        "source_path": case["source_path"],
-        "source_format": case["source_format"],
-        "source_sha256": case["source_sha256"],
+        "request_sha256": (
+            hashlib.sha256(case["request"].encode()).hexdigest()
+            if is_h1
+            else case["request_sha256"]
+        ),
+        "source_key": None if is_h1 else case["source_key"],
+        "source_path": None if is_h1 else case["source_path"],
+        "source_format": None if is_h1 else case["source_format"],
+        "source_sha256": None if is_h1 else case["source_sha256"],
+        **({"compiler_status": case["compiler_status"]} if is_h1 else {}),
         "source_asset_identity": dict(source_identity),
         "benchmark_class": case.get("benchmark_class"),
         "benchmark_exposure": case.get("benchmark_exposure"),
@@ -6725,10 +6801,10 @@ class D5CampaignRunner:
             cases, gold_payload = final_population.load_final_population(self.repo_root)
             gold_cases = {item["turn_id"]: item for item in gold_payload["cases"]}
             population_ids = final_population.FINAL_TURN_IDS
-        elif population == A10_SEM_53_POPULATION:
+        elif population in PLANNER_POPULATIONS:
             if mode != "planner_only":
                 raise D5StaticPreflightError("A10 population requires planner-only mode")
-            cases = _load_a10_planner_population(self.repo_root)
+            cases = _load_planner_population(self.repo_root, population)
             gold_cases = {item["turn_id"]: item for item in cases}
             population_ids = tuple(item["turn_id"] for item in cases)
         else:
@@ -7058,6 +7134,9 @@ def provider_free_preflight(
         raise D5StaticPreflightError("project configuration fingerprint mismatch")
     if population == "final":
         final_population.load_final_population(repo_root)
+    elif population == H1_POPULATION:
+        cases = _load_planner_population(repo_root, population)
+        role_limits = {"planner": 1, "report_worker": 0, "section_worker": 0}
     elif population == A10_SEM_53_POPULATION:
         if (
             authorization.planner_population != A10_SEM_53_POPULATION
@@ -7081,7 +7160,18 @@ def provider_free_preflight(
         if population == A10_SEM_53_POPULATION
         else _default_static_checks
     )
-    facts = checker(repo_root, authorization, paths)
+    if population == H1_POPULATION and static_checker is None:
+        facts = _default_smoke_static_checks(
+            repo_root,
+            authorization,
+            paths,
+            expected_worktree_porcelain=authorization.expected_worktree_porcelain or None,
+            expected_schema_sha256=_sha256_json(_H1ObservationResponse.model_json_schema()),
+            mode="h1_planner_observation",
+            expected_sdk_max_retries=0,
+        )
+    else:
+        facts = checker(repo_root, authorization, paths)
     if facts.get("status") != "PASS":
         raise D5StaticPreflightError("provider-free static preflight failed")
     static_facts = dict(facts)
@@ -7113,20 +7203,26 @@ def provider_free_preflight(
                 else [case["turn_id"] for case in cases]
             ),
             "benchmark_sha256": (
-                A10_SEM_53_BENCHMARK_SHA256 if population == A10_SEM_53_POPULATION else None
+                H1_PANEL_SHA256
+                if population == H1_POPULATION
+                else A10_SEM_53_BENCHMARK_SHA256
+                if population == A10_SEM_53_POPULATION
+                else None
             ),
             "source_inventory_sha256": (
-                A10_SEM_53_SOURCE_INVENTORY_SHA256 if population == A10_SEM_53_POPULATION else None
+                H1_PANEL_SHA256
+                if population == H1_POPULATION
+                else A10_SEM_53_SOURCE_INVENTORY_SHA256
+                if population == A10_SEM_53_POPULATION
+                else None
             ),
         },
         "logical_call_ceiling": (
-            len(cases) * calls_per_case
-            if population == A10_SEM_53_POPULATION
-            else MAX_LOGICAL_CALLS
+            len(cases) * calls_per_case if population in PLANNER_POPULATIONS else MAX_LOGICAL_CALLS
         ),
         "physical_attempt_upper_bound": (
             len(cases) * calls_per_case * (1 + authorization.sdk_max_retries)
-            if population == A10_SEM_53_POPULATION
+            if population in PLANNER_POPULATIONS
             else MAX_PHYSICAL_ATTEMPTS
         ),
         "role_logical_call_limits": role_limits,
@@ -7176,7 +7272,7 @@ def main() -> int:
     modes.add_argument("--execute-live", action="store_true")
     parser.add_argument(
         "--population",
-        choices=("d4", "final", A10_SEM_53_POPULATION),
+        choices=("d4", "final", *PLANNER_POPULATIONS),
         default="d4",
     )
     parser.add_argument("--artifact-root", type=Path)
@@ -7237,7 +7333,7 @@ def main() -> int:
                 authorization=authorization,
                 artifact_root=artifact_root,
                 population=args.population,
-                mode=("planner_only" if args.population == A10_SEM_53_POPULATION else "scientific"),
+                mode=("planner_only" if args.population in PLANNER_POPULATIONS else "scientific"),
             )
         except D5ReadinessError as error:
             print(json.dumps(_readiness_failure_result(error), indent=2, sort_keys=True))

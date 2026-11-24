@@ -36,7 +36,7 @@ from wellplot.agent.code_mode.canonical_workers import (
 from wellplot.agent.code_mode.canonical_workers import (
     SectionSemanticActionResponse as DeliverySectionResponse,
 )
-from wellplot.agent.code_mode.planner import SemanticPlan, _PlannerWirePlan
+from wellplot.agent.code_mode.planner import SemanticPlan, _H1ObservationResponse, _PlannerWirePlan
 from wellplot.agent.code_mode.typed_section_worker import _ACTION_RESPONSE_MODELS
 from wellplot.agent.direct_notebook import DirectNotebookSession
 from wellplot.agent.providers.base import (
@@ -340,6 +340,7 @@ class CountingBackend:
         roles = {
             SemanticPlan: "planner",
             _PlannerWirePlan: "planner",
+            _H1ObservationResponse: "planner",
             DeliveryReportResponse: "report_worker",
             DeliverySectionResponse: "section_worker",
         }

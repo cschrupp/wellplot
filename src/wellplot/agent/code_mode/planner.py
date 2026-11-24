@@ -6,6 +6,7 @@ import json
 import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from hashlib import sha256
 from typing import Literal
 
 from pydantic import (
@@ -348,6 +349,45 @@ class _PlannerWireSectionTask(_SemanticModel):
         ):
             raise ValueError("Scalar intent cannot carry operation bookkeeping.")
         return self
+
+
+class _H1Outcome(_SemanticModel):
+    disposition: Literal["requested", "already_satisfied", "unavailable", "needs_clarification"]
+    statement: str = Field(min_length=1)
+    qualifiers: tuple[str, ...] = ()
+
+
+class _H1ObservationResponse(_SemanticModel):
+    """Non-executable response for the frozen H1 development panel."""
+
+    outcomes: tuple[_H1Outcome, ...] = Field(min_length=1)
+
+
+class _H1ObservationComplete(Exception):
+    """Stop even if no observation callback interrupts generation."""
+
+
+_H1_CASE_DIGESTS = frozenset(
+    (
+        "8fcb32ecfbabce35793fa5a55efeb75052c77d49ff764e4bffd46691cb2aa634",
+        "13f4ab3a3edae650cd8e6d2fd78fad55127176f3aeceae541005d3b4eb60d953",
+        "e4dd567c70cf0578775f1fcd1a65c297de48f1bfac53704b169a81b87705aeb4",
+        "6ccc28f191289fa74911d4fd84081f7f7d03682b30608fef3ed1240737781545",
+        "ee41fad07474b437b8e3cea8c01f3c4908974e22ac4e0203850a668bc01ea38a",
+        "733f8ec693d760ceb218312533a43c678e89ce4857f01f4efe6024f2bca604df",
+        "82dde92813db2c9714d352a3e42f18323f39e7d87d07ffd22fef33089bf06f0d",
+        "e68a3cad8522d3c6fdf6c80ba844a8168e7d51502ac75a99ac08f476abb5c6e9",
+        "cd2a26c1b4987dd4df5b34f058833fc64164a641b4d8185bd21945b6fcdd3b39",
+        "85db63e871637aa397e636b8930c7907bca5c5724e98873128f2effb36925e15",
+    )
+)
+_H1_SYSTEM_PROMPT = (
+    "Describe the requested scientific outcomes using only the request and supplied inspection. "
+    "Preserve physical versus semantic channel clues, sources, scope, quantities, "
+    "units and restrictions. Report unavailable or ambiguous work without substitution; "
+    "ask for consequential clarification. "
+    "Do not produce implementation steps, operation IDs or prerequisites."
+)
 
 
 class _PlannerWirePlan(_SemanticModel):
@@ -898,6 +938,7 @@ class SemanticPlanner:
         timeout_seconds: float,
         temperature: float | None = None,
         max_output_tokens: int | None = None,
+        _h1_case: Mapping[str, object] | None = None,
     ) -> SemanticPlan:
         """Make at most two bounded structured calls for a semantic plan."""
         if not isinstance(request, str) or not request.strip():
@@ -909,7 +950,25 @@ class SemanticPlanner:
             "REQUEST_COMPILATION_PASS",
             result=compilation.model_dump(mode="json"),
         )
-        if compilation.status in {
+        if _h1_case is not None:
+            digest = sha256(
+                json.dumps(
+                    _h1_case, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+                ).encode()
+            ).hexdigest()
+            if (
+                digest not in _H1_CASE_DIGESTS
+                or request != _h1_case["request"]
+                or compilation.status.value != _h1_case["compiler_status"]
+                or compilation.requirements.dependencies
+                or is_c2_request(request)
+                or temperature != 0
+                or max_output_tokens != 4096
+            ):
+                raise PlannerSemanticFailure(
+                    "h1_observation_custody_mismatch", "Invalid H1 observation."
+                )
+        elif compilation.status in {
             RequestCompilationStatus.CONFLICTING,
             RequestCompilationStatus.UNRESOLVED_SUPPORTED,
             RequestCompilationStatus.COVERAGE_FAILURE,
@@ -937,9 +996,15 @@ class SemanticPlanner:
             "source_summary": _safe_source_summary(source_summary),
             "capabilities": _planning_catalog(self.registry),
         }
-        self._trace("PLANNER_CONTEXT", context=context)
+        self._trace(
+            "PLANNER_CONTEXT",
+            context=context
+            if _h1_case is None
+            else {"request": request, "inspection": _h1_case["context"]},
+        )
         invalid_response_retry_used = False
         wire_attempt = 1
+        response_model = _PlannerWirePlan if _h1_case is None else _H1ObservationResponse
 
         async def generate(
             request_value: StructuredGenerationRequest,
@@ -949,12 +1014,12 @@ class SemanticPlanner:
             self._trace(
                 "PLANNER_GENERATION_ENTER",
                 attempt=attempt,
-                response_schema="_PlannerWirePlan",
+                response_schema=response_model.__name__,
             )
             try:
                 response = await self.backend.generate_structured(
                     request_value,
-                    response_model=_PlannerWirePlan,
+                    response_model=response_model,
                 )
             except ProviderRequestError as error:
                 self._trace(
@@ -966,10 +1031,26 @@ class SemanticPlanner:
             self._trace(
                 "PLANNER_GENERATION_PASS",
                 attempt=attempt,
-                response_schema="_PlannerWirePlan",
+                response_schema=response_model.__name__,
                 validated_response=response.value.model_dump(mode="json"),
             )
             return response
+
+        if _h1_case is not None:
+            await generate(
+                StructuredGenerationRequest(
+                    system_prompt=_H1_SYSTEM_PROMPT,
+                    user_prompt=(
+                        f"USER REQUEST:\n{request}\n\nINSPECTED CONTEXT:\n"
+                        + json.dumps(_h1_case["context"], sort_keys=True, ensure_ascii=False)
+                    ),
+                    timeout_seconds=timeout_seconds,
+                    temperature=temperature,
+                    max_output_tokens=max_output_tokens,
+                ),
+                attempt=1,
+            )
+            raise _H1ObservationComplete
 
         try:
             generated = await generate(

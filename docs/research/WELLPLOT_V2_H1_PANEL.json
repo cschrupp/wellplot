@@ -1,0 +1,699 @@
+[
+  {
+    "turn_id": "H01",
+    "request": "Could you show the gamma-ray measurement?",
+    "compiler_status": "NO_SUPPORTED_SEMANTICS",
+    "context": {
+      "synthetic_inspection": true,
+      "document": {
+        "title": "Survey",
+        "subtitle": "Initial",
+        "sections": [
+          {
+            "title": "Main Pass",
+            "tracks": [
+              {
+                "label": "GR",
+                "curve": "GR",
+                "mnemonic": "GR",
+                "source": "Survey A"
+              },
+              {
+                "label": "Resistivity",
+                "curve": "Resistivity",
+                "mnemonic": "RT",
+                "source": "Survey A"
+              }
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "label": "Survey A",
+          "inspection_state": "inspected",
+          "inventory_complete": true,
+          "channels": [
+            {
+              "mnemonic": "GR",
+              "unit": "gAPI",
+              "measurement": "Gamma Ray",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RT",
+              "unit": "ohm.m",
+              "measurement": "Resistivity",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RHOB",
+              "unit": "g/cm3",
+              "measurement": "Density",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "NPHI",
+              "unit": "v/v",
+              "measurement": "Neutron Porosity",
+              "kind": "scalar",
+              "addressable": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "turn_id": "H02",
+    "request": "Show physical GR alongside the resistivity measurement.",
+    "compiler_status": "NO_SUPPORTED_SEMANTICS",
+    "context": {
+      "synthetic_inspection": true,
+      "document": {
+        "title": "Survey",
+        "subtitle": "Initial",
+        "sections": [
+          {
+            "title": "Main Pass",
+            "tracks": [
+              {
+                "label": "GR",
+                "curve": "GR",
+                "mnemonic": "GR",
+                "source": "Survey A"
+              },
+              {
+                "label": "Resistivity",
+                "curve": "Resistivity",
+                "mnemonic": "RT",
+                "source": "Survey A"
+              }
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "label": "Survey A",
+          "inspection_state": "inspected",
+          "inventory_complete": true,
+          "channels": [
+            {
+              "mnemonic": "GR",
+              "unit": "gAPI",
+              "measurement": "Gamma Ray",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RT",
+              "unit": "ohm.m",
+              "measurement": "Resistivity",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RHOB",
+              "unit": "g/cm3",
+              "measurement": "Density",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "NPHI",
+              "unit": "v/v",
+              "measurement": "Neutron Porosity",
+              "kind": "scalar",
+              "addressable": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "turn_id": "H03",
+    "request": "Put the density and neutron porosity curves in the same track.",
+    "compiler_status": "NO_SUPPORTED_SEMANTICS",
+    "context": {
+      "synthetic_inspection": true,
+      "document": {
+        "title": "Survey",
+        "subtitle": "Initial",
+        "sections": [
+          {
+            "title": "Main Pass",
+            "tracks": [
+              {
+                "label": "GR",
+                "curve": "GR",
+                "mnemonic": "GR",
+                "source": "Survey A"
+              },
+              {
+                "label": "Resistivity",
+                "curve": "Resistivity",
+                "mnemonic": "RT",
+                "source": "Survey A"
+              }
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "label": "Survey A",
+          "inspection_state": "inspected",
+          "inventory_complete": true,
+          "channels": [
+            {
+              "mnemonic": "GR",
+              "unit": "gAPI",
+              "measurement": "Gamma Ray",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RT",
+              "unit": "ohm.m",
+              "measurement": "Resistivity",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RHOB",
+              "unit": "g/cm3",
+              "measurement": "Density",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "NPHI",
+              "unit": "v/v",
+              "measurement": "Neutron Porosity",
+              "kind": "scalar",
+              "addressable": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "turn_id": "H04",
+    "request": "Split the fill of the existing physical GR curve at a baseline of 0 gAPI.",
+    "compiler_status": "COVERAGE_FAILURE",
+    "context": {
+      "synthetic_inspection": true,
+      "document": {
+        "title": "Survey",
+        "subtitle": "Initial",
+        "sections": [
+          {
+            "title": "Main Pass",
+            "tracks": [
+              {
+                "label": "GR",
+                "curve": "GR",
+                "mnemonic": "GR",
+                "source": "Survey A"
+              },
+              {
+                "label": "Resistivity",
+                "curve": "Resistivity",
+                "mnemonic": "RT",
+                "source": "Survey A"
+              }
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "label": "Survey A",
+          "inspection_state": "inspected",
+          "inventory_complete": true,
+          "channels": [
+            {
+              "mnemonic": "GR",
+              "unit": "gAPI",
+              "measurement": "Gamma Ray",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RT",
+              "unit": "ohm.m",
+              "measurement": "Resistivity",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RHOB",
+              "unit": "g/cm3",
+              "measurement": "Density",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "NPHI",
+              "unit": "v/v",
+              "measurement": "Neutron Porosity",
+              "kind": "scalar",
+              "addressable": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "turn_id": "H05",
+    "request": "Use a logarithmic scale from 0.2 to 2000 ohm.m on the resistivity curve.",
+    "compiler_status": "COVERAGE_FAILURE",
+    "context": {
+      "synthetic_inspection": true,
+      "document": {
+        "title": "Survey",
+        "subtitle": "Initial",
+        "sections": [
+          {
+            "title": "Main Pass",
+            "tracks": [
+              {
+                "label": "GR",
+                "curve": "GR",
+                "mnemonic": "GR",
+                "source": "Survey A"
+              },
+              {
+                "label": "Resistivity",
+                "curve": "Resistivity",
+                "mnemonic": "RT",
+                "source": "Survey A"
+              }
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "label": "Survey A",
+          "inspection_state": "inspected",
+          "inventory_complete": true,
+          "channels": [
+            {
+              "mnemonic": "GR",
+              "unit": "gAPI",
+              "measurement": "Gamma Ray",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RT",
+              "unit": "ohm.m",
+              "measurement": "Resistivity",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RHOB",
+              "unit": "g/cm3",
+              "measurement": "Density",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "NPHI",
+              "unit": "v/v",
+              "measurement": "Neutron Porosity",
+              "kind": "scalar",
+              "addressable": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "turn_id": "H06",
+    "request": "Make the GR line red in Main Pass only.",
+    "compiler_status": "EXTRACTION_COMPLETE",
+    "context": {
+      "synthetic_inspection": true,
+      "document": {
+        "title": "Survey",
+        "subtitle": "Initial",
+        "sections": [
+          {
+            "title": "Main Pass",
+            "tracks": [
+              {
+                "label": "GR",
+                "curve": "GR",
+                "mnemonic": "GR",
+                "source": "Survey A"
+              },
+              {
+                "label": "Resistivity",
+                "curve": "Resistivity",
+                "mnemonic": "RT",
+                "source": "Survey A"
+              }
+            ]
+          },
+          {
+            "title": "Repeat Pass",
+            "tracks": [
+              {
+                "label": "GR",
+                "curve": "GR",
+                "mnemonic": "GR",
+                "source": "Survey A"
+              }
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "label": "Survey A",
+          "inspection_state": "inspected",
+          "inventory_complete": true,
+          "channels": [
+            {
+              "mnemonic": "GR",
+              "unit": "gAPI",
+              "measurement": "Gamma Ray",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RT",
+              "unit": "ohm.m",
+              "measurement": "Resistivity",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RHOB",
+              "unit": "g/cm3",
+              "measurement": "Density",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "NPHI",
+              "unit": "v/v",
+              "measurement": "Neutron Porosity",
+              "kind": "scalar",
+              "addressable": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "turn_id": "H07",
+    "request": "Set the report title to Well Review and the subtitle to Main Survey.",
+    "compiler_status": "COVERAGE_FAILURE",
+    "context": {
+      "synthetic_inspection": true,
+      "document": {
+        "title": "Survey",
+        "subtitle": "Initial",
+        "sections": [
+          {
+            "title": "Main Pass",
+            "tracks": [
+              {
+                "label": "GR",
+                "curve": "GR",
+                "mnemonic": "GR",
+                "source": "Survey A"
+              },
+              {
+                "label": "Resistivity",
+                "curve": "Resistivity",
+                "mnemonic": "RT",
+                "source": "Survey A"
+              }
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "label": "Survey A",
+          "inspection_state": "inspected",
+          "inventory_complete": true,
+          "channels": [
+            {
+              "mnemonic": "GR",
+              "unit": "gAPI",
+              "measurement": "Gamma Ray",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RT",
+              "unit": "ohm.m",
+              "measurement": "Resistivity",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RHOB",
+              "unit": "g/cm3",
+              "measurement": "Density",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "NPHI",
+              "unit": "v/v",
+              "measurement": "Neutron Porosity",
+              "kind": "scalar",
+              "addressable": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "turn_id": "H08",
+    "request": "Plot the physical mnemonic ZZZ_UNKNOWN from Survey A.",
+    "compiler_status": "NO_SUPPORTED_SEMANTICS",
+    "context": {
+      "synthetic_inspection": true,
+      "document": {
+        "title": "Survey",
+        "subtitle": "Initial",
+        "sections": [
+          {
+            "title": "Main Pass",
+            "tracks": [
+              {
+                "label": "GR",
+                "curve": "GR",
+                "mnemonic": "GR",
+                "source": "Survey A"
+              },
+              {
+                "label": "Resistivity",
+                "curve": "Resistivity",
+                "mnemonic": "RT",
+                "source": "Survey A"
+              }
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "label": "Survey A",
+          "inspection_state": "inspected",
+          "inventory_complete": true,
+          "channels": [
+            {
+              "mnemonic": "GR",
+              "unit": "gAPI",
+              "measurement": "Gamma Ray",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RT",
+              "unit": "ohm.m",
+              "measurement": "Resistivity",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RHOB",
+              "unit": "g/cm3",
+              "measurement": "Density",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "NPHI",
+              "unit": "v/v",
+              "measurement": "Neutron Porosity",
+              "kind": "scalar",
+              "addressable": true
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "turn_id": "H09",
+    "request": "Plot physical GR.",
+    "compiler_status": "EXTRACTION_COMPLETE",
+    "context": {
+      "synthetic_inspection": true,
+      "document": {
+        "title": "Survey",
+        "subtitle": "Initial",
+        "sections": [
+          {
+            "title": "Main Pass",
+            "tracks": []
+          }
+        ]
+      },
+      "sources": [
+        {
+          "label": "Survey A",
+          "inspection_state": "inspected",
+          "inventory_complete": true,
+          "channels": [
+            {
+              "mnemonic": "GR",
+              "unit": "gAPI",
+              "measurement": "Gamma Ray",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RT",
+              "unit": "ohm.m",
+              "measurement": "Resistivity",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RHOB",
+              "unit": "g/cm3",
+              "measurement": "Density",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "NPHI",
+              "unit": "v/v",
+              "measurement": "Neutron Porosity",
+              "kind": "scalar",
+              "addressable": true
+            }
+          ]
+        },
+        {
+          "label": "Survey B",
+          "inspection_state": "inspected",
+          "inventory_complete": true,
+          "channels": [
+            {
+              "mnemonic": "GR",
+              "unit": "gAPI",
+              "measurement": "Gamma Ray",
+              "kind": "scalar",
+              "addressable": true
+            }
+          ]
+        }
+      ],
+      "source_preference": null,
+      "equally_eligible_sources": [
+        "Survey A",
+        "Survey B"
+      ]
+    }
+  },
+  {
+    "turn_id": "H10",
+    "request": "Show physical GR without changing the existing Resistivity track.",
+    "compiler_status": "NO_SUPPORTED_SEMANTICS",
+    "context": {
+      "synthetic_inspection": true,
+      "document": {
+        "title": "Survey",
+        "subtitle": "Initial",
+        "sections": [
+          {
+            "title": "Main Pass",
+            "tracks": [
+              {
+                "label": "GR",
+                "curve": "GR",
+                "mnemonic": "GR",
+                "source": "Survey A"
+              },
+              {
+                "label": "Resistivity",
+                "curve": "Resistivity",
+                "mnemonic": "RT",
+                "source": "Survey A"
+              }
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "label": "Survey A",
+          "inspection_state": "inspected",
+          "inventory_complete": true,
+          "channels": [
+            {
+              "mnemonic": "GR",
+              "unit": "gAPI",
+              "measurement": "Gamma Ray",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RT",
+              "unit": "ohm.m",
+              "measurement": "Resistivity",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "RHOB",
+              "unit": "g/cm3",
+              "measurement": "Density",
+              "kind": "scalar",
+              "addressable": true
+            },
+            {
+              "mnemonic": "NPHI",
+              "unit": "v/v",
+              "measurement": "Neutron Porosity",
+              "kind": "scalar",
+              "addressable": true
+            }
+          ]
+        }
+      ]
+    }
+  }
+]
