@@ -7,7 +7,7 @@ import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import Literal
+from typing import Literal, Self
 
 from pydantic import (
     BaseModel,
@@ -430,6 +430,132 @@ _H1_SYSTEM_PROMPT = (
     "l and South Well each have addressable DT; neither source is preferred.\nResp"
     'onse: {"outcomes":[{"disposition":"needs_clarification","statement":"Which s'
     'ource should supply literal DT: North Well or South Well?"}]}'
+)
+
+
+class _H1BTask(_SemanticModel):
+    ref: str = Field(pattern=r"^[A-H]$")
+    worker: Literal["report", "section"]
+    scope: str | None = Field(min_length=1)
+    disposition: Literal["requested", "already_satisfied", "unavailable", "needs_clarification"]
+    outcome: str = Field(min_length=1)
+    qualifiers: tuple[str, ...] = ()
+    depends_on: tuple[str, ...] = ()
+
+
+class _H1BObservationResponse(_SemanticModel):
+    """Scientific delegation observation, never an executable plan."""
+
+    tasks: tuple[_H1BTask, ...] = Field(min_length=1, max_length=8)
+
+    @model_validator(mode="after")
+    def validate_task_references(self) -> Self:
+        """Check scope and local DAG integrity without scheduling any work."""
+        remaining = {task.ref: set(task.depends_on) for task in self.tasks}
+        if len(remaining) != len(self.tasks):
+            raise ValueError("Duplicate task reference.")
+        for task in self.tasks:
+            if task.worker == "report" and task.scope is not None:
+                raise ValueError("Report tasks cannot have section scope.")
+            if (
+                task.worker == "section"
+                and task.scope is None
+                and (task.disposition != "needs_clarification")
+            ):
+                raise ValueError("Section scope is required unless unresolved.")
+            edges = remaining[task.ref]
+            if len(edges) != len(task.depends_on) or not edges <= remaining.keys():
+                raise ValueError("Invalid task dependency reference.")
+        while remaining:
+            ready = {ref for ref, edges in remaining.items() if not edges}
+            if not ready:
+                raise ValueError("Cyclic task dependencies.")
+            remaining = {ref: edges - ready for ref, edges in remaining.items() if ref not in ready}
+        return self
+
+
+_H1B_CASE_DIGESTS = frozenset(
+    (
+        "a5dd3b41cae3bb9b065fee051d647ba4a8a467071d5ae0d542cd9c6de5656b8f",
+        "ad5f8b21a6194ceaab63899c0e8fb6ce8bf9ad159914820672a571e90557b312",
+        "45dda6558adef8d2cce2032f540cefac1b13af9c556bf6e9de33394303db2676",
+        "ac90da67541c868c1f01bc72dd4372a3519b38179eea2dceeb90ae3bab3f9d54",
+        "00fa729e3cecf67aad8bb030db1a55b93cc467f9174f5eba74f5965f07246c9c",
+        "d5ff95b937a160567227076399fd3c40351447588e7a5937a8fc67b49c1fc679",
+        "18dc4eaac60a8c103bbb791396ddb34bddc079f49fdce4d7f1f853f518e5627d",
+        "0dc5306912f1b6577b0b78d101cc04709232f2ba4c344b847195041240dab0ba",
+        "afebbe8d3718801d33a58f31efacfec69b0c13855aeea13d39d9f963830d2d2d",
+    )
+)
+_H1B_COVERAGE_FAILURE_DIGESTS = frozenset(
+    (
+        "ad5f8b21a6194ceaab63899c0e8fb6ce8bf9ad159914820672a571e90557b312",
+        "45dda6558adef8d2cce2032f540cefac1b13af9c556bf6e9de33394303db2676",
+    )
+)
+_H1B_SYSTEM_PROMPT = (
+    "You are the scientific planner for WellPlot, a conversational application"
+    " for creating and refining well-log presentations. Return scientific work"
+    " for specialists to consider, not edits, API calls, execution steps, impl"
+    "ementation prerequisites or claims that a new change has already happened"
+    ".\n\nThe report owns report-wide title, subtitle and report-page content. A"
+    " section is a logical panel, often one logging pass. A section contains t"
+    "racks; a track groups displayed measurements. A binding displays a source"
+    " channel in a track. A named pass is a section, not a track. A track titl"
+    "e does not prove which channels it displays: use bindings. Channels in an"
+    " inspected source can be available without any binding. Two curves in the"
+    " same section are not necessarily in the same track.\n\nGive report-wide ob"
+    "jectives to the report specialist. Give channel display, scale, style, fi"
+    "lls and other section-local objectives to the section specialist, scoped "
+    "to the named or unambiguously identified section. Group tasks with the sa"
+    "me worker and scope; grouping by section is distinct from grouping curves"
+    " in a track. Split independently assessable objectives, but retain insepa"
+    "rable scientific relationships together. A scientific dependency means on"
+    "e outcome requires another to be satisfied first. Link the dependent to t"
+    "he earlier task using a task-local reference. Do not manufacture dependen"
+    "cies between independent edits or create tasks merely for internal constr"
+    "uction like choosing IDs, creating a binding object or validating YAML.\n\n"
+    "Preserve exact physical mnemonics, semantic measurement clues, source ide"
+    "ntities, numeric values, units, geometry, ordering and restrictions. Use "
+    "inspected state as evidence, not as a limit on new requested presentation"
+    ". Use already_satisfied only if verified state matches the whole objectiv"
+    "e. Use unavailable for an affirmatively absent measurement in the relevan"
+    "t complete inventory. Use needs_clarification when a consequential choice"
+    " is unresolved. Do not pick a source by guesswork or replace a channel. R"
+    "etain independent safe work alongside blocked work.\n\nResolve phrases like"
+    ' "it" or "that curve" only from grounded prior turns and verified current'
+    " state. A previous assistant proposal does not prove a change happened. T"
+    "reat an answer to a pending clarification as resolving that choice for th"
+    "e original task; preserve still-applicable values, target and constraints"
+    ". Do not treat unrelated conversation as new instructions.\n\nReturn only t"
+    "he structured tasks. Each task has a unique local ref, worker, scope, dis"
+    "position and outcome. Use null scope for report work or unresolved scope,"
+    " and state the needed clarification instead of guessing. Qualifiers carry"
+    " explicit restrictions. depends_on lists only necessary other task refs, "
+    "never object identifiers. Keep the set acyclic.\n\nExample 1. Request: Set "
+    "the report title to Calibration Summary and make the existing SP line das"
+    "hed in Calibration Panel without changing its scale. Inspection: Calibrat"
+    'ion Panel is a section; its Signals track contains SP.\nResponse: {"tasks"'
+    ':[{"ref":"A","worker":"report","scope":null,"disposition":"requested","ou'
+    'tcome":"Set report title to Calibration Summary."},{"ref":"B","worker":"s'
+    'ection","scope":"Calibration Panel","disposition":"requested","outcome":"'
+    'Make the existing SP line dashed.","qualifiers":["Preserve SP scale."]}]}'
+    "\n\nExample 2. Request: Show physical DT and DTS together in Vp/Vs Panel, t"
+    "hen shade the region between them. Inspection: Vp/Vs Panel contains DT in"
+    " the Sonic track; complete source inventory contains both DT and DTS.\nRes"
+    'ponse: {"tasks":[{"ref":"A","worker":"section","scope":"Vp/Vs Panel","dis'
+    'position":"requested","outcome":"Display literal DT and DTS together on o'
+    'ne track."},{"ref":"B","worker":"section","scope":"Vp/Vs Panel","disposit'
+    'ion":"requested","outcome":"Shade between the DT and DTS curves.","depend'
+    's_on":["A"]}]}\n\nExample 3. Verified prior result: Calibration Panel now d'
+    "isplays CALI from Source West on Geometry. Request: Keep that curve and s"
+    "how physical PE too. Inspection: Complete Source West inventory contains "
+    'CALI but not PE, and CALI is still displayed.\nResponse: {"tasks":[{"ref":'
+    '"A","worker":"section","scope":"Calibration Panel","disposition":"already'
+    '_satisfied","outcome":"Retain the verified CALI curve unchanged."},{"ref"'
+    ':"B","worker":"section","scope":"Calibration Panel","disposition":"unavai'
+    'lable","outcome":"Physical PE is absent from the inspected Source West in'
+    'ventory."}]}'
 )
 
 
@@ -993,14 +1119,28 @@ class SemanticPlanner:
             "REQUEST_COMPILATION_PASS",
             result=compilation.model_dump(mode="json"),
         )
+        is_h1b = False
         if _h1_case is not None:
             digest = sha256(
                 json.dumps(
                     _h1_case, sort_keys=True, separators=(",", ":"), ensure_ascii=False
                 ).encode()
             ).hexdigest()
+            is_h1b = digest in _H1B_CASE_DIGESTS
             if (
-                digest not in _H1_CASE_DIGESTS
+                (not is_h1b and digest not in _H1_CASE_DIGESTS)
+                or (
+                    is_h1b
+                    and compilation.status
+                    not in {
+                        RequestCompilationStatus.EXTRACTION_COMPLETE,
+                        RequestCompilationStatus.NO_SUPPORTED_SEMANTICS,
+                    }
+                    and not (
+                        compilation.status is RequestCompilationStatus.COVERAGE_FAILURE
+                        and digest in _H1B_COVERAGE_FAILURE_DIGESTS
+                    )
+                )
                 or request != _h1_case["request"]
                 or compilation.status.value != _h1_case["compiler_status"]
                 or compilation.requirements.dependencies
@@ -1048,6 +1188,8 @@ class SemanticPlanner:
         invalid_response_retry_used = False
         wire_attempt = 1
         response_model = _PlannerWirePlan if _h1_case is None else _H1ObservationResponse
+        if is_h1b:
+            response_model = _H1BObservationResponse
 
         async def generate(
             request_value: StructuredGenerationRequest,
@@ -1082,10 +1224,15 @@ class SemanticPlanner:
         if _h1_case is not None:
             await generate(
                 StructuredGenerationRequest(
-                    system_prompt=_H1_SYSTEM_PROMPT,
+                    system_prompt=_H1B_SYSTEM_PROMPT if is_h1b else _H1_SYSTEM_PROMPT,
                     user_prompt=(
                         f"USER REQUEST:\n{request}\n\nINSPECTED CONTEXT:\n"
-                        + json.dumps(_h1_case["context"], sort_keys=True, ensure_ascii=False)
+                        + json.dumps(
+                            _h1_case["context"],
+                            sort_keys=True,
+                            ensure_ascii=False,
+                            separators=(",", ":") if is_h1b else None,
+                        )
                     ),
                     timeout_seconds=timeout_seconds,
                     temperature=temperature,

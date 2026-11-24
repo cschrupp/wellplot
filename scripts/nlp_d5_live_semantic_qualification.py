@@ -45,7 +45,9 @@ from wellplot.agent.code_mode.obligations import (
 )
 from wellplot.agent.code_mode.planner import (
     _H1_SYSTEM_PROMPT,
+    _H1B_SYSTEM_PROMPT,
     PlannerSemanticFailure,
+    _H1BObservationResponse,
     _H1ObservationComplete,
     _H1ObservationResponse,
 )
@@ -133,7 +135,54 @@ H1_SMOKE_FIXTURE_SHA256 = "22226372dcfe1bcc1f9fb6910a228de9a114d7e7b3c017db41925
 H1_PANEL_PATH = "docs/research/WELLPLOT_V2_H1_PANEL.json"
 H1_PANEL_SHA256 = "967b3f670e4d5763b8aaa37cdbf9805ef76a8e7f831ea5106567895126391402"
 H1_TURN_IDS = tuple(f"H{index:02d}" for index in range(1, 11))
-PLANNER_POPULATIONS = (A10_SEM_53_POPULATION, H1_POPULATION)
+H1B_POPULATION = "h1b-development"
+H1B_SMOKE_MODE = "h1b_observation"
+H1B_PANEL_PATH = "docs/research/WELLPLOT_V2_H1B_PANEL.json"
+H1B_PANEL_SHA256 = "62d1bd4e359399a18cbc59bd40932abb5e22f5df86ce8ddab52da463a9c5378c"
+H1B_TURN_IDS = tuple(f"P{index:02d}" for index in range(1, 9))
+H1B_SMOKE_CASE = {
+    "turn_id": "H1B-SMOKE",
+    "request": "Could you show borehole temperature?",
+    "context": {
+        "report": {"sections": [{"name": "Thermal Panel", "tracks": []}]},
+        "sources": [
+            {
+                "name": "Thermal LAS",
+                "section": "Thermal Panel",
+                "inspected": True,
+                "complete": True,
+                "channels": [
+                    {
+                        "mnemonic": "TEMP",
+                        "measurement": "borehole temperature",
+                        "unit": "degC",
+                        "kind": "scalar",
+                        "addressable": True,
+                    }
+                ],
+            }
+        ],
+    },
+    "compiler_status": "NO_SUPPORTED_SEMANTICS",
+}
+H1B_SMOKE_FIXTURE_SHA256 = "afebbe8d3718801d33a58f31efacfec69b0c13855aeea13d39d9f963830d2d2d"
+H1_POPULATIONS = (H1_POPULATION, H1B_POPULATION)
+H1_SMOKE_MODES = (H1_SMOKE_MODE, H1B_SMOKE_MODE)
+PLANNER_POPULATIONS = (A10_SEM_53_POPULATION, *H1_POPULATIONS)
+
+
+def _h1_contract(population: str) -> tuple[str, str, tuple[str, ...], str, type[BaseModel]]:
+    if population == H1B_POPULATION:
+        return (
+            H1B_PANEL_PATH,
+            H1B_PANEL_SHA256,
+            H1B_TURN_IDS,
+            _H1B_SYSTEM_PROMPT,
+            _H1BObservationResponse,
+        )
+    return H1_PANEL_PATH, H1_PANEL_SHA256, H1_TURN_IDS, _H1_SYSTEM_PROMPT, _H1ObservationResponse
+
+
 A10_SEM_53_BENCHMARK_SHA256 = "595839779e9ca59d9ce8ff20cbbdaf006ad41138b4510acc0ea26733e080067a"
 A10_SEM_53_SOURCE_INVENTORY_SHA256 = (
     "21f11462696af7a9f1d9b18d625a6a311794912b9ef10a70106f0267e83c19b0"
@@ -649,16 +698,19 @@ class D5Authorization:
             or self.sdk_max_retries != 0
         ):
             raise D5StaticPreflightError("invalid A10 first-pass authority")
-        if self.planner_population == H1_POPULATION:
-            if self.planner_population_system_prompt_sha256 != d4.sha256_text(_H1_SYSTEM_PROMPT):
+        if self.planner_population in H1_POPULATIONS:
+            _, digest, ids, prompt, model = _h1_contract(self.planner_population)
+            if (
+                self.planner_population_system_prompt_sha256
+                != hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+            ):
                 raise D5StaticPreflightError("H1 system prompt authority is missing or mismatched")
             if (
                 cap is None
-                or self.planner_first_pass_turn_ids != H1_TURN_IDS
-                or self.planner_population_benchmark_sha256 != H1_PANEL_SHA256
-                or self.planner_population_source_inventory_sha256 != H1_PANEL_SHA256
-                or self.planner_smoke_wire_schema_sha256
-                != _sha256_json(_H1ObservationResponse.model_json_schema())
+                or self.planner_first_pass_turn_ids != ids
+                or self.planner_population_benchmark_sha256 != digest
+                or self.planner_population_source_inventory_sha256 != digest
+                or self.planner_smoke_wire_schema_sha256 != _sha256_json(model.model_json_schema())
             ):
                 raise D5StaticPreflightError("invalid frozen H1 observation authority")
         elif self.planner_first_pass_turn_ids is not None:
@@ -794,14 +846,15 @@ def _select_first_pass_turns(
     turn_ids: Sequence[str] | None,
 ) -> Sequence[str] | None:
     """Constrain the opt-in first-pass authority to the exposed development panel."""
-    if population == H1_POPULATION or authorization.planner_population == H1_POPULATION:
+    if population in H1_POPULATIONS or authorization.planner_population in H1_POPULATIONS:
+        ids = _h1_contract(population)[2]
         if (
             population != authorization.planner_population
             or mode != "planner_only"
-            or (turn_ids is not None and tuple(turn_ids) != H1_TURN_IDS)
+            or (turn_ids is not None and tuple(turn_ids) != ids)
         ):
             raise D5StaticPreflightError("H1 requires the complete authorized planner-only panel")
-        return H1_TURN_IDS
+        return ids
     if authorization.planner_first_pass_max_output_tokens is None:
         return turn_ids
     if population != A10_SEM_53_POPULATION or mode != "planner_only":
@@ -1118,7 +1171,7 @@ def _default_smoke_static_checks(
     elif mode == "canonical_schema_behavior_probe":
         if _git_porcelain_raw(repo_root) != expected_worktree_porcelain:
             raise D5StaticPreflightError("working tree differs from schema-probe authorization")
-    elif mode == "h1_planner_observation":
+    elif mode in {"h1_planner_observation", "h1b_planner_observation"}:
         if (
             expected_worktree_porcelain != H1_EXPECTED_WORKTREE_PORCELAIN
             or _git_porcelain_raw(repo_root) != expected_worktree_porcelain
@@ -1156,6 +1209,7 @@ def _default_smoke_static_checks(
         "canonical_live_smoke": SMOKE_SCHEMA_SHA256,
         "canonical_planner_only_smoke": _planner_wire_schema_sha256(),
         "h1_planner_observation": _sha256_json(_H1ObservationResponse.model_json_schema()),
+        "h1b_planner_observation": _sha256_json(_H1BObservationResponse.model_json_schema()),
         "canonical_schema_behavior_probe": _schema_probe_bundle_sha256(),
     }.get(mode)
     if expected_mode_schema is None or expected_schema_sha256 != expected_mode_schema:
@@ -1259,24 +1313,28 @@ def _planner_smoke_case(
     case_id: str | None = None,
 ) -> dict[str, Any]:
     """Resolve one authority-pinned case from the immutable SEM-01 inputs."""
-    if authorization.planner_smoke_mode == H1_SMOKE_MODE:
+    if authorization.planner_smoke_mode in H1_SMOKE_MODES:
         from wellplot.agent.code_mode.obligations import compile_request_contract
 
-        request = H1_SMOKE_CASE["request"]
+        is_h1b = authorization.planner_smoke_mode == H1B_SMOKE_MODE
+        fixture = H1B_SMOKE_CASE if is_h1b else H1_SMOKE_CASE
+        fixture_digest = H1B_SMOKE_FIXTURE_SHA256 if is_h1b else H1_SMOKE_FIXTURE_SHA256
+        _, _, _, prompt, model = _h1_contract(H1B_POPULATION if is_h1b else H1_POPULATION)
+        request = fixture["request"]
         compilation = compile_request_contract(request)
-        schema_digest = _sha256_json(_H1ObservationResponse.model_json_schema())
+        schema_digest = _sha256_json(model.model_json_schema())
         request_digest = hashlib.sha256(request.encode()).hexdigest()
         if (
-            authorization.planner_smoke_case_id != H1_SMOKE_CASE["turn_id"]
-            or case_id not in {None, H1_SMOKE_CASE["turn_id"]}
+            authorization.planner_smoke_case_id != fixture["turn_id"]
+            or case_id not in {None, fixture["turn_id"]}
             or authorization.planner_population
             or authorization.planner_first_pass_max_output_tokens is not None
             or authorization.planner_smoke_sdk_max_retries != 0
             or authorization.sdk_max_retries != 0
-            or _sha256_json(H1_SMOKE_CASE) != H1_SMOKE_FIXTURE_SHA256
-            or authorization.planner_smoke_source_inventory_sha256 != H1_SMOKE_FIXTURE_SHA256
+            or _sha256_json(fixture) != fixture_digest
+            or authorization.planner_smoke_source_inventory_sha256 != fixture_digest
             or authorization.planner_smoke_benchmark_sha256
-            != hashlib.sha256(_H1_SYSTEM_PROMPT.encode()).hexdigest()
+            != hashlib.sha256(prompt.encode()).hexdigest()
             or authorization.planner_smoke_request_sha256 != request_digest
             or authorization.planner_smoke_wire_schema_sha256 != schema_digest
             or authorization.planner_smoke_harness_sha256 != _sha256_file(Path(__file__).resolve())
@@ -1285,16 +1343,16 @@ def _planner_smoke_case(
         ):
             raise D5StaticPreflightError("H1 smoke authority or fixture drifted")
         return {
-            "case_id": H1_SMOKE_CASE["turn_id"],
+            "case_id": fixture["turn_id"],
             "request": request,
             "request_sha256": request_digest,
             "benchmark_sha256": authorization.planner_smoke_benchmark_sha256,
-            "source_inventory_sha256": H1_SMOKE_FIXTURE_SHA256,
+            "source_inventory_sha256": fixture_digest,
             "source_sha256": None,
             "wire_schema_sha256": schema_digest,
             "sdk_max_retries": 0,
             "physical_attempt_limit": 1,
-            "h1_case": H1_SMOKE_CASE,
+            "h1_case": fixture,
         }
     required_digests = {
         "benchmark": authorization.planner_smoke_benchmark_sha256,
@@ -1395,11 +1453,12 @@ def _planner_smoke_case(
 
 
 def _load_planner_population(repo_root: Path, population: str) -> list[dict[str, Any]]:
-    if population == H1_POPULATION:
-        path = repo_root / H1_PANEL_PATH
-        _assert_hash(path, H1_PANEL_SHA256, "H1 request and inspection panel")
+    if population in H1_POPULATIONS:
+        filename, digest, ids, _, _ = _h1_contract(population)
+        path = repo_root / filename
+        _assert_hash(path, digest, "H1 request and inspection panel")
         cases = json.loads(path.read_text(encoding="utf-8"))
-        if tuple(case["turn_id"] for case in cases) != H1_TURN_IDS:
+        if tuple(case["turn_id"] for case in cases) != ids:
             raise D5StaticPreflightError("H1 panel order drifted")
         return cases
     return _load_a10_planner_population(repo_root)
@@ -1496,7 +1555,7 @@ def _default_planner_smoke_static_checks(
         raise D5StaticPreflightError("planner smoke is not running in the canonical checkout")
     if Path(_git(repo_root, "rev-parse", "--show-toplevel")).resolve() != canonical_root:
         raise D5StaticPreflightError("planner smoke Git top-level is not canonical")
-    is_h1 = authorization.planner_smoke_mode == H1_SMOKE_MODE
+    is_h1 = authorization.planner_smoke_mode in H1_SMOKE_MODES
     if not is_h1 and authorization.planner_smoke_mode != SMOKE_PLANNER_KIND:
         raise D5StaticPreflightError("planner-only smoke mode is not authorized")
     expected = H1_EXPECTED_WORKTREE_PORCELAIN if is_h1 else A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN
@@ -1509,7 +1568,13 @@ def _default_planner_smoke_static_checks(
         artifact_paths,
         expected_worktree_porcelain=authorization.expected_worktree_porcelain,
         expected_schema_sha256=authorization.planner_smoke_wire_schema_sha256,
-        mode="h1_planner_observation" if is_h1 else "canonical_planner_only_smoke",
+        mode=(
+            "h1b_planner_observation"
+            if authorization.planner_smoke_mode == H1B_SMOKE_MODE
+            else "h1_planner_observation"
+            if is_h1
+            else "canonical_planner_only_smoke"
+        ),
         **({"expected_sdk_max_retries": 0} if is_h1 else {}),
     )
     static.update(
@@ -4533,9 +4598,12 @@ class _ObservedLiveAdapter:
 
     async def execute_planner_case(self, case: Mapping[str, Any]) -> Mapping[str, Any]:
         """Observe one planner-only case through the canonical SemanticPlanner."""
-        is_h1 = str(case["turn_id"]) in H1_TURN_IDS
+        is_h1b = case["turn_id"] in H1B_TURN_IDS
+        is_h1 = is_h1b or case["turn_id"] in H1_TURN_IDS
         if is_h1:
-            frozen = _load_planner_population(self.inner.repo_root, H1_POPULATION)
+            frozen = _load_planner_population(
+                self.inner.repo_root, H1B_POPULATION if is_h1b else H1_POPULATION
+            )
             if self.planner_first_pass_max_output_tokens != 4096 or case not in frozen:
                 raise D5HarnessError("H1 observation case custody drifted")
             context = {
@@ -4546,7 +4614,7 @@ class _ObservedLiveAdapter:
                     "context_sha256": _sha256_json(case["context"]),
                 },
                 "source_channel_count": sum(
-                    len(source["channels"]) for source in case["context"]["sources"]
+                    len(source["channels"]) for source in case["context"].get("sources", ())
                 ),
                 "numeric_sample_apis_invoked": False,
             }
@@ -4828,7 +4896,7 @@ def execute_live_campaign(
     population: str = "d4",
 ) -> dict[str, Any]:
     """Run selected frozen turns after static/readiness interlocks."""
-    if authorization.planner_smoke_mode == H1_SMOKE_MODE:
+    if authorization.planner_smoke_mode in H1_SMOKE_MODES:
         raise D5StaticPreflightError("H1 smoke authority cannot execute a campaign")
     if population in PLANNER_POPULATIONS and mode != "planner_only":
         raise D5StaticPreflightError("Planner population requires planner-only campaign mode")
@@ -5394,7 +5462,7 @@ def execute_live_planner_smoke(
     if authorization.project_config_fingerprint_sha256 != project_config.fingerprint_sha256:
         raise D5StaticPreflightError("project configuration fingerprint mismatch")
     paths = EvidencePaths(artifact_root, authorization.campaign_id)
-    is_h1 = authorization.planner_smoke_mode == H1_SMOKE_MODE
+    is_h1 = authorization.planner_smoke_mode in H1_SMOKE_MODES
     if static_checker is None:
         static, case = _default_planner_smoke_static_checks(
             repo_root,
@@ -5522,7 +5590,7 @@ def execute_live_planner_smoke(
     if is_h1:
         custody.ledger.max_logical_calls = 1
         custody.ledger.max_physical_attempts = 1
-        custody.state["synthetic_inspection_sha256"] = H1_SMOKE_FIXTURE_SHA256
+        custody.state["synthetic_inspection_sha256"] = case["source_inventory_sha256"]
     custody.state.update(
         {
             "planner_smoke_case_id": case["case_id"],
@@ -5600,7 +5668,11 @@ def execute_live_planner_smoke(
 
     from wellplot.agent.code_mode.planner import _PlannerWirePlan
 
-    response_model = _H1ObservationResponse if is_h1 else _PlannerWirePlan
+    response_model = _PlannerWirePlan
+    if is_h1:
+        response_model = _h1_contract(
+            H1B_POPULATION if authorization.planner_smoke_mode == H1B_SMOKE_MODE else H1_POPULATION
+        )[4]
     wire_response = None if wire_capture is None else wire_capture.get("validated_response")
     if (
         result is not None
@@ -5664,7 +5736,7 @@ def execute_live_planner_smoke(
             and (
                 custody.ledger.logical_calls != 1
                 or custody.ledger.physical_attempts != 1
-                or _sha256_json(H1_SMOKE_CASE) != H1_SMOKE_FIXTURE_SHA256
+                or _sha256_json(case["h1_case"]) != case["source_inventory_sha256"]
             )
         )
     ):
@@ -6384,7 +6456,7 @@ def _bounded_planner_observation_row(
     source_identity = actual.get("source_asset_identity")
     if not isinstance(source_identity, Mapping):
         source_identity = {}
-    is_h1 = case["turn_id"] in H1_TURN_IDS
+    is_h1 = case["turn_id"] in (*H1_TURN_IDS, *H1B_TURN_IDS)
     return {
         "experiment_version": D5_EXPERIMENT_VERSION,
         "case_id": case["turn_id"] if is_h1 else case["case_id"],
@@ -7261,7 +7333,7 @@ def provider_free_preflight(
         raise D5StaticPreflightError("project configuration fingerprint mismatch")
     if population == "final":
         final_population.load_final_population(repo_root)
-    elif population == H1_POPULATION:
+    elif population in H1_POPULATIONS:
         cases = _load_planner_population(repo_root, population)
         role_limits = {"planner": 1, "report_worker": 0, "section_worker": 0}
     elif population == A10_SEM_53_POPULATION:
@@ -7287,14 +7359,16 @@ def provider_free_preflight(
         if population == A10_SEM_53_POPULATION
         else _default_static_checks
     )
-    if population == H1_POPULATION and static_checker is None:
+    if population in H1_POPULATIONS and static_checker is None:
         facts = _default_smoke_static_checks(
             repo_root,
             authorization,
             paths,
             expected_worktree_porcelain=authorization.expected_worktree_porcelain or None,
-            expected_schema_sha256=_sha256_json(_H1ObservationResponse.model_json_schema()),
-            mode="h1_planner_observation",
+            expected_schema_sha256=_sha256_json(_h1_contract(population)[4].model_json_schema()),
+            mode="h1b_planner_observation"
+            if population == H1B_POPULATION
+            else "h1_planner_observation",
             expected_sdk_max_retries=0,
         )
     else:
@@ -7308,7 +7382,7 @@ def provider_free_preflight(
             authorization.planner_first_pass_max_output_tokens
         )
         static_facts["planner_first_pass_turn_ids"] = list(first_pass_turns)
-    if population == H1_POPULATION:
+    if population in H1_POPULATIONS:
         static_facts["planner_population_system_prompt_sha256"] = (
             authorization.planner_population_system_prompt_sha256
         )
@@ -7334,15 +7408,15 @@ def provider_free_preflight(
                 else [case["turn_id"] for case in cases]
             ),
             "benchmark_sha256": (
-                H1_PANEL_SHA256
-                if population == H1_POPULATION
+                _h1_contract(population)[1]
+                if population in H1_POPULATIONS
                 else A10_SEM_53_BENCHMARK_SHA256
                 if population == A10_SEM_53_POPULATION
                 else None
             ),
             "source_inventory_sha256": (
-                H1_PANEL_SHA256
-                if population == H1_POPULATION
+                _h1_contract(population)[1]
+                if population in H1_POPULATIONS
                 else A10_SEM_53_SOURCE_INVENTORY_SHA256
                 if population == A10_SEM_53_POPULATION
                 else None
@@ -7417,7 +7491,7 @@ def main() -> int:
         parser.error("--planner-case-id requires --execute-planner-smoke")
     repo_root = args.repo_root.resolve()
     authorization = _load_authorization(args.authorization_json.resolve())
-    if authorization.planner_smoke_mode == H1_SMOKE_MODE and not (
+    if authorization.planner_smoke_mode in H1_SMOKE_MODES and not (
         args.provider_free_preflight or args.execute_planner_smoke
     ):
         parser.error("H1 smoke authority is only for canonical planner smoke")
@@ -7431,7 +7505,7 @@ def main() -> int:
         else (repo_root / authorization.artifact_root).resolve()
     )
     paths = EvidencePaths(artifact_root, authorization.campaign_id)
-    if args.provider_free_preflight and authorization.planner_smoke_mode == H1_SMOKE_MODE:
+    if args.provider_free_preflight and authorization.planner_smoke_mode in H1_SMOKE_MODES:
         result, _ = _default_planner_smoke_static_checks(repo_root, authorization, paths)
     elif args.provider_free_preflight:
         result = provider_free_preflight(

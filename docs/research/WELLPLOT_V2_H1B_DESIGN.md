@@ -131,24 +131,29 @@ requests/contexts and this prompt/schema. Reuse launcher, provider and raw
 capture. Like H1a, stop unconditionally on first response, even with no
 observer callback; never convert, attach, dispatch or mutate.
 
-The current H1 lane cannot accept any P-case as written: case digests,
-population and known compiler dispositions are frozen to H1. A read-only
-probe at `ed87f7c2d84ea57733cb51200fa1ef7a638e8e2f` using the real
-`compile_request_contract` and `is_c2_request` found:
+The previous design probe selected the wrong Markdown table column. Its
+published status mapping and claim of zero coverage failures were incorrect
+(preserved in Git at `5b73ffeb2bd0a776feef0640d0648aa401bf5383`). Repeating
+the probe with the exact Request cells at that checkpoint using
+`compile_request_contract` and `is_c2_request` produced:
 
-| Cases | Current compiler status |
-| --- | --- |
-| P01, P05, P06, P07 | `EXTRACTION_COMPLETE` |
-| P02, P03, P04, P08 | `NO_SUPPORTED_SEMANTICS` |
+| Cases | Compiler status | Diagnostic codes |
+| --- | --- | --- |
+| P02, P03 | `COVERAGE_FAILURE` | `supported_request_coverage_failure` |
+| P04, P05 | `EXTRACTION_COMPLETE` | None |
+| P01, P06, P07, P08 | `NO_SUPPORTED_SEMANTICS` | None |
 
-All eight had no diagnostics, no dependencies and false C2 membership.
-No coverage-failure exception is proposed. Recheck these dispositions in
-provider-free qualification; drift stops the experiment. The capture
+All eight have no compiler dependencies and false C2 membership. The SOL
+amendment authorizes capture only for P02/P03 by complete frozen-case digest;
+ordinary admission still rejects. Retain the compiler status, diagnostic
+codes and compilation trace as evidence for S06. No compiler fix is part of
+this slice. Recheck dispositions in provider-free qualification; drift stops
+the experiment. The capture
 context, not deterministic compilation, supplies prior dialogue. **Never**
 bypass recognized C2 or dependency-bearing compiler output: the scientific
 edge in P05 is an experimental response, not a trusted request dependency.
 If a case conflicts with that containment, stop for review, not live probing
-or silent replacement. No authorization for runtime changes exists here.
+or silent replacement. No live authority exists here.
 
 Use one first response per case, max eight logical and eight physical,
 zero corrections or SDK retries; propose the same configured Qwen runtime,
@@ -164,3 +169,54 @@ preservation. Consequential substitution, unsafe scope expansion or invented
 destruction blocks progression. Unusable/incomplete observations do not
 establish progression. H2/H3 remain blocked; decisive negatives may take the
 reviewed early S06 route.
+
+## Provider-free implementation record
+
+The [frozen panel](WELLPLOT_V2_H1B_PANEL.json) contains only request, inspection
+and expected compiler custody, not scientific grading expectations. Panel
+SHA-256: `62d1bd4e359399a18cbc59bd40932abb5e22f5df86ce8ddab52da463a9c5378c`.
+Advertised H1b schema SHA-256 (canonical JSON):
+`fb02f4c22c4c681625cfbe3959e6a9a92330e88226a8596e51617f3180fa7b8f`.
+The implemented prompt matches the 4,465-byte design block, and its digest
+is computed from raw UTF-8 bytes in authority validation. All three manual
+demonstrations validate against the observation DTO.
+
+The existing planner capture boundary checks exact case custody and the
+actual compiler status before generation. P02/P03 alone may be observed
+after ordinary coverage rejection. The original diagnostics remain in the
+compiler trace. The task DTO checks references and scope without scheduling
+or modifying any work. D4 counts the DTO as planner output, and D5 uses the
+same custody and planner-only runner with the ordered eight-case population.
+
+**Prepared non-panel smoke:** `H1B-SMOKE`, “Could you show borehole
+temperature?” An empty Thermal Panel has a complete inspected Thermal LAS
+inventory with addressable scalar TEMP in degC. The canonical compiler
+returns `NO_SUPPORTED_SEMANTICS`; no coverage exception is used. Exact
+fixture SHA-256:
+`afebbe8d3718801d33a58f31efacfec69b0c13855aeea13d39d9f963830d2d2d`.
+The existing smoke mode accepts `h1b_observation` and uses one logical and
+one physical attempt, zero corrections and retries. A future authorized
+descriptor must bind the exact checkpoint, worktree, harness, request,
+fixture, raw prompt digest, schema, runtime and fresh private namespace.
+Use the canonical launcher `planner-smoke h1b-development AUTH_JSON` only
+after separate authority, static qualification and approved LAN readiness.
+The measured panel needs separate authority after independent smoke
+acceptance. Neither the smoke nor the panel ran in this slice.
+
+Provider-free qualification (Python 3.12, `PYTHONPATH=src`):
+
+```bash
+.venv/bin/python -m pytest -q tests/test_nlp_d5_live_semantic_qualification.py \
+  tests/test_code_mode_planner.py tests/test_code_mode_workflow.py \
+  tests/test_d5_5j_obligations.py tests/test_d5_single_engine_convergence.py \
+  -k 'not (final_population or c02)'
+```
+
+380 passed in 49.86 s, exit 0. Mock HTTP covered all eight exact requests and
+serialized contexts, original compiler statuses and diagnostics, retained
+no-correction behavior, and absence of conversion. Tests also cover real
+invalid-response and transport paths, mock valid/invalid smoke termination,
+tampered custody, unmodified production rejection, unknown/cyclic task
+references, dependency and C2 guards, and termination without the observer.
+Scoped Ruff lint/format, Python compilation, shell syntax, diff checks,
+attestation and reachability passed. No full-suite or live claim.

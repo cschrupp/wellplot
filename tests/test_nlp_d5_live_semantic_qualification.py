@@ -481,28 +481,28 @@ def test_a10_campaign_uses_shared_runner_without_semantic_scoring(tmp_path: Path
 
 
 @pytest.mark.parametrize("valid", [True, False])
+@pytest.mark.parametrize("is_h1b", [False, True])
 def test_h1_operational_smoke_is_single_call(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, valid: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, valid: bool, is_h1b: bool
 ) -> None:
     """Exercise H1 smoke through existing custody and SDK with local HTTP doubles."""
     from openai import _base_client
 
-    from wellplot.agent.code_mode.planner import _H1_SYSTEM_PROMPT
-
     monkeypatch.setattr(_base_client, "get_platform", lambda: "Linux")
     paths = _paths(tmp_path, "h1-smoke")
-    request_text = d5.H1_SMOKE_CASE["request"]
+    fixture = d5.H1B_SMOKE_CASE if is_h1b else d5.H1_SMOKE_CASE
+    fixture_sha = d5.H1B_SMOKE_FIXTURE_SHA256 if is_h1b else d5.H1_SMOKE_FIXTURE_SHA256
+    _, _, _, prompt, model = d5._h1_contract(d5.H1B_POPULATION if is_h1b else d5.H1_POPULATION)
+    request_text = fixture["request"]
     authority = replace(
         _authorization(campaign_id=paths.campaign_id, artifact_root=str(paths.root)),
-        planner_smoke_mode=d5.H1_SMOKE_MODE,
-        planner_smoke_case_id="H1-SMOKE",
+        planner_smoke_mode=d5.H1B_SMOKE_MODE if is_h1b else d5.H1_SMOKE_MODE,
+        planner_smoke_case_id=fixture["turn_id"],
         planner_smoke_request_sha256=d4.sha256_text(request_text),
-        planner_smoke_benchmark_sha256=d4.sha256_text(_H1_SYSTEM_PROMPT),
-        planner_smoke_source_inventory_sha256=d5.H1_SMOKE_FIXTURE_SHA256,
+        planner_smoke_benchmark_sha256=d4.sha256_text(prompt),
+        planner_smoke_source_inventory_sha256=fixture_sha,
         planner_smoke_harness_sha256=d5._sha256_file(Path(d5.__file__)),
-        planner_smoke_wire_schema_sha256=d5._sha256_json(
-            d5._H1ObservationResponse.model_json_schema()
-        ),
+        planner_smoke_wire_schema_sha256=d5._sha256_json(model.model_json_schema()),
         planner_smoke_sdk_max_retries=0,
         sdk_max_retries=0,
         expected_worktree_porcelain=d5.H1_EXPECTED_WORKTREE_PORCELAIN,
@@ -518,6 +518,20 @@ def test_h1_operational_smoke_is_single_call(
             if valid
             else {"outcomes": []}
         )
+        if is_h1b:
+            content = {
+                "tasks": [
+                    {
+                        "ref": "A",
+                        "worker": "section",
+                        "scope": "Thermal Panel",
+                        "disposition": "requested",
+                        "outcome": "Display temperature.",
+                    }
+                ]
+                if valid
+                else []
+            }
         return httpx.Response(
             200,
             request=request,
@@ -575,14 +589,14 @@ def test_h1_operational_smoke_is_single_call(
     payload = requests[0]
     assert payload["temperature"] == 0
     assert payload["max_tokens"] == 4096
-    assert payload["messages"][0]["content"] == _H1_SYSTEM_PROMPT
+    assert payload["messages"][0]["content"] == prompt
     assert d4.sha256_text(payload["messages"][0]["content"]) == (
-        "ebc9aa1d1a01967e6088a6ec5b403192fa274fc9f19bba026ddf734f4035c013"
+        "6cb230f71729199521b52dd2d602553aad58f8c9827a3ec4209b17cdda9499bd"
+        if is_h1b
+        else "ebc9aa1d1a01967e6088a6ec5b403192fa274fc9f19bba026ddf734f4035c013"
     )
     assert request_text in payload["messages"][1]["content"]
-    assert payload["response_format"]["json_schema"]["schema"] == (
-        d5._H1ObservationResponse.model_json_schema()
-    )
+    assert payload["response_format"]["json_schema"]["schema"] == (model.model_json_schema())
     assert "WIRE_TO_CANONICAL_ENTER" not in paths.stage_trace.read_text()
     summary = json.loads(paths.summary.read_text())
     assert summary["terminal_sha256"] == d5._sha256_file(paths.terminal)
@@ -600,21 +614,43 @@ def test_h1_operational_smoke_is_single_call(
     assert sum("response_body_base64" in entry for entry in wire_io) == 1
 
 
-def test_h1_planner_fails_closed_without_observation_callback() -> None:
+@pytest.mark.parametrize("population", d5.H1_POPULATIONS)
+def test_h1_planner_fails_closed_without_observation_callback(
+    population: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Success without a callback must stop, and tampered inputs must never generate."""
     from types import SimpleNamespace
 
     from wellplot.agent.code_mode.planner import SemanticPlanner
     from wellplot.capabilities import create_builtin_registry
 
+    is_h1b = population == d5.H1B_POPULATION
+    _, _, _, _, expected_model = d5._h1_contract(population)
+
     class Backend:
         calls = 0
 
         async def generate_structured(
-            self, request: object, *, response_model: type[d5._H1ObservationResponse]
+            self, request: object, *, response_model: type[BaseModel]
         ) -> SimpleNamespace:
             self.calls += 1
-            assert response_model is d5._H1ObservationResponse
+            assert response_model is expected_model
+            if is_h1b:
+                return SimpleNamespace(
+                    value=response_model.model_validate(
+                        {
+                            "tasks": [
+                                {
+                                    "ref": "A",
+                                    "worker": "report",
+                                    "scope": None,
+                                    "disposition": "requested",
+                                    "outcome": "Fixture",
+                                }
+                            ]
+                        }
+                    )
+                )
             return SimpleNamespace(
                 value=response_model.model_validate(
                     {
@@ -625,18 +661,21 @@ def test_h1_planner_fails_closed_without_observation_callback() -> None:
 
     backend = Backend()
     planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
-    case = d5._load_planner_population(REPO_ROOT, d5.H1_POPULATION)[3]
+    cases = d5._load_planner_population(REPO_ROOT, population)
+    case = cases[1 if is_h1b else 3]
     options = {
         "mode": "revise",
         "timeout_seconds": 5,
         "temperature": 0,
         "max_output_tokens": 4096,
     }
-    with pytest.raises(d5.PlannerSemanticFailure) as failure:
-        asyncio.run(planner.plan(request=case["request"], **options))
-    assert failure.value.code == "request_compilation_coverage_failure"
+    for rejected in cases[1:3] if is_h1b else [case]:
+        with pytest.raises(d5.PlannerSemanticFailure) as failure:
+            asyncio.run(planner.plan(request=rejected["request"], **options))
+        assert failure.value.code == "request_compilation_coverage_failure"
     for request, fixture in (
         (case["request"], {**case, "context": {}}),
+        (case["request"] + " ", case),
         ("Plot physical GR. Then split the GR curve fill at baseline 0.", case),
     ):
         with pytest.raises(d5.PlannerSemanticFailure):
@@ -645,6 +684,65 @@ def test_h1_planner_fails_closed_without_observation_callback() -> None:
     with pytest.raises(d5._H1ObservationComplete):
         asyncio.run(planner.plan(request=case["request"], _h1_case=case, **options))
     assert backend.calls == 1
+    if is_h1b:
+        from wellplot.agent.code_mode import planner as planner_module
+        from wellplot.agent.code_mode.obligations import RequestCompilationStatus
+
+        actual = planner_module.compile_request_contract(case["request"])
+        assert actual.diagnostic_codes == ("supported_request_coverage_failure",)
+        monkeypatch.setattr(
+            planner_module,
+            "compile_request_contract",
+            lambda _: actual.model_copy(
+                update={"status": RequestCompilationStatus.NO_SUPPORTED_SEMANTICS}
+            ),
+        )
+        with pytest.raises(d5.PlannerSemanticFailure):
+            asyncio.run(planner.plan(request=case["request"], _h1_case=case, **options))
+        from wellplot.agent.code_mode.obligations import compile_request_contract
+
+        dependent_set = compile_request_contract(
+            "Plot physical GR. Then split the GR curve fill at baseline 0."
+        ).requirements
+        assert dependent_set.dependencies
+        dependency = actual.requirements.model_copy(
+            update={
+                "dependencies": dependent_set.dependencies,
+            }
+        )
+        monkeypatch.setattr(
+            planner_module,
+            "compile_request_contract",
+            lambda _: actual.model_copy(update={"requirements": dependency}),
+        )
+        with pytest.raises(d5.PlannerSemanticFailure):
+            asyncio.run(planner.plan(request=case["request"], _h1_case=case, **options))
+        assert backend.calls == 1
+
+
+def test_h1b_task_refs_and_scopes_are_not_wildcards() -> None:
+    """Check the non-executable graph contract without assuming list order."""
+    a = {
+        "ref": "A",
+        "worker": "section",
+        "scope": "Panel",
+        "disposition": "requested",
+        "outcome": "Plot",
+    }
+    b = {**a, "ref": "B", "outcome": "Shade", "depends_on": ["A"]}
+    model = d5._H1BObservationResponse
+    assert model.model_validate({"tasks": [b, a]}).tasks[0].depends_on == ("A",)
+    for tasks in (
+        [a, a],
+        [b],
+        [b, {**a, "depends_on": ["B"]}],
+        [{**a, "scope": None}],
+        [{**a, "worker": "report"}],
+        [{**a, "depends_on": ["A"]}],
+        [a, {**b, "depends_on": ["A", "A"]}],
+    ):
+        with pytest.raises(ValueError):
+            model.model_validate({"tasks": tasks})
 
 
 def test_first_pass_authority_pins_panel_and_request_controls(tmp_path: Path) -> None:
@@ -786,7 +884,7 @@ def test_first_pass_authority_pins_panel_and_request_controls(tmp_path: Path) ->
 
 
 @pytest.mark.parametrize("interrupt", [False, True])
-@pytest.mark.parametrize("population", [d5.A10_SEM_53_POPULATION, d5.H1_POPULATION])
+@pytest.mark.parametrize("population", d5.PLANNER_POPULATIONS)
 def test_first_pass_campaign_captures_one_response_per_case(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, interrupt: bool, population: str
 ) -> None:
@@ -801,19 +899,23 @@ def test_first_pass_campaign_captures_one_response_per_case(
         ),
         planner_first_pass_max_output_tokens=4096,
     )
-    is_h1 = population == d5.H1_POPULATION
+    is_h1b = population == d5.H1B_POPULATION
+    is_h1 = population in d5.H1_POPULATIONS
     if is_h1:
-        accepted_prompt = "ebc9aa1d1a01967e6088a6ec5b403192fa274fc9f19bba026ddf734f4035c013"
+        _, digest, expected_ids, prompt, response_model = d5._h1_contract(population)
+        accepted_prompt = (
+            "6cb230f71729199521b52dd2d602553aad58f8c9827a3ec4209b17cdda9499bd"
+            if is_h1b
+            else "ebc9aa1d1a01967e6088a6ec5b403192fa274fc9f19bba026ddf734f4035c013"
+        )
         authorization = replace(
             authorization,
             planner_population=population,
-            planner_population_benchmark_sha256=d5.H1_PANEL_SHA256,
-            planner_population_source_inventory_sha256=d5.H1_PANEL_SHA256,
+            planner_population_benchmark_sha256=digest,
+            planner_population_source_inventory_sha256=digest,
             planner_population_system_prompt_sha256=accepted_prompt,
-            planner_first_pass_turn_ids=d5.H1_TURN_IDS,
-            planner_smoke_wire_schema_sha256=d5._sha256_json(
-                d5._H1ObservationResponse.model_json_schema()
-            ),
+            planner_first_pass_turn_ids=expected_ids,
+            planner_smoke_wire_schema_sha256=d5._sha256_json(response_model.model_json_schema()),
         )
         for wrong in (
             "",
@@ -825,6 +927,7 @@ def test_first_pass_campaign_captures_one_response_per_case(
         with pytest.raises(d5.D5StaticPreflightError):
             d5._select_first_pass_turns(authorization, population, "planner_only", ("H04",))
     paths = _paths(tmp_path, authorization.campaign_id)
+    full_count = 8 if is_h1b else 10
     clients = []
     requests = []
 
@@ -836,6 +939,18 @@ def test_first_pass_campaign_captures_one_response_per_case(
         response = _planner_wire_payload()
         if is_h1:
             response = {"outcomes": [{"disposition": "requested", "statement": "Test fixture"}]}
+        if is_h1b:
+            response = {
+                "tasks": [
+                    {
+                        "ref": "A",
+                        "worker": "report",
+                        "scope": None,
+                        "disposition": "requested",
+                        "outcome": "Test fixture",
+                    }
+                ]
+            }
         if len(requests) == 1:
             response = {"version": "wellplot.semantic-plan.v2", "summary": "Invalid fixture."}
         return httpx.Response(
@@ -895,7 +1010,7 @@ def test_first_pass_campaign_captures_one_response_per_case(
         for client in clients:
             asyncio.run(client.aclose())
 
-    assert len(requests) == (2 if interrupt else 10)
+    assert len(requests) == (2 if interrupt else full_count)
     assert (
         result["logical_generation_calls"]
         == result["physical_generation_attempts"]
@@ -917,7 +1032,7 @@ def test_first_pass_campaign_captures_one_response_per_case(
     assert rows[0]["observation_status"] == "MODEL_STRUCTURAL_FAILURE"
     assert all(row["correction_usage"]["native_correction"] == 0 for row in rows)
     assert all(row["authoring_status"] == "NOT_REACHED" for row in rows)
-    expected_ids = d5.H1_TURN_IDS if is_h1 else d5.A10_FIRST_PASS_TURN_IDS
+    expected_ids = d5._h1_contract(population)[2] if is_h1 else d5.A10_FIRST_PASS_TURN_IDS
     assert [row["turn_id"] for row in rows] == list(expected_ids[: len(rows)])
     if interrupt:
         assert result["decision"] == "INCONCLUSIVE"
@@ -925,9 +1040,43 @@ def test_first_pass_campaign_captures_one_response_per_case(
         assert len(rows) == 1
     else:
         assert result["decision"] == "PASS"
-        assert len(rows) == 10
+        assert len(rows) == full_count
         assert all(row["schema_valid"] for row in rows[1:])
-        if is_h1:
+        if is_h1b:
+            cases = d5._load_planner_population(REPO_ROOT, population)
+            compiler_events = {
+                event["turn_id"]: event["result"]
+                for line in paths.stage_trace.read_text().splitlines()
+                if (event := json.loads(line))["event"] == "REQUEST_COMPILATION_PASS"
+            }
+            for payload, case, row in zip(requests, cases, rows, strict=True):
+                system, user = payload["messages"]
+                assert d4.sha256_text(system["content"]) == accepted_prompt
+                assert system["content"] == prompt
+                assert user["content"] == (
+                    "USER REQUEST:\n"
+                    + case["request"]
+                    + "\n\nINSPECTED CONTEXT:\n"
+                    + json.dumps(
+                        case["context"], sort_keys=True, separators=(",", ":"), ensure_ascii=False
+                    )
+                )
+                assert (
+                    payload["response_format"]["json_schema"]["schema"]
+                    == response_model.model_json_schema()
+                )
+                assert payload["temperature"] == 0
+                assert payload["chat_template_kwargs"] == {"enable_thinking": False}
+                assert row["compiler_status"] == case["compiler_status"]
+                compilation = compiler_events[case["turn_id"]]
+                assert compilation["status"] == case["compiler_status"]
+                assert compilation["requirements"]["dependencies"] == []
+                assert compilation["diagnostic_codes"] == (
+                    ["supported_request_coverage_failure"]
+                    if case["turn_id"] in {"P02", "P03"}
+                    else []
+                )
+        elif is_h1:
             # Sealed H1-R1 HTTP JSON, canonicalized with only system content blanked.
             original_payloads = (
                 "042aa662d4e31bdfadb1671ab17b7da539580fb6c21efea2db008008e73fec1a",
@@ -987,7 +1136,9 @@ def test_first_pass_campaign_captures_one_response_per_case(
     assert initial_failure["response_reason"] == "schema_validation"
     assert initial_failure["validation_shape"]["issues"]
     assert sum("request_body_base64" in event for event in model_io) == len(requests)
-    assert sum("response_body_base64" in event for event in model_io) == (1 if interrupt else 10)
+    assert sum("response_body_base64" in event for event in model_io) == (
+        1 if interrupt else full_count
+    )
     assert d5.verify_custody_artifacts(paths) == result["custody_digests"]
 
 
