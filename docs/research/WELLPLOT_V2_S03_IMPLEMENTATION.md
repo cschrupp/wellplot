@@ -53,9 +53,19 @@ separately authorized operational smoke proving this exact response model,
 transport, accounting, custody and orderly stop, without consuming the
 ten measured H1 observations. The existing A10 smoke does not certify the
 H1 DTO; the H1 campaign selector intentionally rejects subsets. An
-H1-specific smoke descriptor/path using the existing canonical smoke
-boundary must be resolved separately, not by running the measured panel
-or weakening its selector. Then obtain separate live campaign authority.
+H1-specific smoke descriptor uses the existing canonical planner smoke
+entrypoint, not the measured panel or a weakened selector. Then obtain
+separate live campaign authority.
+
+The operational fixture `H1-SMOKE` asks: “Could you display the natural gamma
+radiation measurement?” Its synthetic, complete inventory contains one
+addressable scalar GR curve (gAPI), with no real file or numerical data. The
+compiler returns `NO_SUPPORTED_SEMANTICS`, not a coverage failure. The smoke
+mode binds the request, synthetic fixture, system prompt, existing H1 schema,
+harness, executable checkpoint, reviewed worktree and runtime identity.
+Use `scripts/run_d5_live_campaign.sh planner-smoke h1-development AUTH_JSON`
+only with this separate smoke authority: one generation and one physical
+attempt, no correction or SDK retry, same thinking-off and output controls.
 
 No live call, scientific result, holdout execution, mutation, activation
 or merge was authorized in this implementation slice.

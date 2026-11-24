@@ -102,6 +102,33 @@ A10_SEM_01_BENCHMARK = f"{A10_SEM_01_ROOT}/benchmark.json"
 A10_SEM_01_SOURCE_INVENTORY = f"{A10_SEM_01_ROOT}/source-inventory.json"
 A10_SEM_53_POPULATION = "a10-53"
 H1_POPULATION = "h1-development"
+H1_SMOKE_MODE = "h1_observation"
+H1_SMOKE_CASE = {
+    "turn_id": "H1-SMOKE",
+    "request": "Could you display the natural gamma radiation measurement?",
+    "compiler_status": "NO_SUPPORTED_SEMANTICS",
+    "context": {
+        "synthetic_inspection": True,
+        "document": {"title": "Smoke", "sections": [{"title": "Main Pass", "tracks": []}]},
+        "sources": [
+            {
+                "label": "Smoke Survey",
+                "inspection_state": "inspected",
+                "inventory_complete": True,
+                "channels": [
+                    {
+                        "mnemonic": "GR",
+                        "unit": "gAPI",
+                        "measurement": "Gamma Ray",
+                        "kind": "scalar",
+                        "addressable": True,
+                    }
+                ],
+            }
+        ],
+    },
+}
+H1_SMOKE_FIXTURE_SHA256 = "22226372dcfe1bcc1f9fb6910a228de9a114d7e7b3c017db4192548bd8317df0"
 H1_PANEL_PATH = "docs/research/WELLPLOT_V2_H1_PANEL.json"
 H1_PANEL_SHA256 = "967b3f670e4d5763b8aaa37cdbf9805ef76a8e7f831ea5106567895126391402"
 H1_TURN_IDS = tuple(f"H{index:02d}" for index in range(1, 11))
@@ -1225,6 +1252,44 @@ def _planner_smoke_case(
     case_id: str | None = None,
 ) -> dict[str, Any]:
     """Resolve one authority-pinned case from the immutable SEM-01 inputs."""
+    if authorization.planner_smoke_mode == H1_SMOKE_MODE:
+        from wellplot.agent.code_mode.obligations import compile_request_contract
+        from wellplot.agent.code_mode.planner import _H1_SYSTEM_PROMPT
+
+        request = H1_SMOKE_CASE["request"]
+        compilation = compile_request_contract(request)
+        schema_digest = _sha256_json(_H1ObservationResponse.model_json_schema())
+        request_digest = hashlib.sha256(request.encode()).hexdigest()
+        if (
+            authorization.planner_smoke_case_id != H1_SMOKE_CASE["turn_id"]
+            or case_id not in {None, H1_SMOKE_CASE["turn_id"]}
+            or authorization.planner_population
+            or authorization.planner_first_pass_max_output_tokens is not None
+            or authorization.planner_smoke_sdk_max_retries != 0
+            or authorization.sdk_max_retries != 0
+            or _sha256_json(H1_SMOKE_CASE) != H1_SMOKE_FIXTURE_SHA256
+            or authorization.planner_smoke_source_inventory_sha256 != H1_SMOKE_FIXTURE_SHA256
+            or authorization.planner_smoke_benchmark_sha256
+            != hashlib.sha256(_H1_SYSTEM_PROMPT.encode()).hexdigest()
+            or authorization.planner_smoke_request_sha256 != request_digest
+            or authorization.planner_smoke_wire_schema_sha256 != schema_digest
+            or authorization.planner_smoke_harness_sha256 != _sha256_file(Path(__file__).resolve())
+            or compilation.status.value != "NO_SUPPORTED_SEMANTICS"
+            or compilation.requirements.dependencies
+        ):
+            raise D5StaticPreflightError("H1 smoke authority or fixture drifted")
+        return {
+            "case_id": H1_SMOKE_CASE["turn_id"],
+            "request": request,
+            "request_sha256": request_digest,
+            "benchmark_sha256": authorization.planner_smoke_benchmark_sha256,
+            "source_inventory_sha256": H1_SMOKE_FIXTURE_SHA256,
+            "source_sha256": None,
+            "wire_schema_sha256": schema_digest,
+            "sdk_max_retries": 0,
+            "physical_attempt_limit": 1,
+            "h1_case": H1_SMOKE_CASE,
+        }
     required_digests = {
         "benchmark": authorization.planner_smoke_benchmark_sha256,
         "source inventory": authorization.planner_smoke_source_inventory_sha256,
@@ -1425,9 +1490,11 @@ def _default_planner_smoke_static_checks(
         raise D5StaticPreflightError("planner smoke is not running in the canonical checkout")
     if Path(_git(repo_root, "rev-parse", "--show-toplevel")).resolve() != canonical_root:
         raise D5StaticPreflightError("planner smoke Git top-level is not canonical")
-    if authorization.planner_smoke_mode != SMOKE_PLANNER_KIND:
+    is_h1 = authorization.planner_smoke_mode == H1_SMOKE_MODE
+    if not is_h1 and authorization.planner_smoke_mode != SMOKE_PLANNER_KIND:
         raise D5StaticPreflightError("planner-only smoke mode is not authorized")
-    if authorization.expected_worktree_porcelain != A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN:
+    expected = H1_EXPECTED_WORKTREE_PORCELAIN if is_h1 else A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN
+    if authorization.expected_worktree_porcelain != expected:
         raise D5StaticPreflightError("planner smoke worktree allowlist is not the reviewed state")
     case = _planner_smoke_case(repo_root, authorization, case_id=case_id)
     static = _default_smoke_static_checks(
@@ -1436,7 +1503,8 @@ def _default_planner_smoke_static_checks(
         artifact_paths,
         expected_worktree_porcelain=authorization.expected_worktree_porcelain,
         expected_schema_sha256=authorization.planner_smoke_wire_schema_sha256,
-        mode="canonical_planner_only_smoke",
+        mode="h1_planner_observation" if is_h1 else "canonical_planner_only_smoke",
+        **({"expected_sdk_max_retries": 0} if is_h1 else {}),
     )
     static.update(
         {
@@ -4754,6 +4822,8 @@ def execute_live_campaign(
     population: str = "d4",
 ) -> dict[str, Any]:
     """Run selected frozen turns after static/readiness interlocks."""
+    if authorization.planner_smoke_mode == H1_SMOKE_MODE:
+        raise D5StaticPreflightError("H1 smoke authority cannot execute a campaign")
     if population in PLANNER_POPULATIONS and mode != "planner_only":
         raise D5StaticPreflightError("Planner population requires planner-only campaign mode")
     turn_ids = _select_first_pass_turns(authorization, population, mode, turn_ids)
@@ -5067,6 +5137,18 @@ def _build_planner_smoke_inputs(
     case: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Build the same bounded document/source summaries consumed by plan_node."""
+    if "h1_case" in case:
+        return {
+            "document_summary": {},
+            "source_summary": {},
+            "source_asset_identity": {"asset_id": "H1 synthetic inspection"},
+            "source_channel_count": 1,
+            "numeric_sample_apis_invoked": False,
+            "source_sha256_before": None,
+            "source_sha256_after_inspection": None,
+            "source_revision_before": None,
+            "source_revision_after_inspection": None,
+        }
     from wellplot.agent.code_mode.source_loader import LogfileSourceLoader
     from wellplot.agent.code_mode.workflow import _planner_source_summary
     from wellplot.agent.inspection import AuthoringInspectionFacade
@@ -5152,6 +5234,7 @@ async def _run_planner_only_and_close(
     request: str,
     document_summary: Mapping[str, Any],
     source_summary: Mapping[str, Any],
+    h1_case: Mapping[str, Any] | None = None,
 ) -> tuple[object | None, BaseException | None, BaseException | None]:
     """Call only the canonical planner entrypoint, then close its canonical client."""
     from wellplot.agent.code_mode.planner import SemanticPlanner
@@ -5171,8 +5254,9 @@ async def _run_planner_only_and_close(
             current_document_summary=document_summary,
             source_summary=source_summary,
             timeout_seconds=config.timeout_seconds,
-            temperature=config.planner_temperature,
-            max_output_tokens=config.max_output_tokens,
+            temperature=0 if h1_case is not None else config.planner_temperature,
+            max_output_tokens=4096 if h1_case is not None else config.max_output_tokens,
+            **({"_h1_case": h1_case} if h1_case is not None else {}),
         )
     except BaseException as error:
         execution_error = error
@@ -5304,6 +5388,7 @@ def execute_live_planner_smoke(
     if authorization.project_config_fingerprint_sha256 != project_config.fingerprint_sha256:
         raise D5StaticPreflightError("project configuration fingerprint mismatch")
     paths = EvidencePaths(artifact_root, authorization.campaign_id)
+    is_h1 = authorization.planner_smoke_mode == H1_SMOKE_MODE
     if static_checker is None:
         static, case = _default_planner_smoke_static_checks(
             repo_root,
@@ -5313,7 +5398,14 @@ def execute_live_planner_smoke(
         )
     else:
         case = _planner_smoke_case(repo_root, authorization, case_id=case_id)
-        _require_exact_planner_worktree(repo_root, authorization.expected_worktree_porcelain)
+        if is_h1:
+            if (
+                authorization.expected_worktree_porcelain != H1_EXPECTED_WORKTREE_PORCELAIN
+                or _git_porcelain_raw(repo_root) != H1_EXPECTED_WORKTREE_PORCELAIN
+            ):
+                raise D5StaticPreflightError("H1 smoke worktree differs from its authority")
+        else:
+            _require_exact_planner_worktree(repo_root, authorization.expected_worktree_porcelain)
         static = static_checker(repo_root, authorization, paths)
     try:
         context = _build_planner_smoke_inputs(repo_root, case)
@@ -5345,6 +5437,11 @@ def execute_live_planner_smoke(
     load_key = api_key_loader or (lambda: d4.load_d4_api_key(repo_root))
 
     def build_provider(token: str) -> object:
+        h1_limits = (
+            {"logical_call_ceiling": 1, "planner_first_pass_max_output_tokens": 4096}
+            if is_h1
+            else {}
+        )
         if provider_factory is not None:
             return provider_factory(
                 repo_root,
@@ -5352,6 +5449,7 @@ def execute_live_planner_smoke(
                 token,
                 max_retries_override=authorization.planner_smoke_sdk_max_retries,
                 trace_callback=on_trace,
+                **h1_limits,
             )
         return create_live_adapter(
             repo_root=repo_root,
@@ -5362,6 +5460,7 @@ def execute_live_planner_smoke(
             require_thinking_control=True,
             max_retries_override=authorization.planner_smoke_sdk_max_retries,
             trace_callback=on_trace,
+            **h1_limits,
         )
 
     try:
@@ -5414,6 +5513,10 @@ def execute_live_planner_smoke(
         source_asset_identities=(context["source_asset_identity"],),
     )
     custody_ref["custody"] = custody
+    if is_h1:
+        custody.ledger.max_logical_calls = 1
+        custody.ledger.max_physical_attempts = 1
+        custody.state["synthetic_inspection_sha256"] = H1_SMOKE_FIXTURE_SHA256
     custody.state.update(
         {
             "planner_smoke_case_id": case["case_id"],
@@ -5449,10 +5552,13 @@ def execute_live_planner_smoke(
             request=case["request"],
             document_summary=context["document_summary"],
             source_summary=context["source_summary"],
+            h1_case=case.get("h1_case"),
         )
     )
     reliability = _planner_output_reliability(trace_events, custody.ledger)
     custody.state.update(reliability)
+    if is_h1:
+        custody.state["client_closed"] = cleanup_error is None
     _atomic_json(paths.state, custody.state)
     if cleanup_error is not None:
         custody.record_unexpected_host_exception(
@@ -5464,7 +5570,7 @@ def execute_live_planner_smoke(
         (event for event in trace_events if event.get("event") == "PLANNER_GENERATION_PASS"),
         None,
     )
-    if isinstance(execution_error, _PlannerOnlyWireCaptured):
+    if isinstance(execution_error, (_PlannerOnlyWireCaptured, _H1ObservationComplete)):
         execution_error = None
     if execution_error is not None:
         custody.record_unexpected_host_exception(
@@ -5488,25 +5594,28 @@ def execute_live_planner_smoke(
 
     from wellplot.agent.code_mode.planner import _PlannerWirePlan
 
+    response_model = _H1ObservationResponse if is_h1 else _PlannerWirePlan
     wire_response = None if wire_capture is None else wire_capture.get("validated_response")
     if (
         result is not None
         or not isinstance(wire_response, Mapping)
-        or wire_capture.get("response_schema") != "_PlannerWirePlan"
+        or wire_capture.get("response_schema") != response_model.__name__
     ):
         terminal = custody.finish("SMOKE_CONTRACT_FAIL", reason="planner_wire_capture_invalid")
         return {"status": "SMOKE_CONTRACT_FAIL", "terminal": terminal}
     try:
-        _PlannerWirePlan.model_validate(wire_response)
+        response_model.model_validate(wire_response)
     except Exception:
         terminal = custody.finish("SMOKE_CONTRACT_FAIL", reason="planner_wire_schema_invalid")
         return {"status": "SMOKE_CONTRACT_FAIL", "terminal": terminal}
     downstream_events = _planner_smoke_downstream_events(trace_events, custody.ledger.calls_by_role)
-    source_path = context["source_path"]
-    source_sha_after = _sha256_file(source_path)
-    from wellplot.file_revision import file_revision_token
+    source_sha_after = source_revision_after = None
+    if not is_h1:
+        from wellplot.file_revision import file_revision_token
 
-    source_revision_after = file_revision_token(source_path)
+        source_path = context["source_path"]
+        source_sha_after = _sha256_file(source_path)
+        source_revision_after = file_revision_token(source_path)
     worktree_unchanged = _git_porcelain_raw(repo_root) == authorization.expected_worktree_porcelain
     source_unchanged = (
         source_sha_after == context["source_sha256_before"]
@@ -5515,7 +5624,7 @@ def execute_live_planner_smoke(
     custody.record_planner_observability(
         {
             "event": "PLANNER_RESULT_CAPTURED",
-            "response_schema": "_PlannerWirePlan",
+            "response_schema": response_model.__name__,
             "schema_valid": True,
             "validated_response": wire_response,
         }
@@ -5540,7 +5649,19 @@ def execute_live_planner_smoke(
         }
     )
     _atomic_json(paths.state, custody.state)
-    if not worktree_unchanged or not source_unchanged or downstream_events:
+    if (
+        not worktree_unchanged
+        or not source_unchanged
+        or downstream_events
+        or (
+            is_h1
+            and (
+                custody.ledger.logical_calls != 1
+                or custody.ledger.physical_attempts != 1
+                or _sha256_json(H1_SMOKE_CASE) != H1_SMOKE_FIXTURE_SHA256
+            )
+        )
+    ):
         terminal = custody.finish("SMOKE_CONTRACT_FAIL", reason="planner_smoke_boundary_failed")
         return {"status": "SMOKE_CONTRACT_FAIL", "terminal": terminal}
     terminal = custody.finish("SMOKE_PASS")
@@ -7286,6 +7407,10 @@ def main() -> int:
         parser.error("--planner-case-id requires --execute-planner-smoke")
     repo_root = args.repo_root.resolve()
     authorization = _load_authorization(args.authorization_json.resolve())
+    if authorization.planner_smoke_mode == H1_SMOKE_MODE and not (
+        args.provider_free_preflight or args.execute_planner_smoke
+    ):
+        parser.error("H1 smoke authority is only for canonical planner smoke")
     if authorization.planner_first_pass_max_output_tokens is not None and not (
         args.provider_free_preflight or args.execute_live
     ):
@@ -7296,7 +7421,9 @@ def main() -> int:
         else (repo_root / authorization.artifact_root).resolve()
     )
     paths = EvidencePaths(artifact_root, authorization.campaign_id)
-    if args.provider_free_preflight:
+    if args.provider_free_preflight and authorization.planner_smoke_mode == H1_SMOKE_MODE:
+        result, _ = _default_planner_smoke_static_checks(repo_root, authorization, paths)
+    elif args.provider_free_preflight:
         result = provider_free_preflight(
             repo_root,
             authorization,

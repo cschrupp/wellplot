@@ -369,6 +369,8 @@ class _H1ObservationComplete(Exception):
 
 _H1_CASE_DIGESTS = frozenset(
     (
+        # Non-panel operational smoke.
+        "22226372dcfe1bcc1f9fb6910a228de9a114d7e7b3c017db4192548bd8317df0",
         "8fcb32ecfbabce35793fa5a55efeb75052c77d49ff764e4bffd46691cb2aa634",
         "13f4ab3a3edae650cd8e6d2fd78fad55127176f3aeceae541005d3b4eb60d953",
         "e4dd567c70cf0578775f1fcd1a65c297de48f1bfac53704b169a81b87705aeb4",

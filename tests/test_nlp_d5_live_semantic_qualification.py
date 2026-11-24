@@ -480,6 +480,123 @@ def test_a10_campaign_uses_shared_runner_without_semantic_scoring(tmp_path: Path
     assert b01["first_divergence"] == "NONE"
 
 
+@pytest.mark.parametrize("valid", [True, False])
+def test_h1_operational_smoke_is_single_call(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, valid: bool
+) -> None:
+    """Exercise H1 smoke through existing custody and SDK with local HTTP doubles."""
+    from openai import _base_client
+
+    from wellplot.agent.code_mode.planner import _H1_SYSTEM_PROMPT
+
+    monkeypatch.setattr(_base_client, "get_platform", lambda: "Linux")
+    paths = _paths(tmp_path, "h1-smoke")
+    request_text = d5.H1_SMOKE_CASE["request"]
+    authority = replace(
+        _authorization(campaign_id=paths.campaign_id, artifact_root=str(paths.root)),
+        planner_smoke_mode=d5.H1_SMOKE_MODE,
+        planner_smoke_case_id="H1-SMOKE",
+        planner_smoke_request_sha256=d4.sha256_text(request_text),
+        planner_smoke_benchmark_sha256=d4.sha256_text(_H1_SYSTEM_PROMPT),
+        planner_smoke_source_inventory_sha256=d5.H1_SMOKE_FIXTURE_SHA256,
+        planner_smoke_harness_sha256=d5._sha256_file(Path(d5.__file__)),
+        planner_smoke_wire_schema_sha256=d5._sha256_json(
+            d5._H1ObservationResponse.model_json_schema()
+        ),
+        planner_smoke_sdk_max_retries=0,
+        sdk_max_retries=0,
+        expected_worktree_porcelain=d5.H1_EXPECTED_WORKTREE_PORCELAIN,
+    )
+    monkeypatch.setattr(d5, "_git_porcelain_raw", lambda _: d5.H1_EXPECTED_WORKTREE_PORCELAIN)
+    requests = []
+    clients = []
+
+    async def respond(request: httpx.Request) -> httpx.Response:
+        requests.append(json.loads(request.content))
+        content = (
+            {"outcomes": [{"disposition": "requested", "statement": "Display Gamma Ray"}]}
+            if valid
+            else {"outcomes": []}
+        )
+        return httpx.Response(
+            200,
+            request=request,
+            json={
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": json.dumps(content)},
+                        "finish_reason": "stop",
+                    }
+                ],
+            },
+        )
+
+    def client_factory(observer: d5._PhysicalAttemptObserver) -> httpx.AsyncClient:
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(respond),
+            event_hooks={
+                "request": [observer.on_request],
+                "response": [observer.on_response],
+            },
+        )
+        clients.append(client)
+        return client
+
+    create_adapter = d5.create_live_adapter
+    monkeypatch.setattr(
+        d5,
+        "create_live_adapter",
+        lambda **kwargs: create_adapter(
+            **kwargs,
+            http_client_factory=client_factory,
+        ),
+    )
+    with pytest.raises(d5.D5StaticPreflightError, match="fixture drifted"):
+        d5._planner_smoke_case(REPO_ROOT, replace(authority, planner_smoke_request_sha256="0" * 64))
+    result = d5.execute_live_planner_smoke(
+        repo_root=REPO_ROOT,
+        authorization=authority,
+        artifact_root=paths.root,
+        endpoint_get=lambda url, _token: (
+            {"data": [{"id": d5.EXPECTED_MODEL}]}
+            if url == PROJECT_CONFIG.model_catalog_url
+            else _props()
+        ),
+        api_key_loader=lambda: "test-only-token",
+        static_checker=lambda *_args: {"status": "PASS"},
+    )
+    assert result["status"] == ("SMOKE_PASS" if valid else "SMOKE_CONTRACT_FAIL")
+    terminal = result["terminal"]
+    assert terminal["logical_generation_calls"] == terminal["physical_generation_attempts"] == 1
+    assert terminal["correction_generation_requests"] == 0
+    assert terminal["first_pass_schema_valid"] is valid
+    assert len(requests) == 1
+    assert clients[0].is_closed
+    payload = requests[0]
+    assert payload["temperature"] == 0
+    assert payload["max_tokens"] == 4096
+    assert payload["messages"][0]["content"] == _H1_SYSTEM_PROMPT
+    assert request_text in payload["messages"][1]["content"]
+    assert payload["response_format"]["json_schema"]["schema"] == (
+        d5._H1ObservationResponse.model_json_schema()
+    )
+    assert "WIRE_TO_CANONICAL_ENTER" not in paths.stage_trace.read_text()
+    summary = json.loads(paths.summary.read_text())
+    assert summary["terminal_sha256"] == d5._sha256_file(paths.terminal)
+    for path in (paths.state, paths.journal, paths.model_io):
+        key = {
+            paths.state: "state_sha256",
+            paths.journal: "journal_sha256",
+            paths.model_io: "model_io_sha256",
+        }[path]
+        assert terminal[key] == d5._sha256_file(path)
+    for relative, digest in terminal["observability_artifacts"].items():
+        assert d5._sha256_file(paths.root / relative) == digest
+    wire_io = [json.loads(line) for line in paths.planner_wire_diagnostics.read_text().splitlines()]
+    assert sum("request_body_base64" in entry for entry in wire_io) == 1
+    assert sum("response_body_base64" in entry for entry in wire_io) == 1
+
+
 def test_h1_planner_fails_closed_without_observation_callback() -> None:
     """Success without a callback must stop, and tampered inputs must never generate."""
     from types import SimpleNamespace
