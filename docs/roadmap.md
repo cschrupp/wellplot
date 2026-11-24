@@ -1,6 +1,86 @@
 # wellplot Roadmap
 
-Last updated: 2026-11-01
+Last updated: 2026-11-24
+
+## Active WellPlot V2 Plan
+
+Deliver scientifically correct, extensible well-log authoring through ordinary
+natural language, using one canonical deterministic authoring engine. The
+model hypotheses are experiments serving product delivery, not release gates
+by themselves. The active backlog is Beads epic `well_log_os-bdn`;
+S00–S18 are its children `.1`–`.19` in order. Recover work with
+`bd prime`, `bd show well_log_os-bdn`, and `bd ready` in the canonical checkout.
+
+Product acceptance requires real LAS/DLIS authoring (PR-01); unfamiliar phrasing
+(PR-02); ordinary prerequisite selection (PR-03); multiple outcomes (PR-04);
+conversational revision (PR-05); exact scientific parameters and restrictions
+(PR-06); approved defaults (PR-07); grounding and consequential clarification
+(PR-08); preservation (PR-09); truthful disposition (PR-10); persistence,
+reload and rendering (PR-11); Notebook/MCP parity (PR-12); and incremental
+extension without architectural redesign (PR-13).
+
+S00–S02 establish planning and experiment readiness; S03–S06 test H1–H3 and
+decide whether downstream integration is warranted. S07–S09 deliver the first
+scientific vertical slice, S10–S13 complete conversational behavior, S14/S15
+qualify representative workloads, S17 tests extensibility before the S16 final
+scientific freeze, and S18 decides viable-product acceptance. C3 continuation is
+suspended. A decisive negative result can bring S06 forward by explicitly
+revising the affected Beads dependencies. Ready tasks do not confer live authority.
+
+The accepted C2 checkpoint `ba94c8c36c2faca3ba9a2c4cbe4afb8cca5090de` is
+non-executing. Its empty-subtitle resolver limitation remains a mandatory
+prerequisite to resolve before future dependency-aware execution. Existing
+historical roadmap text below is provenance, not concurrent implementation
+authority. No runtime changes or scientific execution are authorized here.
+
+### S02 Draft for S03 (H1)
+
+Open question: can the same model state complete, scientifically grounded
+outcomes with less implementation bookkeeping? A09 proves deterministic
+authoring/rendering can work, not that the model understands requests.
+A10 and R1–R5 show structural failures and bookkeeping pressure; they do
+not isolate contract complexity from model capability. C2 rejection before
+generation is a host observation, not a model failure.
+
+Use the canonical `SemanticPlanner.plan` provider, D5 planner-only observation,
+`D5CampaignRunner`, existing custody and `scripts/run_d5_live_campaign.sh`.
+The current `_PlannerWirePlan` measures the implementation-oriented contract
+only. The current campaign binds existing populations; S02 must identify the
+smallest reviewed dev-panel loading change if the proposed cases cannot be
+selected already. A second condition, if justified and separately approved,
+would change only the model-facing representation at a successive checkpoint.
+Neither arm executes workers. H2 and H3 must not be inferred from H1 wire
+evidence; the existing host-selected worker action is not a choice test.
+
+Proposed exposed-development requests and required interpretations (S02 must
+check exact exposure and fixture availability before freezing):
+
+| Request | Expected interpretation |
+| --- | --- |
+| Plot gamma ray. | Semantic Gamma Ray; no invented mnemonic or preset. |
+| Display GR and resistivity. | Literal GR and distinct resistivity clue; preserve both. |
+| Put density and neutron together. | Two semantic clues and an explicit grouping. |
+| Split the existing GR curve fill at baseline 0. | Existing GR, split geometry, baseline zero. |
+| Change resistivity to logarithmic scale, 0.2–2000. | Exact scale kind and bounds. |
+| Change the GR line to red only in Main Pass. | One scoped style change; other sections untouched. |
+| Rename the report to Well Review and set its subtitle to Main Survey. | Preserve both independent exact strings. |
+| Plot ZZZ_UNKNOWN. | No substitution; surface unavailable channel using supplied inventory. |
+| Plot GR. | With two equally plausible sources, retain ambiguity; do not choose one. |
+| Plot GR while preserving the existing resistivity track. | Plot GR and retain the preservation constraint. |
+
+Hold model, runtime, context, cases and generation controls fixed. Candidate
+runtime is the configured llama.cpp `qwen3.6-35b-a3b`; actual model/build and
+configuration identity remain unverified until authorized readiness. Propose
+one first-pass generation per case per condition, zero correction and SDK
+retries (10 logical/physical attempts for baseline, ceiling 20 if two arms are
+approved). Record actual prompts, responses, structural validity, latency and
+tokens; use downstream human scientific grading, not a new scorer. Progress
+requires at least 9/10 complete and correct with no consequential substitution,
+scope violation or destructive invention. Classify admission, transport and
+schema failures separately. Before any live measurement, require frozen
+authority, provider-free qualification, approved LAN execution, non-generative
+readiness and separate accepted smoke as applicable. This proposal authorizes
+none of those calls.
 
 ## Scope Summary
 
