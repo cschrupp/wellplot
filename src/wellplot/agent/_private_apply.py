@@ -68,6 +68,7 @@ def _verify_c2_receipt(
         or derived.scope_binding != scope_binding
         or derived.scope_binding != plan.scope_binding
         or derived.obligations != obligations
+        or derived.obligations != plan.obligations
         or derived.section_tasks != plan.section_tasks
         or len(inspected.sections) != 1
         or inspected.sections[0].task_index != 0
@@ -345,8 +346,10 @@ def _apply_private_authoring(
             rolled_back=rolled_back,
         )
 
-    if (
-        requirement_compilation is not None and requirement_compilation.requirements.dependencies
+    retained = inspected.plan.requirement_compilation if inspected is not None else None
+    if any(
+        compilation is not None and compilation.requirements.dependencies
+        for compilation in (requirement_compilation, retained)
     ) or (request is not None and is_c2_request(request)):
         if request is not None and requirement_compilation is not None and inspected is not None:
             try:

@@ -310,6 +310,26 @@ def test_graph_merges_report_and_sections_in_plan_order() -> None:
     assert result["merged_intent"]["title"] == "Report title"
     assert "report = wp.report" not in str(result["worker_outcomes"])
 
+    # Exercise only result projection with synthetic custody; never dispatch C2.
+    from wellplot.agent.code_mode.facade import _project_graph_result
+    from wellplot.agent.code_mode.obligations import compile_request_contract
+    from wellplot.agent.session import _project_result
+
+    baseline = _project_graph_result(result)
+    retained_plan = SemanticPlan.model_validate(result["plan"])
+    compilation = compile_request_contract(
+        "Plot physical GR. Then split the GR curve fill at baseline 0."
+    )
+    injected = retained_plan.model_copy(update={"requirement_compilation": compilation})
+    facade = _project_graph_result({**result, "plan": injected.model_dump(mode="json")})
+    session = _project_result(facade, mode="reconstruct")
+    assert facade.requirement_compilation == session.requirement_compilation == compilation
+    assert facade.scope_binding == session.scope_binding == retained_plan.scope_binding
+    assert facade.model_dump(mode="json") == baseline.model_dump(mode="json")
+    original_session = _project_result(baseline, mode="reconstruct")
+    assert session.model_dump(mode="json") == original_session.model_dump(mode="json")
+    assert session.inspection() == original_session.inspection()
+
 
 def test_planner_condition_cannot_cancel_mandatory_graph_work() -> None:
     """An unconditional user request remains outstanding despite planner conditions."""
@@ -538,6 +558,15 @@ def test_c2_graph_rejects_attached_plan_before_dispatch() -> None:
     )
     with pytest.raises(ValueError, match="request-owned section hint"):
         _attach_compiled_requirements(plan, compilation, request=request)
+    wrong = plan.section_tasks[0].model_copy(update={"existing_section_hint": "Repeat Pass"})
+    with pytest.raises(ValueError, match="request-owned section hint"):
+        _attach_compiled_requirements(
+            plan.model_copy(update={"section_tasks": (wrong,)}), compilation, request=request
+        )
+    with pytest.raises(ValueError, match="exactly one section task"):
+        _attach_compiled_requirements(
+            plan.model_copy(update={"section_tasks": (wrong, wrong)}), compilation, request=request
+        )
     plan = plan.model_copy(
         update={
             "section_tasks": (
@@ -552,13 +581,54 @@ def test_c2_graph_rejects_attached_plan_before_dispatch() -> None:
         item.requirement_id for item in attached.obligations
     )
     document = _document()
+    document.sections[0].subtitle = "Unrelated subtitle"
+    enricher = SemanticEnricher(loader=None, allowed_roots={"test": "."})
+    with pytest.raises(ValueError, match="did not match"):
+        enricher.enrich(plan=attached, document=document, source_candidates=(), mode="revise")
     document.sections[0].title = "Main Pass"
-    inspected = SemanticEnricher(loader=None, allowed_roots={"test": "."}).enrich(
+    ambiguous = document.model_copy(
+        update={
+            "sections": [
+                document.sections[0],
+                document.sections[0].model_copy(update={"id": "another"}),
+            ]
+        }
+    )
+    with pytest.raises(ValueError, match="multiple"):
+        enricher.enrich(plan=attached, document=ambiguous, source_candidates=(), mode="revise")
+    inspected = enricher.enrich(
         plan=attached, document=document, source_candidates=(), mode="revise"
     )
     _verify_c2_receipt(
         request, compilation, attached.scope_binding, attached.obligations, inspected, document
     )
+    aggregate_only = attached.model_copy(update={"obligations": attached.obligations[:-1]})
+    task = attached.section_tasks[0]
+    first, *rest = task.obligations
+    tampered_plans = [aggregate_only]
+    for copies in (
+        (*task.obligations, first),
+        tuple(rest),
+        (first.model_copy(update={"value": "CGR"}), *rest),
+        (first.model_copy(update={"scope_key": "existing:other"}), *rest),
+    ):
+        tampered_plans.append(
+            attached.model_copy(
+                update={
+                    "section_tasks": (task.model_copy(update={"obligations": copies}),),
+                }
+            )
+        )
+    for tampered in tampered_plans:
+        with pytest.raises(ValueError, match="receipt"):
+            _verify_c2_receipt(
+                request,
+                compilation,
+                attached.scope_binding,
+                attached.obligations,
+                inspected.model_copy(update={"plan": tampered}),
+                document,
+            )
     with pytest.raises(ValueError, match="receipt"):
         _verify_c2_receipt(
             request,
@@ -575,6 +645,12 @@ def test_c2_graph_rejects_attached_plan_before_dispatch() -> None:
         )
     assert failure.value.code == "dependency_execution_not_authorized"
     assert not events
+    stripped = attached.model_copy(update={"requirement_compilation": None})
+    workers = _Workers()
+    with pytest.raises(PlannerSemanticFailure) as failure:
+        asyncio.run(_graph(stripped, workers).ainvoke({**_state(plan), "request": request}))
+    assert failure.value.code == "dependency_execution_not_authorized"
+    assert not workers.completion_order
 
 
 def test_dispatch_failure_records_context_order_error() -> None:

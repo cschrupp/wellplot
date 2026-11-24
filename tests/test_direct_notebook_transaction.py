@@ -38,11 +38,13 @@ from wellplot.model import AuthoringDocumentIntent, AuthoringDocumentSpec
 from wellplot.semantic_catalog import ExpectedSemanticBinding, SemanticPublicationContract
 
 
-@pytest.mark.parametrize("stripped", [False, True])
-def test_c2_private_apply_rejects_before_service_construction(stripped: bool) -> None:
+@pytest.mark.parametrize("custody", ["explicit", "request", "retained", "conflicting"])
+def test_c2_private_apply_rejects_before_service_construction(custody: str) -> None:
     """Reject C2 before mutation and keep host-only fields out of public output."""
     from wellplot.agent._private_apply import _apply_private_authoring
+    from wellplot.agent.code_mode.enrichment import EnrichedSemanticContext, ReportContext
     from wellplot.agent.code_mode.obligations import compile_request_contract
+    from wellplot.agent.code_mode.planner import SectionTask, SemanticPlan
 
     request = "Plot physical GR. Then split the GR curve fill at baseline 0."
     compilation = compile_request_contract(request)
@@ -50,6 +52,20 @@ def test_c2_private_apply_rejects_before_service_construction(stripped: bool) ->
     retained = legacy.model_copy(update={"requirement_compilation": compilation})
     assert retained.model_dump(mode="json") == legacy.model_dump(mode="json")
     assert retained.inspection() == legacy.inspection()
+    inspected = None
+    if custody in {"retained", "conflicting"}:
+        inspected = EnrichedSemanticContext(
+            plan=SemanticPlan(
+                summary="Retained C2",
+                section_tasks=(SectionTask(goal="Plot GR", capability_ids=("section.log_plot",)),),
+                requirement_compilation=compilation,
+            ),
+            sections=(),
+            report=ReportContext(),
+        )
+    explicit = compilation if custody == "explicit" else None
+    if custody == "conflicting":
+        explicit = compile_request_contract("Plot physical GR.")
     with patch("wellplot.agent._private_apply.AuthoringService") as service:
         result = _apply_private_authoring(
             document=AuthoringDocumentSpec(
@@ -66,13 +82,44 @@ def test_c2_private_apply_rejects_before_service_construction(stripped: bool) ->
             ),
             intent=AuthoringDocumentIntent(title="Must not change"),
             obligations=(),
-            inspected=None,
+            inspected=inspected,
             semantic_contract=None,
-            request=request,
-            requirement_compilation=None if stripped else compilation,
+            request=request if custody == "request" else None,
+            requirement_compilation=explicit,
         )
     assert result.candidate is None
     assert result.errors == ("dependency_execution_not_authorized",)
+    service.assert_not_called()
+
+
+@pytest.mark.parametrize("adapter", ["notebook", "mcp"])
+def test_c2_adapters_reject_without_publication(adapter: str, tmp_path: Path) -> None:
+    """Send a synthetic successful envelope through each real adapter boundary."""
+    document = AuthoringDocumentSpec(
+        name="C2 guard",
+        sections=[
+            {
+                "id": "main",
+                "title": "Main Pass",
+                "tracks": [{"id": "normal", "title": "Normal", "kind": "normal", "width_mm": 20}],
+            }
+        ],
+    )
+    target = tmp_path / "untouched.log.yaml"
+    context = SimpleNamespace(document=document, logfile_path=target)
+    request = "\u2003 Plot physical GR. Then split the GR curve fill at baseline 0. \n"
+    legacy = _successful_result()
+    with patch("wellplot.agent._private_apply.AuthoringService") as service:
+        if adapter == "notebook":
+            outcome = _apply_result(context=context, result=legacy, root=tmp_path, request=request)
+        else:
+            outcome = _apply_session_result(
+                context=context, session_result=legacy, root=tmp_path, request=request
+            )
+    assert not outcome[0]
+    assert outcome[3] == ["dependency_execution_not_authorized"]
+    assert not target.exists()
+    assert document.title is None
     service.assert_not_called()
 
 

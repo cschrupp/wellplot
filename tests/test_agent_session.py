@@ -289,6 +289,26 @@ def test_session_configuration_rejects_nonfinite_and_coercible_values(
         AgentSessionConfig(**kwargs)
 
 
+def test_c2_session_uses_exact_stripped_compiler_bytes() -> None:
+    """Strip only outer whitespace and retain the compilation byte identity."""
+    import hashlib
+
+    from wellplot.agent.code_mode.obligations import compile_request_contract
+
+    canonical = "Plot physical GR.  Then split the GR curve fill at baseline 0."
+    compilation = compile_request_contract(canonical)
+    compiler = _Compiler(
+        _success_result().model_copy(update={"requirement_compilation": compilation})
+    )
+    session = AgentSession(compiler=compiler)
+    result = asyncio.run(
+        session.build(request=f"\u2003{canonical}\n", document=_document(), sources=())
+    )
+    assert compiler.calls[0]["request"] == canonical
+    assert result.request_sha256 == hashlib.sha256(canonical.encode()).hexdigest()
+    assert result.requirement_compilation == compilation
+
+
 def test_empty_request_is_rejected_before_compiler_call() -> None:
     """The public boundary does not dispatch blank requests."""
     compiler = _Compiler(_success_result())

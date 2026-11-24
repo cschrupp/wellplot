@@ -1059,6 +1059,54 @@ def test_c2_named_compilation_keeps_distinct_clause_and_selector_spans() -> None
         verify_anchor_coverage(request, compilation.requirements, anchors=compilation.anchors[:-1])
 
 
+def test_c2_named_scope_rejects_forged_declarations() -> None:
+    """Independently check named C2 identity, selector and provenance."""
+    request = (
+        "In the Main Pass section, plot physical GR. Then split the GR curve fill at baseline 0."
+    )
+    requirements = compile_request_contract(request).requirements
+    scope = requirements.scopes.scopes[0]
+    evidence = scope.provenance[0]
+    for scopes in (
+        (),
+        (scope, scope),
+        (scope.model_copy(update={"declaration_id": "scope.forged"}),),
+        (scope.model_copy(update={"selector_text": "Repeat Pass"}),),
+        (scope.model_copy(update={"origin": "HOST_CONTEXT"}),),
+        (
+            scope.model_copy(
+                update={"provenance": (evidence.model_copy(update={"start_byte": 0}),)}
+            ),
+        ),
+    ):
+        forged = requirements.model_copy(
+            update={
+                "scopes": requirements.scopes.model_copy(update={"scopes": scopes}),
+            }
+        )
+        with pytest.raises(ValueError, match="authoritative scope"):
+            verify_anchor_coverage(request, forged)
+
+
+def test_c2_compiler_preserves_literal_and_utf8_boundaries() -> None:
+    """Match original byte slices and leave quoted compound text to legacy extraction."""
+    from wellplot.agent.code_mode.obligations import is_c2_request
+
+    request = "\u2003Plot physical GR. Then split the GR curve fill at baseline 0."
+    compilation = compile_request_contract(request)
+    first = compilation.requirements.requirements[0]
+    assert first.start_byte == request.encode().index(b"GR")
+    assert request.encode()[first.start_byte : first.end_byte] == b"GR"
+    verify_anchor_coverage(request, compilation.requirements)
+    literal = (
+        'Set the report title to "Plot physical GR. Then split the GR curve fill at baseline 0."'
+    )
+    assert not is_c2_request(literal)
+    result = compile_request_contract(literal)
+    assert result.status.value == "NO_SUPPORTED_SEMANTICS"
+    assert not result.requirements.dependencies
+
+
 @pytest.mark.parametrize(
     "request_text",
     [

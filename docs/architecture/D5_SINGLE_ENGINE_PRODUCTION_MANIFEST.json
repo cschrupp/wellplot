@@ -14,7 +14,7 @@
     "src/wellplot/__init__.py": "2d360539f8070b39e85ce1e14db655c991e024d056b19508779ee069a211f1d4",
     "src/wellplot/_version.py": "1abe50b80342d28110fd6962cdb57b7601d72b33acd3cff6618761b69f2e0363",
     "src/wellplot/agent/__init__.py": "606f9b921b9dabae9ce10c3317fa0f701d5870eb59d8b5447867f43394140a44",
-    "src/wellplot/agent/_private_apply.py": "733ddc923f446b963eafa30e3549603ae1da97fc3634b5a7a7adce6c3edcb13f",
+    "src/wellplot/agent/_private_apply.py": "d3ad09a0345e74334acbb86d0296da8a77cee2af874c672051a1ba8dcf947b3d",
     "src/wellplot/agent/code_mode/canonical_workers.py": "8c64b2fc8653954afbf2dffb9382cdc307482a4917cca67eaf341b588b3296b4",
     "src/wellplot/agent/code_mode/capability_safety.py": "569503a5cc0ecf57ba04e47dba57ca3e5b57e6dd5f6af3d2d4945eb799e38568",
     "src/wellplot/agent/code_mode/enrichment.py": "15a335bcebef2fef3214e3d386f9c9f338dac160fad72c61c0efba1e50789336",
