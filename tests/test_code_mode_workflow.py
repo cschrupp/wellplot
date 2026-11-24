@@ -494,6 +494,89 @@ def test_enrichment_failure_emits_stage_trace_and_propagates() -> None:
     assert failure["exception_type"] == "SemanticEnrichmentError"
 
 
+def test_c2_graph_rejects_attached_plan_before_dispatch() -> None:
+    """Reject a validated synthetic C2 plan before any graph continuation."""
+    from wellplot.agent._private_apply import _verify_c2_receipt
+    from wellplot.agent.code_mode.enrichment import SemanticEnricher
+    from wellplot.agent.code_mode.obligations import compile_request_contract
+    from wellplot.agent.code_mode.planner import (
+        PlannerSemanticFailure,
+        _attach_compiled_requirements,
+        _canonical_plan_from_wire,
+        _PlannerWirePlan,
+    )
+
+    request = (
+        "In the Main Pass section, plot physical GR. Then split the GR curve fill at baseline 0."
+    )
+    compilation = compile_request_contract(request)
+    plan = _canonical_plan_from_wire(
+        _PlannerWirePlan.model_validate(
+            {
+                "version": "wellplot.semantic-plan.v2",
+                "summary": "Plot and fill GR",
+                "section_tasks": [
+                    {
+                        "goal": "Plot GR",
+                        "capability_ids": ["section.log_plot"],
+                        "existing_section_hint": None,
+                        "scope_ref": "main",
+                        "operations": [
+                            {
+                                "local_ref": "ensure_main",
+                                "scope_ref": "main",
+                                "verb": "ENSURE",
+                                "object_kind": "section",
+                                "semantic_ref": "main",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
+        compilation,
+    )
+    with pytest.raises(ValueError, match="request-owned section hint"):
+        _attach_compiled_requirements(plan, compilation, request=request)
+    plan = plan.model_copy(
+        update={
+            "section_tasks": (
+                plan.section_tasks[0].model_copy(update={"existing_section_hint": "Main Pass"}),
+            )
+        }
+    )
+    attached = _attach_compiled_requirements(plan, compilation, request=request)
+    assert attached.requirement_compilation == compilation
+    assert len(attached.obligations) == 4
+    assert attached.section_tasks[0].requirement_refs == tuple(
+        item.requirement_id for item in attached.obligations
+    )
+    document = _document()
+    document.sections[0].title = "Main Pass"
+    inspected = SemanticEnricher(loader=None, allowed_roots={"test": "."}).enrich(
+        plan=attached, document=document, source_candidates=(), mode="revise"
+    )
+    _verify_c2_receipt(
+        request, compilation, attached.scope_binding, attached.obligations, inspected, document
+    )
+    with pytest.raises(ValueError, match="receipt"):
+        _verify_c2_receipt(
+            request,
+            compilation,
+            attached.scope_binding,
+            attached.obligations[:-1],
+            inspected,
+            document,
+        )
+    events = []
+    with pytest.raises(PlannerSemanticFailure) as failure:
+        asyncio.run(
+            _graph(attached, _Workers(), trace_callback=events.append).ainvoke(_state(plan))
+        )
+    assert failure.value.code == "dependency_execution_not_authorized"
+    assert not events
+
+
 def test_dispatch_failure_records_context_order_error() -> None:
     """A pre-dispatch order mismatch is captured before any worker is sent."""
 

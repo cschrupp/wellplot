@@ -38,6 +38,44 @@ from wellplot.model import AuthoringDocumentIntent, AuthoringDocumentSpec
 from wellplot.semantic_catalog import ExpectedSemanticBinding, SemanticPublicationContract
 
 
+@pytest.mark.parametrize("stripped", [False, True])
+def test_c2_private_apply_rejects_before_service_construction(stripped: bool) -> None:
+    """Reject C2 before mutation and keep host-only fields out of public output."""
+    from wellplot.agent._private_apply import _apply_private_authoring
+    from wellplot.agent.code_mode.obligations import compile_request_contract
+
+    request = "Plot physical GR. Then split the GR curve fill at baseline 0."
+    compilation = compile_request_contract(request)
+    legacy = _successful_result()
+    retained = legacy.model_copy(update={"requirement_compilation": compilation})
+    assert retained.model_dump(mode="json") == legacy.model_dump(mode="json")
+    assert retained.inspection() == legacy.inspection()
+    with patch("wellplot.agent._private_apply.AuthoringService") as service:
+        result = _apply_private_authoring(
+            document=AuthoringDocumentSpec(
+                name="C2 guard",
+                sections=[
+                    {
+                        "id": "main",
+                        "title": "Main Pass",
+                        "tracks": [
+                            {"id": "normal", "title": "Normal", "kind": "normal", "width_mm": 20}
+                        ],
+                    }
+                ],
+            ),
+            intent=AuthoringDocumentIntent(title="Must not change"),
+            obligations=(),
+            inspected=None,
+            semantic_contract=None,
+            request=request,
+            requirement_compilation=None if stripped else compilation,
+        )
+    assert result.candidate is None
+    assert result.errors == ("dependency_execution_not_authorized",)
+    service.assert_not_called()
+
+
 def _successful_result(
     intent: AuthoringDocumentIntent | None = None,
     *,

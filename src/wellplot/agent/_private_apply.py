@@ -31,6 +31,7 @@ from ..semantic_catalog import (
 from .code_mode.enrichment import (
     EnrichedSemanticContext,
     ReportContext,
+    _resolved_section_id,
     bind_semantic_publication_sources,
     intent_requires_channel_context,
     reconciliation_channels,
@@ -39,12 +40,43 @@ from .code_mode.enrichment import (
 from .code_mode.obligations import (
     DocumentPostconditionError,
     ObligationState,
+    RequestCompilationResult,
     RequestObligation,
+    ScopeBindingResult,
+    is_c2_request,
     verify_document_obligations,
     verify_document_postconditions,
     verify_document_preservation,
     verify_obligation_spans,
 )
+from .code_mode.planner import _attach_compiled_requirements
+
+
+def _verify_c2_receipt(
+    request: str,
+    compilation: RequestCompilationResult,
+    scope_binding: ScopeBindingResult | None,
+    obligations: tuple[RequestObligation, ...],
+    inspected: EnrichedSemanticContext,
+    document: AuthoringDocumentSpec,
+) -> None:
+    """Verify original and attached custody without granting execution authority."""
+    plan = inspected.plan
+    derived = _attach_compiled_requirements(plan, compilation, request=request)
+    if (
+        derived.requirement_compilation != plan.requirement_compilation
+        or derived.scope_binding != scope_binding
+        or derived.scope_binding != plan.scope_binding
+        or derived.obligations != obligations
+        or derived.section_tasks != plan.section_tasks
+        or len(inspected.sections) != 1
+        or inspected.sections[0].task_index != 0
+        or sum(section.id == inspected.sections[0].section_id for section in document.sections) != 1
+    ):
+        raise ValueError("C2 receipt differs from original scope or attachment custody.")
+    if _resolved_section_id(derived.section_tasks[0], document) != inspected.sections[0].section_id:
+        raise ValueError("C2 receipt does not resolve to the inspected section.")
+    validate_enriched_snapshot(inspected, document)
 
 
 @dataclass(frozen=True, slots=True)
@@ -293,6 +325,9 @@ def _apply_private_authoring(
     obligations: tuple[RequestObligation, ...],
     inspected: EnrichedSemanticContext | None,
     semantic_contract: SemanticPublicationContract | None,
+    request: str | None = None,
+    requirement_compilation: RequestCompilationResult | None = None,
+    scope_binding: ScopeBindingResult | None = None,
     source_base_dir: Path | None = None,
     source_allowed_root: Path | None = None,
     _admitted_plan: AuthoringReconciliationPlan | None = None,
@@ -309,6 +344,23 @@ def _apply_private_authoring(
             errors=errors,
             rolled_back=rolled_back,
         )
+
+    if (
+        requirement_compilation is not None and requirement_compilation.requirements.dependencies
+    ) or (request is not None and is_c2_request(request)):
+        if request is not None and requirement_compilation is not None and inspected is not None:
+            try:
+                _verify_c2_receipt(
+                    request,
+                    requirement_compilation,
+                    scope_binding,
+                    obligations,
+                    inspected,
+                    document,
+                )
+            except ValueError:
+                return rejected("reconciliation_blocked", "dependency_execution_not_authorized")
+        return rejected("reconciliation_blocked", "dependency_execution_not_authorized")
 
     private_service = AuthoringService(document)
     semantic_catalog = EMPTY_SEMANTIC_CHANNEL_CATALOG

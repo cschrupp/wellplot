@@ -127,6 +127,7 @@ def _apply_session_result(
     context: _McpDocumentContext,
     session_result: AgentSessionResult,
     root: Path,
+    request: str | None = None,
 ) -> tuple[bool, bool, bool, list[str], list[str], list[str]]:
     """Apply one successful session intent through a private canonical clone."""
     if not isinstance(session_result, AgentSessionResult):
@@ -167,6 +168,9 @@ def _apply_session_result(
         obligations=session_result.obligations,
         inspected=inspected,
         semantic_contract=session_result.semantic_publication_contract,
+        request=request.strip() if request is not None else None,
+        requirement_compilation=session_result.requirement_compilation,
+        scope_binding=session_result.scope_binding,
         source_base_dir=context.logfile_path.parent,
         source_allowed_root=root,
     )
@@ -330,6 +334,7 @@ class GraphAuthoringMcpOperations:
                 apply_status,
                 section_ids,
             ) = _apply_session_result(
+                request=request,
                 context=context,
                 session_result=result,
                 root=self.root,

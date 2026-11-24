@@ -522,8 +522,8 @@ _CURVE_CREATION_START_RE = re.compile(
     re.I,
 )
 _EXPLICIT_BASELINE_SPLIT_RE = re.compile(
-    r"\s*(?i:split the)\s+(?P<channel>[A-Z][A-Z0-9_]{1,11})"
-    r"\s+(?i:curve fill at baseline)\s+(?P<baseline>[+-]?\d{1,12}(?:\.\d{1,12})?)\s*\.?\s*"
+    r"\s*(?P<geometry>(?i:split the)\s+(?P<channel>[A-Z][A-Z0-9_]{1,11})"
+    r"\s+(?i:curve))\s+(?i:fill at baseline)\s+(?P<baseline>[+-]?\d{1,12}(?:\.\d{1,12})?)\s*\.?\s*"
 )
 _BASELINE_FILL_REQUEST_RE = re.compile(
     r"(?:\A|[.!?;,\n]|\b(?:and|then)\b)\s*(?:(?:please|also)\s+)*"
@@ -933,6 +933,42 @@ def extract_supported_anchors(request: str) -> tuple[SupportedAnchor, ...]:
     """Return the independent, bounded anchor inventory used for coverage."""
     data = request.encode("utf-8")
     anchors: list[SupportedAnchor] = []
+    joint = _C2_REQUEST_RE.fullmatch(request)
+    if joint is not None:
+        plot_start = joint.end("section_prefix") if joint["section_prefix"] else 0
+        plot = _EXPLICIT_PHYSICAL_PLOT_RE.fullmatch(request[plot_start : joint.start("sequence")])
+        fill_start = joint.start("geometry")
+        fill = _EXPLICIT_BASELINE_SPLIT_RE.fullmatch(request[fill_start:])
+        if plot is None or fill is None:
+            raise ValueError("C2 lacks independent plot and fill anchors.")
+        spans = [
+            ("channel", "explicit", None, *(plot_start + i for i in plot.span("channel"))),
+            ("target", "explicit", None, *(fill_start + i for i in fill.span("channel"))),
+            ("kind", "explicit", None, *(fill_start + i for i in fill.span("geometry"))),
+            ("baseline", "explicit", None, *(fill_start + i for i in fill.span("baseline"))),
+        ]
+        if joint["selector"] is not None:
+            clause = _SECTION_TARGET_RE.search(request)
+            scope = _SCOPE_NAME_RE.search(request)
+            if clause is None or scope is None:
+                raise ValueError("C2 lacks independent named scope anchors.")
+            spans.extend(
+                [
+                    ("target", "target", "section_scope_target", *clause.span()),
+                    ("target", "scope", "section_scope", *scope.span()),
+                ]
+            )
+        return tuple(
+            SupportedAnchor(
+                text=request[start:end],
+                start_byte=_byte_offset(request, start),
+                end_byte=_byte_offset(request, end),
+                field=field,
+                kind=kind,
+                family=family,
+            )
+            for field, kind, family, start, end in spans
+        )
     split = _EXPLICIT_BASELINE_SPLIT_RE.fullmatch(request)
     create_curve = _CREATE_PHYSICAL_CURVE_RE.fullmatch(request)
     if split or create_curve:
@@ -1957,6 +1993,20 @@ def compile_request_contract(request: str) -> RequestCompilationResult:
     if not isinstance(request, str) or not request.strip():
         raise ValueError("Authoritative request must be non-empty.")
     _, request_sha256 = _request_identity(request)
+    joint = _C2_REQUEST_RE.fullmatch(request)
+    if joint is not None or is_c2_request(request):
+        if joint is not None and joint["channel"] == joint["fill_channel"]:
+            try:
+                return _compile_c2_request(request, joint, request_sha256)
+            except ValueError:
+                pass
+        return RequestCompilationResult(
+            requirements=CanonicalRequirementSet(
+                request_sha256=request_sha256, language_version="wellplot-request-v1"
+            ),
+            status=RequestCompilationStatus.COVERAGE_FAILURE,
+            diagnostic_codes=("supported_request_coverage_failure",),
+        )
     if _has_unsupported_curve_creation_or_baseline_fill(request):
         return RequestCompilationResult(
             requirements=CanonicalRequirementSet(
@@ -2217,14 +2267,20 @@ def verify_anchor_coverage(
     if not has_dependencies and _has_unsupported_curve_creation_or_baseline_fill(request):
         raise ValueError("Canonical requirement set lacks supported request coverage.")
     if isinstance(obligations, CanonicalRequirementSet):
+        if not obligations.dependencies and is_c2_request(request):
+            raise ValueError("C2 dependency custody is missing.")
         if obligations.request_sha256 != _request_identity(request)[1]:
             raise ValueError("Canonical requirement set request identity mismatch.")
         if obligations.dependencies:
             _verify_request_dependencies(request, obligations)
+            fresh = extract_supported_anchors(request)
+            if anchors is not None and anchors != fresh:
+                raise ValueError("C2 anchor custody differs from the original request.")
+            anchors = fresh
         obligations = obligations.requirements
     anchors = anchors if anchors is not None else extract_supported_anchors(request)
     for anchor in anchors:
-        if anchor.kind == "scope":
+        if anchor.kind == "scope" or (has_dependencies and anchor.family == "section_scope_target"):
             continue
         if not any(
             item.field == anchor.field
@@ -2235,31 +2291,163 @@ def verify_anchor_coverage(
             raise ValueError("Supported request anchor was not converted to an obligation.")
 
 
+_C2_REQUEST_RE = re.compile(
+    r"\s*(?P<section_prefix>(?P<section_clause>(?i:in the)\s+"
+    r"(?P<selector>(?i:Main\s+Pass|Repeat\s+Pass))\s+(?i:section)),\s*)?"
+    r"(?i:plot physical)\s+(?P<channel>[A-Z][A-Z0-9_]{1,11})\."
+    r"\s*(?P<sequence>(?i:then))\s+(?P<geometry>(?i:split)\s+"
+    r"(?P<target>(?i:the)\s+(?P<fill_channel>[A-Z][A-Z0-9_]{1,11})\s+(?i:curve))"
+    r"\s+(?i:fill at baseline)\s+(?P<baseline>[+-]?\d{1,12}(?:\.\d{1,12})?)\.)\s*"
+)
+
+
+def is_c2_request(request: str) -> bool:
+    """Recognize only the bounded compound family, including rejected forms."""
+    if _C2_REQUEST_RE.fullmatch(request):
+        return True
+    text = _QUOTED_REQUEST_LITERAL_RE.sub(lambda match: " " * len(match[0]), request)
+    boundaries = list(re.finditer(r"[.!?;,\n]|\b(?:and|then)\b", text, re.I))
+    starts = [0, *(match.end() for match in boundaries)]
+    ends = [*(match.start() for match in boundaries), len(text)]
+    for start, end in zip(starts, ends, strict=True):
+        plot = _EXPLICIT_PHYSICAL_PLOT_RE.fullmatch(text, start, end)
+        if plot is not None:
+            without_plot = text[:start] + " " * (end - start) + text[end:]
+            if _BASELINE_FILL_REQUEST_RE.search(without_plot):
+                return True
+    return False
+
+
+def _c2_scope(request: str, match: re.Match[str], digest: str) -> ScopeDeclaration:
+    if match["selector"] is None:
+        return ScopeDeclaration(
+            declaration_id="scope.existing.request.1",
+            kind="EXISTING_SECTION",
+            origin="HOST_CONTEXT",
+        )
+    declarations = _request_scope_declarations(request, digest).scopes
+    clause = _SECTION_TARGET_RE.search(request)
+    selector = _SCOPE_NAME_RE.search(request)
+    if (
+        len(declarations) != 1
+        or clause is None
+        or selector is None
+        or clause.span() != match.span("section_clause")
+        or clause.span("target") != match.span("selector")
+        or selector.span() != match.span("selector")
+        or declarations[0].origin != "REQUEST"
+        or declarations[0].kind != "EXISTING_SECTION"
+    ):
+        raise ValueError("Invalid C2 named scope.")
+    return declarations[0]
+
+
+def _compile_c2_request(
+    request: str, match: re.Match[str], digest: str
+) -> RequestCompilationResult:
+    scope = _c2_scope(request, match, digest)
+    channel = match["channel"]
+    facts = tuple(
+        _make_obligation(
+            request=request,
+            request_sha256=digest,
+            match=_re_span_match(request, *match.span(group)),
+            kind=kind,
+            owner_kind=owner_kind,
+            owner_ref=owner,
+            field=field,
+            value=value,
+        ).model_copy(update={"scope_key": scope.declaration_id})
+        for group, kind, owner_kind, owner, field, value in (
+            (
+                "channel",
+                ObligationKind.EXPLICIT_FIELD,
+                OwnerKind.BINDING,
+                "request",
+                "channel",
+                channel,
+            ),
+            (
+                "fill_channel",
+                ObligationKind.TARGET_REFERENCE,
+                OwnerKind.FILL,
+                channel,
+                "target",
+                channel,
+            ),
+            (
+                "geometry",
+                ObligationKind.EXPLICIT_FIELD,
+                OwnerKind.FILL,
+                channel,
+                "kind",
+                "baseline_split",
+            ),
+            (
+                "baseline",
+                ObligationKind.EXPLICIT_FIELD,
+                OwnerKind.FILL,
+                channel,
+                "baseline",
+                float(match["baseline"]),
+            ),
+        )
+    )
+    data = request.encode("utf-8")
+    provenance = tuple(
+        RequirementProvenance(
+            request_sha256=digest,
+            start_byte=start,
+            end_byte=end,
+            span_sha256=hashlib.sha256(data[start:end]).hexdigest(),
+        )
+        for group in ("sequence", "target")
+        for start, end in [tuple(_byte_offset(request, offset) for offset in match.span(group))]
+    )
+    requirements = CanonicalRequirementSet(
+        request_sha256=digest,
+        language_version="wellplot-request-v1",
+        requirements=facts,
+        scopes=ScopeDeclarationSet(scopes=(scope,)),
+        dependencies=(
+            RequestDependency(
+                request_sha256=digest,
+                relation="FILL_TARGET_SATISFIED_BY",
+                predecessor_requirement_id=facts[0].requirement_id,
+                dependent_requirement_id=facts[1].requirement_id,
+                provenance=provenance,
+            ),
+        ),
+    )
+    verify_anchor_coverage(request, requirements)
+    return RequestCompilationResult(
+        requirements=requirements,
+        anchors=extract_supported_anchors(request),
+        status=RequestCompilationStatus.EXTRACTION_COMPLETE,
+    )
+
+
 def _verify_request_dependencies(
     request: str,
     requirement_set: CanonicalRequirementSet,
 ) -> None:
     """Validate a finite joint form against original bytes, not repeated names alone."""
-    pattern = re.compile(
-        r"\s*(?i:plot physical)\s+(?P<channel>[A-Z][A-Z0-9_]{1,11})\."
-        r"\s*(?P<sequence>(?i:then))\s+(?P<geometry>(?i:split)\s+"
-        r"(?P<target>(?i:the)\s+(?P<fill_channel>[A-Z][A-Z0-9_]{1,11})\s+(?i:curve))"
-        r"\s+(?i:fill at baseline)\s+(?P<baseline>[+-]?\d{1,12}(?:\.\d{1,12})?)\.)\s*"
-    )
-    match = pattern.fullmatch(request)
+    match = _C2_REQUEST_RE.fullmatch(request)
     if match is None:
         raise ValueError("Dependency lacks complete supported request coverage.")
     data, digest = _request_identity(request)
     obligations = requirement_set.requirements
     dependencies = requirement_set.dependencies
-    scope = ScopeDeclaration(
-        declaration_id="scope.existing.request.1", kind="EXISTING_SECTION", origin="HOST_CONTEXT"
-    )
+    scope = _c2_scope(request, match, digest)
     if (
-        requirement_set.scopes != ScopeDeclarationSet(scopes=(scope,))
+        requirement_set.language_version != "wellplot-request-v1"
+        or requirement_set.scopes != ScopeDeclarationSet(scopes=(scope,))
         or requirement_set.shared_scope_rules
         or any(
-            item.scope_key != scope.declaration_id or item.scope != "task" for item in obligations
+            item.scope_key != scope.declaration_id
+            or item.scope != "task"
+            or item.slot_key is not None
+            for item in obligations
         )
     ):
         raise ValueError("Dependency requires the original authoritative scope declaration.")

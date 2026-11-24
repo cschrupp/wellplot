@@ -958,6 +958,29 @@ def test_semantic_plan_rejects_empty_work() -> None:
         SemanticPlan(summary="No work")
 
 
+@pytest.mark.parametrize("stripped", [False, True])
+def test_c2_planner_stops_before_provider(monkeypatch: pytest.MonkeyPatch, stripped: bool) -> None:
+    """Block generation even when the compiled dependency has been stripped."""
+    from wellplot.agent.code_mode import planner as planner_module
+
+    request = "Plot physical GR. Then split the GR curve fill at baseline 0."
+    compilation = planner_module.compile_request_contract(request)
+    assert compilation.requirements.dependencies
+    if stripped:
+        missing = compilation.requirements.model_copy(update={"dependencies": ()})
+        monkeypatch.setattr(
+            planner_module,
+            "compile_request_contract",
+            lambda _: compilation.model_copy(update={"requirements": missing}),
+        )
+    backend = _RecordedBackend(None)
+    planner = SemanticPlanner(backend=backend, registry=create_builtin_registry())
+    with pytest.raises(planner_module.PlannerSemanticFailure) as failure:
+        asyncio.run(planner.plan(request=request, mode="revise", timeout_seconds=5))
+    assert failure.value.code == "dependency_execution_not_authorized"
+    assert not backend.requests
+
+
 def test_planner_makes_one_static_structured_call() -> None:
     """Normal planning uses one fixed response model and no source discovery."""
     backend = _RecordedBackend(_plan_payload())

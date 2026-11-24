@@ -16,7 +16,7 @@ from ..model.authoring import AuthoringDocumentSpec
 from ..model.intent import AuthoringDocumentIntent
 from ..semantic_catalog import SemanticPublicationContract
 from .code_mode.enrichment import ChannelContext, EnrichedSemanticContext, SourceCandidate
-from .code_mode.obligations import RequestObligation
+from .code_mode.obligations import RequestCompilationResult, RequestObligation, ScopeBindingResult
 from .semantic_runtime import SemanticStageEvidence
 
 CompilationMode = Literal["reconstruct", "revise"]
@@ -192,6 +192,8 @@ class AgentSessionResult(_SessionModel):
         pattern=r"^[0-9a-f]{64}$",
     )
     inspection_context: EnrichedSemanticContext | None = Field(default=None, exclude=True)
+    requirement_compilation: RequestCompilationResult | None = Field(default=None, exclude=True)
+    scope_binding: ScopeBindingResult | None = Field(default=None, exclude=True)
     semantic_publication_contract: SemanticPublicationContract | None = Field(
         default=None,
         exclude=True,
@@ -409,6 +411,8 @@ def _project_result(result: _CompileResultLike, *, mode: CompilationMode) -> Age
         workers=workers,
         metrics=_project_metrics(result.metrics),
         obligations=result.obligations,
+        requirement_compilation=getattr(result, "requirement_compilation", None),
+        scope_binding=getattr(result, "scope_binding", None),
         inspection_context=getattr(result, "inspection_context", None),
         semantic_publication_contract=getattr(result, "semantic_publication_contract", None),
     )

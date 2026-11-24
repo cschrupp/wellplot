@@ -34,7 +34,9 @@ from .enrichment import (
     SemanticEnrichmentError,
     SourceCandidate,
 )
+from .obligations import is_c2_request
 from .planner import (
+    PlannerSemanticFailure,
     ReportTask,
     SectionTask,
     SemanticPlan,
@@ -120,6 +122,14 @@ def build_compile_graph(dependencies: CodeModeGraphDependencies) -> CompiledStat
             temperature=state.get("planner_temperature", 0.0),
             max_output_tokens=state.get("max_output_tokens"),
         )
+        if is_c2_request(state["request"]) or (
+            plan.requirement_compilation is not None
+            and plan.requirement_compilation.requirements.dependencies
+        ):
+            raise PlannerSemanticFailure(
+                "dependency_execution_not_authorized",
+                "Compound request execution is not authorized.",
+            )
         return {
             "plan": plan.model_dump(mode="json"),
             "planned_document_revision": document_revision,

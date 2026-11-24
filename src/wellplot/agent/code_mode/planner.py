@@ -45,6 +45,8 @@ from .obligations import (
     ScopeBindingStatus,
     ScopeDeclaration,
     compile_request_contract,
+    is_c2_request,
+    verify_anchor_coverage,
 )
 
 CompilationMode = Literal["reconstruct", "revise"]
@@ -922,6 +924,12 @@ class SemanticPlanner:
                 "The authoritative request could not be compiled consistently.",
             )
 
+        if compilation.requirements.dependencies or is_c2_request(request):
+            raise PlannerSemanticFailure(
+                "dependency_execution_not_authorized",
+                "Compound request execution is not authorized.",
+            )
+
         context = {
             "request": request,
             "mode": mode,
@@ -1203,8 +1211,23 @@ def _safe_trace_failure(error: Exception) -> dict[str, object]:
 def _attach_compiled_requirements(
     plan: SemanticPlan,
     compilation: RequestCompilationResult,
+    *,
+    request: str | None = None,
 ) -> SemanticPlan:
     """Bind already compiled request facts to plan tasks without reparsing text."""
+    if compilation.requirements.dependencies or (request is not None and is_c2_request(request)):
+        if request is None:
+            raise ValueError("C2 attachment requires original request custody.")
+        if compilation.status is not RequestCompilationStatus.EXTRACTION_COMPLETE:
+            raise ValueError("C2 attachment requires complete compilation custody.")
+        verify_anchor_coverage(request, compilation.requirements, anchors=compilation.anchors)
+        scope = compilation.requirements.scopes.scopes[0]
+        if len(plan.section_tasks) != 1 or plan.report_task is not None:
+            raise ValueError("C2 attachment requires exactly one section task.")
+        if scope.origin == "REQUEST" and _scope_key(
+            plan.section_tasks[0].existing_section_hint or ""
+        ) != _scope_key(scope.selector_text or ""):
+            raise ValueError("C2 attachment requires the request-owned section hint.")
     requirements = compilation.requirements.requirements
     report = plan.report_task
     if report is not None:

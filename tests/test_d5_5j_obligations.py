@@ -1037,7 +1037,42 @@ def test_request_dependency_original_provenance_and_roundtrip() -> None:
     )
     assert CanonicalRequirementSet.model_validate_json(values.model_dump_json()) == values
     assert not compile_request_contract("Plot physical GR.").requirements.dependencies
-    assert compile_request_contract(request).status.value == "COVERAGE_FAILURE"
+    assert compile_request_contract(request).requirements == values
+
+
+def test_c2_named_compilation_keeps_distinct_clause_and_selector_spans() -> None:
+    """Verify named scope without turning scope anchors into scientific facts."""
+    request = (
+        "In the Main Pass section, plot physical GR. Then split the GR curve fill at baseline 0."
+    )
+    compilation = compile_request_contract(request)
+    assert compilation.status.value == "EXTRACTION_COMPLETE"
+    assert len(compilation.requirements.requirements) == 4
+    assert len(compilation.requirements.dependencies) == 1
+    assert compilation.requirements.scopes.scopes[0].selector_text == "Main Pass"
+    assert [anchor.text for anchor in compilation.anchors[-2:]] == [
+        "In the Main Pass section",
+        "Main Pass",
+    ]
+    verify_anchor_coverage(request, compilation.requirements, anchors=compilation.anchors)
+    with pytest.raises(ValueError, match="anchor custody"):
+        verify_anchor_coverage(request, compilation.requirements, anchors=compilation.anchors[:-1])
+
+
+@pytest.mark.parametrize(
+    "request_text",
+    [
+        "Plot physical GR. Then split the CGR curve fill at baseline 0.",
+        "Split the GR curve fill at baseline 0. Then plot physical GR.",
+        "Plot physical GR. Then split the GR curve fill at baseline 0 and delete resistivity.",
+        "Plot physical GR and split the GR curve fill at baseline 0.",
+    ],
+)
+def test_c2_rejects_unmatched_compound_without_salvaging_facts(request_text: str) -> None:
+    """An unmatched compound candidate must not produce partial authority."""
+    compilation = compile_request_contract(request_text)
+    assert compilation.status.value == "COVERAGE_FAILURE"
+    assert not compilation.requirements.requirements
 
 
 @pytest.mark.parametrize("index", range(4))

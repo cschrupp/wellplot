@@ -31,7 +31,7 @@ from .enrichment import (
     SemanticEnrichmentError,
     SourceCandidate,
 )
-from .obligations import RequestObligation
+from .obligations import RequestCompilationResult, RequestObligation, ScopeBindingResult
 from .planner import CompilationMode, PlannerHostRejection, PlannerSemanticFailure, SemanticPlan
 from .report_boundary_safety import (
     ReportBoundarySafetyEvidence,
@@ -151,6 +151,8 @@ class CodeModeCompileResult(_CompileModel):
     metrics: CompileMetrics
     obligations: tuple[RequestObligation, ...] = ()
     inspection_context: EnrichedSemanticContext | None = Field(default=None, exclude=True)
+    requirement_compilation: RequestCompilationResult | None = Field(default=None, exclude=True)
+    scope_binding: ScopeBindingResult | None = Field(default=None, exclude=True)
     semantic_publication_contract: SemanticPublicationContract | None = Field(
         default=None,
         exclude=True,
@@ -342,6 +344,8 @@ def _project_graph_result(
     return CodeModeCompileResult(
         success=True,
         merged_intent=merged_intent,
+        requirement_compilation=plan.requirement_compilation,
+        scope_binding=plan.scope_binding,
         obligations=remaining_obligations,
         diagnostics=diagnostics,
         workers=workers,

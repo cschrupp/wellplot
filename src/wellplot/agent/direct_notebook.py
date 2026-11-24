@@ -222,6 +222,7 @@ def _apply_result(
     context: _NotebookDocumentContext,
     result: AgentSessionResult,
     root: Path,
+    request: str | None = None,
 ) -> tuple[bool, bool, bool, list[str], str, dict[str, str]]:
     """Apply one v2 intent through a private canonical transaction."""
     stages = {
@@ -252,6 +253,9 @@ def _apply_result(
         obligations=result.obligations,
         inspected=inspected,
         semantic_contract=result.semantic_publication_contract,
+        request=request.strip() if request is not None else None,
+        requirement_compilation=result.requirement_compilation,
+        scope_binding=result.scope_binding,
         source_base_dir=context.logfile_path.parent,
         source_allowed_root=root,
     )
@@ -403,6 +407,7 @@ class DirectNotebookSession:
             )
         )
         success, changed, rolled_back, errors, apply_status, host_stage_evidence = _apply_result(
+            request=request,
             context=context,
             result=result,
             root=self.server_root,
