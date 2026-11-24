@@ -576,6 +576,9 @@ def test_h1_operational_smoke_is_single_call(
     assert payload["temperature"] == 0
     assert payload["max_tokens"] == 4096
     assert payload["messages"][0]["content"] == _H1_SYSTEM_PROMPT
+    assert d4.sha256_text(payload["messages"][0]["content"]) == (
+        "ebc9aa1d1a01967e6088a6ec5b403192fa274fc9f19bba026ddf734f4035c013"
+    )
     assert request_text in payload["messages"][1]["content"]
     assert payload["response_format"]["json_schema"]["schema"] == (
         d5._H1ObservationResponse.model_json_schema()
@@ -800,16 +803,25 @@ def test_first_pass_campaign_captures_one_response_per_case(
     )
     is_h1 = population == d5.H1_POPULATION
     if is_h1:
+        accepted_prompt = "ebc9aa1d1a01967e6088a6ec5b403192fa274fc9f19bba026ddf734f4035c013"
         authorization = replace(
             authorization,
             planner_population=population,
             planner_population_benchmark_sha256=d5.H1_PANEL_SHA256,
             planner_population_source_inventory_sha256=d5.H1_PANEL_SHA256,
+            planner_population_system_prompt_sha256=accepted_prompt,
             planner_first_pass_turn_ids=d5.H1_TURN_IDS,
             planner_smoke_wire_schema_sha256=d5._sha256_json(
                 d5._H1ObservationResponse.model_json_schema()
             ),
         )
+        for wrong in (
+            "",
+            "dc0f7ae0e431d1726241ad8a9df2a690091976cfb5c8551e3b615384dae55d1a",
+            "0" * 64,
+        ):
+            with pytest.raises(d5.D5StaticPreflightError, match="system prompt authority"):
+                replace(authorization, planner_population_system_prompt_sha256=wrong)
         with pytest.raises(d5.D5StaticPreflightError):
             d5._select_first_pass_turns(authorization, population, "planner_only", ("H04",))
     paths = _paths(tmp_path, authorization.campaign_id)
@@ -916,6 +928,25 @@ def test_first_pass_campaign_captures_one_response_per_case(
         assert len(rows) == 10
         assert all(row["schema_valid"] for row in rows[1:])
         if is_h1:
+            # Sealed H1-R1 HTTP JSON, canonicalized with only system content blanked.
+            original_payloads = (
+                "042aa662d4e31bdfadb1671ab17b7da539580fb6c21efea2db008008e73fec1a",
+                "c0ff4178ca5285e76d79ee2952b95d49546c2b8236dcb578fe577a10460cad20",
+                "b4fd277a054c71ff8400635ec34a1294243a698027d36e3c7e8286d56089770c",
+                "813e01a6fa8968a90bd4ef1ba739e73cff0180b2bc9f1fff1e304a57df633ce0",
+                "1f6e06df4a84b7d592bdc0d131115d8312b07b753cc9c017280135aea51ecbfa",
+                "3415b811c63b6fee2c880754f783cc0cc8daa5dcb2870cfb1d44dbf3f7f9f496",
+                "ef283f5679e607fa99a435f2edabdf69be0329b7e1b791b46f8e81366f0f43a1",
+                "3060f0f3f89d5d33e34dc3ca68278cdbd12b84df92d1edef1c8a6560c0d471b4",
+                "db8c69b7264707f23ec2d234653ae455d29767ef8614a0e48ebcdfc04281d2b1",
+                "b3e1205d6e99be9ddc3c62046edeaaf59beb5abb4fc1693b8432d0032aca96af",
+            )
+            for payload, expected in zip(requests, original_payloads, strict=True):
+                system, user = payload["messages"]
+                assert d4.sha256_text(system["content"]) == accepted_prompt
+                assert len(system["content"].encode()) == 3481
+                normalized = {**payload, "messages": [{**system, "content": ""}, user]}
+                assert d5._sha256_json(normalized) == expected
             contexts = [
                 json.loads(payload["messages"][1]["content"].split("INSPECTED CONTEXT:\n")[1])
                 for payload in requests

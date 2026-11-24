@@ -44,6 +44,7 @@ from wellplot.agent.code_mode.obligations import (
     compile_request_contract,
 )
 from wellplot.agent.code_mode.planner import (
+    _H1_SYSTEM_PROMPT,
     PlannerSemanticFailure,
     _H1ObservationComplete,
     _H1ObservationResponse,
@@ -634,6 +635,7 @@ class D5Authorization:
     planner_population: str = ""
     planner_population_benchmark_sha256: str = ""
     planner_population_source_inventory_sha256: str = ""
+    planner_population_system_prompt_sha256: str = ""
     planner_first_pass_max_output_tokens: int | None = None
     planner_first_pass_turn_ids: tuple[str, ...] | None = None
 
@@ -648,6 +650,8 @@ class D5Authorization:
         ):
             raise D5StaticPreflightError("invalid A10 first-pass authority")
         if self.planner_population == H1_POPULATION:
+            if self.planner_population_system_prompt_sha256 != d4.sha256_text(_H1_SYSTEM_PROMPT):
+                raise D5StaticPreflightError("H1 system prompt authority is missing or mismatched")
             if (
                 cap is None
                 or self.planner_first_pass_turn_ids != H1_TURN_IDS
@@ -772,6 +776,9 @@ class D5Authorization:
             ),
             planner_population_source_inventory_sha256=str(
                 value.get("planner_population_source_inventory_sha256", "")
+            ),
+            planner_population_system_prompt_sha256=str(
+                value.get("planner_population_system_prompt_sha256", "")
             ),
             planner_first_pass_max_output_tokens=value.get("planner_first_pass_max_output_tokens"),
             planner_first_pass_turn_ids=(
@@ -1254,7 +1261,6 @@ def _planner_smoke_case(
     """Resolve one authority-pinned case from the immutable SEM-01 inputs."""
     if authorization.planner_smoke_mode == H1_SMOKE_MODE:
         from wellplot.agent.code_mode.obligations import compile_request_contract
-        from wellplot.agent.code_mode.planner import _H1_SYSTEM_PROMPT
 
         request = H1_SMOKE_CASE["request"]
         compilation = compile_request_contract(request)
@@ -7302,6 +7308,10 @@ def provider_free_preflight(
             authorization.planner_first_pass_max_output_tokens
         )
         static_facts["planner_first_pass_turn_ids"] = list(first_pass_turns)
+    if population == H1_POPULATION:
+        static_facts["planner_population_system_prompt_sha256"] = (
+            authorization.planner_population_system_prompt_sha256
+        )
     return {
         "experiment_version": D5_EXPERIMENT_VERSION,
         "status": "PASS",
