@@ -19,8 +19,21 @@ conversational revision (PR-05); exact scientific parameters and restrictions
 reload and rendering (PR-11); Notebook/MCP parity (PR-12); and incremental
 extension without architectural redesign (PR-13).
 
-S00–S02 establish planning and experiment readiness; S03–S06 test H1–H3 and
-decide whether downstream integration is warranted. S07–S09 deliver the first
+S00–S02 established planning and experiment readiness. S03 remains in progress:
+H1-R1 collected all ten responses but did not progress (preliminary 1/10).
+The [S03 instruction recovery and H1a package](research/WELLPLOT_V2_S03_IMPLEMENTATION.md#h1a-instructional-package)
+defines the next single intervention. Beads children `well_log_os-bdn.4.1`
+→ `well_log_os-bdn.4.2` → `well_log_os-bdn.4.3` cover instruction recovery,
+informed interpretation, and conditional scientific planning/delegation.
+H2 (S04) measures specialist action choice, not filling a predetermined DTO;
+H3 (S05) measures private completion using verified feedback. S06 decides
+KEEP, ADAPT, SIMPLIFY, REPLACE, REMOVE or DEFER. A failed hypothesis is
+evidence, not authorization to build around it. Separate role-specific
+knowledge from runtime machinery; qualify the model before adding complexity.
+If decisive negative evidence warrants an early S06, explicitly suspend or
+reconcile the affected Beads dependencies under review rather than marking
+failed hypotheses as passed.
+S07–S09 deliver the first
 scientific vertical slice, S10–S13 complete conversational behavior, S14/S15
 qualify representative workloads, S17 tests extensibility before the S16 final
 scientific freeze, and S18 decides viable-product acceptance. C3 continuation is
