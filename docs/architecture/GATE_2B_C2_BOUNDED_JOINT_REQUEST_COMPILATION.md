@@ -263,10 +263,20 @@ Proposed changes remain in the existing path:
    declaration. Empty, fabricated, altered, duplicated or selectively omitted
    anchors cannot establish coverage. Any failure returns the existing
    `COVERAGE_FAILURE` path; a partial set is never usable authority.
-6. `SemanticPlanner.plan()` continues to compile before provider construction
-   or generation. For accepted compound syntax it gives the unchanged planner
-   wire only the ordinary request/context/capabilities; the dependency model
-   is never added to provider input or schema.
+6. `SemanticPlanner.plan()` compiles the authoritative request before context
+   construction or provider generation. Under R8, validated dependency-bearing
+   C2 requests and recognized C2 requests with missing or stripped dependency
+   custody fail with `dependency_execution_not_authorized`. Canonical wire
+   conversion, attachment and host custody are qualified separately with
+   provider-free synthetic fixtures exercising existing production functions.
+   No production C2 success path is authorized. Legacy dependency-free requests
+   continue through the unchanged planner wire.
+
+   Binding SOL clarification of baseline
+   `d6401a5dede0bf1035087a25fb2c371d5fa38bae`: R8 supersedes the prior
+   statement that accepted compound syntax gives the planner wire ordinary
+   request/context/capabilities. `AUTHORITY_CHECK: PASS`;
+   `DRIFT_CHECK: PASS` (R8 clarification only).
 7. Before `_attach_compiled_requirements()` rewrites task-copy scope keys and
    requirement IDs, that boundary revalidates the original normalized request
    against the original complete set and freshly recovered anchors. The
