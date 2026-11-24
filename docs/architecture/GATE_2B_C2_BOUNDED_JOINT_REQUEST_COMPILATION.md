@@ -1,4 +1,4 @@
-# Gate 2B-C2 — Bounded Joint Request Compilation (Revision 2)
+# Gate 2B-C2 — Bounded Joint Request Compilation (Revision 3)
 
 **Status:** Design candidate for SOL independent architectural review. No C2
 implementation or production activation is authorized by this document.
@@ -7,7 +7,7 @@ implementation or production activation is authorized by this document.
 <br>
 **C1 accepted implementation baseline:** `fe5b750d05e07585c902e61d1f39bc0b0f6e292c`
 <br>
-**Revised from:** `9b6d635c226df7f0e167829e51ac2656a4405f73`
+**Revised from:** `8c87e975359bde3ba56929ae6a5cf9d8d8312cbd`
 
 **SOL decisions incorporated:** retain `wellplot-request-v1`; approve optional
 excluded host-only compilation/scope fields subject to exact custody and public
@@ -15,8 +15,8 @@ serialization parity; limit named scope to existing recognized request
 syntax; defer necessary-parent admission, dependent execution, scheduling and
 publication; reject unmatched members of the bounded compound family before
 legacy partial extraction; retain distinct named-clause, selector and scope
-anchor provenance; fail closed before worker dispatch and again at private
-apply until a later execution gate.
+anchor provenance; fail closed before planner generation, worker dispatch and
+private apply until a later execution gate.
 **Branch:** `design/planner-worker-responsibility-realignment`
 
 ## 1. Decision and scope
@@ -291,6 +291,66 @@ Proposed changes remain in the existing path:
 
 ### Production non-execution boundary
 
+#### Planner inference gate
+
+The dependency-bearing request must not reach model generation in C2. In the
+existing `SemanticPlanner.plan()` flow, place the fail-closed check immediately
+after `compile_request_contract(request)` has returned a fully validated
+original `RequestCompilationResult` and after its existing non-success status
+handling, but before planner context construction and before the nested
+`generate()` function can call `backend.generate_structured()`. If the
+validated original set has any dependency, raise the existing
+`PlannerSemanticFailure` with code
+`dependency_execution_not_authorized`. This uses the established typed
+failure path; it does not change the provider request, schema, prompt, retry
+policy, or backend.
+
+An empty dependency tuple alone is not enough to establish that a recognized
+C2 request is dependency-free. Reuse one bounded C2-family membership helper
+shared with `compile_request_contract()`: it recognizes the two exact
+productions and delegates failed fullmatches to the existing post-fullmatch
+candidate classifier. This helper only answers family membership; it does not
+extract requirements, validate dependencies, or compile a second plan. If the
+original request is recognized as a C2 family member but the returned
+compilation is missing, has stripped, or otherwise lacks its required
+dependency custody, raise the same typed failure before generation. The
+compiler's full-input match, candidate classification, complete-set
+verification, and dependency validation remain the single recognition and
+validation authority; the membership guard only prevents missing custody from
+becoming permission to plan. Unrelated noncandidate requests with the
+existing empty dependency tuple preserve their current planner behavior.
+
+Provider-free qualification uses synthetic fixtures and the existing
+production functions. Exercise `compile_request_contract()` and its complete
+validators, then exercise canonical-plan conversion, planner attachment, and
+host-only envelope/custody verification with those verified fixtures. At the
+`SemanticPlanner.plan()` boundary, use a provider test double solely to count
+calls: a valid dependency-bearing set and a recognized compound request with
+dependency custody removed both must raise the typed failure with zero calls
+to `generate_structured()`. A legacy dependency-free request must retain the
+existing behavior, demonstrated with the same bounded fake backend and its
+expected call count. The direct conversion/attachment/envelope tests qualify
+those existing components without turning them into an alternate production
+success route; production `plan()` has no C2 success path in this gate.
+
+Across the existing graph and adapter boundaries, assert the dependency
+failure yields zero worker dispatch/compilation, zero intent merge, zero
+private mutation, zero persistence, and zero publication/render. No live
+provider, worker, document mutation, or publication is used by these tests.
+
+Evidence classification: failing before a provider call when validated
+host-owned requirements are not authorized is **ADAPTED** from the existing
+typed request-compilation failure boundary. Reusing the bounded C2-family
+membership helper to reject missing dependency custody is **NOVEL** in
+WellPlot. Merely checking for a present dependency would leave stripped
+custody fail-open; treating every empty-dependency request as C2 would break
+legacy behavior. The shared bounded helper is the narrower alternative. Its
+risks are false family classification and accidental legacy interception;
+the positive non-interception and missing-custody tests above bound these.
+The guard is reversible only by a later explicit gate, and should be revisited
+if exact family membership cannot be determined from the original request
+without duplicating or broadening the compiler grammar.
+
 The reviewed graph route is `SemanticPlanner.plan()` in `plan_node` → safety
 nodes → enrichment and semantic-publication preparation → `dispatch_workers()`
 → `compile_worker_node()` → `merge_node()` → facade result projection. Notebook
@@ -466,6 +526,9 @@ test.
 | Session input has outer whitespace, changed interior bytes, or mismatched request digest | `request.strip()` defines canonical compiler bytes; receiver recomputes the exact UTF-8 digest and rejects any mismatch. |
 | Host-only result fields accidentally enter public JSON/inspection | Serialization-parity regression fails; the optional excluded fields are not accepted until parity is demonstrated. |
 | Dependency-bearing plan reaches the existing `plan_node` return boundary | Stable `dependency_execution_not_authorized` failure before graph state is returned; worker dispatch and merge spies remain at zero. |
+| Validated dependency-bearing C2 request reaches `SemanticPlanner.plan()` | After full original-set validation but before context/generation, raises `PlannerSemanticFailure` with `dependency_execution_not_authorized`; `generate_structured()` call count is zero. |
+| Recognized C2-family request has missing or stripped dependency custody | Reused bounded family recognition detects the family despite the empty/altered dependency tuple; same typed failure occurs before provider generation, with zero worker calls, mutations, or publications downstream. |
+| Legacy request is dependency-free and not a C2-family member | Existing `SemanticPlanner.plan()` behavior is preserved; a bounded fake backend observes the normal existing generation call count. |
 | Canonical graph receives a dependency-bearing synthetic planner result | Exercise the existing graph/`plan_node` boundary; assert the typed fail-closed terminal and zero calls to worker dispatch/compilation, intent merge, adapter private apply, persistence, and render. No worker node executes. |
 | Dependency-bearing `AgentSessionResult` is injected at the shared private-apply boundary | Entry guard rejects before `AuthoringService`, reconciliation, executor, verifier, persistence or rendering. |
 | Adapter receives the planner failure | Notebook/MCP do not call `_apply_private_authoring`; persistence and render spies remain at zero. |
