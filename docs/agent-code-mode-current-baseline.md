@@ -29,6 +29,10 @@ records the design proposal and custody identities. The original prompt-only
 H1b-R2 is suspended; S04 remains blocked. No proposed role or context change
 supersedes current runtime authority.
 
+**Revised S03 closeout (EMPIRICALLY_SUPPORTED):** SOL accepted collection,
+6/6 typed-valid and 4/6 scientifically correct. Progression was not met;
+S04 remains blocked. See the [adjudication and early S06 decision proposal](research/WELLPLOT_V2_S03_REVISED_CLOSEOUT.md).
+
 This baseline applies to:
 
 - `SemanticPlanner` and canonical report/section workers;
