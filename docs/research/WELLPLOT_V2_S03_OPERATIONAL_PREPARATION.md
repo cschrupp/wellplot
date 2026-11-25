@@ -40,8 +40,12 @@ No matching tokenizer/template pair was found locally; no model was downloaded.
 
 On the qualified runtime, submit the exact mock-captured SDK bodies to documented
 [`/apply-template` and `/tokenize`](https://github.com/ggml-org/llama.cpp/blob/b12340/tools/server/README.md).
-The [release implementation](https://github.com/ggml-org/llama.cpp/blob/b12340/tools/server/server-context.cpp)
+The [upstream release implementation](https://github.com/ggml-org/llama.cpp/blob/b12340/tools/server/server-context.cpp)
 uses the same chat parameter parser for template application and chat generation.
+The upstream tag resolves to `8954f194837d2ec4d5f67f20c81b84abe63883ba`,
+not the runtime's reported `b8645ddda`. Treat release source as documentation,
+not exact deployed-source attestation. The deployed runtime's actual endpoints
+and the same-runtime historical calibration below support the budget finding.
 Count with special-token insertion and parsing enabled, as for text generation.
 The exact schema-bearing and schema-free requests rendered byte-identical
 prompts on each case: structured output adds **zero prompt tokens** here.
