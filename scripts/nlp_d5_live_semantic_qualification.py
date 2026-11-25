@@ -46,10 +46,12 @@ from wellplot.agent.code_mode.obligations import (
 from wellplot.agent.code_mode.planner import (
     _H1_SYSTEM_PROMPT,
     _H1B_SYSTEM_PROMPT,
+    _S03_SYSTEM_PROMPT,
     PlannerSemanticFailure,
     _H1BObservationResponse,
     _H1ObservationComplete,
     _H1ObservationResponse,
+    _S03ObservationResponse,
 )
 from wellplot.agent.providers.base import (
     ProviderFailureCategory,
@@ -166,12 +168,24 @@ H1B_SMOKE_CASE = {
     "compiler_status": "NO_SUPPORTED_SEMANTICS",
 }
 H1B_SMOKE_FIXTURE_SHA256 = "afebbe8d3718801d33a58f31efacfec69b0c13855aeea13d39d9f963830d2d2d"
-H1_POPULATIONS = (H1_POPULATION, H1B_POPULATION)
+S03_POPULATION = "s03-revised-development"
+S03_PANEL_PATH = "docs/research/WELLPLOT_V2_S03_REVISED_PANEL.json"
+S03_PANEL_SHA256 = "890951d0f56d7464e88385131cd89537fb0175fbe17fe547a694c4ff83f0ba17"
+S03_TURN_IDS = tuple(f"R{index:02d}" for index in range(1, 7))
+H1_POPULATIONS = (H1_POPULATION, H1B_POPULATION, S03_POPULATION)
 H1_SMOKE_MODES = (H1_SMOKE_MODE, H1B_SMOKE_MODE)
 PLANNER_POPULATIONS = (A10_SEM_53_POPULATION, *H1_POPULATIONS)
 
 
 def _h1_contract(population: str) -> tuple[str, str, tuple[str, ...], str, type[BaseModel]]:
+    if population == S03_POPULATION:
+        return (
+            S03_PANEL_PATH,
+            S03_PANEL_SHA256,
+            S03_TURN_IDS,
+            _S03_SYSTEM_PROMPT,
+            _S03ObservationResponse,
+        )
     if population == H1B_POPULATION:
         return (
             H1B_PANEL_PATH,
@@ -1171,7 +1185,7 @@ def _default_smoke_static_checks(
     elif mode == "canonical_schema_behavior_probe":
         if _git_porcelain_raw(repo_root) != expected_worktree_porcelain:
             raise D5StaticPreflightError("working tree differs from schema-probe authorization")
-    elif mode in {"h1_planner_observation", "h1b_planner_observation"}:
+    elif mode in {"h1_planner_observation", "h1b_planner_observation", "s03_planner_observation"}:
         if (
             expected_worktree_porcelain != H1_EXPECTED_WORKTREE_PORCELAIN
             or _git_porcelain_raw(repo_root) != expected_worktree_porcelain
@@ -1210,6 +1224,7 @@ def _default_smoke_static_checks(
         "canonical_planner_only_smoke": _planner_wire_schema_sha256(),
         "h1_planner_observation": _sha256_json(_H1ObservationResponse.model_json_schema()),
         "h1b_planner_observation": _sha256_json(_H1BObservationResponse.model_json_schema()),
+        "s03_planner_observation": _sha256_json(_S03ObservationResponse.model_json_schema()),
         "canonical_schema_behavior_probe": _schema_probe_bundle_sha256(),
     }.get(mode)
     if expected_mode_schema is None or expected_schema_sha256 != expected_mode_schema:
@@ -4598,12 +4613,12 @@ class _ObservedLiveAdapter:
 
     async def execute_planner_case(self, case: Mapping[str, Any]) -> Mapping[str, Any]:
         """Observe one planner-only case through the canonical SemanticPlanner."""
-        is_h1b = case["turn_id"] in H1B_TURN_IDS
-        is_h1 = is_h1b or case["turn_id"] in H1_TURN_IDS
-        if is_h1:
-            frozen = _load_planner_population(
-                self.inner.repo_root, H1B_POPULATION if is_h1b else H1_POPULATION
-            )
+        observation_population = next(
+            (p for p in H1_POPULATIONS if case["turn_id"] in _h1_contract(p)[2]), None
+        )
+        is_h1 = observation_population is not None
+        if observation_population is not None:
+            frozen = _load_planner_population(self.inner.repo_root, observation_population)
             if self.planner_first_pass_max_output_tokens != 4096 or case not in frozen:
                 raise D5HarnessError("H1 observation case custody drifted")
             context = {
@@ -6456,7 +6471,7 @@ def _bounded_planner_observation_row(
     source_identity = actual.get("source_asset_identity")
     if not isinstance(source_identity, Mapping):
         source_identity = {}
-    is_h1 = case["turn_id"] in (*H1_TURN_IDS, *H1B_TURN_IDS)
+    is_h1 = any(case["turn_id"] in _h1_contract(p)[2] for p in H1_POPULATIONS)
     return {
         "experiment_version": D5_EXPERIMENT_VERSION,
         "case_id": case["turn_id"] if is_h1 else case["case_id"],
@@ -7366,9 +7381,11 @@ def provider_free_preflight(
             paths,
             expected_worktree_porcelain=authorization.expected_worktree_porcelain or None,
             expected_schema_sha256=_sha256_json(_h1_contract(population)[4].model_json_schema()),
-            mode="h1b_planner_observation"
-            if population == H1B_POPULATION
-            else "h1_planner_observation",
+            mode={
+                H1_POPULATION: "h1_planner_observation",
+                H1B_POPULATION: "h1b_planner_observation",
+                S03_POPULATION: "s03_planner_observation",
+            }[population],
             expected_sdk_max_retries=0,
         )
     else:

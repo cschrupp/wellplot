@@ -1,0 +1,68 @@
+[
+  {
+    "turn_id": "R01",
+    "request": "What units is the deep resistivity curve displayed in?",
+    "compiler_status": "NO_SUPPORTED_SEMANTICS",
+    "context": {
+      "document": {"name":"R01","sections":[{"id":"deep","title":"Deep","data_source":{"source_path":"deep.las","source_format":"las"},"tracks":[{"id":"resistivity","title":"resistivity","width_mm":30,"kind":"normal","bindings":[{"kind":"curve","binding_id":"rt","channel":"RT","label":"Deep resistivity","scale":{"minimum":0.1,"maximum":1000,"unit":"ohm*ft","kind":"log"}}]}]}]},
+      "sources": [{"id":"deep.las","name":"Deep LAS","inspection":"inspected","complete":true,"channels":[{"mnemonic":"RT","unit":"ohm*m","kind":"scalar","addressable":true}]}],
+      "dialogue": [],
+      "workflow": {"published_revision":"r01-current","verified_results":[],"pending":[]}
+    }
+  },
+  {
+    "turn_id": "R02",
+    "request": "Retitle the report Morning Review and tell me whether the Pass B source includes SP.",
+    "compiler_status": "NO_SUPPORTED_SEMANTICS",
+    "context": {
+      "document": {"name":"R02","title":"Morning Draft","sections":[{"id":"a","title":"Pass A","data_source":{"source_path":"pass-a.las"},"tracks":[{"id":"a-track","title":"a-track","width_mm":30,"kind":"normal"}]},{"id":"b","title":"Pass B","data_source":{"source_path":"pass-b.las"},"tracks":[{"id":"b-track","title":"b-track","width_mm":30,"kind":"normal"}]}]},
+      "sources": [{"id":"pass-a.las","name":"Pass A","inspection":"inspected","complete":true,"channels":[{"mnemonic":"SP","unit":"mV","kind":"scalar","addressable":true}]},{"id":"pass-b.las","name":"Pass B","inspection":"inspected","complete":true,"channels":[{"mnemonic":"GR","unit":"gAPI","kind":"scalar","addressable":true}]}],
+      "dialogue": [],
+      "workflow": {"published_revision":"r02-current","verified_results":[],"pending":[]}
+    }
+  },
+  {
+    "turn_id": "R03",
+    "request": "Make density green only in Pilot; in Repeat, put neutron and gamma ray on one track.",
+    "compiler_status": "EXTRACTION_COMPLETE",
+    "context": {
+      "document": {"name":"R03","sections":[{"id":"pilot","title":"Pilot","data_source":{"source_path":"pilot.las"},"tracks":[{"id":"p-density","title":"p-density","width_mm":30,"kind":"normal","bindings":[{"kind":"curve","binding_id":"p-rhob","channel":"RHOB"}]}]},{"id":"repeat","title":"Repeat","data_source":{"source_path":"repeat.las"},"tracks":[{"id":"r-density","title":"r-density","width_mm":30,"kind":"normal","bindings":[{"kind":"curve","binding_id":"r-rhob","channel":"RHOB"}]},{"id":"r-neutron","title":"r-neutron","width_mm":30,"kind":"normal","bindings":[{"kind":"curve","binding_id":"r-nphi","channel":"NPHI"}]},{"id":"r-gamma","title":"r-gamma","width_mm":30,"kind":"normal","bindings":[{"kind":"curve","binding_id":"r-gr","channel":"GR"}]}]}]},
+      "sources": [{"id":"pilot.las","name":"Pilot LAS","inspection":"inspected","complete":true,"channels":[{"mnemonic":"RHOB","measurement":"density","unit":"g/cm3","kind":"scalar","addressable":true}]},{"id":"repeat.las","name":"Repeat LAS","inspection":"inspected","complete":true,"channels":[{"mnemonic":"RHOB","measurement":"density","unit":"g/cm3","kind":"scalar","addressable":true},{"mnemonic":"NPHI","measurement":"neutron porosity","unit":"v/v","kind":"scalar","addressable":true},{"mnemonic":"GR","measurement":"gamma ray","unit":"gAPI","kind":"scalar","addressable":true}]}],
+      "dialogue": [],
+      "workflow": {"published_revision":"r03-current","verified_results":[],"pending":[]}
+    }
+  },
+  {
+    "turn_id": "R04",
+    "request": "Overlay porosity A and porosity B in East and shade between them after they are together.",
+    "compiler_status": "NO_SUPPORTED_SEMANTICS",
+    "context": {
+      "document": {"name":"R04","sections":[{"id":"east","title":"East","data_source":{"source_path":"east.las"},"tracks":[{"id":"east-a","title":"east-a","width_mm":30,"kind":"normal","bindings":[{"kind":"curve","binding_id":"east-pa","channel":"PA","label":"porosity A"}]},{"id":"east-b","title":"east-b","width_mm":30,"kind":"normal","bindings":[{"kind":"curve","binding_id":"east-pb","channel":"PB","label":"porosity B"}]}]}]},
+      "sources": [{"id":"east.las","name":"East LAS","inspection":"inspected","complete":true,"channels":[{"mnemonic":"PA","unit":"v/v","kind":"scalar","addressable":true},{"mnemonic":"PB","unit":"v/v","kind":"scalar","addressable":true}]}],
+      "dialogue": [],
+      "workflow": {"published_revision":"r04-current","verified_results":[],"pending":[]}
+    }
+  },
+  {
+    "turn_id": "R05",
+    "request": "Plot the same curve from the second source instead, without changing the limits.",
+    "compiler_status": "NO_SUPPORTED_SEMANTICS",
+    "context": {
+      "document": {"name":"R05","title":"Sonic Comparison","sections":[{"id":"sonic","title":"Sonic","depth_range":[1200,1250],"data_source":{"source_path":"base.las"},"tracks":[{"id":"sonic-track","title":"sonic-track","width_mm":30,"kind":"normal","bindings":[{"kind":"curve","binding_id":"sonic-dt","channel":"DT"}]}]}],"depth":{"unit":"m"}},
+      "sources": [{"id":"base.las","name":"Base","inspection":"inspected","complete":true,"channels":[{"mnemonic":"DT","unit":"us/ft","kind":"scalar","addressable":true}]},{"id":"repeat.las","name":"Repeat","inspection":"inspected","complete":true,"channels":[{"mnemonic":"DT","unit":"us/ft","kind":"scalar","addressable":true}]}],
+      "dialogue": [{"role":"user","content":"In Sonic, plot literal DT from Base between 1200 and 1250 m. Keep the report title."},{"role":"assistant","content":"Saved DT from Base. The inspected alternatives in order are Base first and Repeat second."}],
+      "workflow": {"published_revision":"r05-current","verified_results":[{"outcome":"Sonic displays DT from Base at 1200 to 1250 m; title unchanged","status":"published"}],"pending":[]}
+    }
+  },
+  {
+    "turn_id": "R06",
+    "request": "Add the remark Review pending and plot physical XCAL from Run West; leave SP alone.",
+    "compiler_status": "NO_SUPPORTED_SEMANTICS",
+    "context": {
+      "document": {"name":"R06","sections":[{"id":"west","title":"Run West","data_source":{"source_path":"west.las"},"tracks":[{"id":"west-sp","title":"west-sp","width_mm":30,"kind":"normal","bindings":[{"kind":"curve","binding_id":"west-sp","channel":"SP"}]}]}]},
+      "sources": [{"id":"west.las","name":"Run West","inspection":"inspected","complete":true,"channels":[{"mnemonic":"SP","unit":"mV","kind":"scalar","addressable":true},{"mnemonic":"CALI","unit":"in","kind":"scalar","addressable":true}]}],
+      "dialogue": [],
+      "workflow": {"published_revision":"r06-current","verified_results":[],"pending":[]}
+    }
+  }
+]

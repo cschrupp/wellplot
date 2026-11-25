@@ -41,6 +41,7 @@ from wellplot.agent.code_mode.planner import (
     _H1BObservationResponse,
     _H1ObservationResponse,
     _PlannerWirePlan,
+    _S03ObservationResponse,
 )
 from wellplot.agent.code_mode.typed_section_worker import _ACTION_RESPONSE_MODELS
 from wellplot.agent.direct_notebook import DirectNotebookSession
@@ -347,6 +348,7 @@ class CountingBackend:
             _PlannerWirePlan: "planner",
             _H1ObservationResponse: "planner",
             _H1BObservationResponse: "planner",
+            _S03ObservationResponse: "planner",
             DeliveryReportResponse: "report_worker",
             DeliverySectionResponse: "section_worker",
         }

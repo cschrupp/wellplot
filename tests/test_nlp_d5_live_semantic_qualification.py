@@ -625,6 +625,7 @@ def test_h1_planner_fails_closed_without_observation_callback(
     from wellplot.capabilities import create_builtin_registry
 
     is_h1b = population == d5.H1B_POPULATION
+    is_s03 = population == d5.S03_POPULATION
     _, _, _, _, expected_model = d5._h1_contract(population)
 
     class Backend:
@@ -635,22 +636,17 @@ def test_h1_planner_fails_closed_without_observation_callback(
         ) -> SimpleNamespace:
             self.calls += 1
             assert response_model is expected_model
-            if is_h1b:
-                return SimpleNamespace(
-                    value=response_model.model_validate(
-                        {
-                            "tasks": [
-                                {
-                                    "ref": "A",
-                                    "worker": "report",
-                                    "scope": None,
-                                    "disposition": "requested",
-                                    "outcome": "Fixture",
-                                }
-                            ]
-                        }
-                    )
-                )
+            if is_h1b or is_s03:
+                task = {
+                    "ref": "A",
+                    "worker": "report",
+                    "scope": None,
+                    "disposition": "requested",
+                    "outcome": "Fixture",
+                }
+                if is_s03:
+                    task["intent"] = "authoring"
+                return SimpleNamespace(value=response_model.model_validate({"tasks": [task]}))
             return SimpleNamespace(
                 value=response_model.model_validate(
                     {
@@ -669,7 +665,7 @@ def test_h1_planner_fails_closed_without_observation_callback(
         "temperature": 0,
         "max_output_tokens": 4096,
     }
-    for rejected in cases[1:3] if is_h1b else [case]:
+    for rejected in [] if is_s03 else cases[1:3] if is_h1b else [case]:
         with pytest.raises(d5.PlannerSemanticFailure) as failure:
             asyncio.run(planner.plan(request=rejected["request"], **options))
         assert failure.value.code == "request_compilation_coverage_failure"
@@ -900,6 +896,7 @@ def test_first_pass_campaign_captures_one_response_per_case(
         planner_first_pass_max_output_tokens=4096,
     )
     is_h1b = population == d5.H1B_POPULATION
+    is_s03 = population == d5.S03_POPULATION
     is_h1 = population in d5.H1_POPULATIONS
     if is_h1:
         _, digest, expected_ids, prompt, response_model = d5._h1_contract(population)
@@ -908,6 +905,8 @@ def test_first_pass_campaign_captures_one_response_per_case(
             if is_h1b
             else "ebc9aa1d1a01967e6088a6ec5b403192fa274fc9f19bba026ddf734f4035c013"
         )
+        if is_s03:
+            accepted_prompt = "807797c9e776c47cd980e7423686c0bec5e4b8dd194a50b8b2d9c4e9218fadca"
         authorization = replace(
             authorization,
             planner_population=population,
@@ -927,7 +926,7 @@ def test_first_pass_campaign_captures_one_response_per_case(
         with pytest.raises(d5.D5StaticPreflightError):
             d5._select_first_pass_turns(authorization, population, "planner_only", ("H04",))
     paths = _paths(tmp_path, authorization.campaign_id)
-    full_count = 8 if is_h1b else 10
+    full_count = 6 if is_s03 else 8 if is_h1b else 10
     clients = []
     requests = []
 
@@ -939,7 +938,7 @@ def test_first_pass_campaign_captures_one_response_per_case(
         response = _planner_wire_payload()
         if is_h1:
             response = {"outcomes": [{"disposition": "requested", "statement": "Test fixture"}]}
-        if is_h1b:
+        if is_h1b or is_s03:
             response = {
                 "tasks": [
                     {
@@ -951,6 +950,8 @@ def test_first_pass_campaign_captures_one_response_per_case(
                     }
                 ]
             }
+            if is_s03:
+                response["tasks"][0]["intent"] = "authoring"
         if len(requests) == 1:
             response = {"version": "wellplot.semantic-plan.v2", "summary": "Invalid fixture."}
         return httpx.Response(
@@ -1019,9 +1020,13 @@ def test_first_pass_campaign_captures_one_response_per_case(
     assert all(payload["max_tokens"] == 4096 for payload in requests)
     assert all("max_completion_tokens" not in payload for payload in requests)
     assert all(
-        payload["messages"][1]["content"].startswith("USER REQUEST:\n")
-        and ("\n\nINSPECTED CONTEXT:\n" if is_h1 else "\n\nPERMITTED CAPABILITIES:\n")
-        in payload["messages"][1]["content"]
+        payload["messages"][1]["content"].startswith("AVAILABLE SOURCE INVENTORIES:\n")
+        if is_s03
+        else (
+            payload["messages"][1]["content"].startswith("USER REQUEST:\n")
+            and ("\n\nINSPECTED CONTEXT:\n" if is_h1 else "\n\nPERMITTED CAPABILITIES:\n")
+            in payload["messages"][1]["content"]
+        )
         for payload in requests
     )
     assert all(
@@ -1042,7 +1047,7 @@ def test_first_pass_campaign_captures_one_response_per_case(
         assert result["decision"] == "PASS"
         assert len(rows) == full_count
         assert all(row["schema_valid"] for row in rows[1:])
-        if is_h1b:
+        if is_h1b or is_s03:
             cases = d5._load_planner_population(REPO_ROOT, population)
             compiler_events = {
                 event["turn_id"]: event["result"]
@@ -1053,14 +1058,36 @@ def test_first_pass_campaign_captures_one_response_per_case(
                 system, user = payload["messages"]
                 assert d4.sha256_text(system["content"]) == accepted_prompt
                 assert system["content"] == prompt
-                assert user["content"] == (
-                    "USER REQUEST:\n"
-                    + case["request"]
-                    + "\n\nINSPECTED CONTEXT:\n"
-                    + json.dumps(
-                        case["context"], sort_keys=True, separators=(",", ":"), ensure_ascii=False
+                if is_s03:
+                    source, document, dialogue, workflow, assignment = user["content"].split("\n\n")
+                    context = case["context"]
+                    assert json.loads(source.split("\n", 1)[1]) == context["sources"]
+                    assert json.loads(document.split("\n", 1)[1]) == (
+                        AuthoringDocumentSpec.model_validate(context["document"]).model_dump(
+                            mode="json"
+                        )
                     )
-                )
+                    assert json.loads(dialogue.split("\n", 1)[1]) == context["dialogue"]
+                    assert json.loads(workflow.split("\n", 1)[1]) == context["workflow"]
+                    assert assignment == (
+                        f"CURRENT REQUEST:\n{case['request']}\n"
+                        "ASSIGNMENT:\nPropose scientific objectives only."
+                    )
+                    assert d5._sha256_json(response_model.model_json_schema()) == (
+                        "8fe2dffed215069f2ec28672c218db45b405efa059b3c5aacf2356b515d582c0"
+                    )
+                else:
+                    assert user["content"] == (
+                        "USER REQUEST:\n"
+                        + case["request"]
+                        + "\n\nINSPECTED CONTEXT:\n"
+                        + json.dumps(
+                            case["context"],
+                            sort_keys=True,
+                            separators=(",", ":"),
+                            ensure_ascii=False,
+                        )
+                    )
                 assert (
                     payload["response_format"]["json_schema"]["schema"]
                     == response_model.model_json_schema()
