@@ -19,6 +19,16 @@ uses the statuses defined by the project decision protocol.
 
 ## 1. Scope and Applicability
 
+**S03 evidence delta:** H1a remains accepted at 9/10 on exposed development
+cases. The consumed H1b condition is independently adjudicated as collection
+PASS, 8/8 typed-valid, 6/8 scientifically correct, progression NOT MET.
+P04 omitted an independent section objective; P08 both proposed and marked
+unavailable the same measurement. These are observation results, not host
+execution outcomes. The [conversational refinement](architecture/WELLPLOT_V2_CONVERSATIONAL_REFINEMENT.md)
+records the design proposal and custody identities. The original prompt-only
+H1b-R2 is suspended; S04 remains blocked. No proposed role or context change
+supersedes current runtime authority.
+
 This baseline applies to:
 
 - `SemanticPlanner` and canonical report/section workers;

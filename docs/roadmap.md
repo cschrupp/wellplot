@@ -26,10 +26,17 @@ defines the next single intervention. Beads children `well_log_os-bdn.4.1`
 → `well_log_os-bdn.4.2` → `well_log_os-bdn.4.3` cover instruction recovery,
 informed interpretation, and conditional scientific planning/delegation.
 H1a is independently accepted at 9/10 on the exposed panel; S03.2 is closed.
-[H1b preparation](research/WELLPLOT_V2_H1B_DESIGN.md) tests fresh scientific
-planning and delegation without executing a plan. S04 remains gated.
-H2 (S04) measures specialist action choice, not filling a predetermined DTO;
-H3 (S05) measures private completion using verified feedback. S06 decides
+[H1b](research/WELLPLOT_V2_H1B_DESIGN.md) is closed as a consumed condition:
+collection PASS, 8/8 typed-valid, 6/8 scientifically correct, progression NOT MET.
+The original prompt-only H1b-R2 is suspended.
+The [conversational refinement](architecture/WELLPLOT_V2_CONVERSATIONAL_REFINEMENT.md)
+proposes a six-case capture-only S03 pilot separating planner intent coverage
+from specialist feasibility. Retain P01–P08 as exposed evidence. S04 remains
+blocked on the revised progression decision in S03.3.
+H2 (S04) measures specialist inspection, feasibility and action choice, not
+filling a predetermined DTO; H3 (S05) measures private completion using verified
+feedback and safe partial completion. The dedicated non-mutating response-role
+experiment is proposed as evidence for S06, not a replacement for H4. S06 decides
 KEEP, ADAPT, SIMPLIFY, REPLACE, REMOVE or DEFER. A failed hypothesis is
 evidence, not authorization to build around it. Separate role-specific
 knowledge from runtime machinery; qualify the model before adding complexity.
