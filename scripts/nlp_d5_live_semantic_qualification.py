@@ -46,6 +46,8 @@ from wellplot.agent.code_mode.obligations import (
 from wellplot.agent.code_mode.planner import (
     _H1_SYSTEM_PROMPT,
     _H1B_SYSTEM_PROMPT,
+    _S03_SMOKE_CASE,
+    _S03_SMOKE_FIXTURE_SHA256,
     _S03_SYSTEM_PROMPT,
     PlannerSemanticFailure,
     _H1BObservationResponse,
@@ -173,7 +175,28 @@ S03_PANEL_PATH = "docs/research/WELLPLOT_V2_S03_REVISED_PANEL.json"
 S03_PANEL_SHA256 = "890951d0f56d7464e88385131cd89537fb0175fbe17fe547a694c4ff83f0ba17"
 S03_TURN_IDS = tuple(f"R{index:02d}" for index in range(1, 7))
 H1_POPULATIONS = (H1_POPULATION, H1B_POPULATION, S03_POPULATION)
-H1_SMOKE_MODES = (H1_SMOKE_MODE, H1B_SMOKE_MODE)
+S03_SMOKE_MODE = "s03_revised_observation"
+_OBSERVATION_SMOKE_PROFILES = {
+    H1_SMOKE_MODE: (
+        H1_SMOKE_CASE,
+        H1_SMOKE_FIXTURE_SHA256,
+        H1_POPULATION,
+        "h1_planner_observation",
+    ),
+    H1B_SMOKE_MODE: (
+        H1B_SMOKE_CASE,
+        H1B_SMOKE_FIXTURE_SHA256,
+        H1B_POPULATION,
+        "h1b_planner_observation",
+    ),
+    S03_SMOKE_MODE: (
+        _S03_SMOKE_CASE,
+        _S03_SMOKE_FIXTURE_SHA256,
+        S03_POPULATION,
+        "s03_planner_observation",
+    ),
+}
+H1_SMOKE_MODES = tuple(_OBSERVATION_SMOKE_PROFILES)
 PLANNER_POPULATIONS = (A10_SEM_53_POPULATION, *H1_POPULATIONS)
 
 
@@ -1331,10 +1354,10 @@ def _planner_smoke_case(
     if authorization.planner_smoke_mode in H1_SMOKE_MODES:
         from wellplot.agent.code_mode.obligations import compile_request_contract
 
-        is_h1b = authorization.planner_smoke_mode == H1B_SMOKE_MODE
-        fixture = H1B_SMOKE_CASE if is_h1b else H1_SMOKE_CASE
-        fixture_digest = H1B_SMOKE_FIXTURE_SHA256 if is_h1b else H1_SMOKE_FIXTURE_SHA256
-        _, _, _, prompt, model = _h1_contract(H1B_POPULATION if is_h1b else H1_POPULATION)
+        fixture, fixture_digest, population, _ = _OBSERVATION_SMOKE_PROFILES[
+            authorization.planner_smoke_mode
+        ]
+        _, _, _, prompt, model = _h1_contract(population)
         request = fixture["request"]
         compilation = compile_request_contract(request)
         schema_digest = _sha256_json(model.model_json_schema())
@@ -1584,9 +1607,7 @@ def _default_planner_smoke_static_checks(
         expected_worktree_porcelain=authorization.expected_worktree_porcelain,
         expected_schema_sha256=authorization.planner_smoke_wire_schema_sha256,
         mode=(
-            "h1b_planner_observation"
-            if authorization.planner_smoke_mode == H1B_SMOKE_MODE
-            else "h1_planner_observation"
+            _OBSERVATION_SMOKE_PROFILES[authorization.planner_smoke_mode][3]
             if is_h1
             else "canonical_planner_only_smoke"
         ),
@@ -5686,7 +5707,7 @@ def execute_live_planner_smoke(
     response_model = _PlannerWirePlan
     if is_h1:
         response_model = _h1_contract(
-            H1B_POPULATION if authorization.planner_smoke_mode == H1B_SMOKE_MODE else H1_POPULATION
+            _OBSERVATION_SMOKE_PROFILES[authorization.planner_smoke_mode][2]
         )[4]
     wire_response = None if wire_capture is None else wire_capture.get("validated_response")
     if (

@@ -481,22 +481,27 @@ def test_a10_campaign_uses_shared_runner_without_semantic_scoring(tmp_path: Path
 
 
 @pytest.mark.parametrize("valid", [True, False])
-@pytest.mark.parametrize("is_h1b", [False, True])
+@pytest.mark.parametrize("smoke_mode", d5.H1_SMOKE_MODES)
 def test_h1_operational_smoke_is_single_call(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, valid: bool, is_h1b: bool
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, valid: bool, smoke_mode: str
 ) -> None:
     """Exercise H1 smoke through existing custody and SDK with local HTTP doubles."""
     from openai import _base_client
 
     monkeypatch.setattr(_base_client, "get_platform", lambda: "Linux")
     paths = _paths(tmp_path, "h1-smoke")
-    fixture = d5.H1B_SMOKE_CASE if is_h1b else d5.H1_SMOKE_CASE
-    fixture_sha = d5.H1B_SMOKE_FIXTURE_SHA256 if is_h1b else d5.H1_SMOKE_FIXTURE_SHA256
-    _, _, _, prompt, model = d5._h1_contract(d5.H1B_POPULATION if is_h1b else d5.H1_POPULATION)
+    fixture, fixture_sha, population, _ = d5._OBSERVATION_SMOKE_PROFILES[smoke_mode]
+    is_s03 = smoke_mode == d5.S03_SMOKE_MODE
+    is_h1b = smoke_mode == d5.H1B_SMOKE_MODE
+    if is_s03:
+        monkeypatch.setattr(
+            d5, "_load_planner_population", lambda *_: pytest.fail("smoke loaded measured panel")
+        )
+    _, _, _, prompt, model = d5._h1_contract(population)
     request_text = fixture["request"]
     authority = replace(
         _authorization(campaign_id=paths.campaign_id, artifact_root=str(paths.root)),
-        planner_smoke_mode=d5.H1B_SMOKE_MODE if is_h1b else d5.H1_SMOKE_MODE,
+        planner_smoke_mode=smoke_mode,
         planner_smoke_case_id=fixture["turn_id"],
         planner_smoke_request_sha256=d4.sha256_text(request_text),
         planner_smoke_benchmark_sha256=d4.sha256_text(prompt),
@@ -518,7 +523,7 @@ def test_h1_operational_smoke_is_single_call(
             if valid
             else {"outcomes": []}
         )
-        if is_h1b:
+        if is_h1b or is_s03:
             content = {
                 "tasks": [
                     {
@@ -532,6 +537,13 @@ def test_h1_operational_smoke_is_single_call(
                 if valid
                 else []
             }
+            if is_s03 and valid:
+                content["tasks"][0].update(
+                    intent="informational",
+                    worker="report",
+                    scope=None,
+                    outcome="Identify the current report title.",
+                )
         return httpx.Response(
             200,
             request=request,
@@ -583,6 +595,8 @@ def test_h1_operational_smoke_is_single_call(
     terminal = result["terminal"]
     assert terminal["logical_generation_calls"] == terminal["physical_generation_attempts"] == 1
     assert terminal["correction_generation_requests"] == 0
+    assert terminal["transport_retries"] == 0
+    assert not terminal["scientific_population_loaded"]
     assert terminal["first_pass_schema_valid"] is valid
     assert len(requests) == 1
     assert clients[0].is_closed
@@ -590,14 +604,19 @@ def test_h1_operational_smoke_is_single_call(
     assert payload["temperature"] == 0
     assert payload["max_tokens"] == 4096
     assert payload["messages"][0]["content"] == prompt
-    assert d4.sha256_text(payload["messages"][0]["content"]) == (
-        "6cb230f71729199521b52dd2d602553aad58f8c9827a3ec4209b17cdda9499bd"
-        if is_h1b
-        else "ebc9aa1d1a01967e6088a6ec5b403192fa274fc9f19bba026ddf734f4035c013"
+    assert (
+        d4.sha256_text(payload["messages"][0]["content"])
+        == {
+            d5.H1_SMOKE_MODE: "ebc9aa1d1a01967e6088a6ec5b403192fa274fc9f19bba026ddf734f4035c013",
+            d5.H1B_SMOKE_MODE: "6cb230f71729199521b52dd2d602553aad58f8c9827a3ec4209b17cdda9499bd",
+            d5.S03_SMOKE_MODE: "807797c9e776c47cd980e7423686c0bec5e4b8dd194a50b8b2d9c4e9218fadca",
+        }[smoke_mode]
     )
     assert request_text in payload["messages"][1]["content"]
     assert payload["response_format"]["json_schema"]["schema"] == (model.model_json_schema())
     assert "WIRE_TO_CANONICAL_ENTER" not in paths.stage_trace.read_text()
+    state = json.loads(paths.state.read_text())
+    assert not any(state["downstream_stage_calls"].values())
     summary = json.loads(paths.summary.read_text())
     assert summary["terminal_sha256"] == d5._sha256_file(paths.terminal)
     for path in (paths.state, paths.journal, paths.model_io):
