@@ -17,9 +17,10 @@ from ..providers.base import (
     ModelBackendProtocol,
     ProviderRequestError,
     StructuredGenerationRequest,
+    StructuredGenerationResult,
 )
 from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
-from .canonical_workers import SectionSemanticActionResponse
+from .canonical_workers import SectionSemanticActionResponse, SectionSpecialistObservation
 from .enrichment import ResolvedSectionContext
 from .obligations import (
     ObligationKind,
@@ -288,6 +289,15 @@ class CanonicalSectionWorker:
     """Generate and lower the one canonical section action contract."""
 
     backend: ModelBackendProtocol
+
+    async def observe_first_response(
+        self, request: StructuredGenerationRequest
+    ) -> StructuredGenerationResult[SectionSpecialistObservation]:
+        """Capture a decision without selecting an action schema or lowering."""
+        return await self.backend.generate_structured(
+            request, response_model=SectionSpecialistObservation
+        )
+
     action_observer: Callable[[Mapping[str, object]], None] | None = None
     action_capture_mode: Literal["off", "diagnostics", "validated_dto"] = "off"
 

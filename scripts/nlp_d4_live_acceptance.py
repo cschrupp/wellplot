@@ -34,6 +34,10 @@ from wellplot.agent.code_mode.canonical_workers import (
     ReportSemanticResponse as DeliveryReportResponse,
 )
 from wellplot.agent.code_mode.canonical_workers import (
+    ReportSpecialistObservation,
+    SectionSpecialistObservation,
+)
+from wellplot.agent.code_mode.canonical_workers import (
     SectionSemanticActionResponse as DeliverySectionResponse,
 )
 from wellplot.agent.code_mode.planner import (
@@ -330,6 +334,7 @@ class CountingBackend:
     ledger: LogicalCallLedger | None = None
     capture_logical_identity: bool = False
     planner_max_output_tokens: int | None = None
+    specialist_observation: bool = False
 
     def __post_init__(self) -> None:
         """Give standalone wrappers a ledger while allowing campaign sharing."""
@@ -344,6 +349,8 @@ class CountingBackend:
         if operation != "structured":
             raise PreflightError("program generation is forbidden for the typed D4 harness")
         roles = {
+            ReportSpecialistObservation: "report_worker",
+            SectionSpecialistObservation: "section_worker",
             SemanticPlan: "planner",
             _PlannerWirePlan: "planner",
             _H1ObservationResponse: "planner",
@@ -364,6 +371,8 @@ class CountingBackend:
         expected = (
             (0.0, self.planner_max_output_tokens) if generation_role == "planner" else (None, None)
         )
+        if self.specialist_observation:
+            expected = (0.0, 4096)
         temperature = getattr(request, "temperature", None)
         max_output_tokens = getattr(request, "max_output_tokens", None)
         if (temperature, max_output_tokens) != expected:
@@ -501,6 +510,12 @@ class CountingBackend:
     ) -> StructuredGenerationResult[Any]:
         """Delegate one structured call and record only bounded metadata."""
         generation_role = self._generation_role("structured", response_model)
+        is_specialist = response_model in (
+            ReportSpecialistObservation,
+            SectionSpecialistObservation,
+        )
+        if is_specialist != self.specialist_observation:
+            raise PreflightError("specialist observation boundary mismatch")
         index = self._before(
             "structured",
             request,

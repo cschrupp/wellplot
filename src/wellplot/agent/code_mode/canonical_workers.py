@@ -25,6 +25,7 @@ from ..providers.base import (
     ModelBackendProtocol,
     ProviderRequestError,
     StructuredGenerationRequest,
+    StructuredGenerationResult,
 )
 from ..semantic_runtime import SemanticDiagnostic, SemanticMetrics, SemanticStageEvidence
 from .enrichment import ReportContext, ResolvedSectionContext, inspect_report_context
@@ -154,6 +155,25 @@ class ReportSemanticResponse(_SemanticModel):
         return self
 
 
+class SpecialistFinding(_SemanticModel):
+    """Non-executable specialist disposition grounded in inspected facts."""
+
+    disposition: Literal["already_satisfied", "unavailable", "unsupported", "clarification"]
+    explanation: str = Field(min_length=1)
+
+
+class ReportSpecialistObservation(_SemanticModel):
+    decision: ReportSemanticResponse | SpecialistFinding
+    rationale: str = Field(min_length=1)
+    pending_objective: str | None = None
+
+
+class SectionSpecialistObservation(_SemanticModel):
+    decision: SectionSemanticAction | SpecialistFinding
+    rationale: str = Field(min_length=1)
+    pending_objective: str | None = None
+
+
 class _ReportCorrectionRequired(ValueError):
     """Signal one bounded retry for an unknown general-slot alias."""
 
@@ -163,6 +183,14 @@ class CanonicalReportWorker:
     """Generate one sparse report semantic response and lower it deterministically."""
 
     backend: ModelBackendProtocol
+
+    async def observe_first_response(
+        self, request: StructuredGenerationRequest
+    ) -> StructuredGenerationResult[ReportSpecialistObservation]:
+        """Capture a decision without resolving assignments or lowering it."""
+        return await self.backend.generate_structured(
+            request, response_model=ReportSpecialistObservation
+        )
 
     async def compile(
         self,
