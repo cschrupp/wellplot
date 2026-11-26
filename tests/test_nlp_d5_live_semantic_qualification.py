@@ -633,7 +633,7 @@ def test_h1_operational_smoke_is_single_call(
     assert sum("response_body_base64" in entry for entry in wire_io) == 1
 
 
-@pytest.mark.parametrize("population", d5.H1_POPULATIONS)
+@pytest.mark.parametrize("population", (d5.H1_POPULATION, d5.H1B_POPULATION, d5.S03_POPULATION))
 def test_h1_planner_fails_closed_without_observation_callback(
     population: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -916,6 +916,7 @@ def test_first_pass_campaign_captures_one_response_per_case(
     )
     is_h1b = population == d5.H1B_POPULATION
     is_s03 = population == d5.S03_POPULATION
+    is_specialist = population == d5.SPECIALIST_POPULATION
     is_h1 = population in d5.H1_POPULATIONS
     if is_h1:
         _, digest, expected_ids, prompt, response_model = d5._h1_contract(population)
@@ -926,6 +927,12 @@ def test_first_pass_campaign_captures_one_response_per_case(
         )
         if is_s03:
             accepted_prompt = "807797c9e776c47cd980e7423686c0bec5e4b8dd194a50b8b2d9c4e9218fadca"
+        if is_specialist:
+            accepted_prompt = prompt
+            authorization = replace(
+                authorization,
+                planner_smoke_harness_sha256=d5._sha256_file(Path(d5.__file__)),
+            )
         authorization = replace(
             authorization,
             planner_population=population,
@@ -944,8 +951,39 @@ def test_first_pass_campaign_captures_one_response_per_case(
                 replace(authorization, planner_population_system_prompt_sha256=wrong)
         with pytest.raises(d5.D5StaticPreflightError):
             d5._select_first_pass_turns(authorization, population, "planner_only", ("H04",))
+    if is_specialist:
+        from wellplot.agent.code_mode.canonical_workers import CanonicalReportWorker
+        from wellplot.agent.code_mode.planner import SemanticPlanner
+        from wellplot.agent.code_mode.typed_section_worker import CanonicalSectionWorker
+
+        async def forbidden(*args: object, **kwargs: object) -> None:
+            pytest.fail("specialist observation reached production planning or lowering")
+
+        monkeypatch.setattr(SemanticPlanner, "plan", forbidden)
+        monkeypatch.setattr(CanonicalReportWorker, "compile", forbidden)
+        monkeypatch.setattr(CanonicalSectionWorker, "compile", forbidden)
+        monkeypatch.setattr(d5._ObservedLiveAdapter, "execute_turn", forbidden)
+        with pytest.raises(d5.D5StaticPreflightError):
+            replace(authorization, sdk_max_retries=1)
+        ledger = d5.D5LogicalCallLedger(
+            max_logical_calls=8,
+            max_physical_attempts=8,
+            planner_first_pass=True,
+            specialist_first_pass=True,
+        )
+        ledger.begin_turn("W01")
+        with pytest.raises(d5.D5CallCapExceeded):
+            ledger.reserve("planner")
+        with pytest.raises(d5.D5CallCapExceeded):
+            ledger.reserve("section_worker")
+        index = ledger.reserve("report_worker")
+        with pytest.raises(d5.D5CallCapExceeded):
+            ledger.reserve("report_worker")
+        ledger.physical_attempt(index)
+        with pytest.raises(d5.D5CallCapExceeded):
+            ledger.physical_attempt(index)
     paths = _paths(tmp_path, authorization.campaign_id)
-    full_count = 6 if is_s03 else 8 if is_h1b else 10
+    full_count = 6 if is_s03 else 8 if is_h1b or is_specialist else 10
     clients = []
     requests = []
 
@@ -971,6 +1009,11 @@ def test_first_pass_campaign_captures_one_response_per_case(
             }
             if is_s03:
                 response["tasks"][0]["intent"] = "authoring"
+        if is_specialist:
+            response = {
+                "decision": {"disposition": "unsupported", "explanation": "Test fixture."},
+                "rationale": "Mock first response.",
+            }
         if len(requests) == 1:
             response = {"version": "wellplot.semantic-plan.v2", "summary": "Invalid fixture."}
         return httpx.Response(
@@ -1005,10 +1048,17 @@ def test_first_pass_campaign_captures_one_response_per_case(
         }
 
     create_adapter = d5.create_live_adapter
+
+    def create_mock_adapter(**kwargs: object) -> d5._ObservedLiveAdapter:
+        adapter = create_adapter(**kwargs, http_client_factory=client_factory)
+        (backend,) = adapter.inner.call_source.backends
+        backend.delegate.client._platform = "Linux"
+        return adapter
+
     monkeypatch.setattr(
         d5,
         "create_live_adapter",
-        lambda **kwargs: create_adapter(**kwargs, http_client_factory=client_factory),
+        create_mock_adapter,
     )
     monkeypatch.setattr(d5, "_build_planner_smoke_inputs", source_context)
     try:
@@ -1039,7 +1089,9 @@ def test_first_pass_campaign_captures_one_response_per_case(
     assert all(payload["max_tokens"] == 4096 for payload in requests)
     assert all("max_completion_tokens" not in payload for payload in requests)
     assert all(
-        payload["messages"][1]["content"].startswith("AVAILABLE SOURCE INVENTORIES:\n")
+        "required_action" not in payload["messages"][1]["content"]
+        if is_specialist
+        else payload["messages"][1]["content"].startswith("AVAILABLE SOURCE INVENTORIES:\n")
         if is_s03
         else (
             payload["messages"][1]["content"].startswith("USER REQUEST:\n")
@@ -1066,7 +1118,34 @@ def test_first_pass_campaign_captures_one_response_per_case(
         assert result["decision"] == "PASS"
         assert len(rows) == full_count
         assert all(row["schema_valid"] for row in rows[1:])
-        if is_h1b or is_s03:
+        if is_specialist:
+            from wellplot.agent.code_mode.canonical_workers import (
+                ReportSpecialistObservation,
+                SectionSpecialistObservation,
+            )
+
+            cases = d5._load_planner_population(REPO_ROOT, population)
+            for payload, case in zip(requests, cases, strict=True):
+                system, user = d5._specialist_observation_input(REPO_ROOT, case)
+                assert payload["messages"] == [
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ]
+                expected_model = (
+                    ReportSpecialistObservation
+                    if case["role"] == "report"
+                    else SectionSpecialistObservation
+                )
+                assert payload["response_format"]["json_schema"]["schema"] == (
+                    expected_model.model_json_schema()
+                )
+                assert payload["temperature"] == 0
+                assert payload["chat_template_kwargs"] == {"enable_thinking": False}
+            wire = [json.loads(line) for line in paths.planner_wire.read_text().splitlines()]
+            assert [row["generation_role"] for row in wire] == (
+                ["report_worker"] * 2 + ["section_worker"] * 5
+            )
+        elif is_h1b or is_s03:
             cases = d5._load_planner_population(REPO_ROOT, population)
             compiler_events = {
                 event["turn_id"]: event["result"]
@@ -1171,9 +1250,17 @@ def test_first_pass_campaign_captures_one_response_per_case(
                 if row["event"] == "REQUEST_COMPILATION_PASS"
                 and row["result"]["status"] == "COVERAGE_FAILURE"
             ] == ["H04", "H05", "H07"]
-    assert "PLANNER_GENERATION_FAIL" in paths.stage_trace.read_text(encoding="utf-8")
+    failure_event = "SPECIALIST_GENERATION_FAIL" if is_specialist else "PLANNER_GENERATION_FAIL"
+    assert failure_event in paths.stage_trace.read_text(encoding="utf-8")
     assert "WIRE_TO_CANONICAL_ENTER" not in paths.stage_trace.read_text(encoding="utf-8")
     model_io = [json.loads(line) for line in paths.model_io.read_text().splitlines()]
+    if is_specialist:
+        journal = [json.loads(line) for line in paths.journal.read_text().splitlines()]
+        assert [
+            row["generation_role"] for row in journal if row["event"] == "logical_call_started"
+        ] == (
+            ["report_worker"] * 2 if interrupt else ["report_worker"] * 3 + ["section_worker"] * 5
+        )
     initial_failure = next(
         event
         for event in model_io

@@ -174,7 +174,12 @@ S03_POPULATION = "s03-revised-development"
 S03_PANEL_PATH = "docs/research/WELLPLOT_V2_S03_REVISED_PANEL.json"
 S03_PANEL_SHA256 = "890951d0f56d7464e88385131cd89537fb0175fbe17fe547a694c4ff83f0ba17"
 S03_TURN_IDS = tuple(f"R{index:02d}" for index in range(1, 7))
-H1_POPULATIONS = (H1_POPULATION, H1B_POPULATION, S03_POPULATION)
+SPECIALIST_POPULATION = "isolated-specialists"
+SPECIALIST_PANEL_PATH = "docs/research/WELLPLOT_V2_SPECIALIST_PANEL.json"
+SPECIALIST_PANEL_SHA256 = "729292eee9e54c3bb09705c30eca692b530ab28a7b285a8c5237ab83ef9f9817"
+SPECIALIST_TURN_IDS = tuple(f"W{index:02d}" for index in range(1, 9))
+SPECIALIST_INPUTS_SHA256 = "9b72e75dba95712aa04fb936ae6c5d3343303457413a564ea25887af0e1df613"
+H1_POPULATIONS = (H1_POPULATION, H1B_POPULATION, S03_POPULATION, SPECIALIST_POPULATION)
 S03_SMOKE_MODE = "s03_revised_observation"
 _OBSERVATION_SMOKE_PROFILES = {
     H1_SMOKE_MODE: (
@@ -201,6 +206,29 @@ PLANNER_POPULATIONS = (A10_SEM_53_POPULATION, *H1_POPULATIONS)
 
 
 def _h1_contract(population: str) -> tuple[str, str, tuple[str, ...], str, type[BaseModel]]:
+    if population == SPECIALIST_POPULATION:
+        from wellplot.agent.code_mode.canonical_workers import (
+            ReportSpecialistObservation,
+            SectionSpecialistObservation,
+        )
+
+        class SpecialistSchemaBundle(BaseModel):
+            report: ReportSpecialistObservation
+            section: SectionSpecialistObservation
+
+        SpecialistSchemaBundle.model_rebuild(
+            _types_namespace={
+                "ReportSpecialistObservation": ReportSpecialistObservation,
+                "SectionSpecialistObservation": SectionSpecialistObservation,
+            }
+        )
+        return (
+            SPECIALIST_PANEL_PATH,
+            SPECIALIST_PANEL_SHA256,
+            SPECIALIST_TURN_IDS,
+            SPECIALIST_INPUTS_SHA256,
+            SpecialistSchemaBundle,
+        )
     if population == S03_POPULATION:
         return (
             S03_PANEL_PATH,
@@ -737,10 +765,12 @@ class D5Authorization:
             raise D5StaticPreflightError("invalid A10 first-pass authority")
         if self.planner_population in H1_POPULATIONS:
             _, digest, ids, prompt, model = _h1_contract(self.planner_population)
-            if (
-                self.planner_population_system_prompt_sha256
-                != hashlib.sha256(prompt.encode("utf-8")).hexdigest()
-            ):
+            prompt_identity = (
+                prompt
+                if self.planner_population == SPECIALIST_POPULATION
+                else hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+            )
+            if self.planner_population_system_prompt_sha256 != prompt_identity:
                 raise D5StaticPreflightError("H1 system prompt authority is missing or mismatched")
             if (
                 cap is None
@@ -1208,7 +1238,12 @@ def _default_smoke_static_checks(
     elif mode == "canonical_schema_behavior_probe":
         if _git_porcelain_raw(repo_root) != expected_worktree_porcelain:
             raise D5StaticPreflightError("working tree differs from schema-probe authorization")
-    elif mode in {"h1_planner_observation", "h1b_planner_observation", "s03_planner_observation"}:
+    elif mode in {
+        "h1_planner_observation",
+        "h1b_planner_observation",
+        "s03_planner_observation",
+        "specialist_observation",
+    }:
         if (
             expected_worktree_porcelain != H1_EXPECTED_WORKTREE_PORCELAIN
             or _git_porcelain_raw(repo_root) != expected_worktree_porcelain
@@ -1248,6 +1283,9 @@ def _default_smoke_static_checks(
         "h1_planner_observation": _sha256_json(_H1ObservationResponse.model_json_schema()),
         "h1b_planner_observation": _sha256_json(_H1BObservationResponse.model_json_schema()),
         "s03_planner_observation": _sha256_json(_S03ObservationResponse.model_json_schema()),
+        "specialist_observation": _sha256_json(
+            _h1_contract(SPECIALIST_POPULATION)[4].model_json_schema()
+        ),
         "canonical_schema_behavior_probe": _schema_probe_bundle_sha256(),
     }.get(mode)
     if expected_mode_schema is None or expected_schema_sha256 != expected_mode_schema:
@@ -1529,6 +1567,13 @@ def _load_planner_population(repo_root: Path, population: str) -> list[dict[str,
         path = repo_root / filename
         _assert_hash(path, digest, "H1 request and inspection panel")
         cases = json.loads(path.read_text(encoding="utf-8"))
+        if population == SPECIALIST_POPULATION:
+            identities = [_specialist_observation_input(repo_root, case) for case in cases]
+            if _sha256_json(identities) != SPECIALIST_INPUTS_SHA256:
+                raise D5StaticPreflightError("specialist rendered input custody drifted")
+            cases = [
+                {**case, "turn_id": case["id"], "compiler_status": "NOT_INVOKED"} for case in cases
+            ]
         if tuple(case["turn_id"] for case in cases) != ids:
             raise D5StaticPreflightError("H1 panel order drifted")
         return cases
@@ -3274,6 +3319,7 @@ class D5LogicalCallLedger:
     active_turn_id: str | None = None
     turn_role_counts: dict[str, int] = field(default_factory=dict)
     planner_first_pass: bool = False
+    specialist_first_pass: bool = False
 
     def begin_turn(self, turn_id: str) -> None:
         """Reset per-turn role accounting at the frozen turn boundary."""
@@ -3289,6 +3335,15 @@ class D5LogicalCallLedger:
             limit = ROLE_LOGICAL_CALL_LIMITS[role]
             if self.planner_first_pass:
                 limit = 1 if role == "planner" else 0
+            if self.specialist_first_pass:
+                expected = (
+                    "report_worker"
+                    if self.active_turn_id in SPECIALIST_TURN_IDS[:3]
+                    else "section_worker"
+                    if self.active_turn_id in SPECIALIST_TURN_IDS[3:]
+                    else None
+                )
+                limit = int(role == expected)
             if used >= limit:
                 raise D5CallCapExceeded(
                     f"{role} logical call limit {limit} exceeded for turn {self.active_turn_id}"
@@ -3459,6 +3514,7 @@ class D5CampaignCustody:
                 max_logical_calls=logical_limit,
                 max_physical_attempts=physical_limit,
                 planner_first_pass=first_pass,
+                specialist_first_pass=authorization.planner_population == SPECIALIST_POPULATION,
             ),
             authorization_id=authorization.authorization_id,
             mode=mode,
@@ -3791,13 +3847,16 @@ class D5CampaignCustody:
         if self.mode != "planner_only":
             raise D5HarnessError("planner campaign observability used outside planner-only mode")
         name = event.get("event")
-        if name == "PLANNER_GENERATION_PASS":
+        wire_events = {"PLANNER_GENERATION_PASS", "SPECIALIST_GENERATION_PASS"}
+        if name in wire_events:
             payload = {
                 "turn_id": self._active_turn_id,
                 "attempt": event.get("attempt"),
                 "response_schema": event.get("response_schema"),
                 "validated_response": event.get("validated_response"),
             }
+            if name == "SPECIALIST_GENERATION_PASS":
+                payload["generation_role"] = event["generation_role"]
         elif name == "PLANNER_CONTEXT":
             payload = {
                 "event": name,
@@ -3814,9 +3873,7 @@ class D5CampaignCustody:
             payload = {"turn_id": self._active_turn_id, **dict(event)}
         if not evidence_is_redacted(payload):
             raise D5HarnessError("planner campaign observability redaction failure")
-        destination = (
-            self.paths.planner_wire if name == "PLANNER_GENERATION_PASS" else self.paths.stage_trace
-        )
+        destination = self.paths.planner_wire if name in wire_events else self.paths.stage_trace
         _append_jsonl(destination, payload)
 
     def record_logical_model_result(self, event: Mapping[str, Any]) -> None:
@@ -4667,6 +4724,8 @@ class _ObservedLiveAdapter:
 
     async def execute_planner_case(self, case: Mapping[str, Any]) -> Mapping[str, Any]:
         """Observe one planner-only case through the canonical SemanticPlanner."""
+        if case["turn_id"] in SPECIALIST_TURN_IDS:
+            return await self._observe_specialist(case)
         observation_population = next(
             (p for p in H1_POPULATIONS if case["turn_id"] in _h1_contract(p)[2]), None
         )
@@ -4768,6 +4827,64 @@ class _ObservedLiveAdapter:
             "numeric_sample_apis_invoked": context["numeric_sample_apis_invoked"],
         }
 
+    async def _observe_specialist(self, case: Mapping[str, Any]) -> Mapping[str, Any]:
+        from wellplot.agent.code_mode.canonical_workers import CanonicalReportWorker
+        from wellplot.agent.code_mode.typed_section_worker import CanonicalSectionWorker
+
+        root = self.inner.repo_root
+        if (
+            self.planner_first_pass_max_output_tokens != 4096
+            or case not in _load_planner_population(root, SPECIALIST_POPULATION)
+        ):
+            raise D5HarnessError("specialist case custody drifted")
+        (backend,) = self.inner.call_source.backends
+        if not backend.specialist_observation:
+            raise D5HarnessError("specialist backend controls not bound")
+        role = case["role"] + "_worker"
+        worker = (
+            CanonicalReportWorker(backend)
+            if role == "report_worker"
+            else CanonicalSectionWorker(backend)
+        )
+        prompt, user = _specialist_observation_input(root, case)
+        request = StructuredGenerationRequest(
+            prompt, user, self.inner.session.session.config.timeout_seconds, 0, 4096
+        )
+        self._trace_events.append(
+            {
+                "event": "SPECIALIST_GENERATION_ENTER",
+                "generation_role": role,
+                "input_sha256": _sha256_json((prompt, user)),
+            }
+        )
+        try:
+            response = await worker.observe_first_response(request)
+        except ProviderRequestError as error:
+            self._trace_events.append(
+                {
+                    "event": "SPECIALIST_GENERATION_FAIL",
+                    "generation_role": role,
+                    "category": error.category.value,
+                }
+            )
+            if error.category != ProviderFailureCategory.INVALID_RESPONSE:
+                raise
+            return {
+                "observation_status": "MODEL_STRUCTURAL_FAILURE",
+                "schema_valid": False,
+                "failure_category": "MODEL_STRUCTURAL_INVALID_RESPONSE",
+            }
+        self._trace_events.append(
+            {
+                "event": "SPECIALIST_GENERATION_PASS",
+                "generation_role": role,
+                "attempt": 1,
+                "response_schema": _sha256_json(type(response.value).model_json_schema()),
+                "validated_response": response.value.model_dump(mode="json"),
+            }
+        )
+        return {"observation_status": "SCHEMA_VALID_WIRE_CAPTURED", "schema_valid": True}
+
 
 def create_live_adapter(
     *,
@@ -4784,6 +4901,7 @@ def create_live_adapter(
     max_retries_override: int | None = None,
     logical_call_ceiling: int | None = None,
     planner_first_pass_max_output_tokens: int | None = None,
+    specialist_observation: bool = False,
     trace_callback: Callable[[Mapping[str, Any]], None] | None = None,
     compile_result_callback: Callable[[Any], None] | None = None,
     section_action_callback: Callable[[Mapping[str, object]], None] | None = None,
@@ -4856,6 +4974,7 @@ def create_live_adapter(
         ledger=ledger,
         capture_logical_identity=section_action_capture_mode != "off",
         planner_max_output_tokens=planner_first_pass_max_output_tokens,
+        specialist_observation=specialist_observation,
     )
     trace_events: list[dict[str, Any]] = []
 
@@ -5009,6 +5128,7 @@ def execute_live_campaign(
             max_retries_override=authorization.sdk_max_retries,
             logical_call_ceiling=campaign_logical_call_ceiling,
             planner_first_pass_max_output_tokens=first_pass_cap,
+            specialist_observation=population == SPECIALIST_POPULATION,
         )
     )
     readiness = prepare_readiness(
@@ -5029,6 +5149,18 @@ def execute_live_campaign(
         provenance={
             "authorization_id": authorization.authorization_id,
             "implementation_checkpoint": authorization.implementation_checkpoint,
+            **(
+                {
+                    "specialist_panel_sha256": SPECIALIST_PANEL_SHA256,
+                    "specialist_inputs_sha256": SPECIALIST_INPUTS_SHA256,
+                    "specialist_schema_bundle_sha256": (
+                        authorization.planner_smoke_wire_schema_sha256
+                    ),
+                    "specialist_harness_sha256": authorization.planner_smoke_harness_sha256,
+                }
+                if population == SPECIALIST_POPULATION
+                else {}
+            ),
             "accepted_d5_engine_checkpoint": authorization.accepted_d5_engine_checkpoint,
             "accepted_d5_design_checkpoint": authorization.accepted_d5_design_checkpoint,
             "accepted_h_implementation_checkpoint": (
@@ -5039,6 +5171,16 @@ def execute_live_campaign(
     runner_kwargs: dict[str, Any] = {"turn_ids": turn_ids, "mode": mode}
     if population != "d4":
         runner_kwargs["population"] = population
+    if population == SPECIALIST_POPULATION:
+
+        async def run_specialist_and_close() -> dict[str, Any]:
+            try:
+                return await runner.run(readiness.adapter, **runner_kwargs)
+            finally:
+                (backend,) = readiness.adapter.inner.call_source.backends
+                await backend.delegate.client.close()
+
+        return asyncio.run(run_specialist_and_close())
     return asyncio.run(runner.run(readiness.adapter, **runner_kwargs))
 
 
@@ -7059,6 +7201,10 @@ class D5CampaignRunner:
             raise D5HarnessError("unknown campaign mode")
         turn_ids = _select_first_pass_turns(self.authorization, population, mode, turn_ids)
         first_pass_cap = self.authorization.planner_first_pass_max_output_tokens
+        if population == SPECIALIST_POPULATION and (
+            not isinstance(adapter, _ObservedLiveAdapter) or not adapter.observes_physical_attempts
+        ):
+            raise D5StaticPreflightError("specialist campaign requires canonical HTTP custody")
         if first_pass_cap != getattr(adapter, "planner_first_pass_max_output_tokens", None):
             raise D5StaticPreflightError("adapter first-pass controls differ from authority")
         if population == "d4":
@@ -7405,6 +7551,13 @@ def provider_free_preflight(
     elif population in H1_POPULATIONS:
         cases = _load_planner_population(repo_root, population)
         role_limits = {"planner": 1, "report_worker": 0, "section_worker": 0}
+        if population == SPECIALIST_POPULATION:
+            role_limits = {"planner": 0, "report_worker": 1, "section_worker": 1}
+            _assert_hash(
+                Path(__file__).resolve(),
+                authorization.planner_smoke_harness_sha256,
+                "specialist D5 harness",
+            )
     elif population == A10_SEM_53_POPULATION:
         if (
             authorization.planner_population != A10_SEM_53_POPULATION
@@ -7439,6 +7592,7 @@ def provider_free_preflight(
                 H1_POPULATION: "h1_planner_observation",
                 H1B_POPULATION: "h1b_planner_observation",
                 S03_POPULATION: "s03_planner_observation",
+                SPECIALIST_POPULATION: "specialist_observation",
             }[population],
             expected_sdk_max_retries=0,
         )
