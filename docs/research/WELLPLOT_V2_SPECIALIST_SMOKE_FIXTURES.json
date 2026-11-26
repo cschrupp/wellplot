@@ -1,0 +1,65 @@
+[
+  {
+    "id": "SPECIALIST-REPORT-SMOKE",
+    "role": "report",
+    "request": "Retitle the report Alpine Check. Keep the subtitle and header unchanged.",
+    "objective": "Set the report title to Alpine Check; preserve the subtitle and header.",
+    "scope": "report",
+    "document": {
+      "name": "alpine-smoke",
+      "title": "Alpine Draft",
+      "subtitle": "Station Ledger",
+      "header": {
+        "general_fields": [
+          {"slot_id": "well", "key": "well", "label": "Well", "value": {"value": "Alpine-9"}}
+        ]
+      },
+      "sections": [
+        {"id": "reference", "title": "Reference", "tracks": [
+          {"id": "depth", "title": "Depth", "width_mm": 16, "kind": "reference"}
+        ]}
+      ]
+    },
+    "sources": [],
+    "dialogue": [],
+    "workflow": {"pending": [], "verified_results": []}
+  },
+  {
+    "id": "SPECIALIST-SECTION-SMOKE",
+    "role": "section",
+    "request": "Plot exact physical FLOW in the Hydraulics track in Canyon. Leave existing curves unchanged.",
+    "objective": "Display exact physical FLOW in the existing Hydraulics track in Canyon; preserve existing curves.",
+    "scope": "canyon",
+    "document": {
+      "name": "canyon-smoke",
+      "sections": [
+        {
+          "id": "canyon",
+          "title": "Canyon",
+          "data_source": {"source_path": "canyon.las"},
+          "tracks": [
+            {
+              "id": "hydraulics",
+              "title": "Hydraulics",
+              "width_mm": 30,
+              "kind": "normal",
+              "bindings": [{"kind": "curve", "binding_id": "pressure", "channel": "PRES"}]
+            }
+          ]
+        }
+      ]
+    },
+    "sources": [
+      {
+        "id": "canyon.las",
+        "complete": true,
+        "channels": [
+          {"mnemonic": "FLOW", "kind": "scalar", "unit": "L/min", "addressable": true},
+          {"mnemonic": "PRES", "kind": "scalar", "unit": "kPa", "addressable": true}
+        ]
+      }
+    ],
+    "dialogue": [],
+    "workflow": {"pending": [], "verified_results": []}
+  }
+]

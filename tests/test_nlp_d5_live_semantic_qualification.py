@@ -481,7 +481,7 @@ def test_a10_campaign_uses_shared_runner_without_semantic_scoring(tmp_path: Path
 
 
 @pytest.mark.parametrize("valid", [True, False])
-@pytest.mark.parametrize("smoke_mode", d5.H1_SMOKE_MODES)
+@pytest.mark.parametrize("smoke_mode", d5.BOUNDED_SMOKE_MODES)
 def test_h1_operational_smoke_is_single_call(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, valid: bool, smoke_mode: str
 ) -> None:
@@ -490,21 +490,56 @@ def test_h1_operational_smoke_is_single_call(
 
     monkeypatch.setattr(_base_client, "get_platform", lambda: "Linux")
     paths = _paths(tmp_path, "h1-smoke")
-    fixture, fixture_sha, population, _ = d5._OBSERVATION_SMOKE_PROFILES[smoke_mode]
+    role = d5.SPECIALIST_SMOKE_ROLES.get(smoke_mode)
+    if role is not None:
+        from wellplot.agent.code_mode.canonical_workers import CanonicalReportWorker
+        from wellplot.agent.code_mode.planner import SemanticPlanner
+        from wellplot.agent.code_mode.typed_section_worker import CanonicalSectionWorker
+
+        async def forbidden(*args: object, **kwargs: object) -> None:
+            pytest.fail("specialist smoke reached production planning or compilation")
+
+        monkeypatch.setattr(SemanticPlanner, "plan", forbidden)
+        monkeypatch.setattr(CanonicalReportWorker, "compile", forbidden)
+        monkeypatch.setattr(CanonicalSectionWorker, "compile", forbidden)
+        (fixture,) = (
+            row
+            for row in json.loads((REPO_ROOT / d5.SPECIALIST_SMOKE_FIXTURES).read_text())
+            if row["role"] == role
+        )
+        fixture_sha = d5._sha256_json(fixture)
+        prompt, user = d5._specialist_observation_input(REPO_ROOT, fixture)
+        input_sha = d5._sha256_json((prompt, user))
+        model = d5._specialist_smoke_model(role)
+        fixture_id = fixture["id"]
+        ledger = d5.D5SmokeCallLedger(mode=d5.SMOKE_PLANNER_KIND, specialist_role=role + "_worker")
+        for wrong in {"planner", "report_worker", "section_worker"} - {role + "_worker"}:
+            with pytest.raises(d5.D5CallCapExceeded):
+                ledger.record_canonical_call_started(1, wrong)
+        ledger.record_canonical_call_started(1, role + "_worker")
+        with pytest.raises(d5.D5CallCapExceeded):
+            ledger.record_canonical_call_started(2, role + "_worker")
+        ledger.physical_attempt(1)
+        with pytest.raises(d5.D5CallCapExceeded):
+            ledger.physical_attempt(1)
+    else:
+        fixture, fixture_sha, population, _ = d5._OBSERVATION_SMOKE_PROFILES[smoke_mode]
+        _, _, _, prompt, model = d5._h1_contract(population)
+        input_sha = d4.sha256_text(prompt)
+        fixture_id = fixture["turn_id"]
     is_s03 = smoke_mode == d5.S03_SMOKE_MODE
     is_h1b = smoke_mode == d5.H1B_SMOKE_MODE
-    if is_s03:
+    if is_s03 or role is not None:
         monkeypatch.setattr(
             d5, "_load_planner_population", lambda *_: pytest.fail("smoke loaded measured panel")
         )
-    _, _, _, prompt, model = d5._h1_contract(population)
     request_text = fixture["request"]
     authority = replace(
         _authorization(campaign_id=paths.campaign_id, artifact_root=str(paths.root)),
         planner_smoke_mode=smoke_mode,
-        planner_smoke_case_id=fixture["turn_id"],
+        planner_smoke_case_id=fixture_id,
         planner_smoke_request_sha256=d4.sha256_text(request_text),
-        planner_smoke_benchmark_sha256=d4.sha256_text(prompt),
+        planner_smoke_benchmark_sha256=input_sha,
         planner_smoke_source_inventory_sha256=fixture_sha,
         planner_smoke_harness_sha256=d5._sha256_file(Path(d5.__file__)),
         planner_smoke_wire_schema_sha256=d5._sha256_json(model.model_json_schema()),
@@ -544,6 +579,17 @@ def test_h1_operational_smoke_is_single_call(
                     scope=None,
                     outcome="Identify the current report title.",
                 )
+        if role is not None:
+            decision = (
+                {"title": "Alpine Check"}
+                if role == "report"
+                else {
+                    "action": "add_binding",
+                    "target": {"handle": "track-1"},
+                    "binding": {"semantic_id": "flow", "channel": "FLOW"},
+                }
+            )
+            content = {"decision": decision, "rationale": "Mock first response."} if valid else {}
         return httpx.Response(
             200,
             request=request,
@@ -569,13 +615,17 @@ def test_h1_operational_smoke_is_single_call(
         return client
 
     create_adapter = d5.create_live_adapter
+
+    def create_mock_adapter(**kwargs: object) -> d5._ObservedLiveAdapter:
+        adapter = create_adapter(**kwargs, http_client_factory=client_factory)
+        (backend,) = adapter.inner.call_source.backends
+        backend.delegate.client._platform = "Linux"
+        return adapter
+
     monkeypatch.setattr(
         d5,
         "create_live_adapter",
-        lambda **kwargs: create_adapter(
-            **kwargs,
-            http_client_factory=client_factory,
-        ),
+        create_mock_adapter,
     )
     with pytest.raises(d5.D5StaticPreflightError, match="fixture drifted"):
         d5._planner_smoke_case(REPO_ROOT, replace(authority, planner_smoke_request_sha256="0" * 64))
@@ -604,14 +654,18 @@ def test_h1_operational_smoke_is_single_call(
     assert payload["temperature"] == 0
     assert payload["max_tokens"] == 4096
     assert payload["messages"][0]["content"] == prompt
-    assert (
-        d4.sha256_text(payload["messages"][0]["content"])
-        == {
+    if role is not None:
+        assert payload["messages"][1]["content"] == user
+        assert terminal["logical_planner_invocations"] == 0
+        state = json.loads(paths.state.read_text())
+        assert state["observation_role"] == role + "_worker"
+    else:
+        expected_prompts = {
             d5.H1_SMOKE_MODE: "ebc9aa1d1a01967e6088a6ec5b403192fa274fc9f19bba026ddf734f4035c013",
             d5.H1B_SMOKE_MODE: "6cb230f71729199521b52dd2d602553aad58f8c9827a3ec4209b17cdda9499bd",
             d5.S03_SMOKE_MODE: "807797c9e776c47cd980e7423686c0bec5e4b8dd194a50b8b2d9c4e9218fadca",
-        }[smoke_mode]
-    )
+        }
+        assert d4.sha256_text(payload["messages"][0]["content"]) == expected_prompts[smoke_mode]
     assert request_text in payload["messages"][1]["content"]
     assert payload["response_format"]["json_schema"]["schema"] == (model.model_json_schema())
     assert "WIRE_TO_CANONICAL_ENTER" not in paths.stage_trace.read_text()

@@ -202,6 +202,15 @@ _OBSERVATION_SMOKE_PROFILES = {
     ),
 }
 H1_SMOKE_MODES = tuple(_OBSERVATION_SMOKE_PROFILES)
+SPECIALIST_SMOKE_ROLES = {
+    "report_specialist_smoke": "report",
+    "section_specialist_smoke": "section",
+}
+BOUNDED_SMOKE_MODES = (*H1_SMOKE_MODES, *SPECIALIST_SMOKE_ROLES)
+SPECIALIST_SMOKE_FIXTURES = "docs/research/WELLPLOT_V2_SPECIALIST_SMOKE_FIXTURES.json"
+SPECIALIST_SMOKE_FIXTURES_SHA256 = (
+    "743ab51d3f9f864d9048ce87aaae86f455cc4027233d3d26fdde78375c84118a"
+)
 PLANNER_POPULATIONS = (A10_SEM_53_POPULATION, *H1_POPULATIONS)
 
 
@@ -1243,6 +1252,7 @@ def _default_smoke_static_checks(
         "h1b_planner_observation",
         "s03_planner_observation",
         "specialist_observation",
+        *SPECIALIST_SMOKE_ROLES,
     }:
         if (
             expected_worktree_porcelain != H1_EXPECTED_WORKTREE_PORCELAIN
@@ -1287,6 +1297,10 @@ def _default_smoke_static_checks(
             _h1_contract(SPECIALIST_POPULATION)[4].model_json_schema()
         ),
         "canonical_schema_behavior_probe": _schema_probe_bundle_sha256(),
+        **{
+            name: _sha256_json(_specialist_smoke_model(role).model_json_schema())
+            for name, role in SPECIALIST_SMOKE_ROLES.items()
+        },
     }.get(mode)
     if expected_mode_schema is None or expected_schema_sha256 != expected_mode_schema:
         raise D5StaticPreflightError("smoke schema fingerprint drifted")
@@ -1382,6 +1396,15 @@ def _planner_generation_purpose(logical_index: int) -> str:
     raise D5HarnessError("planner generation exceeded its production correction policy")
 
 
+def _specialist_smoke_model(role: str) -> type[BaseModel]:
+    from wellplot.agent.code_mode.canonical_workers import (
+        ReportSpecialistObservation,
+        SectionSpecialistObservation,
+    )
+
+    return {"report": ReportSpecialistObservation, "section": SectionSpecialistObservation}[role]
+
+
 def _planner_smoke_case(
     repo_root: Path,
     authorization: D5Authorization,
@@ -1389,6 +1412,45 @@ def _planner_smoke_case(
     case_id: str | None = None,
 ) -> dict[str, Any]:
     """Resolve one authority-pinned case from the immutable SEM-01 inputs."""
+    if authorization.planner_smoke_mode in SPECIALIST_SMOKE_ROLES:
+        role = SPECIALIST_SMOKE_ROLES[authorization.planner_smoke_mode]
+        path = repo_root / SPECIALIST_SMOKE_FIXTURES
+        _assert_hash(path, SPECIALIST_SMOKE_FIXTURES_SHA256, "specialist smoke fixtures")
+        (fixture,) = (
+            row for row in json.loads(path.read_text(encoding="utf-8")) if row["role"] == role
+        )
+        schema_digest = _sha256_json(_specialist_smoke_model(role).model_json_schema())
+        fixture_digest = _sha256_json(fixture)
+        rendered_digest = _sha256_json(_specialist_observation_input(repo_root, fixture))
+        request = fixture["request"]
+        request_digest = hashlib.sha256(request.encode()).hexdigest()
+        if (
+            authorization.planner_smoke_case_id != fixture["id"]
+            or case_id not in {None, fixture["id"]}
+            or authorization.planner_population
+            or authorization.planner_first_pass_max_output_tokens is not None
+            or authorization.planner_smoke_sdk_max_retries != 0
+            or authorization.sdk_max_retries != 0
+            or authorization.planner_smoke_source_inventory_sha256 != fixture_digest
+            or authorization.planner_smoke_benchmark_sha256 != rendered_digest
+            or authorization.planner_smoke_request_sha256 != request_digest
+            or authorization.planner_smoke_wire_schema_sha256 != schema_digest
+            or authorization.planner_smoke_harness_sha256 != _sha256_file(Path(__file__).resolve())
+        ):
+            raise D5StaticPreflightError("specialist smoke authority or fixture drifted")
+        return {
+            "case_id": fixture["id"],
+            "request": request,
+            "request_sha256": request_digest,
+            "benchmark_sha256": rendered_digest,
+            "source_inventory_sha256": fixture_digest,
+            "source_sha256": None,
+            "wire_schema_sha256": schema_digest,
+            "sdk_max_retries": 0,
+            "physical_attempt_limit": 1,
+            "h1_case": fixture,
+            "specialist_role": role,
+        }
     if authorization.planner_smoke_mode in H1_SMOKE_MODES:
         from wellplot.agent.code_mode.obligations import compile_request_contract
 
@@ -1671,7 +1733,8 @@ def _default_planner_smoke_static_checks(
         raise D5StaticPreflightError("planner smoke is not running in the canonical checkout")
     if Path(_git(repo_root, "rev-parse", "--show-toplevel")).resolve() != canonical_root:
         raise D5StaticPreflightError("planner smoke Git top-level is not canonical")
-    is_h1 = authorization.planner_smoke_mode in H1_SMOKE_MODES
+    is_h1 = authorization.planner_smoke_mode in BOUNDED_SMOKE_MODES
+    specialist = authorization.planner_smoke_mode in SPECIALIST_SMOKE_ROLES
     if not is_h1 and authorization.planner_smoke_mode != SMOKE_PLANNER_KIND:
         raise D5StaticPreflightError("planner-only smoke mode is not authorized")
     expected = H1_EXPECTED_WORKTREE_PORCELAIN if is_h1 else A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN
@@ -1685,7 +1748,9 @@ def _default_planner_smoke_static_checks(
         expected_worktree_porcelain=authorization.expected_worktree_porcelain,
         expected_schema_sha256=authorization.planner_smoke_wire_schema_sha256,
         mode=(
-            _OBSERVATION_SMOKE_PROFILES[authorization.planner_smoke_mode][3]
+            authorization.planner_smoke_mode
+            if specialist
+            else _OBSERVATION_SMOKE_PROFILES[authorization.planner_smoke_mode][3]
             if is_h1
             else "canonical_planner_only_smoke"
         ),
@@ -1693,7 +1758,9 @@ def _default_planner_smoke_static_checks(
     )
     static.update(
         {
-            "planner_entrypoint": "wellplot.agent.code_mode.planner.SemanticPlanner.plan",
+            "planner_entrypoint": (
+                None if specialist else "wellplot.agent.code_mode.planner.SemanticPlanner.plan"
+            ),
             "planner_smoke_case_id": case["case_id"],
             "planner_smoke_request_sha256": case["request_sha256"],
             "planner_smoke_benchmark_sha256": case["benchmark_sha256"],
@@ -1840,9 +1907,18 @@ class D5SmokeCallLedger:
     calls_by_role: dict[str, int] = field(default_factory=dict)
     roles_by_index: dict[int, str] = field(default_factory=dict)
     attempts_by_index: dict[int, int] = field(default_factory=dict)
+    specialist_role: Literal["report_worker", "section_worker"] | None = None
 
     def __post_init__(self) -> None:
         """Set the logical-call ceiling for the selected smoke mode."""
+        if self.specialist_role is not None:
+            if self.mode != SMOKE_PLANNER_KIND or self.specialist_role not in {
+                "report_worker",
+                "section_worker",
+            }:
+                raise D5HarnessError("invalid specialist smoke ledger role")
+            self.max_logical_calls = self.max_physical_attempts = 1
+            return
         if self.mode in {SMOKE_BINDING_KIND, SMOKE_PLANNER_KIND}:
             self.max_logical_calls = (
                 SMOKE_PLANNER_ROLE_LIMITS["planner"]
@@ -1884,6 +1960,8 @@ class D5SmokeCallLedger:
             if self.mode == SMOKE_PLANNER_KIND
             else SMOKE_BINDING_ROLE_LIMITS
         )
+        if self.mode == SMOKE_PLANNER_KIND and self.specialist_role is not None:
+            role_limits = {self.specialist_role: 1}
         if role not in role_limits:
             raise D5CallCapExceeded("binding smoke generation role is not authorized")
         if self.logical_calls >= self.max_logical_calls:
@@ -1983,7 +2061,11 @@ class D5SmokeCustody:
             if smoke_kind == SMOKE_SCHEMA_PROBE_KIND
             else "canonical_live_smoke"
         )
-        ledger = D5SmokeCallLedger(mode=ledger_mode)
+        specialist = SPECIALIST_SMOKE_ROLES.get(authorization.planner_smoke_mode)
+        ledger = D5SmokeCallLedger(
+            mode=ledger_mode,
+            specialist_role=None if specialist is None else specialist + "_worker",
+        )
         state = {
             "experiment_version": D5_EXPERIMENT_VERSION,
             "mode": custody_mode,
@@ -2477,11 +2559,15 @@ class D5SmokeCustody:
             if isinstance(logical_index, int) and not isinstance(logical_index, bool):
                 bounded["generation_purpose"] = _planner_generation_purpose(logical_index)
         turn_id = (
-            SMOKE_PLANNER_TURN_ID
-            if smoke_kind == SMOKE_PLANNER_KIND
-            else SMOKE_BINDING_TURN_ID
-            if smoke_kind == SMOKE_BINDING_KIND
-            else SMOKE_TURN_ID
+            self.authorization.planner_smoke_case_id
+            if self.ledger.specialist_role
+            else (
+                SMOKE_PLANNER_TURN_ID
+                if smoke_kind == SMOKE_PLANNER_KIND
+                else SMOKE_BINDING_TURN_ID
+                if smoke_kind == SMOKE_BINDING_KIND
+                else SMOKE_TURN_ID
+            )
         )
         bounded.update(
             {
@@ -2693,7 +2779,11 @@ class D5SmokeCustody:
         if not callable(set_active_turn):
             raise D5HarnessError("canonical binding-smoke observer is unavailable")
         turn_id = (
-            SMOKE_PLANNER_TURN_ID if smoke_kind == SMOKE_PLANNER_KIND else SMOKE_BINDING_TURN_ID
+            self.authorization.planner_smoke_case_id
+            if self.ledger.specialist_role
+            else (
+                SMOKE_PLANNER_TURN_ID if smoke_kind == SMOKE_PLANNER_KIND else SMOKE_BINDING_TURN_ID
+            )
         )
         set_active_turn(turn_id)
 
@@ -5084,7 +5174,7 @@ def execute_live_campaign(
     population: str = "d4",
 ) -> dict[str, Any]:
     """Run selected frozen turns after static/readiness interlocks."""
-    if authorization.planner_smoke_mode in H1_SMOKE_MODES:
+    if authorization.planner_smoke_mode in BOUNDED_SMOKE_MODES:
         raise D5StaticPreflightError("H1 smoke authority cannot execute a campaign")
     if population in PLANNER_POPULATIONS and mode != "planner_only":
         raise D5StaticPreflightError("Planner population requires planner-only campaign mode")
@@ -5426,8 +5516,16 @@ def _build_planner_smoke_inputs(
         return {
             "document_summary": {},
             "source_summary": {},
-            "source_asset_identity": {"asset_id": "H1 synthetic inspection"},
-            "source_channel_count": 1,
+            "source_asset_identity": {
+                "asset_id": case["case_id"]
+                if case.get("specialist_role")
+                else "H1 synthetic inspection"
+            },
+            "source_channel_count": (
+                sum(len(source["channels"]) for source in case["h1_case"]["sources"])
+                if case.get("specialist_role")
+                else 1
+            ),
             "numeric_sample_apis_invoked": False,
             "source_sha256_before": None,
             "source_sha256_after_inspection": None,
@@ -5520,6 +5618,8 @@ async def _run_planner_only_and_close(
     document_summary: Mapping[str, Any],
     source_summary: Mapping[str, Any],
     h1_case: Mapping[str, Any] | None = None,
+    specialist_role: str | None = None,
+    trace_callback: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> tuple[object | None, BaseException | None, BaseException | None]:
     """Call only the canonical planner entrypoint, then close its canonical client."""
     from wellplot.agent.code_mode.planner import SemanticPlanner
@@ -5529,20 +5629,57 @@ async def _run_planner_only_and_close(
     cleanup_error: BaseException | None = None
     try:
         session = adapter.inner.session.session
-        planner = session.compiler.dependencies.planner
-        if not isinstance(planner, SemanticPlanner):
-            raise D5HarnessError("canonical semantic planner is unavailable")
         config = session.config
-        result = await planner.plan(
-            request=request,
-            mode="revise",
-            current_document_summary=document_summary,
-            source_summary=source_summary,
-            timeout_seconds=config.timeout_seconds,
-            temperature=0 if h1_case is not None else config.planner_temperature,
-            max_output_tokens=4096 if h1_case is not None else config.max_output_tokens,
-            **({"_h1_case": h1_case} if h1_case is not None else {}),
-        )
+        if specialist_role is not None:
+            from wellplot.agent.code_mode.canonical_workers import CanonicalReportWorker
+            from wellplot.agent.code_mode.typed_section_worker import CanonicalSectionWorker
+
+            if h1_case is None or trace_callback is None or h1_case["role"] != specialist_role:
+                raise D5HarnessError("specialist smoke fixture is not bound")
+            (backend,) = adapter.inner.call_source.backends
+            worker = (
+                CanonicalReportWorker(backend)
+                if specialist_role == "report"
+                else CanonicalSectionWorker(backend)
+            )
+            prompt, user = _specialist_observation_input(adapter.inner.repo_root, h1_case)
+            role_event = {"attempt": 1, "generation_role": specialist_role + "_worker"}
+            trace_callback({"event": "PLANNER_GENERATION_ENTER", **role_event})
+            try:
+                observed = await worker.observe_first_response(
+                    StructuredGenerationRequest(prompt, user, config.timeout_seconds, 0, 4096)
+                )
+            except ProviderRequestError as error:
+                trace_callback(
+                    {
+                        "event": "PLANNER_GENERATION_FAIL",
+                        "category": error.category.value,
+                        **role_event,
+                    }
+                )
+                raise
+            trace_callback(
+                {
+                    "event": "PLANNER_GENERATION_PASS",
+                    "response_schema": type(observed.value).__name__,
+                    "validated_response": observed.value.model_dump(mode="json"),
+                    **role_event,
+                }
+            )
+        else:
+            planner = session.compiler.dependencies.planner
+            if not isinstance(planner, SemanticPlanner):
+                raise D5HarnessError("canonical semantic planner is unavailable")
+            result = await planner.plan(
+                request=request,
+                mode="revise",
+                current_document_summary=document_summary,
+                source_summary=source_summary,
+                timeout_seconds=config.timeout_seconds,
+                temperature=0 if h1_case is not None else config.planner_temperature,
+                max_output_tokens=4096 if h1_case is not None else config.max_output_tokens,
+                **({"_h1_case": h1_case} if h1_case is not None else {}),
+            )
     except BaseException as error:
         execution_error = error
     try:
@@ -5673,7 +5810,7 @@ def execute_live_planner_smoke(
     if authorization.project_config_fingerprint_sha256 != project_config.fingerprint_sha256:
         raise D5StaticPreflightError("project configuration fingerprint mismatch")
     paths = EvidencePaths(artifact_root, authorization.campaign_id)
-    is_h1 = authorization.planner_smoke_mode in H1_SMOKE_MODES
+    is_h1 = authorization.planner_smoke_mode in BOUNDED_SMOKE_MODES
     if static_checker is None:
         static, case = _default_planner_smoke_static_checks(
             repo_root,
@@ -5692,6 +5829,7 @@ def execute_live_planner_smoke(
         else:
             _require_exact_planner_worktree(repo_root, authorization.expected_worktree_porcelain)
         static = static_checker(repo_root, authorization, paths)
+    specialist_role = case.get("specialist_role")
     try:
         context = _build_planner_smoke_inputs(repo_root, case)
     except Exception as error:
@@ -5727,6 +5865,8 @@ def execute_live_planner_smoke(
             if is_h1
             else {}
         )
+        if specialist_role is not None:
+            h1_limits["specialist_observation"] = True
         if provider_factory is not None:
             return provider_factory(
                 repo_root,
@@ -5802,11 +5942,15 @@ def execute_live_planner_smoke(
         custody.ledger.max_logical_calls = 1
         custody.ledger.max_physical_attempts = 1
         custody.state["synthetic_inspection_sha256"] = case["source_inventory_sha256"]
+    if specialist_role is not None:
+        custody.state["observation_role"] = custody.ledger.specialist_role
     custody.state.update(
         {
             "planner_smoke_case_id": case["case_id"],
             "planner_smoke_request_sha256": case["request_sha256"],
-            "planner_entrypoint": "wellplot.agent.code_mode.planner.SemanticPlanner.plan",
+            "planner_entrypoint": (
+                None if specialist_role else "wellplot.agent.code_mode.planner.SemanticPlanner.plan"
+            ),
             "planner_result_status": "NOT_REACHED",
             "planner_result_schema_valid": False,
             "numeric_sample_apis_invoked": context["numeric_sample_apis_invoked"],
@@ -5838,6 +5982,8 @@ def execute_live_planner_smoke(
             document_summary=context["document_summary"],
             source_summary=context["source_summary"],
             h1_case=case.get("h1_case"),
+            specialist_role=specialist_role,
+            trace_callback=on_trace,
         )
     )
     reliability = _planner_output_reliability(trace_events, custody.ledger)
@@ -5880,7 +6026,9 @@ def execute_live_planner_smoke(
     from wellplot.agent.code_mode.planner import _PlannerWirePlan
 
     response_model = _PlannerWirePlan
-    if is_h1:
+    if specialist_role is not None:
+        response_model = _specialist_smoke_model(specialist_role)
+    elif is_h1:
         response_model = _h1_contract(
             _OBSERVATION_SMOKE_PROFILES[authorization.planner_smoke_mode][2]
         )[4]
@@ -5897,7 +6045,10 @@ def execute_live_planner_smoke(
     except Exception:
         terminal = custody.finish("SMOKE_CONTRACT_FAIL", reason="planner_wire_schema_invalid")
         return {"status": "SMOKE_CONTRACT_FAIL", "terminal": terminal}
-    downstream_events = _planner_smoke_downstream_events(trace_events, custody.ledger.calls_by_role)
+    downstream_roles = dict(custody.ledger.calls_by_role)
+    if specialist_role is not None:
+        downstream_roles.pop(specialist_role + "_worker", None)
+    downstream_events = _planner_smoke_downstream_events(trace_events, downstream_roles)
     source_sha_after = source_revision_after = None
     if not is_h1:
         from wellplot.file_revision import file_revision_token
@@ -5927,8 +6078,8 @@ def execute_live_planner_smoke(
             "worktree_allowlist_unchanged": worktree_unchanged,
             "downstream_stage_events": downstream_events,
             "downstream_stage_calls": {
-                "report_worker": custody.ledger.calls_by_role.get("report_worker", 0),
-                "section_worker": custody.ledger.calls_by_role.get("section_worker", 0),
+                "report_worker": downstream_roles.get("report_worker", 0),
+                "section_worker": downstream_roles.get("section_worker", 0),
                 "reconciliation": 0,
                 "execution": 0,
                 "persistence": 0,
@@ -7716,7 +7867,7 @@ def main() -> int:
         parser.error("--planner-case-id requires --execute-planner-smoke")
     repo_root = args.repo_root.resolve()
     authorization = _load_authorization(args.authorization_json.resolve())
-    if authorization.planner_smoke_mode in H1_SMOKE_MODES and not (
+    if authorization.planner_smoke_mode in BOUNDED_SMOKE_MODES and not (
         args.provider_free_preflight or args.execute_planner_smoke
     ):
         parser.error("H1 smoke authority is only for canonical planner smoke")
@@ -7730,7 +7881,7 @@ def main() -> int:
         else (repo_root / authorization.artifact_root).resolve()
     )
     paths = EvidencePaths(artifact_root, authorization.campaign_id)
-    if args.provider_free_preflight and authorization.planner_smoke_mode in H1_SMOKE_MODES:
+    if args.provider_free_preflight and authorization.planner_smoke_mode in BOUNDED_SMOKE_MODES:
         result, _ = _default_planner_smoke_static_checks(repo_root, authorization, paths)
     elif args.provider_free_preflight:
         result = provider_free_preflight(
