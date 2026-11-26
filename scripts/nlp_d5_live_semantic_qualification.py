@@ -1490,6 +1490,39 @@ def _planner_smoke_case(
     }
 
 
+def _specialist_observation_input(repo_root: Path, case: Mapping[str, Any]) -> tuple[str, str]:
+    """Render a synthetic specialist input using canonical inspection projections."""
+    from wellplot.agent.code_mode.enrichment import (
+        _existing_tracks,
+        inspect_report_context,
+    )
+    from wellplot.model.authoring import AuthoringDocumentSpec
+
+    role = case["role"]
+    if role not in {"report", "section"}:
+        raise D5StaticPreflightError("unknown isolated specialist role")
+    document = AuthoringDocumentSpec.model_validate(case["document"])
+    payload = {
+        "request": case["request"],
+        "objective": case["objective"],
+        "scope": case["scope"],
+        "document": document.model_dump(mode="json"),
+        "sources": case["sources"],
+        "dialogue": case.get("dialogue", []),
+        "workflow": case.get("workflow", {"pending": [], "verified_results": []}),
+    }
+    if role == "report":
+        payload["report_inspection"] = inspect_report_context(document, str(case["id"])).model_dump(
+            mode="json", exclude={"metadata_bindings"}
+        )
+    else:
+        payload["existing_tracks"] = [
+            track.model_dump(mode="json") for track in _existing_tracks(document, case["scope"])
+        ]
+    manual = repo_root / "docs/research" / f"WELLPLOT_V2_SPECIALIST_{role.upper()}.md"
+    return manual.read_text(encoding="utf-8"), json.dumps(payload, ensure_ascii=False)
+
+
 def _load_planner_population(repo_root: Path, population: str) -> list[dict[str, Any]]:
     if population in H1_POPULATIONS:
         filename, digest, ids, _, _ = _h1_contract(population)

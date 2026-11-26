@@ -35,3 +35,8 @@ and its subtitle must remain unchanged:
 Example: the report already uses landscape and the only objective is
 landscape orientation:
 `{"decision":{"disposition":"already_satisfied","explanation":"The inspected page orientation is landscape."},"rationale":"No report change is needed."}`
+
+Example: the inspected detail row has a Datum cell with slot ID
+`detail-datum-a`; the request specifies the detail datum of 85 m, not the
+similarly labelled general field:
+`{"decision":{"detail_fields":[{"slot_id":"detail-datum-a","value":85,"unit":"m"}]},"rationale":"The inspected detail slot matches the qualified label; omit the general field."}`

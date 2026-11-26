@@ -190,3 +190,9 @@ requirement within the existing S06 acceptance criteria; no separate epic or byp
 The historical H1b condition is closed; its active Beads work remains open for the
 revised progression decision. No implementation, live work, holdout consumption,
 production routing or main merge is authorized by this document.
+
+The approved isolated specialist qualification is separate from integrated H2:
+it may use independently verified scientific objectives without requiring a
+passing S03 planner result. Revised S03 did not progress (4/6). This exception
+does not change the integrated S04 dependency, the S05/S06 gates, or the
+separate response-agent evidence requirement. It grants no live authority.

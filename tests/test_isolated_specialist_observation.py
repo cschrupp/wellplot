@@ -7,13 +7,13 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
-from scripts.nlp_d4_live_acceptance import CountingBackend
+from scripts.nlp_d4_live_acceptance import CountingBackend, LogicalCallLedger
+from scripts.nlp_d5_live_semantic_qualification import _specialist_observation_input
 
 from wellplot.agent.code_mode.canonical_workers import CanonicalReportWorker
 from wellplot.agent.code_mode.typed_section_worker import CanonicalSectionWorker
 from wellplot.agent.providers.base import ProviderRequestError, StructuredGenerationRequest
 from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
-from wellplot.model.authoring import AuthoringDocumentSpec
 
 RESEARCH = Path(__file__).resolve().parents[1] / "docs/research"
 
@@ -40,7 +40,7 @@ def test_first_response_boundaries() -> None:
             {"title": "Winter Survey", "subtitle": "Station 12"},
             {"detail_fields": [{"slot_id": "operator-detail", "value": "Northstar"}]},
             _finding("already_satisfied"),
-            _binding("acoustics", "SLOW"),
+            _binding("track-1", "SLOW"),
             {
                 "action": "add_track",
                 "track": {
@@ -52,21 +52,20 @@ def test_first_response_boundaries() -> None:
             },
             _finding("unavailable"),
             _finding("clarification"),
-            _binding("bounds", "UPPER"),
+            _binding("track-1", "UPPER"),
         ]
         actual = []
+        measured_ledger = LogicalCallLedger(max_calls=8)
         for case, decision in zip(panel, decisions, strict=True):
             role = case["role"]
-            prompt = (RESEARCH / f"WELLPLOT_V2_SPECIALIST_{role.upper()}.md").read_text()
-            document = AuthoringDocumentSpec.model_validate(case["document"])
-            user = json.dumps(
-                {
-                    "dialogue": [],
-                    "workflow": {"pending": [], "verified_results": []},
-                    **case,
-                    "document": document.model_dump(mode="json"),
-                }
-            )
+            prompt, user = _specialist_observation_input(RESEARCH.parents[1], case)
+            payload = json.loads(user)
+            if case["id"] == "W02":
+                inspection = payload["report_inspection"]
+                assert inspection["general_slot_ids"] == ["operator-general"]
+                assert inspection["detail_slot_ids"] == ["operator-detail"]
+            if case["id"] in {"W04", "W08"}:
+                assert payload["existing_tracks"][0]["handle"] == "track-1"
             content = {"decision": decision, "rationale": "Synthetic first response."}
             if case["id"] == "W08":
                 content["pending_objective"] = "Blue between-curve fill after verified co-location."
@@ -112,7 +111,8 @@ def test_first_response_boundaries() -> None:
                     delegate=OpenAICompatibleBackendV2(
                         model="mock", client=client, structured_output="json_schema"
                     ),
-                    max_calls=1,
+                    max_calls=8,
+                    ledger=measured_ledger,
                     specialist_observation=True,
                 )
                 worker_type = CanonicalReportWorker if role == "report" else CanonicalSectionWorker
@@ -128,5 +128,6 @@ def test_first_response_boundaries() -> None:
                 with pytest.raises(ProviderRequestError):
                     await worker_type(invalid_backend).observe_first_response(request)
         assert actual == [case["id"] for case in panel for _ in range(2)]
+        assert measured_ledger.started_calls == 8
 
     asyncio.run(asyncio.wait_for(run(), timeout=10))

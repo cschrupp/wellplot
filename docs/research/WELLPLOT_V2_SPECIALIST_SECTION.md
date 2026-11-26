@@ -43,3 +43,20 @@ INCL; the objective is to plot INCL:
 Example: two eligible sources both contain literal CAL and the scope does
 not select one:
 `{"decision":{"disposition":"clarification","explanation":"Which inspected source should supply CAL: Run North or Run South?"},"rationale":"The source choice changes the scientific result."}`
+
+Example: a conductivity scalar is addressable in the assigned source and a
+compatible existing track has snapshot handle `track-2`:
+`{"decision":{"action":"add_binding","target":{"handle":"track-2"},"binding":{"semantic_id":"new-cond","channel":"EC"}},"rationale":"Use the existing track without changing its curves."}`
+
+Example: the user asks for a separate temperature track and the assigned
+source has addressable BHT:
+`{"decision":{"action":"add_track","track":{"semantic_id":"new-temperature","kind":"normal","title":"Temperature","bindings":[{"semantic_id":"bht","channel":"BHT"}]}},"rationale":"A separate track preserves existing track contents."}`
+
+Example: the inspected curve selector is `curve-2`, and the only request
+is a linear display scale from 0 to 120 degC:
+`{"decision":{"action":"update_curve_scale","target":{"handle":"curve-2"},"scale":{"kind":"linear","minimum":0,"maximum":120,"unit":"degC"}},"rationale":"Only the existing curve display scale changes."}`
+
+For a between-curve fill, use `add_fill` only once both curve handles are
+grounded in the inspected track. For example, if the same track already
+contains the requested curves at `curve-a` and `curve-b`:
+`{"decision":{"action":"add_fill","target":{"handle":"curve-a"},"fill":{"kind":"between_curves","semantic_id":"new-shade","target_binding":"curve-a","other_binding":"curve-b","color":"orange"}},"rationale":"Both fill endpoints are already inspected on the same track."}`
