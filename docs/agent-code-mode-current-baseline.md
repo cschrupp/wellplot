@@ -33,6 +33,13 @@ supersedes current runtime authority.
 6/6 typed-valid and 4/6 scientifically correct. Progression was not met;
 S04 remains blocked. See the [adjudication and early S06 decision proposal](research/WELLPLOT_V2_S03_REVISED_CLOSEOUT.md).
 
+**Isolated specialist evidence (EMPIRICALLY_SUPPORTED):** SOL accepted
+collection and 8/8 typed validity; scientific grade was 6/8 (report 3/3,
+section 3/5), with unsafe source ambiguity in W07 and loss of the exact
+pending shading objective in W08. Progression was not met. This does not
+change S03, integrated H2 or S05 dependencies. See the
+[scientific closeout](research/WELLPLOT_V2_SPECIALIST_CLOSEOUT.md).
+
 This baseline applies to:
 
 - `SemanticPlanner` and canonical report/section workers;
