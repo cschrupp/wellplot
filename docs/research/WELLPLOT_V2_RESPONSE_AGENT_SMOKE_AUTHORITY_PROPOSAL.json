@@ -19,7 +19,7 @@
     "sdk_request_body_sha256": "04d5eebc858897b7ba411c050e222ff94c830ff5065f181d1d425ce8816b8a81",
     "harness_path": "scripts/nlp_d5_live_semantic_qualification.py",
     "harness_sha256": "6b3abded85d05e318d24a9914a97c1380218c0723b69750da2cfe54ea1521238",
-    "project_config_fingerprint_sha256": "14357a627f060572e73e822ab9efe9ed3a6cca6727b7247361a2a5adfa5bd498"
+    "project_config_fingerprint_sha256": "14357a627f060572e73a822ab9efe9ed3a6cca6727b7247361a2a5adfa5bd498"
   },
   "runtime": {
     "model_expected_from_accepted_project_config": "qwen3.6-35b-a3b",
