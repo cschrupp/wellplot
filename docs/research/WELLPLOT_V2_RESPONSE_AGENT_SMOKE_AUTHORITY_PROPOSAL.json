@@ -1,0 +1,66 @@
+{
+  "descriptor_type": "wellplot-live-authority-proposal",
+  "descriptor_status": "PROPOSED_NOT_AUTHORIZED",
+  "execution_eligible": false,
+  "authority_id": "HA-WELLPLOT-V2-RESPONSE-AGENT-SMOKE-001-PROPOSED",
+  "campaign_id": "wellplot-v2-response-agent-smoke-20261127-001-proposed",
+  "implementation_checkpoint": "d3f3c7e813eda1921bb5c37c3f03c90ac0bc4469",
+  "mode": "response_agent_smoke",
+  "case_id": "RESPONSE-AGENT-SMOKE",
+  "population_loading": false,
+  "frozen_inputs": {
+    "fixture_path": "docs/research/WELLPLOT_V2_RESPONSE_AGENT_SMOKE_FIXTURE.json",
+    "fixture_file_sha256": "1b13499a54b1871ac91b8022ffe9f9bff95a2d5ebab9683e10d026781eb7f834",
+    "fixture_object_sha256": "963dedd3628539b6baf2072ade98ab671175120eaef939e4f8b92f4993a39674",
+    "request_sha256": "8750e725c98bef1aba1523cb5cf5d8c14862e7fa733657152407eaaf8aeaf220",
+    "rendered_system_user_pair_sha256": "cec4cca9ed0fbb7853dab32434d07bec815bb63e1eb6a3d01724d2f32ab0da24",
+    "instructions_sha256": "782a1cf6b463b57211d3231aeb62214b50a681d5e4e69b68e6781c2555d33bcd",
+    "response_schema_sha256": "7cfe35615916d50c78f293870b72d72538b8e71b91d54c6ada4dc14a469f74ea",
+    "sdk_request_body_sha256": "04d5eebc858897b7ba411c050e222ff94c830ff5065f181d1d425ce8816b8a81",
+    "harness_path": "scripts/nlp_d5_live_semantic_qualification.py",
+    "harness_sha256": "6b3abded85d05e318d24a9914a97c1380218c0723b69750da2cfe54ea1521238",
+    "project_config_fingerprint_sha256": "14357a627f060572e73e822ab9efe9ed3a6cca6727b7247361a2a5adfa5bd498"
+  },
+  "runtime": {
+    "model_expected_from_accepted_project_config": "qwen3.6-35b-a3b",
+    "current_endpoint_identity": "PENDING_NON_GENERATIVE_LAN_READINESS",
+    "readiness_evidence_sha256": null,
+    "tokenizer_and_template_identity": "PENDING_NON_GENERATIVE_LAN_QUALIFICATION",
+    "historical_accepted_runtime_values_are_not_current_verification": true
+  },
+  "input_budget": {
+    "max_input_tokens": 60000,
+    "reserved_output_tokens": 4096,
+    "additional_context_margin_tokens": 1440,
+    "exact_smoke_input_tokens": null,
+    "exact_panel_input_tokens": null,
+    "tokenization_evidence_sha256": null,
+    "status": "PENDING_APPROVED_NON_GENERATIVE_LAN_QUALIFICATION"
+  },
+  "generation_controls": {
+    "logical_generations_max": 1,
+    "physical_attempts_max": 1,
+    "sdk_retries": 0,
+    "native_corrections": 0,
+    "temperature": 0,
+    "thinking_enabled": false,
+    "max_output_tokens": 4096
+  },
+  "execution_controls": {
+    "worker_or_planner_calls": 0,
+    "authoring_or_publication": false,
+    "evidence_namespace": "wellplot-v2-response-agent-smoke-20261127-001-PROPOSED",
+    "canonical_launcher": "scripts/run_d5_live_campaign.sh planner-smoke response-agent-development AUTH_JSON",
+    "worktree_binding": "PENDING_FINAL_STATIC_PREFLIGHT",
+    "human_smoke_authorization": "NOT_GRANTED",
+    "lan_execution_approval": "NOT_AVAILABLE_IN_CURRENT_TOOL_POLICY"
+  },
+  "blocking_prerequisites": [
+    "Approved LAN execution for authenticated non-generative endpoint readiness and tokenization.",
+    "Verify current model/build/template/defaults identity and exact seven-input token counts, including schema-related overhead and the thinking-disabled suffix.",
+    "Bind final worktree state and regenerated descriptor digest after readiness evidence is available.",
+    "Separate Human Authority for the single smoke generation.",
+    "Approved LAN execution for the entire canonical launcher invocation."
+  ],
+  "warning": "This proposal is intentionally not a D5Authorization JSON and must not be passed to the campaign launcher."
+}

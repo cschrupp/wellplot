@@ -95,9 +95,9 @@ defaults digest
 `5136c0f2b22a73572fe88f44e8cf32159ffb3b345ced2e33ba7507d612f7f8c3`; those
 are historical expected values, not a current readiness observation.
 
-The proposed authority remains non-executable pending that qualification and
-independent smoke authorization. No current runtime identity or token count is
-claimed here. A D5-consumable authority descriptor is not yet issued because
-the current runtime identity, exact tokenization results, and post-commit
-worktree/checkpoint binding are unavailable; a proposal must not be passed to
-the launcher as executable authority.
+The non-executable descriptor proposal is
+[`WELLPLOT_V2_RESPONSE_AGENT_SMOKE_AUTHORITY_PROPOSAL.json`](WELLPLOT_V2_RESPONSE_AGENT_SMOKE_AUTHORITY_PROPOSAL.json).
+It binds the committed implementation and known local identities, but leaves
+current runtime identity, exact token counts, readiness evidence and final
+worktree binding pending. It is deliberately not a D5-consumable authority
+descriptor and must not be passed to the launcher.
