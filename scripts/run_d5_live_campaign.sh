@@ -6,7 +6,7 @@ readonly WATCHDOG_SECONDS=10800
 readonly TERMINATION_GRACE_SECONDS=10
 
 usage() {
-    printf 'Usage: %s {preflight|execute|planner-smoke} {d4|final|a10-53|h1-development|h1b-development|s03-revised-development|isolated-specialists} AUTHORIZATION_JSON\n' "$0" >&2
+    printf 'Usage: %s {preflight|execute|planner-smoke} {d4|final|a10-53|h1-development|h1b-development|s03-revised-development|isolated-specialists|response-agent-development} AUTHORIZATION_JSON\n' "$0" >&2
 }
 
 if [[ $# -ne 3 ]]; then
@@ -35,7 +35,7 @@ case "$mode" in
 esac
 
 case "$population" in
-    d4|final|a10-53|h1-development|h1b-development|s03-revised-development|isolated-specialists) ;;
+    d4|final|a10-53|h1-development|h1b-development|s03-revised-development|isolated-specialists|response-agent-development) ;;
     *)
         usage
         exit 64

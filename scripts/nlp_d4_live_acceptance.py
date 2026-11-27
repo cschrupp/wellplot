@@ -28,7 +28,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from wellplot.agent.code_mode.canonical_workers import (
     ReportSemanticResponse as DeliveryReportResponse,
@@ -59,6 +59,15 @@ from wellplot.agent.providers.base import (
 )
 from wellplot.io import load_dlis, load_las
 from wellplot.model.authoring import AuthoringDocumentSpec
+
+
+class ResponseAgentObservation(BaseModel):
+    """Minimal non-mutating response-agent observation DTO."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    response: str = Field(min_length=1, pattern=r"\S")
+
 
 EXPERIMENT_VERSION = "WELLPLOT-NLP-D4A"
 PRODUCTION_BASELINE = "a850f932bf0d60edd9def7cbe7d1978c099d23f8"
@@ -335,9 +344,12 @@ class CountingBackend:
     capture_logical_identity: bool = False
     planner_max_output_tokens: int | None = None
     specialist_observation: bool = False
+    response_observation: bool = False
 
     def __post_init__(self) -> None:
         """Give standalone wrappers a ledger while allowing campaign sharing."""
+        if self.specialist_observation and self.response_observation:
+            raise ValueError("observation role profiles are mutually exclusive")
         if self.ledger is None:
             self.ledger = LogicalCallLedger(max_calls=self.max_calls)
         elif self.ledger.max_calls != self.max_calls:
@@ -358,6 +370,7 @@ class CountingBackend:
             _S03ObservationResponse: "planner",
             DeliveryReportResponse: "report_worker",
             DeliverySectionResponse: "section_worker",
+            ResponseAgentObservation: "response_agent",
         }
         if response_model in _ACTION_RESPONSE_MODELS.values():
             return "section_worker"
@@ -372,6 +385,8 @@ class CountingBackend:
             (0.0, self.planner_max_output_tokens) if generation_role == "planner" else (None, None)
         )
         if self.specialist_observation:
+            expected = (0.0, 4096)
+        if self.response_observation:
             expected = (0.0, 4096)
         temperature = getattr(request, "temperature", None)
         max_output_tokens = getattr(request, "max_output_tokens", None)
@@ -516,6 +531,9 @@ class CountingBackend:
         )
         if is_specialist != self.specialist_observation:
             raise PreflightError("specialist observation boundary mismatch")
+        is_response_agent = response_model is ResponseAgentObservation
+        if is_response_agent != self.response_observation:
+            raise PreflightError("response-agent observation boundary mismatch")
         index = self._before(
             "structured",
             request,

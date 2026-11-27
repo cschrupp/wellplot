@@ -60,6 +60,7 @@ from wellplot.agent.providers.base import (
     ProviderRequestError,
     StructuredGenerationRequest,
 )
+from wellplot.model.authoring import AuthoringDocumentSpec
 from wellplot.project_config import ProjectConfig, load_project_config
 
 D5_EXPERIMENT_VERSION = "WELLPLOT-NLP-D5-5I"
@@ -179,7 +180,18 @@ SPECIALIST_PANEL_PATH = "docs/research/WELLPLOT_V2_SPECIALIST_PANEL.json"
 SPECIALIST_PANEL_SHA256 = "729292eee9e54c3bb09705c30eca692b530ab28a7b285a8c5237ab83ef9f9817"
 SPECIALIST_TURN_IDS = tuple(f"W{index:02d}" for index in range(1, 9))
 SPECIALIST_INPUTS_SHA256 = "9b72e75dba95712aa04fb936ae6c5d3343303457413a564ea25887af0e1df613"
+RESPONSE_AGENT_POPULATION = "response-agent-development"
+RESPONSE_AGENT_PANEL_PATH = "docs/research/WELLPLOT_V2_RESPONSE_AGENT_PANEL.json"
+RESPONSE_AGENT_PANEL_SHA256 = "1b8351647ee6802beb46f9b5bd5992df5b806a588d7e6faaaf2e876205c97e0b"
+RESPONSE_AGENT_TURN_IDS = tuple(f"CR{index:02d}" for index in range(1, 7))
+RESPONSE_AGENT_INPUTS_SHA256 = "ccf521c307f82f7f5ce75b7473d2b38f04a52342b79c461f85888053156e3185"
+RESPONSE_AGENT_MANUAL_PATH = "docs/research/WELLPLOT_V2_RESPONSE_AGENT_INSTRUCTIONS.md"
+RESPONSE_AGENT_MANUAL_SHA256 = "782a1cf6b463b57211d3231aeb62214b50a681d5e4e69b68e6781c2555d33bcd"
+RESPONSE_AGENT_RUBRIC_PATH = "docs/research/WELLPLOT_V2_RESPONSE_AGENT_RUBRIC.md"
+RESPONSE_AGENT_RUBRIC_SHA256 = "8f8c267f2941c26052ac59fec224135febb1e5d745f96f93717c4ed65983079f"
+RESPONSE_AGENT_SCHEMA_SHA256 = "7cfe35615916d50c78f293870b72d72538b8e71b91d54c6ada4dc14a469f74ea"
 H1_POPULATIONS = (H1_POPULATION, H1B_POPULATION, S03_POPULATION, SPECIALIST_POPULATION)
+OBSERVATION_POPULATIONS = (*H1_POPULATIONS, RESPONSE_AGENT_POPULATION)
 S03_SMOKE_MODE = "s03_revised_observation"
 _OBSERVATION_SMOKE_PROFILES = {
     H1_SMOKE_MODE: (
@@ -211,10 +223,27 @@ SPECIALIST_SMOKE_FIXTURES = "docs/research/WELLPLOT_V2_SPECIALIST_SMOKE_FIXTURES
 SPECIALIST_SMOKE_FIXTURES_SHA256 = (
     "743ab51d3f9f864d9048ce87aaae86f455cc4027233d3d26fdde78375c84118a"
 )
-PLANNER_POPULATIONS = (A10_SEM_53_POPULATION, *H1_POPULATIONS)
+PLANNER_POPULATIONS = (A10_SEM_53_POPULATION, *OBSERVATION_POPULATIONS)
 
 
 def _h1_contract(population: str) -> tuple[str, str, tuple[str, ...], str, type[BaseModel]]:
+    if population == RESPONSE_AGENT_POPULATION:
+        manual = (Path(__file__).resolve().parents[1] / RESPONSE_AGENT_MANUAL_PATH).read_text(
+            encoding="utf-8"
+        )
+        if hashlib.sha256(manual.encode("utf-8")).hexdigest() != RESPONSE_AGENT_MANUAL_SHA256:
+            raise D5StaticPreflightError("response-agent instructions changed from frozen identity")
+        if _sha256_json(d4.ResponseAgentObservation.model_json_schema()) != (
+            RESPONSE_AGENT_SCHEMA_SHA256
+        ):
+            raise D5StaticPreflightError("response-agent schema changed from frozen identity")
+        return (
+            RESPONSE_AGENT_PANEL_PATH,
+            RESPONSE_AGENT_PANEL_SHA256,
+            RESPONSE_AGENT_TURN_IDS,
+            manual,
+            d4.ResponseAgentObservation,
+        )
     if population == SPECIALIST_POPULATION:
         from wellplot.agent.code_mode.canonical_workers import (
             ReportSpecialistObservation,
@@ -325,6 +354,7 @@ DECODER_POLICY = {
     "planner": {"temperature": 0.0, "max_output_tokens": None},
     "report_worker": {"temperature": None, "max_output_tokens": None},
     "section_worker": {"temperature": None, "max_output_tokens": None},
+    "response_agent": {"temperature": 0.0, "max_output_tokens": 4096},
     "all_roles": {
         "top_p": "ABSENT",
         "top_k": "ABSENT",
@@ -772,7 +802,7 @@ class D5Authorization:
             or self.sdk_max_retries != 0
         ):
             raise D5StaticPreflightError("invalid A10 first-pass authority")
-        if self.planner_population in H1_POPULATIONS:
+        if self.planner_population in OBSERVATION_POPULATIONS:
             _, digest, ids, prompt, model = _h1_contract(self.planner_population)
             prompt_identity = (
                 prompt
@@ -780,7 +810,9 @@ class D5Authorization:
                 else hashlib.sha256(prompt.encode("utf-8")).hexdigest()
             )
             if self.planner_population_system_prompt_sha256 != prompt_identity:
-                raise D5StaticPreflightError("H1 system prompt authority is missing or mismatched")
+                raise D5StaticPreflightError(
+                    "observation system prompt authority is missing or mismatched"
+                )
             if (
                 cap is None
                 or self.planner_first_pass_turn_ids != ids
@@ -788,7 +820,7 @@ class D5Authorization:
                 or self.planner_population_source_inventory_sha256 != digest
                 or self.planner_smoke_wire_schema_sha256 != _sha256_json(model.model_json_schema())
             ):
-                raise D5StaticPreflightError("invalid frozen H1 observation authority")
+                raise D5StaticPreflightError("invalid frozen observation authority")
         elif self.planner_first_pass_turn_ids is not None:
             selected = self.planner_first_pass_turn_ids
             if (
@@ -922,7 +954,9 @@ def _select_first_pass_turns(
     turn_ids: Sequence[str] | None,
 ) -> Sequence[str] | None:
     """Constrain the opt-in first-pass authority to the exposed development panel."""
-    if population in H1_POPULATIONS or authorization.planner_population in H1_POPULATIONS:
+    if population in OBSERVATION_POPULATIONS or authorization.planner_population in (
+        OBSERVATION_POPULATIONS
+    ):
         ids = _h1_contract(population)[2]
         if (
             population != authorization.planner_population
@@ -1252,6 +1286,7 @@ def _default_smoke_static_checks(
         "h1b_planner_observation",
         "s03_planner_observation",
         "specialist_observation",
+        "response_agent_observation",
         *SPECIALIST_SMOKE_ROLES,
     }:
         if (
@@ -1296,6 +1331,7 @@ def _default_smoke_static_checks(
         "specialist_observation": _sha256_json(
             _h1_contract(SPECIALIST_POPULATION)[4].model_json_schema()
         ),
+        "response_agent_observation": _sha256_json(d4.ResponseAgentObservation.model_json_schema()),
         "canonical_schema_behavior_probe": _schema_probe_bundle_sha256(),
         **{
             name: _sha256_json(_specialist_smoke_model(role).model_json_schema())
@@ -1623,12 +1659,37 @@ def _specialist_observation_input(repo_root: Path, case: Mapping[str, Any]) -> t
     return manual.read_text(encoding="utf-8"), json.dumps(payload, ensure_ascii=False)
 
 
+def _response_agent_observation_input(repo_root: Path, case: Mapping[str, Any]) -> tuple[str, str]:
+    """Render one response observation from frozen state and outcome records."""
+    if case.get("id") not in RESPONSE_AGENT_TURN_IDS:
+        raise D5StaticPreflightError("response-agent case identity is not frozen")
+    document = AuthoringDocumentSpec.model_validate(case["saved_document"])
+    payload = {
+        "original_request": case["request"],
+        "ordered_dialogue": case["dialogue"],
+        "saved_document": document.model_dump(mode="json"),
+        "inspected_facts": case["inspected_facts"],
+        "verified_outcome": case["verified_outcome"],
+    }
+    manual = repo_root / RESPONSE_AGENT_MANUAL_PATH
+    return manual.read_text(encoding="utf-8"), json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+
+
 def _load_planner_population(repo_root: Path, population: str) -> list[dict[str, Any]]:
-    if population in H1_POPULATIONS:
+    if population in OBSERVATION_POPULATIONS:
         filename, digest, ids, _, _ = _h1_contract(population)
         path = repo_root / filename
-        _assert_hash(path, digest, "H1 request and inspection panel")
+        _assert_hash(path, digest, "frozen observation panel")
         cases = json.loads(path.read_text(encoding="utf-8"))
+        if population == RESPONSE_AGENT_POPULATION:
+            identities = [_response_agent_observation_input(repo_root, case) for case in cases]
+            if _sha256_json(identities) != RESPONSE_AGENT_INPUTS_SHA256:
+                raise D5StaticPreflightError("response-agent rendered input custody drifted")
+            cases = [
+                {**case, "turn_id": case["id"], "compiler_status": "NOT_INVOKED"} for case in cases
+            ]
         if population == SPECIALIST_POPULATION:
             identities = [_specialist_observation_input(repo_root, case) for case in cases]
             if _sha256_json(identities) != SPECIALIST_INPUTS_SHA256:
@@ -3410,6 +3471,7 @@ class D5LogicalCallLedger:
     turn_role_counts: dict[str, int] = field(default_factory=dict)
     planner_first_pass: bool = False
     specialist_first_pass: bool = False
+    response_agent_first_pass: bool = False
 
     def begin_turn(self, turn_id: str) -> None:
         """Reset per-turn role accounting at the frozen turn boundary."""
@@ -3418,11 +3480,11 @@ class D5LogicalCallLedger:
 
     def reserve(self, role: str) -> int:
         """Reserve a role-tagged logical call before provider delegation."""
-        if role not in {"planner", "report_worker", "section_worker"}:
+        if role not in {"planner", "report_worker", "section_worker", "response_agent"}:
             raise D5HarnessError("unknown generation role")
         if self.active_turn_id is not None:
             used = self.turn_role_counts.get(role, 0)
-            limit = ROLE_LOGICAL_CALL_LIMITS[role]
+            limit = 1 if role == "response_agent" else ROLE_LOGICAL_CALL_LIMITS[role]
             if self.planner_first_pass:
                 limit = 1 if role == "planner" else 0
             if self.specialist_first_pass:
@@ -3434,6 +3496,8 @@ class D5LogicalCallLedger:
                     else None
                 )
                 limit = int(role == expected)
+            if self.response_agent_first_pass:
+                limit = int(role == "response_agent")
             if used >= limit:
                 raise D5CallCapExceeded(
                     f"{role} logical call limit {limit} exceeded for turn {self.active_turn_id}"
@@ -3605,6 +3669,9 @@ class D5CampaignCustody:
                 max_physical_attempts=physical_limit,
                 planner_first_pass=first_pass,
                 specialist_first_pass=authorization.planner_population == SPECIALIST_POPULATION,
+                response_agent_first_pass=(
+                    authorization.planner_population == RESPONSE_AGENT_POPULATION
+                ),
             ),
             authorization_id=authorization.authorization_id,
             mode=mode,
@@ -3937,7 +4004,11 @@ class D5CampaignCustody:
         if self.mode != "planner_only":
             raise D5HarnessError("planner campaign observability used outside planner-only mode")
         name = event.get("event")
-        wire_events = {"PLANNER_GENERATION_PASS", "SPECIALIST_GENERATION_PASS"}
+        wire_events = {
+            "PLANNER_GENERATION_PASS",
+            "SPECIALIST_GENERATION_PASS",
+            "RESPONSE_AGENT_GENERATION_PASS",
+        }
         if name in wire_events:
             payload = {
                 "turn_id": self._active_turn_id,
@@ -3945,7 +4016,7 @@ class D5CampaignCustody:
                 "response_schema": event.get("response_schema"),
                 "validated_response": event.get("validated_response"),
             }
-            if name == "SPECIALIST_GENERATION_PASS":
+            if name in {"SPECIALIST_GENERATION_PASS", "RESPONSE_AGENT_GENERATION_PASS"}:
                 payload["generation_role"] = event["generation_role"]
         elif name == "PLANNER_CONTEXT":
             payload = {
@@ -4813,7 +4884,9 @@ class _ObservedLiveAdapter:
         return await self.inner.execute_turn(case, expected)
 
     async def execute_planner_case(self, case: Mapping[str, Any]) -> Mapping[str, Any]:
-        """Observe one planner-only case through the canonical SemanticPlanner."""
+        """Dispatch one frozen observation through its canonical D5 boundary."""
+        if case["turn_id"] in RESPONSE_AGENT_TURN_IDS:
+            return await self._observe_response_agent(case)
         if case["turn_id"] in SPECIALIST_TURN_IDS:
             return await self._observe_specialist(case)
         observation_population = next(
@@ -4975,6 +5048,69 @@ class _ObservedLiveAdapter:
         )
         return {"observation_status": "SCHEMA_VALID_WIRE_CAPTURED", "schema_valid": True}
 
+    async def _observe_response_agent(self, case: Mapping[str, Any]) -> Mapping[str, Any]:
+        """Capture one response-agent DTO without planner or authoring dispatch."""
+        if (
+            self.planner_first_pass_max_output_tokens != 4096
+            or case not in _load_planner_population(self.inner.repo_root, RESPONSE_AGENT_POPULATION)
+        ):
+            raise D5HarnessError("response-agent case custody drifted")
+        (backend,) = self.inner.call_source.backends
+        if not backend.response_observation:
+            raise D5HarnessError("response-agent backend controls not bound")
+        prompt, user = _response_agent_observation_input(self.inner.repo_root, case)
+        request = StructuredGenerationRequest(
+            prompt,
+            user,
+            self.inner.session.session.config.timeout_seconds,
+            0,
+            4096,
+        )
+        role = "response_agent"
+        self._trace_events.append(
+            {
+                "event": "RESPONSE_AGENT_GENERATION_ENTER",
+                "generation_role": role,
+                "input_sha256": _sha256_json((prompt, user)),
+            }
+        )
+        try:
+            response = await backend.generate_structured(
+                request,
+                response_model=d4.ResponseAgentObservation,
+            )
+        except ProviderRequestError as error:
+            self._trace_events.append(
+                {
+                    "event": "RESPONSE_AGENT_GENERATION_FAIL",
+                    "generation_role": role,
+                    "category": error.category.value,
+                }
+            )
+            if error.category is not ProviderFailureCategory.INVALID_RESPONSE:
+                raise
+            return {
+                "observation_status": "MODEL_STRUCTURAL_FAILURE",
+                "schema_valid": False,
+                "failure_category": "MODEL_STRUCTURAL_INVALID_RESPONSE",
+            }
+        value = response.value.model_dump(mode="json")
+        self._trace_events.append(
+            {
+                "event": "RESPONSE_AGENT_GENERATION_PASS",
+                "generation_role": role,
+                "attempt": 1,
+                "response_schema": _sha256_json(d4.ResponseAgentObservation.model_json_schema()),
+                "validated_response": value,
+            }
+        )
+        return {
+            "observation_status": "SCHEMA_VALID_WIRE_CAPTURED",
+            "schema_valid": True,
+            "generation_role": role,
+            "response": value["response"],
+        }
+
 
 def create_live_adapter(
     *,
@@ -4992,6 +5128,7 @@ def create_live_adapter(
     logical_call_ceiling: int | None = None,
     planner_first_pass_max_output_tokens: int | None = None,
     specialist_observation: bool = False,
+    response_observation: bool = False,
     trace_callback: Callable[[Mapping[str, Any]], None] | None = None,
     compile_result_callback: Callable[[Any], None] | None = None,
     section_action_callback: Callable[[Mapping[str, object]], None] | None = None,
@@ -5065,6 +5202,7 @@ def create_live_adapter(
         capture_logical_identity=section_action_capture_mode != "off",
         planner_max_output_tokens=planner_first_pass_max_output_tokens,
         specialist_observation=specialist_observation,
+        response_observation=response_observation,
     )
     trace_events: list[dict[str, Any]] = []
 
@@ -5219,6 +5357,7 @@ def execute_live_campaign(
             logical_call_ceiling=campaign_logical_call_ceiling,
             planner_first_pass_max_output_tokens=first_pass_cap,
             specialist_observation=population == SPECIALIST_POPULATION,
+            response_observation=population == RESPONSE_AGENT_POPULATION,
         )
     )
     readiness = prepare_readiness(
@@ -5251,6 +5390,19 @@ def execute_live_campaign(
                 if population == SPECIALIST_POPULATION
                 else {}
             ),
+            **(
+                {
+                    "response_agent_panel_sha256": RESPONSE_AGENT_PANEL_SHA256,
+                    "response_agent_inputs_sha256": RESPONSE_AGENT_INPUTS_SHA256,
+                    "response_agent_manual_sha256": (
+                        authorization.planner_population_system_prompt_sha256
+                    ),
+                    "response_agent_schema_sha256": authorization.planner_smoke_wire_schema_sha256,
+                    "response_agent_harness_sha256": authorization.planner_smoke_harness_sha256,
+                }
+                if population == RESPONSE_AGENT_POPULATION
+                else {}
+            ),
             "accepted_d5_engine_checkpoint": authorization.accepted_d5_engine_checkpoint,
             "accepted_d5_design_checkpoint": authorization.accepted_d5_design_checkpoint,
             "accepted_h_implementation_checkpoint": (
@@ -5261,16 +5413,16 @@ def execute_live_campaign(
     runner_kwargs: dict[str, Any] = {"turn_ids": turn_ids, "mode": mode}
     if population != "d4":
         runner_kwargs["population"] = population
-    if population == SPECIALIST_POPULATION:
+    if population in {SPECIALIST_POPULATION, RESPONSE_AGENT_POPULATION}:
 
-        async def run_specialist_and_close() -> dict[str, Any]:
+        async def run_observation_and_close() -> dict[str, Any]:
             try:
                 return await runner.run(readiness.adapter, **runner_kwargs)
             finally:
                 (backend,) = readiness.adapter.inner.call_source.backends
                 await backend.delegate.client.close()
 
-        return asyncio.run(run_specialist_and_close())
+        return asyncio.run(run_observation_and_close())
     return asyncio.run(runner.run(readiness.adapter, **runner_kwargs))
 
 
@@ -6818,7 +6970,7 @@ def _bounded_planner_observation_row(
     source_identity = actual.get("source_asset_identity")
     if not isinstance(source_identity, Mapping):
         source_identity = {}
-    is_h1 = any(case["turn_id"] in _h1_contract(p)[2] for p in H1_POPULATIONS)
+    is_h1 = any(case["turn_id"] in _h1_contract(p)[2] for p in OBSERVATION_POPULATIONS)
     return {
         "experiment_version": D5_EXPERIMENT_VERSION,
         "case_id": case["turn_id"] if is_h1 else case["case_id"],
@@ -6840,6 +6992,12 @@ def _bounded_planner_observation_row(
         "diagnostic_case": case.get("diagnostic_case") is True,
         "observation_status": observation_status,
         "schema_valid": schema_valid,
+        **(
+            {"generation_role": "response_agent", "response": actual["response"]}
+            if actual.get("generation_role") == "response_agent"
+            and isinstance(actual.get("response"), str)
+            else {}
+        ),
         "semantic_status": "NOT_ESTABLISHED",
         "host_resolution_status": "NOT_REACHED",
         "authoring_status": "NOT_REACHED",
@@ -7356,6 +7514,12 @@ class D5CampaignRunner:
             not isinstance(adapter, _ObservedLiveAdapter) or not adapter.observes_physical_attempts
         ):
             raise D5StaticPreflightError("specialist campaign requires canonical HTTP custody")
+        if population == RESPONSE_AGENT_POPULATION and (
+            not isinstance(adapter, _ObservedLiveAdapter)
+            or not adapter.observes_physical_attempts
+            or not adapter.inner.call_source.backends[0].response_observation
+        ):
+            raise D5StaticPreflightError("response-agent campaign requires canonical HTTP custody")
         if first_pass_cap != getattr(adapter, "planner_first_pass_max_output_tokens", None):
             raise D5StaticPreflightError("adapter first-pass controls differ from authority")
         if population == "d4":
@@ -7699,7 +7863,7 @@ def provider_free_preflight(
         raise D5StaticPreflightError("project configuration fingerprint mismatch")
     if population == "final":
         final_population.load_final_population(repo_root)
-    elif population in H1_POPULATIONS:
+    elif population in OBSERVATION_POPULATIONS:
         cases = _load_planner_population(repo_root, population)
         role_limits = {"planner": 1, "report_worker": 0, "section_worker": 0}
         if population == SPECIALIST_POPULATION:
@@ -7708,6 +7872,23 @@ def provider_free_preflight(
                 Path(__file__).resolve(),
                 authorization.planner_smoke_harness_sha256,
                 "specialist D5 harness",
+            )
+        elif population == RESPONSE_AGENT_POPULATION:
+            role_limits = {
+                "planner": 0,
+                "report_worker": 0,
+                "section_worker": 0,
+                "response_agent": 1,
+            }
+            _assert_hash(
+                Path(__file__).resolve(),
+                authorization.planner_smoke_harness_sha256,
+                "response-agent D5 harness",
+            )
+            _assert_hash(
+                repo_root / RESPONSE_AGENT_RUBRIC_PATH,
+                RESPONSE_AGENT_RUBRIC_SHA256,
+                "response-agent scientific rubric",
             )
     elif population == A10_SEM_53_POPULATION:
         if (
@@ -7732,7 +7913,7 @@ def provider_free_preflight(
         if population == A10_SEM_53_POPULATION
         else _default_static_checks
     )
-    if population in H1_POPULATIONS and static_checker is None:
+    if population in OBSERVATION_POPULATIONS and static_checker is None:
         facts = _default_smoke_static_checks(
             repo_root,
             authorization,
@@ -7744,6 +7925,7 @@ def provider_free_preflight(
                 H1B_POPULATION: "h1b_planner_observation",
                 S03_POPULATION: "s03_planner_observation",
                 SPECIALIST_POPULATION: "specialist_observation",
+                RESPONSE_AGENT_POPULATION: "response_agent_observation",
             }[population],
             expected_sdk_max_retries=0,
         )
@@ -7760,6 +7942,10 @@ def provider_free_preflight(
         static_facts["planner_first_pass_turn_ids"] = list(first_pass_turns)
     if population in H1_POPULATIONS:
         static_facts["planner_population_system_prompt_sha256"] = (
+            authorization.planner_population_system_prompt_sha256
+        )
+    elif population == RESPONSE_AGENT_POPULATION:
+        static_facts["response_agent_manual_sha256"] = (
             authorization.planner_population_system_prompt_sha256
         )
     return {
@@ -7785,14 +7971,14 @@ def provider_free_preflight(
             ),
             "benchmark_sha256": (
                 _h1_contract(population)[1]
-                if population in H1_POPULATIONS
+                if population in OBSERVATION_POPULATIONS
                 else A10_SEM_53_BENCHMARK_SHA256
                 if population == A10_SEM_53_POPULATION
                 else None
             ),
             "source_inventory_sha256": (
                 _h1_contract(population)[1]
-                if population in H1_POPULATIONS
+                if population in OBSERVATION_POPULATIONS
                 else A10_SEM_53_SOURCE_INVENTORY_SHA256
                 if population == A10_SEM_53_POPULATION
                 else None

@@ -17,7 +17,7 @@ from typing import Any
 
 import httpx
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from scripts import nlp_d4_live_acceptance as d4
 from scripts import nlp_d5_live_semantic_qualification as d5
 
@@ -953,7 +953,7 @@ def test_first_pass_authority_pins_panel_and_request_controls(tmp_path: Path) ->
 
 
 @pytest.mark.parametrize("interrupt", [False, True])
-@pytest.mark.parametrize("population", d5.PLANNER_POPULATIONS)
+@pytest.mark.parametrize("population", (d5.A10_SEM_53_POPULATION, *d5.H1_POPULATIONS))
 def test_first_pass_campaign_captures_one_response_per_case(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, interrupt: bool, population: str
 ) -> None:
@@ -1327,6 +1327,226 @@ def test_first_pass_campaign_captures_one_response_per_case(
         1 if interrupt else full_count
     )
     assert d5.verify_custody_artifacts(paths) == result["custody_digests"]
+
+
+@pytest.mark.parametrize("outcome", ["complete", "invalid_first", "interrupted"])
+def test_response_agent_campaign_uses_canonical_d5_observation_boundary(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, outcome: str
+) -> None:
+    """Capture truthful response-agent calls and prove no authoring path runs."""
+    from openai import _base_client
+
+    from wellplot.agent.code_mode.canonical_workers import (
+        CanonicalReportWorker,
+    )
+    from wellplot.agent.code_mode.typed_section_worker import CanonicalSectionWorker
+
+    monkeypatch.setattr(_base_client, "get_platform", lambda: "Linux")
+    artifact_root = tmp_path / "response-agent-evidence"
+    manual, _ = d5._response_agent_observation_input(
+        REPO_ROOT,
+        d5._load_planner_population(REPO_ROOT, d5.RESPONSE_AGENT_POPULATION)[0],
+    )
+    response_model = d4.ResponseAgentObservation
+    authorization = replace(
+        _authorization(
+            campaign_id="response-agent-provider-free",
+            artifact_root=str(artifact_root),
+        ),
+        sdk_max_retries=0,
+        planner_population=d5.RESPONSE_AGENT_POPULATION,
+        planner_population_benchmark_sha256=d5.RESPONSE_AGENT_PANEL_SHA256,
+        planner_population_source_inventory_sha256=d5.RESPONSE_AGENT_PANEL_SHA256,
+        planner_population_system_prompt_sha256=hashlib.sha256(manual.encode("utf-8")).hexdigest(),
+        planner_first_pass_max_output_tokens=4096,
+        planner_first_pass_turn_ids=d5.RESPONSE_AGENT_TURN_IDS,
+        planner_smoke_wire_schema_sha256=d5._sha256_json(response_model.model_json_schema()),
+        planner_smoke_harness_sha256=d5._sha256_file(Path(d5.__file__)),
+    )
+    with pytest.raises(d5.D5StaticPreflightError, match="system prompt authority"):
+        replace(authorization, planner_population_system_prompt_sha256="0" * 64)
+    with pytest.raises(d5.D5StaticPreflightError, match="frozen observation authority"):
+        replace(
+            authorization,
+            planner_first_pass_turn_ids=("CR02", "CR01", *d5.RESPONSE_AGENT_TURN_IDS[2:]),
+        )
+    with pytest.raises(d5.D5StaticPreflightError, match="frozen observation authority"):
+        replace(authorization, planner_smoke_wire_schema_sha256="0" * 64)
+    with pytest.raises(d5.D5StaticPreflightError, match="invalid A10 first-pass authority"):
+        replace(authorization, sdk_max_retries=1)
+    preflight = d5.provider_free_preflight(
+        REPO_ROOT,
+        authorization,
+        d5.EvidencePaths(artifact_root, authorization.campaign_id),
+        static_checker=lambda repo, auth, evidence_paths: {"status": "PASS"},
+        population=d5.RESPONSE_AGENT_POPULATION,
+        turn_ids=d5.RESPONSE_AGENT_TURN_IDS,
+    )
+    assert preflight["population"]["turn_ids"] == list(d5.RESPONSE_AGENT_TURN_IDS)
+    assert preflight["logical_call_ceiling"] == 6
+    assert preflight["physical_attempt_upper_bound"] == 6
+    assert preflight["role_logical_call_limits"] == {
+        "planner": 0,
+        "report_worker": 0,
+        "section_worker": 0,
+        "response_agent": 1,
+    }
+    assert preflight["model_calls"] == 0
+    with pytest.raises(ValidationError):
+        response_model.model_validate({"response": "  "})
+    with pytest.raises(ValidationError):
+        response_model.model_validate({"response": "answer", "status": "saved"})
+    role_ledger = d5.D5LogicalCallLedger(
+        max_logical_calls=6,
+        max_physical_attempts=6,
+        planner_first_pass=True,
+        response_agent_first_pass=True,
+    )
+    role_ledger.begin_turn("CR01")
+    for forbidden_role in ("planner", "report_worker", "section_worker"):
+        with pytest.raises(d5.D5CallCapExceeded):
+            role_ledger.reserve(forbidden_role)
+    role_call = role_ledger.reserve("response_agent")
+    with pytest.raises(d5.D5CallCapExceeded):
+        role_ledger.reserve("response_agent")
+    role_ledger.physical_attempt(role_call)
+    with pytest.raises(d5.D5CallCapExceeded):
+        role_ledger.physical_attempt(role_call)
+
+    async def forbidden(*args: object, **kwargs: object) -> None:
+        pytest.fail("response-agent observation reached planner or authoring execution")
+
+    monkeypatch.setattr(SemanticPlanner, "plan", forbidden)
+    monkeypatch.setattr(CanonicalReportWorker, "compile", forbidden)
+    monkeypatch.setattr(CanonicalSectionWorker, "compile", forbidden)
+    monkeypatch.setattr(CanonicalReportWorker, "observe_first_response", forbidden)
+    monkeypatch.setattr(CanonicalSectionWorker, "observe_first_response", forbidden)
+    monkeypatch.setattr(d4.D4CampaignAdapter, "execute_turn", forbidden)
+
+    requests: list[dict[str, Any]] = []
+    clients: list[httpx.AsyncClient] = []
+
+    async def respond(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        requests.append(payload)
+        if outcome == "interrupted" and len(requests) == 2:
+            raise httpx.ReadTimeout("provider-free interruption", request=request)
+        content: dict[str, str] = {"response": "The saved report title is Mesa Review."}
+        if outcome == "invalid_first" and len(requests) == 1:
+            content = {"unexpected": "invalid response"}
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": json.dumps(content)},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 12, "completion_tokens": 7, "total_tokens": 19},
+            },
+            request=request,
+        )
+
+    def client_factory(observer: d5._PhysicalAttemptObserver) -> httpx.AsyncClient:
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(respond),
+            event_hooks={"request": [observer.on_request], "response": [observer.on_response]},
+        )
+        clients.append(client)
+        return client
+
+    create_adapter = d5.create_live_adapter
+
+    def mock_adapter(**kwargs: object) -> d5._ObservedLiveAdapter:
+        adapter = create_adapter(**kwargs, http_client_factory=client_factory)
+        (backend,) = adapter.inner.call_source.backends
+        backend.delegate.client._platform = "Linux"
+        return adapter
+
+    monkeypatch.setattr(d5, "create_live_adapter", mock_adapter)
+    paths = d5.EvidencePaths(artifact_root, authorization.campaign_id)
+    try:
+        result = d5.execute_live_campaign(
+            repo_root=REPO_ROOT,
+            authorization=authorization,
+            artifact_root=artifact_root,
+            endpoint_get=lambda url, token: (
+                {"data": [{"id": d5.EXPECTED_MODEL}]}
+                if url == PROJECT_CONFIG.model_catalog_url
+                else _props()
+            ),
+            api_key_loader=lambda: "provider-free-test-token",
+            static_checker=lambda repo, auth, evidence_paths: {"status": "PASS"},
+            population=d5.RESPONSE_AGENT_POPULATION,
+            mode="planner_only",
+        )
+    finally:
+        for client in clients:
+            asyncio.run(client.aclose())
+
+    expected_calls = 2 if outcome == "interrupted" else 6
+    assert len(requests) == expected_calls
+    assert result["logical_generation_calls"] == expected_calls
+    assert result["physical_generation_attempts"] == expected_calls
+    assert result["terminal"]["logical_generation_calls"] == expected_calls
+    assert result["terminal"]["physical_generation_attempts"] == expected_calls
+    assert d5.verify_custody_artifacts(paths) == result["custody_digests"]
+    assert all(payload["temperature"] == 0 for payload in requests)
+    assert all(payload["max_tokens"] == 4096 for payload in requests)
+    assert all("max_completion_tokens" not in payload for payload in requests)
+    assert all(
+        payload["chat_template_kwargs"] == {"enable_thinking": False} for payload in requests
+    )
+    cases = d5._load_planner_population(REPO_ROOT, d5.RESPONSE_AGENT_POPULATION)
+    grading_rubric = (REPO_ROOT / d5.RESPONSE_AGENT_RUBRIC_PATH).read_text(encoding="utf-8")
+    for payload, case in zip(requests, cases, strict=False):
+        system, user = payload["messages"]
+        expected_system, expected_user = d5._response_agent_observation_input(REPO_ROOT, case)
+        assert system == {"role": "system", "content": expected_system}
+        assert user == {"role": "user", "content": expected_user}
+        assert grading_rubric not in user["content"]
+        assert "At least 5/6" not in user["content"]
+        schema = payload["response_format"]["json_schema"]
+        assert schema["name"] == response_model.__name__
+        assert schema["schema"] == response_model.model_json_schema()
+
+    stage_trace = paths.stage_trace.read_text(encoding="utf-8")
+    assert "PLANNER_CONTEXT" not in stage_trace
+    assert "REQUEST_COMPILATION" not in stage_trace
+    assert "WIRE_TO_CANONICAL" not in stage_trace
+    assert "RESPONSE_AGENT_GENERATION_ENTER" in stage_trace
+    assert "PLANNER_GENERATION_ENTER" not in stage_trace
+    evidence = [json.loads(line) for line in paths.evidence.read_text().splitlines()]
+    assert all(row["authoring_status"] == "NOT_REACHED" for row in evidence)
+    journal = [json.loads(line) for line in paths.journal.read_text().splitlines()]
+    assert {
+        row["generation_role"] for row in journal if row["event"] == "logical_call_started"
+    } == {"response_agent"}
+    if outcome == "interrupted":
+        assert result["decision"] == "INCONCLUSIVE"
+        assert result["completed_turns"] == 1
+        assert [row["turn_id"] for row in evidence] == ["CR01"]
+    else:
+        assert result["decision"] == "PASS"
+        assert result["completed_turns"] == 6
+        assert [row["turn_id"] for row in evidence] == list(d5.RESPONSE_AGENT_TURN_IDS)
+        if outcome == "invalid_first":
+            assert evidence[0]["observation_status"] == "MODEL_STRUCTURAL_FAILURE"
+            assert evidence[0]["schema_valid"] is False
+            assert all(row["correction_usage"]["native_correction"] == 0 for row in evidence)
+            assert all(row["generation_role"] == "response_agent" for row in evidence[1:])
+            io_rows = [json.loads(line) for line in paths.model_io.read_text().splitlines()]
+            first_validation = next(
+                row
+                for row in io_rows
+                if row.get("event") == "logical_call_result" and row.get("logical_call_index") == 1
+            )
+            assert first_validation["response_reason"] == "schema_validation"
+            assert first_validation["validation_shape"]["issues"]
+        else:
+            assert all(row["schema_valid"] is True for row in evidence)
+            assert all(row["generation_role"] == "response_agent" for row in evidence)
 
 
 def test_a10_invalid_after_correction_is_a_structural_observation(tmp_path: Path) -> None:

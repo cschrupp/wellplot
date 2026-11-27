@@ -1,0 +1,78 @@
+[
+  {
+    "id": "CR01",
+    "request": "Retitle the report Mesa Review.",
+    "dialogue": [
+      {"role": "user", "content": "Retitle the report Mesa Review."},
+      {"role": "assistant", "content": "The report title was changed and published."},
+      {"role": "user", "content": "Was it saved?"}
+    ],
+    "saved_document": {"name": "cr01", "title": "Mesa Review", "sections": [{"id": "main", "title": "Main Log", "tracks": [{"id": "depth", "title": "Depth", "width_mm": 16, "kind": "reference"}]}]},
+    "inspected_facts": [],
+    "verified_outcome": {"publication_status": "published", "verification_status": "verified", "saved_title": "Mesa Review", "previous_title": "Mesa Draft", "other_changes": []}
+  },
+  {
+    "id": "CR02",
+    "request": "Change the report subtitle to Shift 4.",
+    "dialogue": [
+      {"role": "user", "content": "Change the report subtitle to Shift 4."},
+      {"role": "assistant", "content": "A private candidate with subtitle Shift 4 was verified, but publication did not run."},
+      {"role": "user", "content": "What title and subtitle are saved now?"}
+    ],
+    "saved_document": {"name": "cr02", "title": "Ridge Report", "subtitle": "Shift 3", "sections": [{"id": "main", "title": "Main Log", "tracks": [{"id": "depth", "title": "Depth", "width_mm": 16, "kind": "reference"}]}]},
+    "inspected_facts": [],
+    "verified_outcome": {"publication_status": "not_published", "verification_status": "private_candidate_verified", "candidate_subtitle": "Shift 4", "saved_title": "Ridge Report", "saved_subtitle": "Shift 3", "blocked_objectives": [], "pending_clarifications": []}
+  },
+  {
+    "id": "CR03",
+    "request": "Save the title Core Check and plot physical CALX from Ridge.",
+    "dialogue": [
+      {"role": "user", "content": "Save the title Core Check and plot physical CALX from Ridge."},
+      {"role": "assistant", "content": "The title was saved. The requested curve could not be added."},
+      {"role": "user", "content": "Which parts did you finish?"}
+    ],
+    "saved_document": {"name": "cr03", "title": "Core Check", "sections": [{"id": "ridge", "title": "Ridge", "tracks": [{"id": "depth", "title": "Depth", "width_mm": 16, "kind": "reference"}]}]},
+    "inspected_facts": [{"source": "Ridge", "inspection_status": "complete", "inventory_complete": true, "channels": [{"mnemonic": "GR", "unit": "gAPI", "measurement": "Gamma Ray"}]}],
+    "verified_outcome": {"publication_status": "published", "verification_status": "verified", "saved_title": "Core Check", "completed_objectives": ["title Core Check"], "blocked_objectives": [{"objective": "plot physical CALX from Ridge", "reason": "literal CALX absent from complete Ridge inventory"}], "substitutions": [], "bindings_added": []}
+  },
+  {
+    "id": "CR04",
+    "request": "Plot physical POR in the Review section.",
+    "dialogue": [
+      {"role": "user", "content": "Plot physical POR in the Review section."},
+      {"role": "assistant", "content": "Two eligible sources contain POR. No source was selected and no change was saved."},
+      {"role": "user", "content": "What do you still need?"}
+    ],
+    "saved_document": {"name": "cr04", "title": "Review", "sections": [{"id": "review", "title": "Review", "tracks": [{"id": "depth", "title": "Depth", "width_mm": 16, "kind": "reference"}]}]},
+    "inspected_facts": [
+      {"source": "North", "inspection_status": "complete", "inventory_complete": true, "channels": [{"mnemonic": "POR", "unit": "%", "measurement": "Porosity"}]},
+      {"source": "South", "inspection_status": "complete", "inventory_complete": true, "channels": [{"mnemonic": "POR", "unit": "%", "measurement": "Porosity"}]}
+    ],
+    "verified_outcome": {"publication_status": "not_published", "verification_status": "verified_pending_clarification", "pending_clarifications": [{"question": "Which source should provide POR?", "options": ["North", "South"]}], "completed_objectives": [], "blocked_objectives": []}
+  },
+  {
+    "id": "CR05",
+    "request": "Check whether literal VELX is available in East and West.",
+    "dialogue": [
+      {"role": "user", "content": "Check whether literal VELX is available in East and West."},
+      {"role": "assistant", "content": "East was completely inspected. West inspection did not complete."},
+      {"role": "user", "content": "Can you confirm it in either?"}
+    ],
+    "saved_document": {"name": "cr05", "title": "Velocity Review", "sections": [{"id": "main", "title": "Main Log", "tracks": [{"id": "depth", "title": "Depth", "width_mm": 16, "kind": "reference"}]}]},
+    "inspected_facts": [
+      {"source": "East", "inspection_status": "complete", "inventory_complete": true, "channels": [{"mnemonic": "VEL", "unit": "m/s", "measurement": "Velocity"}]},
+      {"source": "West", "inspection_status": "failed", "inventory_complete": null, "channels": null}
+    ],
+    "verified_outcome": {"publication_status": "not_applicable", "verification_status": "inspection_record_verified", "confirmed_absence": [{"source": "East", "mnemonic": "VELX"}], "unknown_inventory": ["West"], "substitutions": [], "execution_claims": []}
+  },
+  {
+    "id": "CR06",
+    "request": "What depth units does this report display?",
+    "dialogue": [
+      {"role": "user", "content": "What depth units does this report display?"}
+    ],
+    "saved_document": {"name": "cr06", "title": "Depth Review", "depth": {"unit": "ft"}, "sections": [{"id": "main", "title": "Main Log", "tracks": [{"id": "depth", "title": "Depth", "width_mm": 16, "kind": "reference"}]}]},
+    "inspected_facts": [{"source": "Survey A", "inspection_status": "complete", "inventory_complete": true, "depth_unit": "m"}],
+    "verified_outcome": {"publication_status": "not_applicable", "verification_status": "saved_state_verified", "display_depth_unit": "ft", "source_depth_unit": "m", "authoring_requested": false, "changes_made": []}
+  }
+]
