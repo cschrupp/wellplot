@@ -1,0 +1,39 @@
+{
+  "id": "RESPONSE-AGENT-SMOKE",
+  "role": "response_agent",
+  "request": "Was the title change saved, and what is the current saved title?",
+  "dialogue": [
+    {"role": "user", "content": "Change the report title to North Ridge."},
+    {
+      "role": "assistant",
+      "content": "A private candidate with the title North Ridge was verified, but it was not published."
+    },
+    {
+      "role": "user",
+      "content": "Was the title change saved, and what is the current saved title?"
+    }
+  ],
+  "saved_document": {
+    "name": "response-agent-smoke",
+    "title": "Mesa Draft",
+    "sections": [
+      {
+        "id": "main",
+        "title": "Main Log",
+        "tracks": [
+          {"id": "depth", "title": "Depth", "width_mm": 16, "kind": "reference"}
+        ]
+      }
+    ]
+  },
+  "inspected_facts": [],
+  "verified_outcome": {
+    "publication_status": "not_published",
+    "verification_status": "private_candidate_verified",
+    "candidate_title": "North Ridge",
+    "saved_title": "Mesa Draft",
+    "completed_objectives": ["verify private title candidate North Ridge"],
+    "blocked_objectives": [],
+    "pending_clarifications": []
+  }
+}

@@ -218,7 +218,13 @@ SPECIALIST_SMOKE_ROLES = {
     "report_specialist_smoke": "report",
     "section_specialist_smoke": "section",
 }
-BOUNDED_SMOKE_MODES = (*H1_SMOKE_MODES, *SPECIALIST_SMOKE_ROLES)
+RESPONSE_AGENT_SMOKE_MODE = "response_agent_smoke"
+RESPONSE_AGENT_SMOKE_CASE_ID = "RESPONSE-AGENT-SMOKE"
+RESPONSE_AGENT_SMOKE_FIXTURE_PATH = "docs/research/WELLPLOT_V2_RESPONSE_AGENT_SMOKE_FIXTURE.json"
+RESPONSE_AGENT_SMOKE_FIXTURE_SHA256 = (
+    "1b13499a54b1871ac91b8022ffe9f9bff95a2d5ebab9683e10d026781eb7f834"
+)
+BOUNDED_SMOKE_MODES = (*H1_SMOKE_MODES, *SPECIALIST_SMOKE_ROLES, RESPONSE_AGENT_SMOKE_MODE)
 SPECIALIST_SMOKE_FIXTURES = "docs/research/WELLPLOT_V2_SPECIALIST_SMOKE_FIXTURES.json"
 SPECIALIST_SMOKE_FIXTURES_SHA256 = (
     "743ab51d3f9f864d9048ce87aaae86f455cc4027233d3d26fdde78375c84118a"
@@ -443,6 +449,10 @@ class D5HarnessError(RuntimeError):
 
 class _PlannerOnlyWireCaptured(Exception):
     """Stop after the production planner's schema-validated wire DTO is captured."""
+
+
+class _ResponseAgentOnlyCaptured(Exception):
+    """Stop smoke post-processing after one valid response-agent observation."""
 
 
 class _PlannerFirstResponseInvalid(Exception):
@@ -1287,6 +1297,7 @@ def _default_smoke_static_checks(
         "s03_planner_observation",
         "specialist_observation",
         "response_agent_observation",
+        RESPONSE_AGENT_SMOKE_MODE,
         *SPECIALIST_SMOKE_ROLES,
     }:
         if (
@@ -1332,6 +1343,7 @@ def _default_smoke_static_checks(
             _h1_contract(SPECIALIST_POPULATION)[4].model_json_schema()
         ),
         "response_agent_observation": _sha256_json(d4.ResponseAgentObservation.model_json_schema()),
+        RESPONSE_AGENT_SMOKE_MODE: _sha256_json(d4.ResponseAgentObservation.model_json_schema()),
         "canonical_schema_behavior_probe": _schema_probe_bundle_sha256(),
         **{
             name: _sha256_json(_specialist_smoke_model(role).model_json_schema())
@@ -1438,7 +1450,11 @@ def _specialist_smoke_model(role: str) -> type[BaseModel]:
         SectionSpecialistObservation,
     )
 
-    return {"report": ReportSpecialistObservation, "section": SectionSpecialistObservation}[role]
+    models: dict[str, type[BaseModel]] = {
+        "report": ReportSpecialistObservation,
+        "section": SectionSpecialistObservation,
+    }
+    return models[role]
 
 
 def _planner_smoke_case(
@@ -1448,6 +1464,50 @@ def _planner_smoke_case(
     case_id: str | None = None,
 ) -> dict[str, Any]:
     """Resolve one authority-pinned case from the immutable SEM-01 inputs."""
+    if authorization.planner_smoke_mode == RESPONSE_AGENT_SMOKE_MODE:
+        path = repo_root / RESPONSE_AGENT_SMOKE_FIXTURE_PATH
+        _assert_hash(path, RESPONSE_AGENT_SMOKE_FIXTURE_SHA256, "response-agent smoke fixture")
+        fixture = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(fixture, Mapping):
+            raise D5StaticPreflightError("response-agent smoke fixture is not an object")
+        if fixture.get("id") != RESPONSE_AGENT_SMOKE_CASE_ID or fixture.get("role") != (
+            "response_agent"
+        ):
+            raise D5StaticPreflightError("response-agent smoke fixture identity drifted")
+        schema_digest = _sha256_json(d4.ResponseAgentObservation.model_json_schema())
+        fixture_digest = _sha256_json(fixture)
+        rendered_digest = _sha256_json(
+            _response_agent_observation_input(repo_root, fixture, allow_smoke_fixture=True)
+        )
+        request = fixture["request"]
+        request_digest = hashlib.sha256(request.encode()).hexdigest()
+        if (
+            authorization.planner_smoke_case_id != fixture["id"]
+            or case_id not in {None, fixture["id"]}
+            or authorization.planner_population
+            or authorization.planner_first_pass_max_output_tokens is not None
+            or authorization.planner_smoke_sdk_max_retries != 0
+            or authorization.sdk_max_retries != 0
+            or authorization.planner_smoke_source_inventory_sha256 != fixture_digest
+            or authorization.planner_smoke_benchmark_sha256 != rendered_digest
+            or authorization.planner_smoke_request_sha256 != request_digest
+            or authorization.planner_smoke_wire_schema_sha256 != schema_digest
+            or authorization.planner_smoke_harness_sha256 != _sha256_file(Path(__file__).resolve())
+        ):
+            raise D5StaticPreflightError("response-agent smoke authority or fixture drifted")
+        return {
+            "case_id": fixture["id"],
+            "request": request,
+            "request_sha256": request_digest,
+            "benchmark_sha256": rendered_digest,
+            "source_inventory_sha256": fixture_digest,
+            "source_sha256": None,
+            "wire_schema_sha256": schema_digest,
+            "sdk_max_retries": 0,
+            "physical_attempt_limit": 1,
+            "h1_case": fixture,
+            "specialist_role": "response_agent",
+        }
     if authorization.planner_smoke_mode in SPECIALIST_SMOKE_ROLES:
         role = SPECIALIST_SMOKE_ROLES[authorization.planner_smoke_mode]
         path = repo_root / SPECIALIST_SMOKE_FIXTURES
@@ -1659,9 +1719,20 @@ def _specialist_observation_input(repo_root: Path, case: Mapping[str, Any]) -> t
     return manual.read_text(encoding="utf-8"), json.dumps(payload, ensure_ascii=False)
 
 
-def _response_agent_observation_input(repo_root: Path, case: Mapping[str, Any]) -> tuple[str, str]:
+def _response_agent_observation_input(
+    repo_root: Path,
+    case: Mapping[str, Any],
+    *,
+    allow_smoke_fixture: bool = False,
+) -> tuple[str, str]:
     """Render one response observation from frozen state and outcome records."""
-    if case.get("id") not in RESPONSE_AGENT_TURN_IDS:
+    is_panel_case = case.get("id") in RESPONSE_AGENT_TURN_IDS
+    is_smoke_case = (
+        allow_smoke_fixture
+        and case.get("id") == RESPONSE_AGENT_SMOKE_CASE_ID
+        and case.get("role") == "response_agent"
+    )
+    if not (is_panel_case or is_smoke_case):
         raise D5StaticPreflightError("response-agent case identity is not frozen")
     document = AuthoringDocumentSpec.model_validate(case["saved_document"])
     payload = {
@@ -1795,7 +1866,9 @@ def _default_planner_smoke_static_checks(
     if Path(_git(repo_root, "rev-parse", "--show-toplevel")).resolve() != canonical_root:
         raise D5StaticPreflightError("planner smoke Git top-level is not canonical")
     is_h1 = authorization.planner_smoke_mode in BOUNDED_SMOKE_MODES
-    specialist = authorization.planner_smoke_mode in SPECIALIST_SMOKE_ROLES
+    specialist = authorization.planner_smoke_mode in SPECIALIST_SMOKE_ROLES or (
+        authorization.planner_smoke_mode == RESPONSE_AGENT_SMOKE_MODE
+    )
     if not is_h1 and authorization.planner_smoke_mode != SMOKE_PLANNER_KIND:
         raise D5StaticPreflightError("planner-only smoke mode is not authorized")
     expected = H1_EXPECTED_WORKTREE_PORCELAIN if is_h1 else A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN
@@ -1968,7 +2041,7 @@ class D5SmokeCallLedger:
     calls_by_role: dict[str, int] = field(default_factory=dict)
     roles_by_index: dict[int, str] = field(default_factory=dict)
     attempts_by_index: dict[int, int] = field(default_factory=dict)
-    specialist_role: Literal["report_worker", "section_worker"] | None = None
+    specialist_role: Literal["report_worker", "section_worker", "response_agent"] | None = None
 
     def __post_init__(self) -> None:
         """Set the logical-call ceiling for the selected smoke mode."""
@@ -1976,6 +2049,7 @@ class D5SmokeCallLedger:
             if self.mode != SMOKE_PLANNER_KIND or self.specialist_role not in {
                 "report_worker",
                 "section_worker",
+                "response_agent",
             }:
                 raise D5HarnessError("invalid specialist smoke ledger role")
             self.max_logical_calls = self.max_physical_attempts = 1
@@ -2050,7 +2124,9 @@ class D5SmokeCallLedger:
         if role is None:
             raise D5HarnessError("smoke physical attempt references unknown call")
         next_attempt = self.attempts_by_index[logical_index] + 1
-        if self.mode == SMOKE_PLANNER_KIND:
+        if self.mode == SMOKE_PLANNER_KIND and self.specialist_role == "response_agent":
+            limit = 1
+        elif self.mode == SMOKE_PLANNER_KIND:
             limit = SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS_PER_REQUEST
         elif self.mode == SMOKE_BINDING_KIND:
             limit = SMOKE_BINDING_MAX_PHYSICAL_ATTEMPTS_PER_CALL
@@ -2122,10 +2198,18 @@ class D5SmokeCustody:
             if smoke_kind == SMOKE_SCHEMA_PROBE_KIND
             else "canonical_live_smoke"
         )
-        specialist = SPECIALIST_SMOKE_ROLES.get(authorization.planner_smoke_mode)
+        observation_role = SPECIALIST_SMOKE_ROLES.get(authorization.planner_smoke_mode)
+        if authorization.planner_smoke_mode == RESPONSE_AGENT_SMOKE_MODE:
+            observation_role = "response_agent"
         ledger = D5SmokeCallLedger(
             mode=ledger_mode,
-            specialist_role=None if specialist is None else specialist + "_worker",
+            specialist_role=(
+                None
+                if observation_role is None
+                else observation_role
+                if observation_role == "response_agent"
+                else observation_role + "_worker"
+            ),
         )
         state = {
             "experiment_version": D5_EXPERIMENT_VERSION,
@@ -2645,7 +2729,7 @@ class D5SmokeCustody:
     def record_planner_observability(self, event: Mapping[str, Any]) -> None:
         """Route opt-in canonical planner events to bounded, replayable artifacts."""
         name = event.get("event")
-        if name == "PLANNER_GENERATION_PASS":
+        if name in {"PLANNER_GENERATION_PASS", "RESPONSE_AGENT_GENERATION_PASS"}:
             row = {
                 "attempt": event.get("attempt"),
                 "response_schema": event.get("response_schema"),
@@ -5665,6 +5749,21 @@ def _build_planner_smoke_inputs(
 ) -> dict[str, Any]:
     """Build the same bounded document/source summaries consumed by plan_node."""
     if "h1_case" in case:
+        if case.get("specialist_role") == "response_agent":
+            return {
+                "document_summary": {},
+                "source_summary": {},
+                "source_asset_identity": {
+                    "kind": "synthetic_response_observation",
+                    "fixture_sha256": case["source_inventory_sha256"],
+                },
+                "source_channel_count": 0,
+                "numeric_sample_apis_invoked": False,
+                "source_sha256_before": None,
+                "source_sha256_after_inspection": None,
+                "source_revision_before": None,
+                "source_revision_after_inspection": None,
+            }
         return {
             "document_summary": {},
             "source_summary": {},
@@ -5782,7 +5881,40 @@ async def _run_planner_only_and_close(
     try:
         session = adapter.inner.session.session
         config = session.config
-        if specialist_role is not None:
+        if specialist_role == "response_agent":
+            if h1_case is None or trace_callback is None:
+                raise D5HarnessError("response-agent smoke fixture is not bound")
+            (backend,) = adapter.inner.call_source.backends
+            prompt, user = _response_agent_observation_input(
+                adapter.inner.repo_root,
+                h1_case,
+                allow_smoke_fixture=True,
+            )
+            role_event = {"attempt": 1, "generation_role": "response_agent"}
+            trace_callback({"event": "RESPONSE_AGENT_GENERATION_ENTER", **role_event})
+            try:
+                observed = await backend.generate_structured(
+                    StructuredGenerationRequest(prompt, user, config.timeout_seconds, 0, 4096),
+                    response_model=d4.ResponseAgentObservation,
+                )
+            except ProviderRequestError as error:
+                trace_callback(
+                    {
+                        "event": "RESPONSE_AGENT_GENERATION_FAIL",
+                        "category": error.category.value,
+                        **role_event,
+                    }
+                )
+                raise
+            trace_callback(
+                {
+                    "event": "RESPONSE_AGENT_GENERATION_PASS",
+                    "response_schema": type(observed.value).__name__,
+                    "validated_response": observed.value.model_dump(mode="json"),
+                    **role_event,
+                }
+            )
+        elif specialist_role is not None:
             from wellplot.agent.code_mode.canonical_workers import CanonicalReportWorker
             from wellplot.agent.code_mode.typed_section_worker import CanonicalSectionWorker
 
@@ -5877,20 +6009,23 @@ def _planner_output_reliability(
 ) -> dict[str, Any]:
     """Separate one planner invocation from its initial/correction requests."""
     named_events = [str(event.get("event", "")) for event in trace_events]
+    generation_enter_events = {"PLANNER_GENERATION_ENTER", "RESPONSE_AGENT_GENERATION_ENTER"}
+    generation_pass_events = {"PLANNER_GENERATION_PASS", "RESPONSE_AGENT_GENERATION_PASS"}
+    generation_fail_events = {"PLANNER_GENERATION_FAIL", "RESPONSE_AGENT_GENERATION_FAIL"}
     attempts = {
         attempt
         for event in trace_events
-        if event.get("event") == "PLANNER_GENERATION_ENTER"
+        if event.get("event") in generation_enter_events
         and (attempt := event.get("attempt")) in {1, 2}
     }
     successful_attempts = {
         attempt
         for event in trace_events
-        if event.get("event") == "PLANNER_GENERATION_PASS"
+        if event.get("event") in generation_pass_events
         and (attempt := event.get("attempt")) in {1, 2}
     }
     failed_events = [
-        event for event in trace_events if event.get("event") == "PLANNER_GENERATION_FAIL"
+        event for event in trace_events if event.get("event") in generation_fail_events
     ]
     initial_failure = next(
         (event for event in failed_events if event.get("attempt") == 1),
@@ -6008,6 +6143,8 @@ def execute_live_planner_smoke(
         if event.get("event") == "PLANNER_GENERATION_PASS":
             # Stop at the schema-validated wire DTO, before planner post-processing.
             raise _PlannerOnlyWireCaptured
+        if event.get("event") == "RESPONSE_AGENT_GENERATION_PASS":
+            raise _ResponseAgentOnlyCaptured
 
     load_key = api_key_loader or (lambda: d4.load_d4_api_key(repo_root))
 
@@ -6017,8 +6154,10 @@ def execute_live_planner_smoke(
             if is_h1
             else {}
         )
-        if specialist_role is not None:
+        if specialist_role in SPECIALIST_SMOKE_ROLES.values():
             h1_limits["specialist_observation"] = True
+        elif specialist_role == "response_agent":
+            h1_limits["response_observation"] = True
         if provider_factory is not None:
             return provider_factory(
                 repo_root,
@@ -6149,11 +6288,19 @@ def execute_live_planner_smoke(
             last_completed_stage="CLIENT_CLOSE",
             event_name="PLANNER_SMOKE_CLEANUP_EXCEPTION",
         )
+    wire_event_name = (
+        "RESPONSE_AGENT_GENERATION_PASS"
+        if specialist_role == "response_agent"
+        else "PLANNER_GENERATION_PASS"
+    )
     wire_capture = next(
-        (event for event in trace_events if event.get("event") == "PLANNER_GENERATION_PASS"),
+        (event for event in trace_events if event.get("event") == wire_event_name),
         None,
     )
-    if isinstance(execution_error, (_PlannerOnlyWireCaptured, _H1ObservationComplete)):
+    if isinstance(
+        execution_error,
+        (_PlannerOnlyWireCaptured, _ResponseAgentOnlyCaptured, _H1ObservationComplete),
+    ):
         execution_error = None
     if execution_error is not None:
         custody.record_unexpected_host_exception(
@@ -6178,7 +6325,9 @@ def execute_live_planner_smoke(
     from wellplot.agent.code_mode.planner import _PlannerWirePlan
 
     response_model = _PlannerWirePlan
-    if specialist_role is not None:
+    if specialist_role == "response_agent":
+        response_model = d4.ResponseAgentObservation
+    elif specialist_role is not None:
         response_model = _specialist_smoke_model(specialist_role)
     elif is_h1:
         response_model = _h1_contract(
@@ -6199,7 +6348,10 @@ def execute_live_planner_smoke(
         return {"status": "SMOKE_CONTRACT_FAIL", "terminal": terminal}
     downstream_roles = dict(custody.ledger.calls_by_role)
     if specialist_role is not None:
-        downstream_roles.pop(specialist_role + "_worker", None)
+        generation_role = (
+            "response_agent" if specialist_role == "response_agent" else specialist_role + "_worker"
+        )
+        downstream_roles.pop(generation_role, None)
     downstream_events = _planner_smoke_downstream_events(trace_events, downstream_roles)
     source_sha_after = source_revision_after = None
     if not is_h1:

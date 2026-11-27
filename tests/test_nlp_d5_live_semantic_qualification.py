@@ -481,7 +481,7 @@ def test_a10_campaign_uses_shared_runner_without_semantic_scoring(tmp_path: Path
 
 
 @pytest.mark.parametrize("valid", [True, False])
-@pytest.mark.parametrize("smoke_mode", d5.BOUNDED_SMOKE_MODES)
+@pytest.mark.parametrize("smoke_mode", (*d5.H1_SMOKE_MODES, *d5.SPECIALIST_SMOKE_ROLES))
 def test_h1_operational_smoke_is_single_call(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, valid: bool, smoke_mode: str
 ) -> None:
@@ -685,6 +685,212 @@ def test_h1_operational_smoke_is_single_call(
     wire_io = [json.loads(line) for line in paths.planner_wire_diagnostics.read_text().splitlines()]
     assert sum("request_body_base64" in entry for entry in wire_io) == 1
     assert sum("response_body_base64" in entry for entry in wire_io) == 1
+
+
+@pytest.mark.parametrize("valid", [True, False])
+def test_response_agent_smoke_uses_role_bound_d5_custody(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, valid: bool
+) -> None:
+    """Capture one response-agent smoke response without loading the panel."""
+    from openai import _base_client
+
+    from wellplot.agent.code_mode.canonical_workers import CanonicalReportWorker
+    from wellplot.agent.code_mode.planner import SemanticPlanner
+    from wellplot.agent.code_mode.typed_section_worker import CanonicalSectionWorker
+
+    monkeypatch.setattr(_base_client, "get_platform", lambda: "Linux")
+    fixture = json.loads(
+        (REPO_ROOT / d5.RESPONSE_AGENT_SMOKE_FIXTURE_PATH).read_text(encoding="utf-8")
+    )
+    system, user = d5._response_agent_observation_input(
+        REPO_ROOT, fixture, allow_smoke_fixture=True
+    )
+    schema = d4.ResponseAgentObservation.model_json_schema()
+    paths = _paths(tmp_path, "response-agent-smoke")
+    authority = replace(
+        _authorization(campaign_id=paths.campaign_id, artifact_root=str(paths.root)),
+        sdk_max_retries=0,
+        planner_smoke_mode=d5.RESPONSE_AGENT_SMOKE_MODE,
+        planner_smoke_case_id=fixture["id"],
+        planner_smoke_request_sha256=d4.sha256_text(fixture["request"]),
+        planner_smoke_benchmark_sha256=d5._sha256_json((system, user)),
+        planner_smoke_source_inventory_sha256=d5._sha256_json(fixture),
+        planner_smoke_harness_sha256=d5._sha256_file(Path(d5.__file__)),
+        planner_smoke_wire_schema_sha256=d5._sha256_json(schema),
+        planner_smoke_sdk_max_retries=0,
+        expected_worktree_porcelain=d5.H1_EXPECTED_WORKTREE_PORCELAIN,
+    )
+    with pytest.raises(d5.D5StaticPreflightError, match="authority or fixture drifted"):
+        d5._planner_smoke_case(
+            REPO_ROOT,
+            replace(authority, planner_smoke_benchmark_sha256="0" * 64),
+        )
+    monkeypatch.setattr(
+        d5,
+        "_git",
+        lambda _root, *_args: authority.implementation_checkpoint,
+    )
+    monkeypatch.setattr(
+        d5,
+        "_git_porcelain_raw",
+        lambda _root: d5.H1_EXPECTED_WORKTREE_PORCELAIN,
+    )
+    monkeypatch.setattr(
+        d5,
+        "_inspect_openai_sdk",
+        lambda: (d5.EXPECTED_OPENAI_VERSION, 0),
+    )
+    monkeypatch.setattr(d5, "_run_static_attestation", lambda _root: {"status": "PASS"})
+    static = d5._default_smoke_static_checks(
+        REPO_ROOT,
+        authority,
+        paths,
+        expected_worktree_porcelain=d5.H1_EXPECTED_WORKTREE_PORCELAIN,
+        expected_schema_sha256=d5._sha256_json(schema),
+        mode=d5.RESPONSE_AGENT_SMOKE_MODE,
+        expected_sdk_max_retries=0,
+    )
+    assert static["mode"] == d5.RESPONSE_AGENT_SMOKE_MODE
+    assert static["smoke_schema_sha256"] == d5._sha256_json(schema)
+    with pytest.raises(d5.D5StaticPreflightError, match="schema fingerprint drifted"):
+        d5._default_smoke_static_checks(
+            REPO_ROOT,
+            authority,
+            paths,
+            expected_worktree_porcelain=d5.H1_EXPECTED_WORKTREE_PORCELAIN,
+            expected_schema_sha256="0" * 64,
+            mode=d5.RESPONSE_AGENT_SMOKE_MODE,
+            expected_sdk_max_retries=0,
+        )
+
+    ledger = d5.D5SmokeCallLedger(
+        mode=d5.SMOKE_PLANNER_KIND,
+        specialist_role="response_agent",
+    )
+    for forbidden_role in ("planner", "report_worker", "section_worker"):
+        with pytest.raises(d5.D5CallCapExceeded):
+            ledger.record_canonical_call_started(1, forbidden_role)
+    ledger.record_canonical_call_started(1, "response_agent")
+    with pytest.raises(d5.D5CallCapExceeded):
+        ledger.record_canonical_call_started(2, "response_agent")
+    ledger.physical_attempt(1)
+    with pytest.raises(d5.D5CallCapExceeded, match="forbids transport retries"):
+        ledger.physical_attempt(1)
+
+    async def forbidden(*args: object, **kwargs: object) -> None:
+        pytest.fail("response-agent smoke reached planner, worker, or publication path")
+
+    monkeypatch.setattr(SemanticPlanner, "plan", forbidden)
+    monkeypatch.setattr(CanonicalReportWorker, "compile", forbidden)
+    monkeypatch.setattr(CanonicalSectionWorker, "compile", forbidden)
+    monkeypatch.setattr(CanonicalReportWorker, "observe_first_response", forbidden)
+    monkeypatch.setattr(CanonicalSectionWorker, "observe_first_response", forbidden)
+    monkeypatch.setattr(d4.D4CampaignAdapter, "execute_turn", forbidden)
+    monkeypatch.setattr(
+        d5,
+        "_load_planner_population",
+        lambda *_args: pytest.fail("response-agent smoke loaded a measured population"),
+    )
+    requests: list[dict[str, Any]] = []
+    request_bodies: list[bytes] = []
+    clients: list[httpx.AsyncClient] = []
+
+    async def respond(request: httpx.Request) -> httpx.Response:
+        request_bodies.append(request.content)
+        requests.append(json.loads(request.content))
+        content = (
+            {
+                "response": (
+                    "The North Ridge title was privately verified but not published. "
+                    "The saved report title remains Mesa Draft."
+                )
+            }
+            if valid
+            else {"response": "  "}
+        )
+        return httpx.Response(
+            200,
+            request=request,
+            json={
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": json.dumps(content)},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 50, "completion_tokens": 17, "total_tokens": 67},
+            },
+        )
+
+    def client_factory(observer: d5._PhysicalAttemptObserver) -> httpx.AsyncClient:
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(respond),
+            event_hooks={"request": [observer.on_request], "response": [observer.on_response]},
+        )
+        clients.append(client)
+        return client
+
+    create_adapter = d5.create_live_adapter
+
+    def create_mock_adapter(**kwargs: object) -> d5._ObservedLiveAdapter:
+        adapter = create_adapter(**kwargs, http_client_factory=client_factory)
+        (backend,) = adapter.inner.call_source.backends
+        assert backend.response_observation is True
+        backend.delegate.client._platform = "Linux"
+        return adapter
+
+    monkeypatch.setattr(d5, "create_live_adapter", create_mock_adapter)
+    result = d5.execute_live_planner_smoke(
+        repo_root=REPO_ROOT,
+        authorization=authority,
+        artifact_root=paths.root,
+        endpoint_get=lambda url, _token: (
+            {"data": [{"id": d5.EXPECTED_MODEL}]}
+            if url == PROJECT_CONFIG.model_catalog_url
+            else _props()
+        ),
+        api_key_loader=lambda: "provider-free-test-token",
+        static_checker=lambda *_args: {"status": "PASS"},
+    )
+
+    assert result["status"] == ("SMOKE_PASS" if valid else "SMOKE_CONTRACT_FAIL")
+    terminal = result["terminal"]
+    assert terminal["logical_generation_calls"] == 1
+    assert terminal["physical_generation_attempts"] == 1
+    assert terminal["logical_calls_by_role"] == {"response_agent": 1}
+    assert terminal["logical_planner_invocations"] == 0
+    assert terminal["correction_generation_requests"] == 0
+    assert terminal["transport_retries"] == 0
+    assert terminal["scientific_population_loaded"] is False
+    assert terminal["first_pass_schema_valid"] is valid
+    assert len(requests) == len(request_bodies) == 1
+    assert clients[0].is_closed
+    state = json.loads(paths.state.read_text(encoding="utf-8"))
+    assert state["observation_role"] == "response_agent"
+    assert state["planner_entrypoint"] is None
+    assert not any(state["downstream_stage_calls"].values())
+    payload = requests[0]
+    assert payload["temperature"] == 0
+    assert payload["max_tokens"] == 4096
+    assert payload["chat_template_kwargs"] == {"enable_thinking": False}
+    assert payload["messages"] == [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ]
+    assert payload["response_format"]["json_schema"]["schema"] == schema
+    assert "private_candidate_verified" in payload["messages"][1]["content"]
+    assert "grading" not in payload["messages"][1]["content"].lower()
+    assert "CR01" not in payload["messages"][1]["content"]
+    assert "RESPONSE_AGENT_GENERATION_PASS" not in paths.stage_trace.read_text()
+    assert "RESPONSE_AGENT_GENERATION_ENTER" in paths.stage_trace.read_text()
+    assert d5.verify_smoke_observability(paths)["terminal_sha256"] == d5._sha256_file(
+        paths.terminal
+    )
+    assert len(request_bodies) == 1
+    if valid:
+        assert hashlib.sha256(request_bodies[0]).hexdigest() == (
+            "04d5eebc858897b7ba411c050e222ff94c830ff5065f181d1d425ce8816b8a81"
+        )
 
 
 @pytest.mark.parametrize("population", (d5.H1_POPULATION, d5.H1B_POPULATION, d5.S03_POPULATION))
@@ -1424,9 +1630,11 @@ def test_response_agent_campaign_uses_canonical_d5_observation_boundary(
     monkeypatch.setattr(d4.D4CampaignAdapter, "execute_turn", forbidden)
 
     requests: list[dict[str, Any]] = []
+    request_bodies: list[bytes] = []
     clients: list[httpx.AsyncClient] = []
 
     async def respond(request: httpx.Request) -> httpx.Response:
+        request_bodies.append(request.content)
         payload = json.loads(request.content)
         requests.append(payload)
         if outcome == "interrupted" and len(requests) == 2:
@@ -1547,6 +1755,15 @@ def test_response_agent_campaign_uses_canonical_d5_observation_boundary(
         else:
             assert all(row["schema_valid"] is True for row in evidence)
             assert all(row["generation_role"] == "response_agent" for row in evidence)
+    if outcome == "complete":
+        assert [hashlib.sha256(body).hexdigest() for body in request_bodies] == [
+            "37326345487fb321a8f980b8090e2311c0dc435c9a90951b7c8ad605dfca15a0",
+            "93b3351b5cd51106125e75a779daad275149ded6d003fbd975f5d2c25e85c60a",
+            "98150428d59240dd7f0abeeb27189da61d07cb8ec9484d1d56d622a3f5063b35",
+            "5a773fbae0f042fb2de13f2b65216a539aeeafd977f1a9763d61da433994b136",
+            "92c6340cd829f78ef523040891a309d217c313964de4f0ff6ec4ed3451ee47db",
+            "692888a18dfe199220e33cb7b37a7cfae063e554d00a2086b498c77f0896c91b",
+        ]
 
 
 def test_a10_invalid_after_correction_is_a_structural_observation(tmp_path: Path) -> None:
