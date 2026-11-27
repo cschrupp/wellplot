@@ -1,8 +1,8 @@
 # Response-Agent Operational Preparation
 
-Status: provider-free smoke path qualified; exact runtime tokenization and
-current readiness remain pending approved non-generative LAN access. No live
-generation is authorized by this preparation record.
+Status: provider-free smoke path and non-generative runtime/tokenization
+qualification passed. No live generation is authorized by this preparation
+record.
 
 ## Frozen Experiment Identities
 
@@ -74,30 +74,56 @@ Ruff, formatting, Python compilation, fixture JSON parsing and `git diff
 --check` also passed. These are provider-free results; no live endpoint was
 contacted.
 
-## Pending Non-Generative LAN Qualification
+## Non-Generative Runtime and Tokenization Qualification
 
-The accepted specialist tokenization record used authenticated `/apply-template`
-and `/tokenize` operations against the configured llama.cpp runtime. The same
-method must be applied to the exact seven SDK bodies above, using the matching
-model/template and structured response format. For each body, record template
-rendering with and without the schema, verify the thinking-disabled suffix,
-and count with the runtime tokenizer. All seven counts must be at most 60,000,
-leaving 4,096 output tokens and 1,440 additional context tokens. Do not infer
-counts from bytes.
+At `2026-11-27T19:17:13Z`, current non-generative identity was read through
+`/v1/models` and `/props`, then each exact canonical SDK body was verified
+against its pinned digest before use. The same body was rendered through
+`/apply-template` with and without `response_format`; each pair was
+byte-identical. `/tokenize` used `add_special=true` and `parse_special=true`.
+All rendered prompts ended with the empty thinking block `</think>`.
 
-Current runtime readiness/tokenization was not performed: repository
-instructions require approved LAN execution for these requests, and this
-execution environment does not expose the required sandbox escalation. No
-endpoint was contacted. The prior accepted specialist record reports model
-`qwen3.6-35b-a3b`, build `b12340-b8645ddda`, context 65,536, template digest
-`55d4931433fe502b794226ee7f4d206a6bdd436ac9f80eb7d8ebb4c639f9ea0c`, and
-defaults digest
-`5136c0f2b22a73572fe88f44e8cf32159ffb3b345ced2e33ba7507d612f7f8c3`; those
-are historical expected values, not a current readiness observation.
+| Input | Tokens | Schema prompt overhead | SDK body SHA-256 |
+| --- | ---: | ---: | --- |
+| CR01 | 1,038 | 0 | `37326345487fb321a8f980b8090e2311c0dc435c9a90951b7c8ad605dfca15a0` |
+| CR02 | 1,074 | 0 | `93b3351b5cd51106125e75a779daad275149ded6d003fbd975f5d2c25e85c60a` |
+| CR03 | 1,118 | 0 | `98150428d59240dd7f0abeeb27189da61d07cb8ec9484d1d56d622a3f5063b35` |
+| CR04 | 1,127 | 0 | `5a773fbae0f042fb2de13f2b65216a539aeeafd977f1a9763d61da433994b136` |
+| CR05 | 1,117 | 0 | `92c6340cd829f78ef523040891a309d217c313964de4f0ff6ec4ed3451ee47db` |
+| CR06 | 1,045 | 0 | `692888a18dfe199220e33cb7b37a7cfae063e554d00a2086b498c77f0896c91b` |
+| Response smoke | 1,087 | 0 | `04d5eebc858897b7ba411c050e222ff94c830ff5065f181d1d425ce8816b8a81` |
+
+Current runtime projection:
+
+- Model catalog: `qwen3.6-35b-a3b`.
+- Build: `b12340-b8645ddda`; context: 65,536; slots: 1.
+- Chat-template SHA-256: `55d4931433fe502b794226ee7f4d206a6bdd436ac9f80eb7d8ebb4c639f9ea0c`.
+- Runtime-defaults SHA-256: `5136c0f2b22a73572fe88f44e8cf32159ffb3b345ced2e33ba7507d612f7f8c3`.
+- Model-path basename and fingerprint matched the previously accepted runtime; GGUF byte identity remains unavailable.
+
+Every input is at most 60,000 tokens. Including the 4,096 output reserve and
+1,440 additional margin, the largest total is 6,663 of 65,536 context tokens;
+no truncation is needed.
+
+The bounded non-generative endpoint sequence used 2 identity GETs, 14 template
+POSTs (seven with and seven without the schema), and 7 tokenizer POSTs. No
+completion or generation route was contacted.
+
+The private evidence record contains exact captured SDK bodies and rendered
+prompt bytes, request/response digests, token counts and sanitized runtime
+identity. It excludes credentials and the unprojected `/props` response:
+
+`workspace/evaluations/wellplot-v2-response-agent-readiness-20261127-001/response-agent-readiness-tokenization.json`
+
+SHA-256: `1ee43de5995f38a3f7dbc05f4fb50075f9f2e0f2951e2557986fd9656ddbcea6`.
+
+No completion or generation endpoint was called. This qualification is
+non-generative and does not consume smoke authority.
 
 The non-executable descriptor proposal is
 [`WELLPLOT_V2_RESPONSE_AGENT_SMOKE_AUTHORITY_PROPOSAL.json`](WELLPLOT_V2_RESPONSE_AGENT_SMOKE_AUTHORITY_PROPOSAL.json).
-It binds the committed implementation and known local identities, but leaves
-current runtime identity, exact token counts, readiness evidence and final
-worktree binding pending. It is deliberately not a D5-consumable authority
-descriptor and must not be passed to the launcher.
+It binds the committed implementation and qualified runtime/tokenization
+evidence, but is not a D5-consumable descriptor and must not be passed to the
+launcher. A separate local D5 descriptor is prepared only for the final
+provider-free static preflight and independent smoke authorization; it does not
+authorize generation.

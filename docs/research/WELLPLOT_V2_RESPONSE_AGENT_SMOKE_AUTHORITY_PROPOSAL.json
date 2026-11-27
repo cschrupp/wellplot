@@ -22,20 +22,35 @@
     "project_config_fingerprint_sha256": "14357a627f060572e73a822ab9efe9ed3a6cca6727b7247361a2a5adfa5bd498"
   },
   "runtime": {
-    "model_expected_from_accepted_project_config": "qwen3.6-35b-a3b",
-    "current_endpoint_identity": "PENDING_NON_GENERATIVE_LAN_READINESS",
-    "readiness_evidence_sha256": null,
-    "tokenizer_and_template_identity": "PENDING_NON_GENERATIVE_LAN_QUALIFICATION",
-    "historical_accepted_runtime_values_are_not_current_verification": true
+    "model_catalog": ["qwen3.6-35b-a3b"],
+    "build_info": "b12340-b8645ddda",
+    "context_size": 65536,
+    "total_slots": 1,
+    "model_path_basename": "Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf",
+    "model_path_fingerprint_sha256": "3a6fd986bebd4047876869e8b079f9f9b7b15fb2429853ba0501b5f6ea480b21",
+    "chat_template_sha256": "55d4931433fe502b794226ee7f4d206a6bdd436ac9f80eb7d8ebb4c639f9ea0c",
+    "runtime_defaults_sha256": "5136c0f2b22a73572fe88f44e8cf32159ffb3b345ced2e33ba7507d612f7f8c3",
+    "gguf_byte_identity": "NOT_AVAILABLE",
+    "observed_at_utc": "2026-11-27T19:17:13.740796+00:00",
+    "readiness_evidence_sha256": "1ee43de5995f38a3f7dbc05f4fb50075f9f2e0f2951e2557986fd9656ddbcea6"
   },
   "input_budget": {
     "max_input_tokens": 60000,
     "reserved_output_tokens": 4096,
     "additional_context_margin_tokens": 1440,
-    "exact_smoke_input_tokens": null,
-    "exact_panel_input_tokens": null,
-    "tokenization_evidence_sha256": null,
-    "status": "PENDING_APPROVED_NON_GENERATIVE_LAN_QUALIFICATION"
+    "exact_input_tokens": {
+      "CR01": 1038,
+      "CR02": 1074,
+      "CR03": 1118,
+      "CR04": 1127,
+      "CR05": 1117,
+      "CR06": 1045,
+      "RESPONSE-AGENT-SMOKE": 1087
+    },
+    "schema_prompt_overhead_tokens": 0,
+    "thinking_disabled_suffix_verified": true,
+    "tokenization_evidence_sha256": "1ee43de5995f38a3f7dbc05f4fb50075f9f2e0f2951e2557986fd9656ddbcea6",
+    "status": "PASS"
   },
   "generation_controls": {
     "logical_generations_max": 1,
@@ -51,16 +66,13 @@
     "authoring_or_publication": false,
     "evidence_namespace": "wellplot-v2-response-agent-smoke-20261127-001-PROPOSED",
     "canonical_launcher": "scripts/run_d5_live_campaign.sh planner-smoke response-agent-development AUTH_JSON",
-    "worktree_binding": "PENDING_FINAL_STATIC_PREFLIGHT",
+    "worktree_binding": "PENDING_FINAL_POST-DOCUMENTATION_STATIC_PREFLIGHT",
     "human_smoke_authorization": "NOT_GRANTED",
-    "lan_execution_approval": "NOT_AVAILABLE_IN_CURRENT_TOOL_POLICY"
+    "non_generative_lan_qualification": "COMPLETED_WITHOUT_GENERATION"
   },
   "blocking_prerequisites": [
-    "Approved LAN execution for authenticated non-generative endpoint readiness and tokenization.",
-    "Verify current model/build/template/defaults identity and exact seven-input token counts, including schema-related overhead and the thinking-disabled suffix.",
-    "Bind final worktree state and regenerated descriptor digest after readiness evidence is available.",
-    "Separate Human Authority for the single smoke generation.",
-    "Approved LAN execution for the entire canonical launcher invocation."
+    "Run final provider-free static preflight bound to the post-documentation execution HEAD.",
+    "Separate Human Authority for the single smoke generation."
   ],
   "warning": "This proposal is intentionally not a D5Authorization JSON and must not be passed to the campaign launcher."
 }
