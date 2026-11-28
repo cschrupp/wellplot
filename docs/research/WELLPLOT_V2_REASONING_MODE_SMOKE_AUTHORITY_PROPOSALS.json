@@ -3,7 +3,9 @@
   "descriptor_status": "PROPOSED_NOT_AUTHORIZED",
   "execution_eligible": false,
   "authority_decisions": "NOT_GRANTED",
-  "implementation_checkpoint": "f6e8331167bf9fa8e434c4aff719ae250dd9804d",
+  "source_implementation_checkpoint": "f6e8331167bf9fa8e434c4aff719ae250dd9804d",
+  "readiness_execution_checkpoint": "9f1aeb9648ffe60991336c84cd4a1a4111713f5c",
+  "final_execution_head_status": "PENDING_READINESS_DOCUMENTATION_COMMIT_AND_REPEAT_PREFLIGHT",
   "worktree_allowlist": [
     "docs/architecture/PLANNER_WORKER_RESPONSIBILITY_REALIGNMENT_DESIGN.md",
     "examples/notebooks/user/agent_cbl_log_example_from_prompt.ipynb",
@@ -21,10 +23,55 @@
   },
   "runtime": {
     "model": "qwen3.6-35b-a3b",
-    "identity_status": "PENDING_APPROVED_NON_GENERATIVE_LAN_READINESS",
-    "runtime_build": "NOT_REVERIFIED",
-    "chat_template_sha256": "NOT_REVERIFIED",
-    "runtime_defaults_sha256": "NOT_REVERIFIED"
+    "identity_status": "VERIFIED_NON_GENERATIVELY",
+    "build_info": "b12340-b8645ddda",
+    "context_size": 65536,
+    "chat_template_sha256": "55d4931433fe502b794226ee7f4d206a6bdd436ac9f80eb7d8ebb4c639f9ea0c",
+    "runtime_defaults_sha256": "5136c0f2b22a73572fe88f44e8cf32159ffb3b345ced2e33ba7507d612f7f8c3",
+    "model_path_fingerprint_sha256": "3a6fd986bebd4047876869e8b079f9f9b7b15fb2429853ba0501b5f6ea480b21",
+    "gguf_byte_identity": "NOT_AVAILABLE",
+    "readiness_evidence_sha256": "6646f47594c276be75ddcbdcf7c431e00612d539b47a694cef8e2481e673b335",
+    "runtime_identity_sha256": "84416cbce1b861cc978f24df56385f2ab09bb112deb4ed321a4368ccee8a4045",
+    "reasoning_budget_setting": "NOT_EXPOSED_BY_SANITIZED_READINESS; EFFECTIVE VALUE UNVERIFIED",
+    "reasoning_usage_accounting": "UNVERIFIED_WITHOUT_GENERATION; release-tag docs are not exact-binary evidence"
+  },
+  "tokenization": {
+    "method": "exact captured SDK bodies via /apply-template and /tokenize",
+    "evidence_sha256": "6646f47594c276be75ddcbdcf7c431e00612d539b47a694cef8e2481e673b335",
+    "schema_related_prompt_overhead_tokens": 0,
+    "largest_input_tokens": 2122,
+    "output_reserve_tokens": 4096,
+    "additional_margin_tokens": 1440,
+    "largest_reserved_total_tokens": 7658,
+    "context_size": 65536,
+    "all_sdk_body_identities_match_capture": true,
+    "no_truncation": true,
+    "cell_input_tokens": {
+      "P1-OFF": 1742,
+      "P1-ON": 1740,
+      "P2-ON": 1427,
+      "P2-OFF": 1429,
+      "P3-OFF": 1430,
+      "P3-ON": 1428,
+      "S1-ON": 1875,
+      "S1-OFF": 1877,
+      "S2-OFF": 2109,
+      "S2-ON": 2107,
+      "S3-ON": 2120,
+      "S3-OFF": 2122,
+      "RM-PLANNER-SMOKE": 1385,
+      "RM-SECTION-SMOKE": 1796
+    }
+  },
+  "current_static_preflight": {
+    "status": "PASS",
+    "population": "reasoning-mode-development",
+    "logical_call_ceiling": 12,
+    "physical_attempt_ceiling": 12,
+    "provider_calls": 0,
+    "model_calls": 0,
+    "endpoint_calls": 0,
+    "note": "Repeat after this documentation checkpoint to bind exact final HEAD and worktree."
   },
   "rubric_sha256": "a1ae9a052addd6ac09fb89046a42ea42a05ea540fbeccecbbfbd4605ecbd21a0",
   "shared_controls": {
@@ -60,8 +107,10 @@
       "prompt_sha256": "807797c9e776c47cd980e7423686c0bec5e4b8dd194a50b8b2d9c4e9218fadca",
       "schema_sha256": "8fe2dffed215069f2ec28672c218db45b405efa059b3c5aacf2356b515d582c0",
       "mock_sdk_request_body_sha256": "c3d9f5971d9255e148ade98ab81ef79794ec5348dbee08433430ceedf76ac5a7",
-      "exact_runtime_input_tokens": "PENDING_NON_GENERATIVE_TOKENIZATION",
-      "campaign_static_preflight": "PENDING_FINAL_CHECKPOINT_AND_WORKTREE_BINDING",
+      "exact_runtime_input_tokens": 1385,
+      "sdk_body_identity_verified": true,
+      "schema_overhead_tokens": 0,
+      "campaign_static_preflight": "PASS_AT_PREPARATION_CODE_CHECKPOINT; REPEAT_AFTER_DOC_CHECKPOINT",
       "canonical_invocation": "scripts/run_d5_live_campaign.sh planner-smoke reasoning-mode-development AUTH_JSON"
     },
     {
@@ -80,18 +129,19 @@
       "prompt_sha256": "f2522ae3d1191eb6db265af04c230e93d7f71a03b3194027e334d69a724088e0",
       "schema_sha256": "ac2928f97643f08becb002a5229a950ecbfa6adae62140bb40d39c5ae1e401a1",
       "mock_sdk_request_body_sha256": "a9af08eee7db575275854bccf0a76e1939afb6d60c1837c9268c7eb69a8c346c",
-      "exact_runtime_input_tokens": "PENDING_NON_GENERATIVE_TOKENIZATION",
-      "campaign_static_preflight": "PENDING_FINAL_CHECKPOINT_AND_WORKTREE_BINDING",
+      "exact_runtime_input_tokens": 1796,
+      "sdk_body_identity_verified": true,
+      "schema_overhead_tokens": 0,
+      "campaign_static_preflight": "PASS_AT_PREPARATION_CODE_CHECKPOINT; REPEAT_AFTER_DOC_CHECKPOINT",
       "canonical_invocation": "scripts/run_d5_live_campaign.sh planner-smoke reasoning-mode-development AUTH_JSON"
     }
   ],
   "required_before_execution": [
     "Convert each proposal into a separate Human-Authority-approved D5 descriptor bound to the exact executing HEAD and the recorded worktree allowlist.",
     "Verify exact frozen request identities from the committed fixture.",
-    "Perform approved non-generative LAN runtime readiness and tokenization for both smoke requests and all six paired inputs.",
-    "Verify chat-template and structured-schema behavior and record actual token budget semantics without generation.",
-    "Run committed-checkpoint static preflight and bind the exact worktree allowlist.",
-    "Obtain separate Human Authority for each one-call smoke and use fresh evidence namespaces."
+    "Repeat committed-checkpoint static preflight after the readiness documentation commit, then bind its exact HEAD and worktree allowlist in separate smoke authorities.",
+    "Obtain separate Human Authority for each one-call smoke and use fresh evidence namespaces.",
+    "Reasoning-enabled structured-output compatibility and actual reasoning usage accounting remain unverified until the separately authorized operational smokes."
   ],
   "prohibition": "This proposal bundle is not a D5 authorization and must not be passed to the campaign launcher."
 }

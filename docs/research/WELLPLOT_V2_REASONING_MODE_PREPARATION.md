@@ -1,7 +1,8 @@
 # WellPlot V2 — Reasoning-Mode Diagnostic Preparation
 
-**Status:** Provider-free implementation and mock qualification prepared;
-non-generative LAN qualification and operational smokes remain pending.
+**Status:** Provider-free implementation, mock qualification, and approved
+non-generative LAN readiness are complete; operational smokes remain separately
+unauthorized.
 **Implementation checkpoint:** `f6e8331167bf9fa8e434c4aff719ae250dd9804d`.
 **Superseded preparation checkpoint:**
 `9898823e3d367e73061f7668e883e053f63f93b4` (retained in Git history).
@@ -39,8 +40,9 @@ Evidence classification:
   thinking and final content. This does not establish behavior of this
   deployed Qwen/llama.cpp build.
 - **UNVERIFIED:** deployed runtime handling of the toggle with these structured
-  schemas, separation of reasoning from final structured content, and the
-  runtime's accounting of reasoning tokens against the 4,096 output cap.
+  schemas, separation of reasoning from final structured content, effective
+  reasoning-budget defaults, and generation usage accounting. These require
+  generation and are intentionally not inferred from readiness/tokenization.
 
 Official references consulted:
 
@@ -52,11 +54,23 @@ Official references consulted:
   documents `enable_thinking` and separates thinking and final text in its
   example. It is general Qwen documentation, not proof for this exact local
   build/model combination.
-- [llama.cpp server README](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md)
-  documents request `chat_template_kwargs`, reasoning formats, and optional
-  reasoning budgets. The current upstream page is not version-matched evidence
-  for the deployed runtime; the exact runtime must be verified non-generatively
-  and by separately authorized operational smokes.
+- [llama.cpp b12340 server README](https://github.com/ggml-org/llama.cpp/blob/8954f194837d2ec4d5f67f20c81b84abe63883ba/tools/server/README.md)
+  documents `max_tokens` as the maximum generation count and a separate
+  reasoning-block budget (`--reasoning-budget`, default `-1`, unrestricted).
+  Its release tag is `b12340`, but that tag resolves to commit
+  `8954f194837d2ec4d5f67f20c81b84abe63883ba`, whereas the running server reports
+  `b12340-b8645ddda`. The suffix could not be resolved to that release commit;
+  therefore this is version-label-matched documentation, **not proof of the
+  exact running binary's implementation or configured reasoning-budget value**.
+- The b12340-tagged
+  [`server-task.cpp`](https://github.com/ggml-org/llama.cpp/blob/8954f194837d2ec4d5f67f20c81b84abe63883ba/tools/server/server-task.cpp)
+  emits `completion_tokens` from `n_decoded`, with no separate reasoning-token
+  detail field in the usage object. The tagged
+  [`reasoning-budget.cpp`](https://github.com/ggml-org/llama.cpp/blob/8954f194837d2ec4d5f67f20c81b84abe63883ba/common/reasoning-budget.cpp)
+  counts tokens inside the reasoning block for its distinct reasoning budget.
+  Because the server's reported source suffix does not match the release-tag
+  commit and no generation was permitted, neither behavior is asserted for the
+  exact deployed binary or its runtime response accounting.
 
 ## Frozen Experimental Package
 
@@ -217,32 +231,86 @@ thinking enabled. Each requires its own Human Authority and fresh namespace.
 
 ## Non-Generative LAN Readiness and Tokenization
 
-**Status: NOT PERFORMED.** The tool authorization profile in this session
-does not permit requesting the LAN execution approval required by the
-repository gate. Therefore this is a readiness blocker, not evidence that the
-endpoint is unavailable. No `/v1/models`, `/props`, `/apply-template`, or
-`/tokenize` request was sent. No credentials were loaded or exposed. Do not
-infer runtime identity, template identity, thinking suffix, schema overhead,
-input token counts, structured-output compatibility, or reasoning-token
-budget semantics from local/mock evidence. The twelve measured cells and both
-enabled-mode smoke bodies still require exact approved-runtime tokenization
-and request-identity comparison before smoke authority can be prepared for
-execution.
+**Status: PASS, 2026-11-28.** Using the canonical checkout and D4 credential
+loading, the approved run made only `GET /v1/models`, `GET /props`, 28
+`POST /apply-template`, and 14 `POST /tokenize` calls. Every call returned
+HTTP 200. No completion, chat-completion, generation, or provider-generation
+call occurred. Credentials were neither recorded nor printed.
 
-Before the smoke proposals can be converted into executable authorities, the
-existing approved non-generative procedure must verify current runtime
-identity, apply the exact captured SDK request bodies to the matching chat
-template, tokenize every panel and smoke body, and report schema-related
-overhead and the 60,000-input/4,096-output/1,440-margin budget. The operational
-smokes then test enabled reasoning with the actual planner and section
-contracts. Only those real smokes can establish operational compatibility;
-they are not scientific panel observations.
+Readiness evidence:
 
-Reasoning-token accounting remains explicitly open. Preserve provider-reported
-usage fields verbatim in raw custody. Report reasoning-token usage separately
-only if the deployed runtime exposes it. Do not add hidden/visible token
-estimates or claim the relation between reasoning tokens and the output cap
-until the runtime's behavior is observed/documented for its exact build.
+- Exact execution HEAD: `9f1aeb9648ffe60991336c84cd4a1a4111713f5c`.
+- Sanitized runtime identity SHA-256:
+  `84416cbce1b861cc978f24df56385f2ab09bb112deb4ed321a4368ccee8a4045`.
+- Runtime: `qwen3.6-35b-a3b`; model path basename
+  `Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf`; model-path fingerprint
+  `3a6fd986bebd4047876869e8b079f9f9b7b15fb2429853ba0501b5f6ea480b21`;
+  context `65,536`; build `b12340-b8645ddda`; one slot; structured-output
+  contract `json_schema`.
+- Chat-template SHA-256:
+  `55d4931433fe502b794226ee7f4d206a6bdd436ac9f80eb7d8ebb4c639f9ea0c`.
+- Runtime-defaults SHA-256:
+  `5136c0f2b22a73572fe88f44e8cf32159ffb3b345ced2e33ba7507d612f7f8c3`.
+- GGUF byte identity was unavailable. The model-path fingerprint is not a
+  substitute for a byte-level GGUF digest.
+- Project configuration fingerprint:
+  `14357a627f060572e73a822ab9efe9ed3a6cca6727b7247361a2a5adfa5bd498`.
+
+All 14 exact captured SDK request-body SHA-256 identities matched their
+preflight captures. For every request, schema-present and schema-omitted
+`/apply-template` outputs were byte-identical, so measured schema-related
+prompt overhead was zero tokens. All six enabled/disabled paired rendered
+prompts differed; disabled rendering ended with `<think>\n\n</think>\n\n`,
+enabled rendering ended with `<think>\n`. This verifies the template
+transformation, not structured-output compatibility while thinking is enabled.
+
+| Cell | Exact input tokens |
+| --- | ---: |
+| P1-OFF | 1,742 |
+| P1-ON | 1,740 |
+| P2-ON | 1,427 |
+| P2-OFF | 1,429 |
+| P3-OFF | 1,430 |
+| P3-ON | 1,428 |
+| S1-ON | 1,875 |
+| S1-OFF | 1,877 |
+| S2-OFF | 2,109 |
+| S2-ON | 2,107 |
+| S3-ON | 2,120 |
+| S3-OFF | 2,122 |
+| RM-PLANNER-SMOKE (thinking enabled) | 1,385 |
+| RM-SECTION-SMOKE (thinking enabled) | 1,796 |
+
+The largest input is 2,122 tokens. Adding the reserved 4,096 output tokens and
+1,440 margin gives 7,658 of 65,536 context tokens; all requests are below the
+60,000 input-token ceiling without truncation.
+
+The version-label-matched b12340 source documents a distinct optional
+reasoning-block budget and a completion-wide `max_tokens` ceiling; the tagged
+usage implementation reports aggregate `completion_tokens` based on decoded
+tokens without a separate reasoning-token detail field. The running build
+suffix does not match the release tag's commit, and runtime defaults do not
+reveal an effective reasoning-budget setting. Consequently the deployed
+reasoning-budget value and actual usage accounting are **UNVERIFIED**. No
+generation was made to resolve them. The enabled-mode operational smokes are
+still needed to qualify structured-output compatibility and actual reasoning
+separation; they are not authorized by this readiness record.
+
+The private machine evidence is
+`workspace/evaluations/wellplot-v2-reasoning-mode-readiness-20261128-001/reasoning-mode-readiness-tokenization.json`,
+SHA-256 `6646f47594c276be75ddcbdcf7c431e00612d539b47a694cef8e2481e673b335`.
+The exact SDK-body capture is
+`workspace/evaluations/wellplot-v2-reasoning-mode-readiness-20261128-001/captured-sdk-bodies.json`,
+SHA-256 `6e273588b05678a3775b2ea09bf3a1b954b4afcf4b94021dcc23f34f241a7544`.
+Both are local, private evidence artifacts; the committed record includes
+sanitized identities and counts only.
+
+The canonical provider-free D5 preflight passed at the above HEAD with the
+frozen 12 case IDs, rubric digest, harness, schemas, source/configuration
+attestations, and exact current worktree allowlist. It reported a 12 logical /
+12 physical ceiling and zero provider, model, or endpoint calls. The preflight
+must be repeated after this readiness record is committed so the final
+unapproved smoke descriptors bind the resulting exact HEAD and worktree.
 
 ## Authority and Stop Boundary
 
