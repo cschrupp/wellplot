@@ -1,0 +1,103 @@
+[
+  {
+    "id": "RM-PLANNER-SMOKE",
+    "turn_id": "RM-PLANNER-SMOKE",
+    "role": "planner",
+    "request": "What is the inspected source unit for TEMP in Thermal?",
+    "compiler_status": "NO_SUPPORTED_SEMANTICS",
+    "context": {
+      "document": {
+        "name": "Thermal Review",
+        "title": "Thermal Review",
+        "sections": [
+          {
+            "id": "thermal",
+            "title": "Thermal",
+            "tracks": [
+              {
+                "id": "thermal-track",
+                "title": "Temperature",
+                "kind": "normal",
+                "width_mm": 30,
+                "bindings": []
+              }
+            ]
+          }
+        ]
+      },
+      "sources": [
+        {
+          "id": "thermal-survey",
+          "name": "Thermal Survey",
+          "inspection": "inspected",
+          "complete": true,
+          "channels": [
+            {
+              "mnemonic": "TEMP",
+              "measurement": "borehole temperature",
+              "unit": "degC",
+              "kind": "scalar",
+              "addressable": true
+            }
+          ]
+        }
+      ],
+      "dialogue": [],
+      "workflow": {
+        "verified_results": [],
+        "pending": []
+      }
+    }
+  },
+  {
+    "id": "RM-SECTION-SMOKE",
+    "turn_id": "RM-SECTION-SMOKE",
+    "role": "section",
+    "compiler_status": "NO_SUPPORTED_SEMANTICS",
+    "request": "Add physical TEMP from Thermal Survey to the existing Thermal track.",
+    "objective": "Add the addressable physical TEMP channel from Thermal Survey to the existing Thermal track.",
+    "scope": "thermal",
+    "document": {
+      "name": "Thermal Review",
+      "title": "Thermal Review",
+      "sections": [
+        {
+          "id": "thermal",
+          "title": "Thermal",
+          "tracks": [
+            {
+              "id": "thermal-track",
+              "title": "Temperature",
+              "kind": "normal",
+              "width_mm": 30,
+              "bindings": []
+            }
+          ]
+        }
+      ]
+    },
+    "sources": [
+      {
+        "id": "thermal-survey",
+        "name": "Thermal Survey",
+        "inspection": "inspected",
+        "complete": true,
+        "channels": [
+          {
+            "mnemonic": "TEMP",
+            "measurement": "borehole temperature",
+            "unit": "degC",
+            "kind": "scalar",
+            "addressable": true
+          }
+        ]
+      }
+    ],
+    "dialogue": [],
+    "workflow": {
+      "verified_results": [],
+      "pending": []
+    },
+    "condition": "thinking_enabled"
+  }
+]

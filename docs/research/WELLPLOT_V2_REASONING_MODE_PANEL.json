@@ -1,0 +1,212 @@
+[
+  {
+    "id": "P1-OFF",
+    "turn_id": "RM-P1-OFF",
+    "pair_id": "P1",
+    "condition": "thinking_disabled",
+    "pair_order": 1,
+    "role": "planner",
+    "request": "Plot the physical SAL curve in Acoustics. Do not choose between eligible source datasets if more than one contains SAL.",
+    "compiler_status": "NO_SUPPORTED_SEMANTICS",
+    "context": {
+      "document": {
+        "name": "Two-Well Review",
+        "title": "Two-Well Review",
+        "sections": [
+          {"id": "acoustics", "title": "Acoustics", "tracks": [{"id": "acoustics-track", "title": "Acoustics", "kind": "normal", "width_mm": 30, "bindings": []}]}
+        ]
+      },
+      "sources": [
+        {"id": "north-sal", "name": "North Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "SAL", "measurement": "sonic amplitude log", "unit": "mV", "kind": "scalar", "addressable": true}]},
+        {"id": "south-sal", "name": "South Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "SAL", "measurement": "sonic amplitude log", "unit": "mV", "kind": "scalar", "addressable": true}]}
+      ],
+      "dialogue": [],
+      "workflow": {"verified_results": [], "pending": []}
+    }
+  },
+  {
+    "id": "P1-ON",
+    "turn_id": "RM-P1-ON",
+    "pair_id": "P1",
+    "condition": "thinking_enabled",
+    "pair_order": 2,
+    "role": "planner",
+    "request": "Plot the physical SAL curve in Acoustics. Do not choose between eligible source datasets if more than one contains SAL.",
+    "compiler_status": "NO_SUPPORTED_SEMANTICS",
+    "context": {
+      "document": {
+        "name": "Two-Well Review",
+        "title": "Two-Well Review",
+        "sections": [
+          {"id": "acoustics", "title": "Acoustics", "tracks": [{"id": "acoustics-track", "title": "Acoustics", "kind": "normal", "width_mm": 30, "bindings": []}]}
+        ]
+      },
+      "sources": [
+        {"id": "north-sal", "name": "North Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "SAL", "measurement": "sonic amplitude log", "unit": "mV", "kind": "scalar", "addressable": true}]},
+        {"id": "south-sal", "name": "South Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "SAL", "measurement": "sonic amplitude log", "unit": "mV", "kind": "scalar", "addressable": true}]}
+      ],
+      "dialogue": [],
+      "workflow": {"verified_results": [], "pending": []}
+    }
+  },
+  {
+    "id": "P2-ON",
+    "turn_id": "RM-P2-ON",
+    "pair_id": "P2",
+    "condition": "thinking_enabled",
+    "pair_order": 1,
+    "role": "planner",
+    "request": "In Comparison, show GR and RHOB together on the same track with blue shading between the curves. They must remain on one track, not separate tracks or an overlay.",
+    "compiler_status": "EXTRACTION_COMPLETE",
+    "context": {
+      "document": {"name": "Comparison Study", "title": "Comparison Study", "sections": [{"id": "comparison", "title": "Comparison", "tracks": [{"id": "comparison-track", "title": "Comparison", "kind": "normal", "width_mm": 34, "bindings": []}]}]},
+      "sources": [{"id": "comparison-source", "name": "Comparison Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "GR", "measurement": "gamma ray", "unit": "gAPI", "kind": "scalar", "addressable": true}, {"mnemonic": "RHOB", "measurement": "bulk density", "unit": "g/cm3", "kind": "scalar", "addressable": true}]}],
+      "dialogue": [],
+      "workflow": {"verified_results": [], "pending": []}
+    }
+  },
+  {
+    "id": "P2-OFF",
+    "turn_id": "RM-P2-OFF",
+    "pair_id": "P2",
+    "condition": "thinking_disabled",
+    "pair_order": 2,
+    "role": "planner",
+    "request": "In Comparison, show GR and RHOB together on the same track with blue shading between the curves. They must remain on one track, not separate tracks or an overlay.",
+    "compiler_status": "EXTRACTION_COMPLETE",
+    "context": {
+      "document": {"name": "Comparison Study", "title": "Comparison Study", "sections": [{"id": "comparison", "title": "Comparison", "tracks": [{"id": "comparison-track", "title": "Comparison", "kind": "normal", "width_mm": 34, "bindings": []}]}]},
+      "sources": [{"id": "comparison-source", "name": "Comparison Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "GR", "measurement": "gamma ray", "unit": "gAPI", "kind": "scalar", "addressable": true}, {"mnemonic": "RHOB", "measurement": "bulk density", "unit": "g/cm3", "kind": "scalar", "addressable": true}]}],
+      "dialogue": [],
+      "workflow": {"verified_results": [], "pending": []}
+    }
+  },
+  {
+    "id": "P3-OFF",
+    "turn_id": "RM-P3-OFF",
+    "pair_id": "P3",
+    "condition": "thinking_disabled",
+    "pair_order": 1,
+    "role": "planner",
+    "request": "In Upper, plot the literal CALX channel from the Northern Survey at a linear 5 to 25 in scale. Do not substitute CAL, and leave the report title unchanged.",
+    "compiler_status": "EXTRACTION_COMPLETE",
+    "context": {
+      "document": {"name": "Northern Check", "title": "Northern Check", "sections": [{"id": "upper", "title": "Upper", "tracks": [{"id": "upper-track", "title": "Upper", "kind": "normal", "width_mm": 30, "bindings": []}]}]},
+      "sources": [{"id": "north-source", "name": "Northern Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "CALX", "measurement": "caliper extension", "unit": "in", "kind": "scalar", "addressable": true}, {"mnemonic": "CAL", "measurement": "caliper", "unit": "in", "kind": "scalar", "addressable": true}]}],
+      "dialogue": [],
+      "workflow": {"verified_results": [], "pending": []}
+    }
+  },
+  {
+    "id": "P3-ON",
+    "turn_id": "RM-P3-ON",
+    "pair_id": "P3",
+    "condition": "thinking_enabled",
+    "pair_order": 2,
+    "role": "planner",
+    "request": "In Upper, plot the literal CALX channel from the Northern Survey at a linear 5 to 25 in scale. Do not substitute CAL, and leave the report title unchanged.",
+    "compiler_status": "EXTRACTION_COMPLETE",
+    "context": {
+      "document": {"name": "Northern Check", "title": "Northern Check", "sections": [{"id": "upper", "title": "Upper", "tracks": [{"id": "upper-track", "title": "Upper", "kind": "normal", "width_mm": 30, "bindings": []}]}]},
+      "sources": [{"id": "north-source", "name": "Northern Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "CALX", "measurement": "caliper extension", "unit": "in", "kind": "scalar", "addressable": true}, {"mnemonic": "CAL", "measurement": "caliper", "unit": "in", "kind": "scalar", "addressable": true}]}],
+      "dialogue": [],
+      "workflow": {"verified_results": [], "pending": []}
+    }
+  },
+  {
+    "id": "S1-ON",
+    "turn_id": "RM-S1-ON",
+    "pair_id": "S1",
+    "condition": "thinking_enabled",
+    "pair_order": 1,
+    "role": "section",
+    "compiler_status": "COVERAGE_FAILURE",
+    "request": "Add the physical SAL curve to the Acoustics track.",
+    "objective": "Plot physical SAL in the Acoustics section without choosing between eligible source datasets.",
+    "scope": "acoustics",
+    "document": {"name": "Source Review", "title": "Source Review", "sections": [{"id": "acoustics", "title": "Acoustics", "tracks": [{"id": "acoustics-track", "title": "Acoustics", "kind": "normal", "width_mm": 30, "bindings": []}]}]},
+    "sources": [{"id": "north-sal", "name": "North Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "SAL", "measurement": "sonic amplitude log", "unit": "mV", "kind": "scalar", "addressable": true}]}, {"id": "south-sal", "name": "South Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "SAL", "measurement": "sonic amplitude log", "unit": "mV", "kind": "scalar", "addressable": true}]}],
+    "dialogue": [],
+    "workflow": {"pending": [], "verified_results": []}
+  },
+  {
+    "id": "S1-OFF",
+    "turn_id": "RM-S1-OFF",
+    "pair_id": "S1",
+    "condition": "thinking_disabled",
+    "pair_order": 2,
+    "role": "section",
+    "compiler_status": "COVERAGE_FAILURE",
+    "request": "Add the physical SAL curve to the Acoustics track.",
+    "objective": "Plot physical SAL in the Acoustics section without choosing between eligible source datasets.",
+    "scope": "acoustics",
+    "document": {"name": "Source Review", "title": "Source Review", "sections": [{"id": "acoustics", "title": "Acoustics", "tracks": [{"id": "acoustics-track", "title": "Acoustics", "kind": "normal", "width_mm": 30, "bindings": []}]}]},
+    "sources": [{"id": "north-sal", "name": "North Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "SAL", "measurement": "sonic amplitude log", "unit": "mV", "kind": "scalar", "addressable": true}]}, {"id": "south-sal", "name": "South Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "SAL", "measurement": "sonic amplitude log", "unit": "mV", "kind": "scalar", "addressable": true}]}],
+    "dialogue": [],
+    "workflow": {"pending": [], "verified_results": []}
+  },
+  {
+    "id": "S2-OFF",
+    "turn_id": "RM-S2-OFF",
+    "pair_id": "S2",
+    "condition": "thinking_disabled",
+    "pair_order": 1,
+    "role": "section",
+    "compiler_status": "EXTRACTION_COMPLETE",
+    "request": "Add UPPER to the existing Bounds track. After UPPER is verified there with LOWER, shade blue between UPPER and LOWER. Preserve LOWER and do not add a fill before both curves are present on the same track.",
+    "objective": "First add UPPER to Bounds; retain the dependent blue between-curves shading objective for UPPER and LOWER after verified co-location.",
+    "scope": "bounds",
+    "document": {"name": "Boundary Review", "title": "Boundary Review", "sections": [{"id": "bounds", "title": "Bounds", "tracks": [{"id": "bounds-track", "title": "Bounds", "kind": "normal", "width_mm": 30, "bindings": [{"kind": "curve", "binding_id": "lower-binding", "channel": "LOWER", "label": "LOWER", "scale": {"kind": "linear", "minimum": 0, "maximum": 1, "unit": "m"}}]}]}]},
+    "sources": [{"id": "boundary-source", "name": "Boundary Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "UPPER", "measurement": "upper boundary", "unit": "m", "kind": "scalar", "addressable": true}]}],
+    "dialogue": [],
+    "workflow": {"pending": [], "verified_results": []}
+  },
+  {
+    "id": "S2-ON",
+    "turn_id": "RM-S2-ON",
+    "pair_id": "S2",
+    "condition": "thinking_enabled",
+    "pair_order": 2,
+    "role": "section",
+    "compiler_status": "EXTRACTION_COMPLETE",
+    "request": "Add UPPER to the existing Bounds track. After UPPER is verified there with LOWER, shade blue between UPPER and LOWER. Preserve LOWER and do not add a fill before both curves are present on the same track.",
+    "objective": "First add UPPER to Bounds; retain the dependent blue between-curves shading objective for UPPER and LOWER after verified co-location.",
+    "scope": "bounds",
+    "document": {"name": "Boundary Review", "title": "Boundary Review", "sections": [{"id": "bounds", "title": "Bounds", "tracks": [{"id": "bounds-track", "title": "Bounds", "kind": "normal", "width_mm": 30, "bindings": [{"kind": "curve", "binding_id": "lower-binding", "channel": "LOWER", "label": "LOWER", "scale": {"kind": "linear", "minimum": 0, "maximum": 1, "unit": "m"}}]}]}]},
+    "sources": [{"id": "boundary-source", "name": "Boundary Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "UPPER", "measurement": "upper boundary", "unit": "m", "kind": "scalar", "addressable": true}]}],
+    "dialogue": [],
+    "workflow": {"pending": [], "verified_results": []}
+  },
+  {
+    "id": "S3-ON",
+    "turn_id": "RM-S3-ON",
+    "pair_id": "S3",
+    "condition": "thinking_enabled",
+    "pair_order": 1,
+    "role": "section",
+    "compiler_status": "EXTRACTION_COMPLETE",
+    "request": "In Hydraulics, add physical FLOW from East Survey to the existing track. Keep its native gpm units, do not substitute PRES, and preserve all existing curves and presentation.",
+    "objective": "Add the exact addressable physical FLOW channel from the explicitly named East Survey to Hydraulics while preserving existing state.",
+    "scope": "hydraulics",
+    "document": {"name": "Hydraulics Review", "title": "Hydraulics Review", "sections": [{"id": "hydraulics", "title": "Hydraulics", "tracks": [{"id": "hydraulic-track", "title": "Hydraulics", "kind": "normal", "width_mm": 34, "bindings": [{"kind": "curve", "binding_id": "pressure-binding", "channel": "PRES", "label": "Pressure", "scale": {"kind": "linear", "minimum": 0, "maximum": 100, "unit": "psi"}}]}]}]},
+    "sources": [{"id": "east-source", "name": "East Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "FLOW", "measurement": "flow rate", "unit": "gpm", "kind": "scalar", "addressable": true}, {"mnemonic": "PRES", "measurement": "pressure", "unit": "psi", "kind": "scalar", "addressable": true}]}],
+    "dialogue": [],
+    "workflow": {"pending": [], "verified_results": []}
+  },
+  {
+    "id": "S3-OFF",
+    "turn_id": "RM-S3-OFF",
+    "pair_id": "S3",
+    "condition": "thinking_disabled",
+    "pair_order": 2,
+    "role": "section",
+    "compiler_status": "EXTRACTION_COMPLETE",
+    "request": "In Hydraulics, add physical FLOW from East Survey to the existing track. Keep its native gpm units, do not substitute PRES, and preserve all existing curves and presentation.",
+    "objective": "Add the exact addressable physical FLOW channel from the explicitly named East Survey to Hydraulics while preserving existing state.",
+    "scope": "hydraulics",
+    "document": {"name": "Hydraulics Review", "title": "Hydraulics Review", "sections": [{"id": "hydraulics", "title": "Hydraulics", "tracks": [{"id": "hydraulic-track", "title": "Hydraulics", "kind": "normal", "width_mm": 34, "bindings": [{"kind": "curve", "binding_id": "pressure-binding", "channel": "PRES", "label": "Pressure", "scale": {"kind": "linear", "minimum": 0, "maximum": 100, "unit": "psi"}}]}]}]},
+    "sources": [{"id": "east-source", "name": "East Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "FLOW", "measurement": "flow rate", "unit": "gpm", "kind": "scalar", "addressable": true}, {"mnemonic": "PRES", "measurement": "pressure", "unit": "psi", "kind": "scalar", "addressable": true}]}],
+    "dialogue": [],
+    "workflow": {"pending": [], "verified_results": []}
+  }
+]

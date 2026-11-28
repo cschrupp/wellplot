@@ -559,6 +559,17 @@ _S03_CASE_DIGESTS = frozenset(
         "e1a1a688b876d0af910e4b4dbdd4eb6c8f2a24e51aba55e9d892d411d7d2c8d3",
     )
 )
+_REASONING_MODE_PLANNER_CASE_DIGESTS = frozenset(
+    (
+        "75ce30b908abfde8c9d061e95d5292d221da5b5d00c85056454a73d38a46620d",
+        "5da3860d01be1c47883eca78b8f0e275737bab640f4b421f52558eac1549c5ab",
+        "4961730319eebd0c3897f990e4b2f142c08a41794d53056a30f456815b82da5f",
+        "4f375b0b4cd76af7c616200f51c62796da2f05c47fde1d95bb60f3d4432e4657",
+        "9aa138fa24225b60de740d0e21175f04e066e986ad3dc6132ec49ad1203f9acd",
+        "3cb0e3c31472565f8e13763cb31469cb17286088b4bc6b7560f60e547a591315",
+        "caf954398686fedf4e19998000f6ac5ba0edd77ff08ee80aea4a2cbc58212b94",
+    )
+)
 _S03_SYSTEM_PROMPT = (
     "You are the WellPlot scientific intent planner. WellPlot builds well-log re"
     "ports\nfrom inspected source channels. Reports own titles, subtitles and rem"
@@ -1268,7 +1279,11 @@ class SemanticPlanner:
                 ).encode()
             ).hexdigest()
             is_h1b = digest in _H1B_CASE_DIGESTS
-            is_s03 = digest == _S03_SMOKE_FIXTURE_SHA256 or digest in _S03_CASE_DIGESTS
+            is_s03 = (
+                digest == _S03_SMOKE_FIXTURE_SHA256
+                or digest in _S03_CASE_DIGESTS
+                or digest in _REASONING_MODE_PLANNER_CASE_DIGESTS
+            )
             if (
                 (not (is_h1b or is_s03) and digest not in _H1_CASE_DIGESTS)
                 or (

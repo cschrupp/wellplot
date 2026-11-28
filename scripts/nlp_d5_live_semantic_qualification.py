@@ -27,7 +27,7 @@ import urllib.error
 import urllib.request
 import uuid
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, Protocol
@@ -53,6 +53,7 @@ from wellplot.agent.code_mode.planner import (
     _H1BObservationResponse,
     _H1ObservationComplete,
     _H1ObservationResponse,
+    _s03_observation_prompt,
     _S03ObservationResponse,
 )
 from wellplot.agent.providers.base import (
@@ -190,7 +191,66 @@ RESPONSE_AGENT_MANUAL_SHA256 = "782a1cf6b463b57211d3231aeb62214b50a681d5e4e69b68
 RESPONSE_AGENT_RUBRIC_PATH = "docs/research/WELLPLOT_V2_RESPONSE_AGENT_RUBRIC.md"
 RESPONSE_AGENT_RUBRIC_SHA256 = "8f8c267f2941c26052ac59fec224135febb1e5d745f96f93717c4ed65983079f"
 RESPONSE_AGENT_SCHEMA_SHA256 = "7cfe35615916d50c78f293870b72d72538b8e71b91d54c6ada4dc14a469f74ea"
-H1_POPULATIONS = (H1_POPULATION, H1B_POPULATION, S03_POPULATION, SPECIALIST_POPULATION)
+REASONING_MODE_POPULATION = "reasoning-mode-development"
+REASONING_MODE_PANEL_PATH = "docs/research/WELLPLOT_V2_REASONING_MODE_PANEL.json"
+REASONING_MODE_PANEL_SHA256 = "b8293d3c2a7978c9fa566dc46c82ca98f52a9e07cb23983f3138e0f7eae59ac1"
+REASONING_MODE_INPUTS_SHA256 = "46a427e1454140dcc624513ada6f40f3870f915e9ff38affec5b7cf13623d550"
+REASONING_MODE_PROMPT_BUNDLE_SHA256 = (
+    "09f06538949bbb077472f2b5c05756923dcb65f0a3f2b5d917657857215a8330"
+)
+REASONING_MODE_SCHEMA_BUNDLE_SHA256 = (
+    "0790c3dc9ae06ed1a6964240e38593e8e63d6ed1acdf2906e5bb80b9368db6d6"
+)
+REASONING_MODE_SMOKE_FIXTURES_PATH = "docs/research/WELLPLOT_V2_REASONING_MODE_SMOKES.json"
+REASONING_MODE_SMOKE_FIXTURES_SHA256 = (
+    "7a24d26142c24409e3c37c7a741edad4b0c881801933b043b54776dc9a69dde3"
+)
+REASONING_PLANNER_SMOKE_MODE = "reasoning_planner_smoke"
+REASONING_SECTION_SMOKE_MODE = "reasoning_section_smoke"
+REASONING_MODE_SMOKE_IDS = {
+    REASONING_PLANNER_SMOKE_MODE: "RM-PLANNER-SMOKE",
+    REASONING_SECTION_SMOKE_MODE: "RM-SECTION-SMOKE",
+}
+REASONING_MODE_SMOKE_ROLE_BY_TURN = {
+    "RM-PLANNER-SMOKE": "planner",
+    "RM-SECTION-SMOKE": "section_worker",
+}
+REASONING_MODE_TURN_IDS = (
+    "RM-P1-OFF",
+    "RM-P1-ON",
+    "RM-P2-ON",
+    "RM-P2-OFF",
+    "RM-P3-OFF",
+    "RM-P3-ON",
+    "RM-S1-ON",
+    "RM-S1-OFF",
+    "RM-S2-OFF",
+    "RM-S2-ON",
+    "RM-S3-ON",
+    "RM-S3-OFF",
+)
+REASONING_MODE_ROLE_BY_TURN = {
+    "RM-P1-OFF": "planner",
+    "RM-P1-ON": "planner",
+    "RM-P2-ON": "planner",
+    "RM-P2-OFF": "planner",
+    "RM-P3-OFF": "planner",
+    "RM-P3-ON": "planner",
+    "RM-S1-ON": "section_worker",
+    "RM-S1-OFF": "section_worker",
+    "RM-S2-OFF": "section_worker",
+    "RM-S2-ON": "section_worker",
+    "RM-S3-ON": "section_worker",
+    "RM-S3-OFF": "section_worker",
+    **REASONING_MODE_SMOKE_ROLE_BY_TURN,
+}
+H1_POPULATIONS = (
+    H1_POPULATION,
+    H1B_POPULATION,
+    S03_POPULATION,
+    SPECIALIST_POPULATION,
+    REASONING_MODE_POPULATION,
+)
 OBSERVATION_POPULATIONS = (*H1_POPULATIONS, RESPONSE_AGENT_POPULATION)
 S03_SMOKE_MODE = "s03_revised_observation"
 _OBSERVATION_SMOKE_PROFILES = {
@@ -224,7 +284,13 @@ RESPONSE_AGENT_SMOKE_FIXTURE_PATH = "docs/research/WELLPLOT_V2_RESPONSE_AGENT_SM
 RESPONSE_AGENT_SMOKE_FIXTURE_SHA256 = (
     "1b13499a54b1871ac91b8022ffe9f9bff95a2d5ebab9683e10d026781eb7f834"
 )
-BOUNDED_SMOKE_MODES = (*H1_SMOKE_MODES, *SPECIALIST_SMOKE_ROLES, RESPONSE_AGENT_SMOKE_MODE)
+BOUNDED_SMOKE_MODES = (
+    *H1_SMOKE_MODES,
+    *SPECIALIST_SMOKE_ROLES,
+    RESPONSE_AGENT_SMOKE_MODE,
+    REASONING_PLANNER_SMOKE_MODE,
+    REASONING_SECTION_SMOKE_MODE,
+)
 SPECIALIST_SMOKE_FIXTURES = "docs/research/WELLPLOT_V2_SPECIALIST_SMOKE_FIXTURES.json"
 SPECIALIST_SMOKE_FIXTURES_SHA256 = (
     "743ab51d3f9f864d9048ce87aaae86f455cc4027233d3d26fdde78375c84118a"
@@ -232,7 +298,35 @@ SPECIALIST_SMOKE_FIXTURES_SHA256 = (
 PLANNER_POPULATIONS = (A10_SEM_53_POPULATION, *OBSERVATION_POPULATIONS)
 
 
+def _reasoning_mode_schema_bundle() -> type[BaseModel]:
+    """Return the two unchanged schemas used by the mixed-role diagnostic."""
+    from wellplot.agent.code_mode.canonical_workers import SectionSpecialistObservation
+
+    class ReasoningModeSchemaBundle(BaseModel):
+        planner: _S03ObservationResponse
+        section: SectionSpecialistObservation
+
+    ReasoningModeSchemaBundle.model_rebuild(
+        _types_namespace={
+            "_S03ObservationResponse": _S03ObservationResponse,
+            "SectionSpecialistObservation": SectionSpecialistObservation,
+        }
+    )
+    return ReasoningModeSchemaBundle
+
+
 def _h1_contract(population: str) -> tuple[str, str, tuple[str, ...], str, type[BaseModel]]:
+    if population == REASONING_MODE_POPULATION:
+        bundle = _reasoning_mode_schema_bundle()
+        if _sha256_json(bundle.model_json_schema()) != REASONING_MODE_SCHEMA_BUNDLE_SHA256:
+            raise D5StaticPreflightError("reasoning-mode schema bundle changed")
+        return (
+            REASONING_MODE_PANEL_PATH,
+            REASONING_MODE_PANEL_SHA256,
+            REASONING_MODE_TURN_IDS,
+            REASONING_MODE_PROMPT_BUNDLE_SHA256,
+            bundle,
+        )
     if population == RESPONSE_AGENT_POPULATION:
         manual = (Path(__file__).resolve().parents[1] / RESPONSE_AGENT_MANUAL_PATH).read_text(
             encoding="utf-8"
@@ -505,6 +599,13 @@ class D5ProcessInterruption(D5HarnessError):
 def _thinking_control_options() -> dict[str, object]:
     """Return the one frozen request-level thinking control."""
     return {"chat_template_kwargs": {"enable_thinking": False}}
+
+
+def _thinking_mode_options(enabled: bool) -> dict[str, object]:
+    """Return the request control with only the diagnostic bit selected."""
+    if type(enabled) is not bool:
+        raise D5StaticPreflightError("thinking condition must be boolean")
+    return {"chat_template_kwargs": {"enable_thinking": enabled}}
 
 
 class SmokeReadyResponse(BaseModel):
@@ -815,7 +916,9 @@ class D5Authorization:
         if self.planner_population in OBSERVATION_POPULATIONS:
             _, digest, ids, prompt, model = _h1_contract(self.planner_population)
             prompt_identity = (
-                prompt
+                REASONING_MODE_PROMPT_BUNDLE_SHA256
+                if self.planner_population == REASONING_MODE_POPULATION
+                else prompt
                 if self.planner_population == SPECIALIST_POPULATION
                 else hashlib.sha256(prompt.encode("utf-8")).hexdigest()
             )
@@ -831,6 +934,11 @@ class D5Authorization:
                 or self.planner_smoke_wire_schema_sha256 != _sha256_json(model.model_json_schema())
             ):
                 raise D5StaticPreflightError("invalid frozen observation authority")
+            if self.planner_population == REASONING_MODE_POPULATION and (
+                self.sdk_max_retries != 0
+                or self.planner_smoke_harness_sha256 != _sha256_file(Path(__file__).resolve())
+            ):
+                raise D5StaticPreflightError("invalid reasoning-mode harness authority")
         elif self.planner_first_pass_turn_ids is not None:
             selected = self.planner_first_pass_turn_ids
             if (
@@ -1291,6 +1399,11 @@ def _default_smoke_static_checks(
     elif mode == "canonical_schema_behavior_probe":
         if _git_porcelain_raw(repo_root) != expected_worktree_porcelain:
             raise D5StaticPreflightError("working tree differs from schema-probe authorization")
+    elif mode in {REASONING_PLANNER_SMOKE_MODE, REASONING_SECTION_SMOKE_MODE}:
+        if expected_worktree_porcelain is None or _git_porcelain_raw(repo_root) != (
+            expected_worktree_porcelain
+        ):
+            raise D5StaticPreflightError("reasoning-mode smoke worktree differs from authority")
     elif mode in {
         "h1_planner_observation",
         "h1b_planner_observation",
@@ -1305,6 +1418,9 @@ def _default_smoke_static_checks(
             or _git_porcelain_raw(repo_root) != expected_worktree_porcelain
         ):
             raise D5StaticPreflightError("H1 worktree differs from the reviewed allowlist")
+    elif mode == "reasoning_mode_observation":
+        if _git_porcelain_raw(repo_root) != expected_worktree_porcelain:
+            raise D5StaticPreflightError("reasoning-mode worktree differs from its authority")
     else:
         _require_exact_planner_worktree(repo_root, expected_worktree_porcelain)
     project_config = load_project_config(repo_root)
@@ -1343,6 +1459,11 @@ def _default_smoke_static_checks(
             _h1_contract(SPECIALIST_POPULATION)[4].model_json_schema()
         ),
         "response_agent_observation": _sha256_json(d4.ResponseAgentObservation.model_json_schema()),
+        REASONING_PLANNER_SMOKE_MODE: _sha256_json(_S03ObservationResponse.model_json_schema()),
+        REASONING_SECTION_SMOKE_MODE: _sha256_json(
+            _specialist_smoke_model("section").model_json_schema()
+        ),
+        "reasoning_mode_observation": REASONING_MODE_SCHEMA_BUNDLE_SHA256,
         RESPONSE_AGENT_SMOKE_MODE: _sha256_json(d4.ResponseAgentObservation.model_json_schema()),
         "canonical_schema_behavior_probe": _schema_probe_bundle_sha256(),
         **{
@@ -1507,6 +1628,77 @@ def _planner_smoke_case(
             "physical_attempt_limit": 1,
             "h1_case": fixture,
             "specialist_role": "response_agent",
+        }
+    if authorization.planner_smoke_mode in REASONING_MODE_SMOKE_IDS:
+        path = repo_root / REASONING_MODE_SMOKE_FIXTURES_PATH
+        _assert_hash(
+            path,
+            REASONING_MODE_SMOKE_FIXTURES_SHA256,
+            "reasoning-mode smoke fixtures",
+        )
+        selected_id = REASONING_MODE_SMOKE_IDS[authorization.planner_smoke_mode]
+        matches = [
+            row
+            for row in json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(row, Mapping) and row.get("id") == selected_id
+        ]
+        if len(matches) != 1:
+            raise D5StaticPreflightError("reasoning-mode smoke fixture is missing or duplicate")
+        fixture = dict(matches[0])
+        role = fixture.get("role")
+        response_model = (
+            _S03ObservationResponse
+            if role == "planner"
+            else _specialist_smoke_model("section")
+            if role == "section"
+            else None
+        )
+        if response_model is None:
+            raise D5StaticPreflightError("reasoning-mode smoke role is invalid")
+        rendered = (
+            (_S03_SYSTEM_PROMPT, _s03_observation_prompt(fixture["request"], fixture["context"]))
+            if role == "planner"
+            else _specialist_observation_input(repo_root, fixture)
+        )
+        schema_digest = _sha256_json(response_model.model_json_schema())
+        fixture_digest = _sha256_json(fixture)
+        rendered_digest = _sha256_json(rendered)
+        request = fixture["request"]
+        request_digest = hashlib.sha256(request.encode("utf-8")).hexdigest()
+        from wellplot.agent.code_mode.obligations import compile_request_contract
+
+        compilation = compile_request_contract(request)
+        if (
+            authorization.planner_smoke_case_id != selected_id
+            or case_id not in {None, selected_id}
+            or authorization.planner_population
+            or authorization.planner_first_pass_max_output_tokens is not None
+            or authorization.planner_smoke_sdk_max_retries != 0
+            or authorization.sdk_max_retries != 0
+            or authorization.planner_smoke_source_inventory_sha256 != fixture_digest
+            or authorization.planner_smoke_benchmark_sha256 != rendered_digest
+            or authorization.planner_smoke_request_sha256 != request_digest
+            or authorization.planner_smoke_wire_schema_sha256 != schema_digest
+            or authorization.planner_smoke_harness_sha256 != _sha256_file(Path(__file__).resolve())
+            or compilation.status.value != fixture.get("compiler_status")
+            or compilation.requirements.dependencies
+        ):
+            raise D5StaticPreflightError("reasoning-mode smoke authority or fixture drifted")
+        return {
+            "case_id": selected_id,
+            "turn_id": selected_id,
+            "role": role,
+            "condition": "thinking_enabled",
+            "request": request,
+            "request_sha256": request_digest,
+            "benchmark_sha256": rendered_digest,
+            "source_inventory_sha256": fixture_digest,
+            "source_sha256": None,
+            "wire_schema_sha256": schema_digest,
+            "sdk_max_retries": 0,
+            "physical_attempt_limit": 1,
+            "h1_case": fixture,
+            **({"specialist_role": "section"} if role == "section" else {}),
         }
     if authorization.planner_smoke_mode in SPECIALIST_SMOKE_ROLES:
         role = SPECIALIST_SMOKE_ROLES[authorization.planner_smoke_mode]
@@ -1719,6 +1911,18 @@ def _specialist_observation_input(repo_root: Path, case: Mapping[str, Any]) -> t
     return manual.read_text(encoding="utf-8"), json.dumps(payload, ensure_ascii=False)
 
 
+def _reasoning_mode_observation_input(repo_root: Path, case: Mapping[str, Any]) -> tuple[str, str]:
+    """Render one frozen diagnostic cell through its existing canonical boundary."""
+    if case.get("role") == "planner":
+        return (
+            _S03_SYSTEM_PROMPT,
+            _s03_observation_prompt(str(case["request"]), case["context"]),
+        )
+    if case.get("role") == "section":
+        return _specialist_observation_input(repo_root, case)
+    raise D5StaticPreflightError("reasoning-mode cell has an unknown role")
+
+
 def _response_agent_observation_input(
     repo_root: Path,
     case: Mapping[str, Any],
@@ -1768,6 +1972,48 @@ def _load_planner_population(repo_root: Path, population: str) -> list[dict[str,
             cases = [
                 {**case, "turn_id": case["id"], "compiler_status": "NOT_INVOKED"} for case in cases
             ]
+        if population == REASONING_MODE_POPULATION:
+            identities = [_reasoning_mode_observation_input(repo_root, case) for case in cases]
+            if _sha256_json(identities) != REASONING_MODE_INPUTS_SHA256:
+                raise D5StaticPreflightError("reasoning-mode rendered input custody drifted")
+            seen_pairs: dict[str, list[dict[str, Any]]] = {}
+            for case in cases:
+                turn_id = case.get("turn_id")
+                role = case.get("role")
+                if (
+                    turn_id not in REASONING_MODE_ROLE_BY_TURN
+                    or REASONING_MODE_ROLE_BY_TURN[turn_id]
+                    != ("planner" if role == "planner" else "section_worker")
+                    or case.get("condition") not in {"thinking_enabled", "thinking_disabled"}
+                    or type(case.get("pair_order")) is not int
+                ):
+                    raise D5StaticPreflightError("reasoning-mode cell identity drifted")
+                compilation = compile_request_contract(str(case["request"]))
+                if compilation.status.value != case.get("compiler_status"):
+                    raise D5StaticPreflightError("reasoning-mode compiler disposition drifted")
+                if role == "planner" and (
+                    compilation.status.value
+                    not in {"NO_SUPPORTED_SEMANTICS", "EXTRACTION_COMPLETE"}
+                    or compilation.requirements.dependencies
+                ):
+                    raise D5StaticPreflightError("planner diagnostic request is not admissible")
+                seen_pairs.setdefault(str(case["pair_id"]), []).append(case)
+            if len(seen_pairs) != 6:
+                raise D5StaticPreflightError("reasoning-mode panel must contain six pairs")
+            for pair_rows in seen_pairs.values():
+                if len(pair_rows) != 2 or pair_rows[0]["pair_order"] == pair_rows[1]["pair_order"]:
+                    raise D5StaticPreflightError("reasoning-mode pair is incomplete")
+
+                def normalized(row: Mapping[str, Any]) -> dict[str, Any]:
+                    return {
+                        key: value
+                        for key, value in row.items()
+                        if key not in {"id", "turn_id", "condition", "pair_order"}
+                    }
+
+                if normalized(pair_rows[0]) != normalized(pair_rows[1]):
+                    raise D5StaticPreflightError("paired reasoning-mode inputs differ")
+            cases = [{**case, "turn_id": case["turn_id"]} for case in cases]
         if tuple(case["turn_id"] for case in cases) != ids:
             raise D5StaticPreflightError("H1 panel order drifted")
         return cases
@@ -1867,13 +2113,22 @@ def _default_planner_smoke_static_checks(
         raise D5StaticPreflightError("planner smoke Git top-level is not canonical")
     is_h1 = authorization.planner_smoke_mode in BOUNDED_SMOKE_MODES
     specialist = authorization.planner_smoke_mode in SPECIALIST_SMOKE_ROLES or (
-        authorization.planner_smoke_mode == RESPONSE_AGENT_SMOKE_MODE
+        authorization.planner_smoke_mode
+        in {RESPONSE_AGENT_SMOKE_MODE, REASONING_SECTION_SMOKE_MODE}
     )
     if not is_h1 and authorization.planner_smoke_mode != SMOKE_PLANNER_KIND:
         raise D5StaticPreflightError("planner-only smoke mode is not authorized")
-    expected = H1_EXPECTED_WORKTREE_PORCELAIN if is_h1 else A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN
-    if authorization.expected_worktree_porcelain != expected:
-        raise D5StaticPreflightError("planner smoke worktree allowlist is not the reviewed state")
+    if authorization.planner_smoke_mode in REASONING_MODE_SMOKE_IDS:
+        if _git_porcelain_raw(repo_root) != authorization.expected_worktree_porcelain:
+            raise D5StaticPreflightError("reasoning-mode smoke worktree differs from authority")
+    else:
+        expected = (
+            H1_EXPECTED_WORKTREE_PORCELAIN if is_h1 else A10_SEM_02_EXPECTED_WORKTREE_PORCELAIN
+        )
+        if authorization.expected_worktree_porcelain != expected:
+            raise D5StaticPreflightError(
+                "planner smoke worktree allowlist is not the reviewed state"
+            )
     case = _planner_smoke_case(repo_root, authorization, case_id=case_id)
     static = _default_smoke_static_checks(
         repo_root,
@@ -1883,7 +2138,7 @@ def _default_planner_smoke_static_checks(
         expected_schema_sha256=authorization.planner_smoke_wire_schema_sha256,
         mode=(
             authorization.planner_smoke_mode
-            if specialist
+            if specialist or authorization.planner_smoke_mode == REASONING_PLANNER_SMOKE_MODE
             else _OBSERVATION_SMOKE_PROFILES[authorization.planner_smoke_mode][3]
             if is_h1
             else "canonical_planner_only_smoke"
@@ -2199,6 +2454,8 @@ class D5SmokeCustody:
             else "canonical_live_smoke"
         )
         observation_role = SPECIALIST_SMOKE_ROLES.get(authorization.planner_smoke_mode)
+        if authorization.planner_smoke_mode == REASONING_SECTION_SMOKE_MODE:
+            observation_role = "section"
         if authorization.planner_smoke_mode == RESPONSE_AGENT_SMOKE_MODE:
             observation_role = "response_agent"
         ledger = D5SmokeCallLedger(
@@ -3556,6 +3813,7 @@ class D5LogicalCallLedger:
     planner_first_pass: bool = False
     specialist_first_pass: bool = False
     response_agent_first_pass: bool = False
+    reasoning_mode_first_pass: bool = False
 
     def begin_turn(self, turn_id: str) -> None:
         """Reset per-turn role accounting at the frozen turn boundary."""
@@ -3569,7 +3827,10 @@ class D5LogicalCallLedger:
         if self.active_turn_id is not None:
             used = self.turn_role_counts.get(role, 0)
             limit = 1 if role == "response_agent" else ROLE_LOGICAL_CALL_LIMITS[role]
-            if self.planner_first_pass:
+            if self.reasoning_mode_first_pass:
+                expected = REASONING_MODE_ROLE_BY_TURN.get(self.active_turn_id)
+                limit = int(role == expected)
+            elif self.planner_first_pass:
                 limit = 1 if role == "planner" else 0
             if self.specialist_first_pass:
                 expected = (
@@ -3641,9 +3902,20 @@ class D5LogicalCallLedger:
             row["metrics"] = {
                 key: value
                 for key, value in metrics.items()
-                if key in {"latency_ms", "input_tokens", "output_tokens", "total_tokens"}
-                and isinstance(value, (int, float))
-                and not isinstance(value, bool)
+                if key
+                in {
+                    "latency_ms",
+                    "input_tokens",
+                    "output_tokens",
+                    "total_tokens",
+                    "reasoning_tokens",
+                    "cached_input_tokens",
+                    "finish_reason",
+                }
+                and (
+                    (isinstance(value, (int, float)) and not isinstance(value, bool))
+                    or (key == "finish_reason" and isinstance(value, str))
+                )
             }
 
     def record_d4_event(self, event: Mapping[str, Any]) -> None:
@@ -3755,6 +4027,9 @@ class D5CampaignCustody:
                 specialist_first_pass=authorization.planner_population == SPECIALIST_POPULATION,
                 response_agent_first_pass=(
                     authorization.planner_population == RESPONSE_AGENT_POPULATION
+                ),
+                reasoning_mode_first_pass=(
+                    authorization.planner_population == REASONING_MODE_POPULATION
                 ),
             ),
             authorization_id=authorization.authorization_id,
@@ -4884,6 +5159,36 @@ class _ObservedLiveAdapter:
         """Bind model-I/O records to the current campaign turn."""
         self.observer.set_active_turn(turn_id)
 
+    def set_reasoning_mode_condition(self, case: Mapping[str, Any]) -> None:
+        """Switch only the frozen reasoning bit on the existing D5 provider."""
+        turn_id = str(case.get("turn_id", ""))
+        if (
+            self.planner_first_pass_max_output_tokens != 4096
+            or turn_id not in REASONING_MODE_ROLE_BY_TURN
+        ):
+            raise D5HarnessError("reasoning-mode case custody drifted")
+        expected_role = REASONING_MODE_ROLE_BY_TURN[turn_id]
+        if case.get("role") != ("planner" if expected_role == "planner" else "section"):
+            raise D5HarnessError("reasoning-mode role differs from frozen case")
+        condition = case.get("condition")
+        if condition not in {"thinking_enabled", "thinking_disabled"}:
+            raise D5HarnessError("reasoning-mode condition is invalid")
+        if len(self.inner.call_source.backends) != 1:
+            raise D5HarnessError("reasoning-mode provider topology changed")
+        counted = self.inner.call_source.backends[0]
+        from wellplot.agent.providers.openai_compat_v2 import OpenAICompatibleBackendV2
+
+        if not isinstance(counted.delegate, OpenAICompatibleBackendV2):
+            raise D5HarnessError("reasoning-mode provider implementation changed")
+        current = counted.delegate.request_options
+        if current not in (_thinking_mode_options(False), _thinking_mode_options(True)):
+            raise D5HarnessError("reasoning-mode request options drifted")
+        counted.delegate = replace(
+            counted.delegate,
+            request_options=_thinking_mode_options(condition == "thinking_enabled"),
+        )
+        counted.specialist_observation = expected_role == "section_worker"
+
     def bind_model_io(self, callback: Callable[[dict[str, Any]], None]) -> None:
         """Bind exact transport body capture to campaign custody."""
         self.observer.bind_model_io(callback)
@@ -4973,6 +5278,11 @@ class _ObservedLiveAdapter:
             return await self._observe_response_agent(case)
         if case["turn_id"] in SPECIALIST_TURN_IDS:
             return await self._observe_specialist(case)
+        if (
+            str(case.get("turn_id", "")) in REASONING_MODE_ROLE_BY_TURN
+            and case.get("role") == "section"
+        ):
+            return await self._observe_specialist(case)
         observation_population = next(
             (p for p in H1_POPULATIONS if case["turn_id"] in _h1_contract(p)[2]), None
         )
@@ -5002,6 +5312,8 @@ class _ObservedLiveAdapter:
         if not isinstance(planner, SemanticPlanner):
             raise D5HarnessError("canonical semantic planner is unavailable")
         self.set_active_turn(str(case["turn_id"]))
+        if observation_population == REASONING_MODE_POPULATION:
+            self.set_reasoning_mode_condition(case)
         self.enable_planner_only_boundary()
         source_evidence = {
             "source_asset_identity": context["source_asset_identity"],
@@ -5079,11 +5391,17 @@ class _ObservedLiveAdapter:
         from wellplot.agent.code_mode.typed_section_worker import CanonicalSectionWorker
 
         root = self.inner.repo_root
-        if (
-            self.planner_first_pass_max_output_tokens != 4096
-            or case not in _load_planner_population(root, SPECIALIST_POPULATION)
+        population = (
+            REASONING_MODE_POPULATION
+            if case.get("turn_id") in REASONING_MODE_ROLE_BY_TURN
+            else SPECIALIST_POPULATION
+        )
+        if self.planner_first_pass_max_output_tokens != 4096 or case not in (
+            _load_planner_population(root, population)
         ):
             raise D5HarnessError("specialist case custody drifted")
+        if population == REASONING_MODE_POPULATION:
+            self.set_reasoning_mode_condition(case)
         (backend,) = self.inner.call_source.backends
         if not backend.specialist_observation:
             raise D5HarnessError("specialist backend controls not bound")
@@ -6107,12 +6425,15 @@ def execute_live_planner_smoke(
         )
     else:
         case = _planner_smoke_case(repo_root, authorization, case_id=case_id)
-        if is_h1:
+        if is_h1 and authorization.planner_smoke_mode not in REASONING_MODE_SMOKE_IDS:
             if (
                 authorization.expected_worktree_porcelain != H1_EXPECTED_WORKTREE_PORCELAIN
                 or _git_porcelain_raw(repo_root) != H1_EXPECTED_WORKTREE_PORCELAIN
             ):
                 raise D5StaticPreflightError("H1 smoke worktree differs from its authority")
+        elif authorization.planner_smoke_mode in REASONING_MODE_SMOKE_IDS:
+            if _git_porcelain_raw(repo_root) != authorization.expected_worktree_porcelain:
+                raise D5StaticPreflightError("reasoning-mode smoke worktree differs from authority")
         else:
             _require_exact_planner_worktree(repo_root, authorization.expected_worktree_porcelain)
         static = static_checker(repo_root, authorization, paths)
@@ -6266,6 +6587,9 @@ def execute_live_planner_smoke(
     for event in trace_events:
         custody.record_planner_observability(event)
 
+    if authorization.planner_smoke_mode in REASONING_MODE_SMOKE_IDS:
+        adapter.set_reasoning_mode_condition(case)
+
     result, execution_error, cleanup_error = asyncio.run(
         _run_planner_only_and_close(
             adapter,
@@ -6330,9 +6654,11 @@ def execute_live_planner_smoke(
     elif specialist_role is not None:
         response_model = _specialist_smoke_model(specialist_role)
     elif is_h1:
-        response_model = _h1_contract(
-            _OBSERVATION_SMOKE_PROFILES[authorization.planner_smoke_mode][2]
-        )[4]
+        response_model = (
+            _S03ObservationResponse
+            if authorization.planner_smoke_mode == REASONING_PLANNER_SMOKE_MODE
+            else _h1_contract(_OBSERVATION_SMOKE_PROFILES[authorization.planner_smoke_mode][2])[4]
+        )
     wire_response = None if wire_capture is None else wire_capture.get("validated_response")
     if (
         result is not None
@@ -7138,6 +7464,16 @@ def _bounded_planner_observation_row(
         "source_format": None if is_h1 else case["source_format"],
         "source_sha256": None if is_h1 else case["source_sha256"],
         **({"compiler_status": case["compiler_status"]} if is_h1 else {}),
+        **(
+            {
+                "pair_id": case["pair_id"],
+                "condition": case["condition"],
+                "pair_order": case["pair_order"],
+                "generation_role": REASONING_MODE_ROLE_BY_TURN[case["turn_id"]],
+            }
+            if case.get("turn_id") in REASONING_MODE_ROLE_BY_TURN
+            else {}
+        ),
         "source_asset_identity": dict(source_identity),
         "benchmark_class": case.get("benchmark_class"),
         "benchmark_exposure": case.get("benchmark_exposure"),
@@ -7672,6 +8008,12 @@ class D5CampaignRunner:
             or not adapter.inner.call_source.backends[0].response_observation
         ):
             raise D5StaticPreflightError("response-agent campaign requires canonical HTTP custody")
+        if population == REASONING_MODE_POPULATION and (
+            not isinstance(adapter, _ObservedLiveAdapter)
+            or not adapter.observes_physical_attempts
+            or len(adapter.inner.call_source.backends) != 1
+        ):
+            raise D5StaticPreflightError("reasoning-mode campaign requires canonical D5 custody")
         if first_pass_cap != getattr(adapter, "planner_first_pass_max_output_tokens", None):
             raise D5StaticPreflightError("adapter first-pass controls differ from authority")
         if population == "d4":
@@ -8025,6 +8367,13 @@ def provider_free_preflight(
                 authorization.planner_smoke_harness_sha256,
                 "specialist D5 harness",
             )
+        elif population == REASONING_MODE_POPULATION:
+            role_limits = {"planner": 1, "report_worker": 0, "section_worker": 1}
+            _assert_hash(
+                Path(__file__).resolve(),
+                authorization.planner_smoke_harness_sha256,
+                "reasoning-mode D5 harness",
+            )
         elif population == RESPONSE_AGENT_POPULATION:
             role_limits = {
                 "planner": 0,
@@ -8078,6 +8427,7 @@ def provider_free_preflight(
                 S03_POPULATION: "s03_planner_observation",
                 SPECIALIST_POPULATION: "specialist_observation",
                 RESPONSE_AGENT_POPULATION: "response_agent_observation",
+                REASONING_MODE_POPULATION: "reasoning_mode_observation",
             }[population],
             expected_sdk_max_retries=0,
         )

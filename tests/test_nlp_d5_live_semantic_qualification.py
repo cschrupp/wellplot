@@ -464,7 +464,12 @@ def test_a10_campaign_uses_shared_runner_without_semantic_scoring(tmp_path: Path
             population=d5.A10_SEM_53_POPULATION,
         )
     )
-    assert result["decision"] == "PASS"
+    assert result["decision"] == "PASS", (
+        result["attribution"],
+        result["rows"],
+        result.get("terminal", {}).get("reason"),
+        runner.paths.journal.read_text(encoding="utf-8"),
+    )
     assert result["attribution"] == "OBSERVATION_COLLECTION"
     assert result["completed_turns"] == 53
     assert result["logical_generation_calls"] == 53
@@ -1193,6 +1198,12 @@ def test_first_pass_campaign_captures_one_response_per_case(
                 authorization,
                 planner_smoke_harness_sha256=d5._sha256_file(Path(d5.__file__)),
             )
+        if population == d5.REASONING_MODE_POPULATION:
+            accepted_prompt = d5.REASONING_MODE_PROMPT_BUNDLE_SHA256
+            authorization = replace(
+                authorization,
+                planner_smoke_harness_sha256=d5._sha256_file(Path(d5.__file__)),
+            )
         authorization = replace(
             authorization,
             planner_population=population,
@@ -1243,7 +1254,15 @@ def test_first_pass_campaign_captures_one_response_per_case(
         with pytest.raises(d5.D5CallCapExceeded):
             ledger.physical_attempt(index)
     paths = _paths(tmp_path, authorization.campaign_id)
-    full_count = 6 if is_s03 else 8 if is_h1b or is_specialist else 10
+    full_count = (
+        12
+        if population == d5.REASONING_MODE_POPULATION
+        else 6
+        if is_s03
+        else 8
+        if is_h1b or is_specialist
+        else 10
+    )
     clients = []
     requests = []
 
@@ -1274,6 +1293,28 @@ def test_first_pass_campaign_captures_one_response_per_case(
                 "decision": {"disposition": "unsupported", "explanation": "Test fixture."},
                 "rationale": "Mock first response.",
             }
+        if population == d5.REASONING_MODE_POPULATION:
+            if "tasks" in payload["response_format"]["json_schema"]["schema"]["properties"]:
+                response = {
+                    "tasks": [
+                        {
+                            "ref": "A",
+                            "worker": "section",
+                            "scope": "synthetic",
+                            "disposition": "requested",
+                            "outcome": "Mock observation task.",
+                            "intent": "informational",
+                        }
+                    ]
+                }
+            else:
+                response = {
+                    "decision": {
+                        "disposition": "clarification",
+                        "explanation": "Mock section observation.",
+                    },
+                    "rationale": "Mock first response.",
+                }
         if len(requests) == 1:
             response = {"version": "wellplot.semantic-plan.v2", "summary": "Invalid fixture."}
         return httpx.Response(
@@ -1348,18 +1389,28 @@ def test_first_pass_campaign_captures_one_response_per_case(
     )
     assert all(payload["max_tokens"] == 4096 for payload in requests)
     assert all("max_completion_tokens" not in payload for payload in requests)
-    assert all(
-        "required_action" not in payload["messages"][1]["content"]
-        if is_specialist
-        else payload["messages"][1]["content"].startswith("AVAILABLE SOURCE INVENTORIES:\n")
-        if is_s03
-        else (
-            payload["messages"][1]["content"].startswith("USER REQUEST:\n")
-            and ("\n\nINSPECTED CONTEXT:\n" if is_h1 else "\n\nPERMITTED CAPABILITIES:\n")
-            in payload["messages"][1]["content"]
+    if population == d5.REASONING_MODE_POPULATION:
+        rendered_pairs = [
+            d5._reasoning_mode_observation_input(REPO_ROOT, case)
+            for case in d5._load_planner_population(REPO_ROOT, population)
+        ]
+        assert len(requests) <= len(rendered_pairs)
+        for expected_pair, payload in zip(rendered_pairs[: len(requests)], requests, strict=True):
+            assert [message["content"] for message in payload["messages"]] == list(expected_pair)
+            assert "required_action" not in payload["messages"][1]["content"]
+    else:
+        assert all(
+            "required_action" not in payload["messages"][1]["content"]
+            if is_specialist
+            else payload["messages"][1]["content"].startswith("AVAILABLE SOURCE INVENTORIES:\n")
+            if is_s03
+            else (
+                payload["messages"][1]["content"].startswith("USER REQUEST:\n")
+                and ("\n\nINSPECTED CONTEXT:\n" if is_h1 else "\n\nPERMITTED CAPABILITIES:\n")
+                in payload["messages"][1]["content"]
+            )
+            for payload in requests
         )
-        for payload in requests
-    )
     assert all(
         "Schema correction context:" not in payload["messages"][1]["content"]
         for payload in requests
@@ -1461,6 +1512,29 @@ def test_first_pass_campaign_captures_one_response_per_case(
                     if case["turn_id"] in {"P02", "P03"}
                     else []
                 )
+        elif population == d5.REASONING_MODE_POPULATION:
+            cases = d5._load_planner_population(REPO_ROOT, population)
+            for payload, case, row in zip(requests, cases, rows, strict=True):
+                expected_system, expected_user = d5._reasoning_mode_observation_input(
+                    REPO_ROOT, case
+                )
+                assert payload["messages"] == [
+                    {"role": "system", "content": expected_system},
+                    {"role": "user", "content": expected_user},
+                ]
+                expected_response_model = (
+                    d5._S03ObservationResponse
+                    if case["role"] == "planner"
+                    else d5._specialist_smoke_model("section")
+                )
+                assert payload["response_format"]["json_schema"]["schema"] == (
+                    expected_response_model.model_json_schema()
+                )
+                assert payload["temperature"] == 0
+                assert payload["chat_template_kwargs"] == {
+                    "enable_thinking": case["condition"] == "thinking_enabled"
+                }
+                assert row["compiler_status"] == case["compiler_status"]
         elif is_h1:
             # Sealed H1-R1 HTTP JSON, canonicalized with only system content blanked.
             original_payloads = (
@@ -3896,6 +3970,399 @@ def test_live_adapter_rejects_thinking_control_override() -> None:
             require_thinking_control=True,
             request_options={"chat_template_kwargs": {"enable_thinking": True}},
         )
+
+
+def test_reasoning_mode_panel_runs_through_canonical_mock_campaign(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """The paired diagnostic uses only the existing D5 observation path."""
+    from openai import _base_client
+
+    monkeypatch.setattr(_base_client, "get_platform", lambda: "Linux")
+    cases = d5._load_planner_population(REPO_ROOT, d5.REASONING_MODE_POPULATION)
+    schema_bundle = d5._reasoning_mode_schema_bundle()
+    artifact_root = tmp_path / "reasoning-mode-campaign"
+    authorization = replace(
+        _authorization(
+            campaign_id="reasoning-mode-provider-free",
+            artifact_root=str(artifact_root),
+        ),
+        sdk_max_retries=0,
+        planner_population=d5.REASONING_MODE_POPULATION,
+        planner_population_benchmark_sha256=d5.REASONING_MODE_PANEL_SHA256,
+        planner_population_source_inventory_sha256=d5.REASONING_MODE_PANEL_SHA256,
+        planner_population_system_prompt_sha256=d5.REASONING_MODE_PROMPT_BUNDLE_SHA256,
+        planner_smoke_wire_schema_sha256=d5._sha256_json(schema_bundle.model_json_schema()),
+        planner_smoke_harness_sha256=d5._sha256_file(Path(d5.__file__).resolve()),
+        planner_first_pass_max_output_tokens=4096,
+        planner_first_pass_turn_ids=d5.REASONING_MODE_TURN_IDS,
+    )
+    requests: list[httpx.Request] = []
+    clients: list[httpx.AsyncClient] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        body = json.loads(request.content)
+        schema = body["response_format"]["json_schema"]["schema"]
+        if "tasks" in schema.get("properties", {}):
+            response = {
+                "tasks": []
+                if len(requests) == 2
+                else [
+                    {
+                        "ref": "A",
+                        "worker": "section",
+                        "scope": "acoustics",
+                        "disposition": "requested",
+                        "outcome": "Plot the requested inspected channel.",
+                        "intent": "authoring",
+                    }
+                ]
+            }
+        else:
+            response = {
+                "decision": {
+                    "disposition": "clarification",
+                    "explanation": "The next decision requires clarification.",
+                },
+                "rationale": "This is a provider-free structured observation.",
+            }
+        message = {"role": "assistant", "content": json.dumps(response)}
+        if body.get("chat_template_kwargs", {}).get("enable_thinking") is True:
+            message["reasoning_content"] = "Mock reasoning remains a separate field."
+        usage: dict[str, object] = {
+            "prompt_tokens": 17,
+            "completion_tokens": 9,
+            "total_tokens": 26,
+            "prompt_tokens_details": {"cached_tokens": 3},
+        }
+        if body.get("chat_template_kwargs", {}).get("enable_thinking") is True:
+            usage["completion_tokens_details"] = {"reasoning_tokens": 4}
+        return httpx.Response(
+            200,
+            request=request,
+            json={
+                "choices": [{"message": message, "finish_reason": "stop"}],
+                "usage": usage,
+            },
+        )
+
+    def client_factory(observer: object) -> httpx.AsyncClient:
+        client = httpx.AsyncClient(
+            transport=httpx.MockTransport(handler),
+            event_hooks={"request": [observer.on_request], "response": [observer.on_response]},
+        )
+        client._platform = "Linux"
+        clients.append(client)
+        return client
+
+    adapter = d5.create_live_adapter(
+        repo_root=REPO_ROOT,
+        artifact_root=artifact_root,
+        api_key="provider-free-test-token",
+        project_config=PROJECT_CONFIG,
+        request_options=d5._thinking_control_options(),
+        require_thinking_control=True,
+        max_retries_override=0,
+        logical_call_ceiling=12,
+        planner_first_pass_max_output_tokens=4096,
+        specialist_observation=False,
+        http_client_factory=client_factory,
+    )
+    readiness = _ready(live=False)
+    paths = d5.EvidencePaths(artifact_root, authorization.campaign_id)
+    runner = d5.D5CampaignRunner(
+        repo_root=REPO_ROOT,
+        authorization=authorization,
+        paths=paths,
+        readiness=readiness,
+        provenance=_provenance(),
+    )
+    try:
+        result = asyncio.run(
+            runner.run(
+                adapter,
+                mode="planner_only",
+                population=d5.REASONING_MODE_POPULATION,
+            )
+        )
+    finally:
+        asyncio.run(d5._close_binding_smoke_adapter(adapter))
+
+    assert result["decision"] == "PASS", (
+        result["attribution"],
+        result["rows"],
+        result.get("terminal", {}).get("reason"),
+        paths.journal.read_text(encoding="utf-8"),
+    )
+    assert result["completed_turns"] == 12
+    assert result["logical_generation_calls"] == 12
+    assert result["physical_generation_attempts"] == 12
+    assert [row["turn_id"] for row in result["rows"]] == list(d5.REASONING_MODE_TURN_IDS)
+    assert result["rows"][1]["observation_status"] == "MODEL_STRUCTURAL_FAILURE"
+    assert all(row["correction_usage"]["native_correction"] == 0 for row in result["rows"])
+    assert len(requests) == 12
+
+    request_bodies = [json.loads(request.content) for request in requests]
+    by_pair: dict[str, list[tuple[dict[str, object], str]]] = {}
+    for case, body in zip(cases, request_bodies, strict=True):
+        assert body["temperature"] == 0
+        assert body["max_tokens"] == 4096
+        assert body["chat_template_kwargs"] == {
+            "enable_thinking": case["condition"] == "thinking_enabled"
+        }
+        assert body["response_format"]["json_schema"]["name"] == (
+            "S03ObservationResponse"
+            if case["role"] == "planner"
+            else "SectionSpecialistObservation"
+        )
+        by_pair.setdefault(str(case["pair_id"]), []).append((body, str(case["condition"])))
+    for pair in by_pair.values():
+        assert len(pair) == 2
+        normalized = []
+        for body, _condition in pair:
+            body = dict(body)
+            body.pop("chat_template_kwargs")
+            normalized.append(body)
+        assert normalized[0] == normalized[1]
+
+    model_io = [
+        json.loads(line) for line in paths.model_io.read_text(encoding="utf-8").splitlines()
+    ]
+    raw_responses = [
+        row["response_json"] for row in model_io if row["event"] == "physical_response"
+    ]
+    enabled_responses = [
+        body for body in raw_responses if body["choices"][0]["message"].get("reasoning_content")
+    ]
+    assert enabled_responses
+    raw_by_turn = {
+        row["turn_id"]: row["response_json"]
+        for row in model_io
+        if row["event"] == "physical_response"
+    }
+    for case, row in zip(cases, result["rows"], strict=True):
+        raw = raw_by_turn[case["turn_id"]]
+        message = raw["choices"][0]["message"]
+        usage = raw["usage"]
+        assert usage["prompt_tokens"] == 17
+        assert usage["total_tokens"] == 26
+        assert usage["prompt_tokens_details"]["cached_tokens"] == 3
+        assert row["duration_seconds"] >= 0
+        if case["condition"] == "thinking_enabled":
+            assert message["reasoning_content"] == "Mock reasoning remains a separate field."
+            assert usage["completion_tokens_details"]["reasoning_tokens"] == 4
+        else:
+            assert "reasoning_content" not in message
+            assert "completion_tokens_details" not in usage
+    assert all(
+        "Mock reasoning" not in json.dumps(row.get("validated_response", {}))
+        for row in result["rows"]
+    )
+    assert all("usage" in response for response in raw_responses)
+    assert d5.verify_custody_artifacts(paths)
+    assert [hashlib.sha256(request.content).hexdigest() for request in requests] == [
+        "29c961910718481dc82b55baefd21e8983975a8b6c96eef08233ad207b6fd733",
+        "c698d47e9779e816537944b50c6da739738160f67ebd2757cf6d031b60f66a92",
+        "4b90838916610c27a59a3ccf69991d3c8af1ce2f46cca349ebbb9ed226f46b16",
+        "3b0f730778f7c894ae7c6bf739253a14a9fb652bbb3d0b33ac6eec3513500d70",
+        "8b9d4c35208930a8fc84390436ee859238220e045f806dcd4be0de40b3e77e7c",
+        "06af06d8016c0b49b6cb2680a8d4d8da1281eaeac548d9457a8dd93be398a6d7",
+        "b3c1bf24af7b8e9b2d63cb6fea7995572c263b1e8a3ed97a788808e0bc624f86",
+        "1f6ee45993d4ad31c6a0d3cc0236b69bc58eba1dc44d5aa69e2c1a35a70539b8",
+        "748696c3d9524c04b6a3b65bc68e43aa91f59305861144fbf0ed28d8bdf892e2",
+        "2cc99193bd86a4ef295d5c69b675f8d27c9741c2a461a36bac73c2750afadb4b",
+        "cadbcb64e6d7e2665c3419ee3ca721c4acc14326382126012527cd0ba74029a4",
+        "715ba36d7bceeabf9f1440d72c7a32045e32201b821fbac6ac5f040b0794ba2d",
+    ]
+
+
+def test_reasoning_mode_role_ledger_rejects_cross_role_call() -> None:
+    """A frozen pair cannot consume a generation under the other role."""
+    ledger = d5.D5LogicalCallLedger(
+        max_logical_calls=12,
+        max_physical_attempts=12,
+        reasoning_mode_first_pass=True,
+    )
+    ledger.begin_turn("RM-P1-OFF")
+    with pytest.raises(d5.D5CallCapExceeded):
+        ledger.reserve("section_worker")
+    assert ledger.logical_calls == 0
+
+
+@pytest.mark.parametrize(
+    ("mode", "fixture_id", "invalid"),
+    [
+        (d5.REASONING_PLANNER_SMOKE_MODE, "RM-PLANNER-SMOKE", False),
+        (d5.REASONING_PLANNER_SMOKE_MODE, "RM-PLANNER-SMOKE", True),
+        (d5.REASONING_SECTION_SMOKE_MODE, "RM-SECTION-SMOKE", False),
+        (d5.REASONING_SECTION_SMOKE_MODE, "RM-SECTION-SMOKE", True),
+    ],
+)
+def test_reasoning_mode_smoke_uses_role_schema_and_one_mock_call(
+    tmp_path: Path,
+    mode: str,
+    fixture_id: str,
+    invalid: bool,
+) -> None:
+    """Both role-specific smoke modes stop after one valid or invalid response."""
+    fixture_path = REPO_ROOT / d5.REASONING_MODE_SMOKE_FIXTURES_PATH
+    fixtures = json.loads(fixture_path.read_text(encoding="utf-8"))
+    fixture = next(item for item in fixtures if item["id"] == fixture_id)
+    role = str(fixture["role"])
+    rendered = d5._reasoning_mode_observation_input(REPO_ROOT, fixture)
+    response_model = (
+        d5._S03ObservationResponse if role == "planner" else d5._specialist_smoke_model("section")
+    )
+    artifact_root = tmp_path / f"{mode}-{'invalid' if invalid else 'valid'}"
+    campaign_id = f"{mode}-{'invalid' if invalid else 'valid'}"
+    authorization = replace(
+        _authorization(campaign_id=campaign_id, artifact_root=str(artifact_root)),
+        sdk_max_retries=0,
+        planner_smoke_mode=mode,
+        planner_smoke_case_id=fixture_id,
+        planner_smoke_request_sha256=hashlib.sha256(fixture["request"].encode("utf-8")).hexdigest(),
+        planner_smoke_benchmark_sha256=d5._sha256_json(rendered),
+        planner_smoke_source_inventory_sha256=d5._sha256_json(fixture),
+        planner_smoke_harness_sha256=d5._sha256_file(Path(d5.__file__).resolve()),
+        planner_smoke_wire_schema_sha256=d5._sha256_json(response_model.model_json_schema()),
+        planner_smoke_sdk_max_retries=0,
+        expected_worktree_porcelain=d5._git_porcelain_raw(REPO_ROOT),
+    )
+    requests: list[httpx.Request] = []
+    clients: list[httpx.AsyncClient] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if invalid:
+            content = "{}"
+        elif role == "planner":
+            content = json.dumps(
+                {
+                    "tasks": [
+                        {
+                            "ref": "A",
+                            "worker": "section",
+                            "scope": "thermal",
+                            "disposition": "requested",
+                            "outcome": "Report the inspected TEMP source unit.",
+                            "intent": "informational",
+                        }
+                    ]
+                }
+            )
+        else:
+            content = json.dumps(
+                {
+                    "decision": {
+                        "disposition": "clarification",
+                        "explanation": "This smoke response is a typed observation.",
+                    },
+                    "rationale": "The mock response exercises schema validation only.",
+                }
+            )
+        return httpx.Response(
+            200,
+            request=request,
+            json={
+                "choices": [
+                    {
+                        "message": {"role": "assistant", "content": content},
+                        "finish_reason": "stop",
+                    }
+                ],
+                "usage": {"prompt_tokens": 11, "completion_tokens": 7, "total_tokens": 18},
+            },
+        )
+
+    def provider_factory(
+        repo_root: Path,
+        artifact_root: Path,
+        api_key: str,
+        *,
+        max_retries_override: int | None = None,
+        trace_callback: Callable[[dict[str, Any]], None] | None = None,
+        **limits: object,
+    ) -> object:
+        def client_factory(observer: object) -> httpx.AsyncClient:
+            client = httpx.AsyncClient(
+                transport=httpx.MockTransport(handler),
+                event_hooks={
+                    "request": [observer.on_request],
+                    "response": [observer.on_response],
+                },
+            )
+            client._platform = "Linux"
+            clients.append(client)
+            return client
+
+        return d5.create_live_adapter(
+            repo_root=repo_root,
+            artifact_root=artifact_root,
+            api_key=api_key,
+            project_config=PROJECT_CONFIG,
+            request_options=authorization.thinking_control_options,
+            require_thinking_control=True,
+            max_retries_override=max_retries_override,
+            http_client_factory=client_factory,
+            trace_callback=trace_callback,
+            **limits,
+        )
+
+    def endpoint_get(url: str, token: str) -> object:
+        assert token == "provider-free-test-token"
+        return (
+            {"data": [{"id": d5.EXPECTED_MODEL}]}
+            if url == PROJECT_CONFIG.model_catalog_url
+            else _props()
+        )
+
+    try:
+        result = d5.execute_live_planner_smoke(
+            repo_root=REPO_ROOT,
+            authorization=authorization,
+            artifact_root=artifact_root,
+            endpoint_get=endpoint_get,
+            api_key_loader=lambda: "provider-free-test-token",
+            static_checker=lambda *_args: {"status": "PASS"},
+            provider_factory=provider_factory,
+        )
+    finally:
+        for client in clients:
+            asyncio.run(client.aclose())
+
+    assert len(requests) == 1
+    sent = json.loads(requests[0].content)
+    assert sent["chat_template_kwargs"] == {"enable_thinking": True}
+    assert sent["max_tokens"] == 4096
+    assert sent["temperature"] == 0
+    assert sent["response_format"]["json_schema"]["schema"] == response_model.model_json_schema()
+    assert hashlib.sha256(requests[0].content).hexdigest() == (
+        "c3d9f5971d9255e148ade98ab81ef79794ec5348dbee08433430ceedf76ac5a7"
+        if role == "planner"
+        else "a9af08eee7db575275854bccf0a76e1939afb6d60c1837c9268c7eb69a8c346c"
+    )
+    assert result["terminal"]["logical_generation_calls"] == 1
+    assert result["terminal"]["physical_generation_attempts"] == 1
+    assert result["terminal"]["outcome"] == ("SMOKE_CONTRACT_FAIL" if invalid else "SMOKE_PASS")
+    assert result["terminal"]["scientific_population_loaded"] is False
+    assert result["terminal"]["scientific_campaign_started"] is False
+    smoke_paths = d5.EvidencePaths(artifact_root, campaign_id)
+    state = json.loads(smoke_paths.state.read_text(encoding="utf-8"))
+    assert state["downstream_stage_calls"] == {
+        "report_worker": 0,
+        "section_worker": 0,
+        "reconciliation": 0,
+        "execution": 0,
+        "persistence": 0,
+        "render": 0,
+        "preview": 0,
+    }
+    assert d5.verify_smoke_observability(smoke_paths)["terminal_sha256"] == d5._sha256_file(
+        smoke_paths.terminal
+    )
+    assert result["status"] == ("SMOKE_CONTRACT_FAIL" if invalid else "SMOKE_PASS")
     with pytest.raises(d5.D5StaticPreflightError, match="request control is missing"):
         d5.create_live_adapter(
             repo_root=REPO_ROOT,
