@@ -40,6 +40,25 @@ pending shading objective in W08. Progression was not met. This does not
 change S03, integrated H2 or S05 dependencies. See the
 [scientific closeout](research/WELLPLOT_V2_SPECIALIST_CLOSEOUT.md).
 
+**Response-agent evidence (EMPIRICALLY_SUPPORTED):** SOL accepted collection
+for `wellplot-v2-response-agent-measured-20261127-001`: 6/6 typed-valid,
+truthful-status, fact-grounded and useful; 4/6 met the frozen completeness
+criterion; no fabricated facts or execution claims. Progression was not met.
+CR01 and CR04 were practically useful and truthful but omitted, respectively,
+explicit verification status and explicit no-edit-saved status. This is
+response-role evidence over frozen verified records, not production routing or
+integrated workflow evidence. See the
+[scientific closeout](research/WELLPLOT_V2_RESPONSE_AGENT_CLOSEOUT.md).
+
+**Early S06 consolidation (PROPOSAL FOR ARCHITECTURAL REVIEW):** retain the
+canonical engine and the useful isolated role contracts; adapt planner and
+section-specialist boundaries, and qualify host-owned source admission and
+objective lifecycle before integrated work. This does not close S06, satisfy
+the negative S03 progression result, or alter integrated H2/S05 dependencies.
+The [consolidation decision record](architecture/WELLPLOT_V2_S06_EARLY_CONSOLIDATION.md)
+also proposes, but does not authorize, a bounded paired reasoning-mode
+diagnostic.
+
 This baseline applies to:
 
 - `SemanticPlanner` and canonical report/section workers;
