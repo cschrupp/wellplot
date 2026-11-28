@@ -193,8 +193,10 @@ RESPONSE_AGENT_RUBRIC_SHA256 = "8f8c267f2941c26052ac59fec224135febb1e5d745f96f93
 RESPONSE_AGENT_SCHEMA_SHA256 = "7cfe35615916d50c78f293870b72d72538b8e71b91d54c6ada4dc14a469f74ea"
 REASONING_MODE_POPULATION = "reasoning-mode-development"
 REASONING_MODE_PANEL_PATH = "docs/research/WELLPLOT_V2_REASONING_MODE_PANEL.json"
-REASONING_MODE_PANEL_SHA256 = "b8293d3c2a7978c9fa566dc46c82ca98f52a9e07cb23983f3138e0f7eae59ac1"
-REASONING_MODE_INPUTS_SHA256 = "46a427e1454140dcc624513ada6f40f3870f915e9ff38affec5b7cf13623d550"
+REASONING_MODE_PANEL_SHA256 = "bbad629ff86201d924a04869acfe5dc87325eda3fe6bd2bbc634ce19fd5a8e1c"
+REASONING_MODE_INPUTS_SHA256 = "685ffac5090c90ceaeb421f84c7a78cb8516003fc7a8a141f07ad4f01e2262d0"
+REASONING_MODE_RUBRIC_PATH = "docs/research/WELLPLOT_V2_REASONING_MODE_RUBRIC.md"
+REASONING_MODE_RUBRIC_SHA256 = "a1ae9a052addd6ac09fb89046a42ea42a05ea540fbeccecbbfbd4605ecbd21a0"
 REASONING_MODE_PROMPT_BUNDLE_SHA256 = (
     "09f06538949bbb077472f2b5c05756923dcb65f0a3f2b5d917657857215a8330"
 )
@@ -2291,6 +2293,7 @@ class D5SmokeCallLedger:
     ] = "structured_ready"
     max_logical_calls: int = SMOKE_MAX_LOGICAL_CALLS
     max_physical_attempts: int = SMOKE_MAX_PHYSICAL_ATTEMPTS
+    one_shot_observation: bool = False
     logical_calls: int = 0
     physical_attempts: int = 0
     calls_by_role: dict[str, int] = field(default_factory=dict)
@@ -2300,6 +2303,14 @@ class D5SmokeCallLedger:
 
     def __post_init__(self) -> None:
         """Set the logical-call ceiling for the selected smoke mode."""
+        if self.one_shot_observation:
+            if self.mode != SMOKE_PLANNER_KIND or self.specialist_role not in {
+                None,
+                "section_worker",
+            }:
+                raise D5HarnessError("one-shot observation requires the planner smoke boundary")
+            self.max_logical_calls = self.max_physical_attempts = 1
+            return
         if self.specialist_role is not None:
             if self.mode != SMOKE_PLANNER_KIND or self.specialist_role not in {
                 "report_worker",
@@ -2379,7 +2390,9 @@ class D5SmokeCallLedger:
         if role is None:
             raise D5HarnessError("smoke physical attempt references unknown call")
         next_attempt = self.attempts_by_index[logical_index] + 1
-        if self.mode == SMOKE_PLANNER_KIND and self.specialist_role == "response_agent":
+        if self.one_shot_observation or (
+            self.mode == SMOKE_PLANNER_KIND and self.specialist_role == "response_agent"
+        ):
             limit = 1
         elif self.mode == SMOKE_PLANNER_KIND:
             limit = SMOKE_PLANNER_MAX_PHYSICAL_ATTEMPTS_PER_REQUEST
@@ -2460,6 +2473,7 @@ class D5SmokeCustody:
             observation_role = "response_agent"
         ledger = D5SmokeCallLedger(
             mode=ledger_mode,
+            one_shot_observation=(authorization.planner_smoke_mode in REASONING_MODE_SMOKE_IDS),
             specialist_role=(
                 None
                 if observation_role is None
@@ -2483,6 +2497,8 @@ class D5SmokeCustody:
             "physical_generation_attempts": 0,
             "provider_calls": 0,
             "model_calls": 0,
+            "logical_generation_call_limit": ledger.max_logical_calls,
+            "physical_generation_attempt_limit": ledger.max_physical_attempts,
             "scientific_population_loaded": False,
             "scientific_campaign_started": False,
             "readiness": readiness.as_dict(),
@@ -3253,8 +3269,14 @@ class D5SmokeCustody:
                 "physical_generation_attempts": self.ledger.physical_attempts,
                 "provider_calls": self.ledger.logical_calls,
                 "model_calls": self.ledger.logical_calls,
+                "logical_generation_call_limit": self.ledger.max_logical_calls,
+                "physical_generation_attempt_limit": self.ledger.max_physical_attempts,
             }
         )
+        if self.ledger.one_shot_observation and (
+            self.ledger.logical_calls > 1 or self.ledger.physical_attempts > 1
+        ):
+            raise D5HarnessError("one-shot reasoning smoke exceeded its custody call limits")
         if self.ledger.mode in {
             SMOKE_BINDING_KIND,
             SMOKE_PLANNER_KIND,
@@ -3309,6 +3331,8 @@ class D5SmokeCustody:
             "identity_endpoint_calls": endpoint_calls,
             "provider_calls": self.ledger.logical_calls,
             "model_calls": self.ledger.logical_calls,
+            "logical_generation_call_limit": self.ledger.max_logical_calls,
+            "physical_generation_attempt_limit": self.ledger.max_physical_attempts,
             "scientific_population_loaded": False,
             "scientific_campaign_started": False,
             "state_sha256": _sha256_file(self.paths.state),
@@ -5815,7 +5839,11 @@ def execute_live_campaign(
     runner_kwargs: dict[str, Any] = {"turn_ids": turn_ids, "mode": mode}
     if population != "d4":
         runner_kwargs["population"] = population
-    if population in {SPECIALIST_POPULATION, RESPONSE_AGENT_POPULATION}:
+    if population in {
+        SPECIALIST_POPULATION,
+        RESPONSE_AGENT_POPULATION,
+        REASONING_MODE_POPULATION,
+    }:
 
         async def run_observation_and_close() -> dict[str, Any]:
             try:
@@ -6475,6 +6503,9 @@ def execute_live_planner_smoke(
             if is_h1
             else {}
         )
+        if authorization.planner_smoke_mode in REASONING_MODE_SMOKE_IDS:
+            h1_limits["logical_call_ceiling"] = 1
+            h1_limits["planner_first_pass_max_output_tokens"] = 4096
         if specialist_role in SPECIALIST_SMOKE_ROLES.values():
             h1_limits["specialist_observation"] = True
         elif specialist_role == "response_agent":
@@ -8374,6 +8405,11 @@ def provider_free_preflight(
                 authorization.planner_smoke_harness_sha256,
                 "reasoning-mode D5 harness",
             )
+            _assert_hash(
+                repo_root / REASONING_MODE_RUBRIC_PATH,
+                REASONING_MODE_RUBRIC_SHA256,
+                "reasoning-mode scientific rubric",
+            )
         elif population == RESPONSE_AGENT_POPULATION:
             role_limits = {
                 "planner": 0,
@@ -8446,6 +8482,8 @@ def provider_free_preflight(
         static_facts["planner_population_system_prompt_sha256"] = (
             authorization.planner_population_system_prompt_sha256
         )
+    if population == REASONING_MODE_POPULATION:
+        static_facts["reasoning_mode_rubric_sha256"] = REASONING_MODE_RUBRIC_SHA256
     elif population == RESPONSE_AGENT_POPULATION:
         static_facts["response_agent_manual_sha256"] = (
             authorization.planner_population_system_prompt_sha256

@@ -3972,9 +3972,73 @@ def test_live_adapter_rejects_thinking_control_override() -> None:
         )
 
 
+def test_reasoning_mode_fixtures_preserve_corrected_failure_classes() -> None:
+    """Corrected paired fixtures test independent outcomes and supplied facts."""
+    panel_path = REPO_ROOT / d5.REASONING_MODE_PANEL_PATH
+    panel = json.loads(panel_path.read_text(encoding="utf-8"))
+    cases = {case["turn_id"]: case for case in panel}
+
+    assert [case["turn_id"] for case in panel] == list(d5.REASONING_MODE_TURN_IDS)
+    for first_id, second_id in (
+        ("RM-P1-OFF", "RM-P1-ON"),
+        ("RM-P2-ON", "RM-P2-OFF"),
+        ("RM-P3-OFF", "RM-P3-ON"),
+        ("RM-S1-ON", "RM-S1-OFF"),
+        ("RM-S2-OFF", "RM-S2-ON"),
+        ("RM-S3-ON", "RM-S3-OFF"),
+    ):
+        first = dict(cases[first_id])
+        second = dict(cases[second_id])
+        for field_name in ("id", "turn_id", "condition", "pair_order"):
+            first.pop(field_name, None)
+            second.pop(field_name, None)
+        assert first == second
+
+    p1 = cases["RM-P1-OFF"]
+    assert p1["request"] == (
+        "Plot the physical GR curve in Gamma. Also plot the physical DEN curve in Density."
+    )
+    assert len(p1["context"]["document"]["sections"]) == 2
+    assert {channel["mnemonic"] for channel in p1["context"]["sources"][0]["channels"]} == {
+        "GR",
+        "DEN",
+    }
+
+    s1 = cases["RM-S1-ON"]
+    assert s1["objective"] == (
+        "Add the requested physical SAL curve in Acoustics using the supplied "
+        "inspected source records."
+    )
+    assert "clarif" not in s1["objective"].lower()
+    assert "ambigu" not in s1["objective"].lower()
+    assert len(s1["sources"]) == 2
+    assert all(
+        source["inspection"] == "inspected"
+        and any(
+            channel["mnemonic"] == "SAL" and channel["addressable"]
+            for channel in source["channels"]
+        )
+        for source in s1["sources"]
+    )
+
+    s2 = cases["RM-S2-OFF"]
+    source_channels = {channel["mnemonic"] for channel in s2["sources"][0]["channels"]}
+    existing_channels = {
+        binding["channel"]
+        for section in s2["document"]["sections"]
+        for track in section["tracks"]
+        for binding in track["bindings"]
+    }
+    assert {"UPPER", "LOWER"} <= source_channels
+    assert "LOWER" in existing_channels
+    assert "blue between-curves shading" in s2["objective"]
+
+
+@pytest.mark.parametrize("interrupt_campaign", [False, True])
 def test_reasoning_mode_panel_runs_through_canonical_mock_campaign(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    interrupt_campaign: bool,
 ) -> None:
     """The paired diagnostic uses only the existing D5 observation path."""
     from openai import _base_client
@@ -4003,6 +4067,8 @@ def test_reasoning_mode_panel_runs_through_canonical_mock_campaign(
 
     async def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request)
+        if interrupt_campaign and len(requests) == 7:
+            raise httpx.ReadTimeout("synthetic campaign interruption", request=request)
         body = json.loads(request.content)
         schema = body["response_format"]["json_schema"]["schema"]
         if "tasks" in schema.get("properties", {}):
@@ -4057,56 +4123,80 @@ def test_reasoning_mode_panel_runs_through_canonical_mock_campaign(
         clients.append(client)
         return client
 
-    adapter = d5.create_live_adapter(
-        repo_root=REPO_ROOT,
-        artifact_root=artifact_root,
-        api_key="provider-free-test-token",
-        project_config=PROJECT_CONFIG,
-        request_options=d5._thinking_control_options(),
-        require_thinking_control=True,
-        max_retries_override=0,
-        logical_call_ceiling=12,
-        planner_first_pass_max_output_tokens=4096,
-        specialist_observation=False,
-        http_client_factory=client_factory,
+    def provider_factory(
+        repo_root: Path,
+        output_root: Path,
+        api_key: str,
+        **options: object,
+    ) -> object:
+        return d5.create_live_adapter(
+            repo_root=repo_root,
+            artifact_root=output_root,
+            api_key=api_key,
+            project_config=PROJECT_CONFIG,
+            request_options=d5._thinking_control_options(),
+            require_thinking_control=True,
+            max_retries_override=options.get("max_retries_override", 0),
+            logical_call_ceiling=12,
+            planner_first_pass_max_output_tokens=4096,
+            specialist_observation=False,
+            http_client_factory=client_factory,
+        )
+
+    def endpoint_get(url: str, token: str) -> object:
+        assert token == "provider-free-test-token"
+        return (
+            {"data": [{"id": d5.EXPECTED_MODEL}]}
+            if url == PROJECT_CONFIG.model_catalog_url
+            else _props()
+        )
+
+    static = d5.provider_free_preflight(
+        REPO_ROOT,
+        authorization,
+        d5.EvidencePaths(artifact_root, authorization.campaign_id),
+        static_checker=lambda *_args: {"status": "PASS"},
+        population=d5.REASONING_MODE_POPULATION,
     )
-    readiness = _ready(live=False)
-    paths = d5.EvidencePaths(artifact_root, authorization.campaign_id)
-    runner = d5.D5CampaignRunner(
+    assert static["static"]["reasoning_mode_rubric_sha256"] == (d5.REASONING_MODE_RUBRIC_SHA256)
+
+    result = d5.execute_live_campaign(
         repo_root=REPO_ROOT,
         authorization=authorization,
-        paths=paths,
-        readiness=readiness,
-        provenance=_provenance(),
+        artifact_root=artifact_root,
+        endpoint_get=endpoint_get,
+        api_key_loader=lambda: "provider-free-test-token",
+        static_checker=lambda *_args: {"status": "PASS"},
+        provider_factory=provider_factory,
+        mode="planner_only",
+        population=d5.REASONING_MODE_POPULATION,
     )
-    try:
-        result = asyncio.run(
-            runner.run(
-                adapter,
-                mode="planner_only",
-                population=d5.REASONING_MODE_POPULATION,
-            )
-        )
-    finally:
-        asyncio.run(d5._close_binding_smoke_adapter(adapter))
 
-    assert result["decision"] == "PASS", (
-        result["attribution"],
-        result["rows"],
-        result.get("terminal", {}).get("reason"),
-        paths.journal.read_text(encoding="utf-8"),
-    )
-    assert result["completed_turns"] == 12
-    assert result["logical_generation_calls"] == 12
-    assert result["physical_generation_attempts"] == 12
-    assert [row["turn_id"] for row in result["rows"]] == list(d5.REASONING_MODE_TURN_IDS)
-    assert result["rows"][1]["observation_status"] == "MODEL_STRUCTURAL_FAILURE"
-    assert all(row["correction_usage"]["native_correction"] == 0 for row in result["rows"])
-    assert len(requests) == 12
+    paths = d5.EvidencePaths(artifact_root, authorization.campaign_id)
+    expected_calls = 7 if interrupt_campaign else 12
+    if interrupt_campaign:
+        assert result["decision"] == "INCONCLUSIVE", result
+        assert result["logical_generation_calls"] == expected_calls
+        assert result["physical_generation_attempts"] == expected_calls
+    else:
+        assert result["decision"] == "PASS", (
+            result["attribution"],
+            result["rows"],
+            result.get("terminal", {}).get("reason"),
+            paths.journal.read_text(encoding="utf-8"),
+        )
+        assert result["completed_turns"] == 12
+        assert result["logical_generation_calls"] == 12
+        assert result["physical_generation_attempts"] == 12
+        assert [row["turn_id"] for row in result["rows"]] == list(d5.REASONING_MODE_TURN_IDS)
+        assert result["rows"][1]["observation_status"] == "MODEL_STRUCTURAL_FAILURE"
+        assert all(row["correction_usage"]["native_correction"] == 0 for row in result["rows"])
+    assert len(requests) == expected_calls
+    assert all(client.is_closed for client in clients)
 
     request_bodies = [json.loads(request.content) for request in requests]
     by_pair: dict[str, list[tuple[dict[str, object], str]]] = {}
-    for case, body in zip(cases, request_bodies, strict=True):
+    for case, body in zip(cases[:expected_calls], request_bodies, strict=True):
         assert body["temperature"] == 0
         assert body["max_tokens"] == 4096
         assert body["chat_template_kwargs"] == {
@@ -4119,7 +4209,9 @@ def test_reasoning_mode_panel_runs_through_canonical_mock_campaign(
         )
         by_pair.setdefault(str(case["pair_id"]), []).append((body, str(case["condition"])))
     for pair in by_pair.values():
-        assert len(pair) == 2
+        if len(pair) != 2:
+            assert interrupt_campaign and len(pair) == 1
+            continue
         normalized = []
         for body, _condition in pair:
             body = dict(body)
@@ -4142,7 +4234,10 @@ def test_reasoning_mode_panel_runs_through_canonical_mock_campaign(
         for row in model_io
         if row["event"] == "physical_response"
     }
-    for case, row in zip(cases, result["rows"], strict=True):
+    for case, row in zip(cases[: len(result["rows"])], result["rows"], strict=True):
+        if case["turn_id"] not in raw_by_turn:
+            assert interrupt_campaign
+            continue
         raw = raw_by_turn[case["turn_id"]]
         message = raw["choices"][0]["message"]
         usage = raw["usage"]
@@ -4162,20 +4257,23 @@ def test_reasoning_mode_panel_runs_through_canonical_mock_campaign(
     )
     assert all("usage" in response for response in raw_responses)
     assert d5.verify_custody_artifacts(paths)
-    assert [hashlib.sha256(request.content).hexdigest() for request in requests] == [
-        "29c961910718481dc82b55baefd21e8983975a8b6c96eef08233ad207b6fd733",
-        "c698d47e9779e816537944b50c6da739738160f67ebd2757cf6d031b60f66a92",
+    expected_request_hashes = [
+        "fbaa832ab30982ae9cdd05ac2094009d4fcaa066e9e5483a9ba76b7d033fd4b8",
+        "c48d9ea1f3cd9df03aa413b49dfccc6d1f6ad66cd1ee85a8bf21d6b27a8dc471",
         "4b90838916610c27a59a3ccf69991d3c8af1ce2f46cca349ebbb9ed226f46b16",
         "3b0f730778f7c894ae7c6bf739253a14a9fb652bbb3d0b33ac6eec3513500d70",
         "8b9d4c35208930a8fc84390436ee859238220e045f806dcd4be0de40b3e77e7c",
         "06af06d8016c0b49b6cb2680a8d4d8da1281eaeac548d9457a8dd93be398a6d7",
-        "b3c1bf24af7b8e9b2d63cb6fea7995572c263b1e8a3ed97a788808e0bc624f86",
-        "1f6ee45993d4ad31c6a0d3cc0236b69bc58eba1dc44d5aa69e2c1a35a70539b8",
-        "748696c3d9524c04b6a3b65bc68e43aa91f59305861144fbf0ed28d8bdf892e2",
-        "2cc99193bd86a4ef295d5c69b675f8d27c9741c2a461a36bac73c2750afadb4b",
+        "9a1fb32f7278ec43d9c9d96565bd0c9a573566cce565228ba03006faf02119fb",
+        "cd44e57faf863caba89b8a4cd978722097067ece06b41ddc046ca8c599d35f74",
+        "c1340ab7f6bcf72e55d5b741918adc70638de771fdfd528dfac0ee6156c97907",
+        "cdbb07185344a7fa83a83835e2489127b5edc814c61cb758028156c8c25a1664",
         "cadbcb64e6d7e2665c3419ee3ca721c4acc14326382126012527cd0ba74029a4",
         "715ba36d7bceeabf9f1440d72c7a32045e32201b821fbac6ac5f040b0794ba2d",
     ]
+    assert [hashlib.sha256(request.content).hexdigest() for request in requests] == (
+        expected_request_hashes[:expected_calls]
+    )
 
 
 def test_reasoning_mode_role_ledger_rejects_cross_role_call() -> None:
@@ -4332,7 +4430,11 @@ def test_reasoning_mode_smoke_uses_role_schema_and_one_mock_call(
         for client in clients:
             asyncio.run(client.aclose())
 
-    assert len(requests) == 1
+    assert len(requests) == 1, (
+        result.get("status"),
+        result.get("terminal", {}).get("reason"),
+        result.get("readiness"),
+    )
     sent = json.loads(requests[0].content)
     assert sent["chat_template_kwargs"] == {"enable_thinking": True}
     assert sent["max_tokens"] == 4096
@@ -4345,11 +4447,15 @@ def test_reasoning_mode_smoke_uses_role_schema_and_one_mock_call(
     )
     assert result["terminal"]["logical_generation_calls"] == 1
     assert result["terminal"]["physical_generation_attempts"] == 1
+    assert result["terminal"]["logical_generation_call_limit"] == 1
+    assert result["terminal"]["physical_generation_attempt_limit"] == 1
     assert result["terminal"]["outcome"] == ("SMOKE_CONTRACT_FAIL" if invalid else "SMOKE_PASS")
     assert result["terminal"]["scientific_population_loaded"] is False
     assert result["terminal"]["scientific_campaign_started"] is False
     smoke_paths = d5.EvidencePaths(artifact_root, campaign_id)
     state = json.loads(smoke_paths.state.read_text(encoding="utf-8"))
+    assert state["logical_generation_call_limit"] == 1
+    assert state["physical_generation_attempt_limit"] == 1
     assert state["downstream_stage_calls"] == {
         "report_worker": 0,
         "section_worker": 0,
@@ -4372,6 +4478,25 @@ def test_reasoning_mode_smoke_uses_role_schema_and_one_mock_call(
             require_thinking_control=True,
             request_options=None,
         )
+
+
+@pytest.mark.parametrize("role", [None, "section_worker"])
+def test_reasoning_mode_smoke_custody_ledger_enforces_one_call_and_attempt(
+    role: str | None,
+) -> None:
+    """The reasoning smoke's D5 ledger rejects a second call before delegation."""
+    ledger = d5.D5SmokeCallLedger(
+        mode=d5.SMOKE_PLANNER_KIND,
+        one_shot_observation=True,
+        specialist_role=role,
+    )
+    generation_role = role or "planner"
+    ledger.record_canonical_call_started(1, generation_role)
+    assert ledger.physical_attempt(1) == 1
+    with pytest.raises(d5.D5CallCapExceeded):
+        ledger.record_canonical_call_started(2, generation_role)
+    with pytest.raises(d5.D5CallCapExceeded):
+        ledger.physical_attempt(1)
 
 
 def test_real_live_transport_physical_ceiling_fails_closed(

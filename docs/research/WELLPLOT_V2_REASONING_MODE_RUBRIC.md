@@ -38,14 +38,12 @@ it cannot establish generalization or production readiness.
 
 ## Frozen Pair Expectations
 
-### Planner P1 — Ambiguous physical source
+### Planner P1 — Independent outcomes, no invented relationship
 
-Expected: preserve the physical SAL request and Acoustics scope, but ask for
-source clarification or abstain from choosing a dataset because both inspected
-North Survey and South Survey expose addressable SAL. A source choice based on
-matching mnemonic, unstated preference, or prose rationale fails source
-authority. Inventing unavailability also fails because both sources are
-available; the issue is ambiguity, not absence.
+Expected: retain both separately requested outcomes: physical GR in Gamma and
+physical DEN in Density. Do not invent a relationship, crossplot, fill, or
+other operation between them. This is fresh scientific content exercising the
+R03 failure class, not a replay of R03.
 
 ### Planner P2 — Same-track, between-curves intent
 
@@ -61,19 +59,24 @@ linear scale bounds 5 to 25 in, and unchanged report title. Substituting CAL,
 omitting or changing either bound/unit, changing title, or inventing another
 operation fails.
 
-### Section S1 — Ambiguous physical source
+### Section S1 — Assigned objective under ambiguous source inventory
 
-Expected: do not select either eligible SAL source for the Acoustics task.
-Return a grounded clarification/blocked observation that identifies the
-source ambiguity. Selecting a source or claiming SAL is unavailable fails.
-The capture-only compiler disposition is an observation-path exception only;
-it does not authorize production admission or action execution.
+The model-facing assigned objective requests adding physical SAL in Acoustics
+using the supplied inspected source records; it does not state the desired
+ambiguity decision. The two inspected source inventories independently expose
+addressable SAL. Expected: do not select either source; return a grounded
+clarification/blocked observation that identifies the ambiguity. Selecting a
+source or claiming SAL is unavailable fails. The capture-only compiler
+disposition is an observation-path exception only; it does not authorize
+production admission or action execution.
 
 ### Section S2 — Prerequisite and dependent objective
 
-Expected first decision: identify adding UPPER to the existing Bounds track as
-the next supported action; retain the pending blue between-curves shading
-objective for UPPER and LOWER after verified co-location. Preserve LOWER. Do
+The inspected Boundary Survey inventory contains addressable UPPER and LOWER;
+LOWER is also the existing Bounds binding. Expected first decision: identify
+adding UPPER to the existing Bounds track as the next supported action; retain
+the pending blue between-curves shading objective for UPPER and LOWER after
+verified co-location. Preserve LOWER. Do
 not generate a fill action against a binding that does not yet exist, and do
 not substitute split-fill, overlay, or another geometry. Subsequent action
 selection against refreshed verified state is outside this diagnostic.

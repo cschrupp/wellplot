@@ -6,19 +6,19 @@
     "condition": "thinking_disabled",
     "pair_order": 1,
     "role": "planner",
-    "request": "Plot the physical SAL curve in Acoustics. Do not choose between eligible source datasets if more than one contains SAL.",
+    "request": "Plot the physical GR curve in Gamma. Also plot the physical DEN curve in Density.",
     "compiler_status": "NO_SUPPORTED_SEMANTICS",
     "context": {
       "document": {
-        "name": "Two-Well Review",
-        "title": "Two-Well Review",
+        "name": "Facies Check",
+        "title": "Facies Check",
         "sections": [
-          {"id": "acoustics", "title": "Acoustics", "tracks": [{"id": "acoustics-track", "title": "Acoustics", "kind": "normal", "width_mm": 30, "bindings": []}]}
+          {"id": "gamma", "title": "Gamma", "tracks": [{"id": "gamma-track", "title": "Gamma", "kind": "normal", "width_mm": 30, "bindings": []}]},
+          {"id": "density", "title": "Density", "tracks": [{"id": "density-track", "title": "Density", "kind": "normal", "width_mm": 30, "bindings": []}]}
         ]
       },
       "sources": [
-        {"id": "north-sal", "name": "North Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "SAL", "measurement": "sonic amplitude log", "unit": "mV", "kind": "scalar", "addressable": true}]},
-        {"id": "south-sal", "name": "South Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "SAL", "measurement": "sonic amplitude log", "unit": "mV", "kind": "scalar", "addressable": true}]}
+        {"id": "facies-source", "name": "Facies Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "GR", "measurement": "gamma ray", "unit": "gAPI", "kind": "scalar", "addressable": true}, {"mnemonic": "DEN", "measurement": "bulk density", "unit": "g/cm3", "kind": "scalar", "addressable": true}]}
       ],
       "dialogue": [],
       "workflow": {"verified_results": [], "pending": []}
@@ -31,19 +31,19 @@
     "condition": "thinking_enabled",
     "pair_order": 2,
     "role": "planner",
-    "request": "Plot the physical SAL curve in Acoustics. Do not choose between eligible source datasets if more than one contains SAL.",
+    "request": "Plot the physical GR curve in Gamma. Also plot the physical DEN curve in Density.",
     "compiler_status": "NO_SUPPORTED_SEMANTICS",
     "context": {
       "document": {
-        "name": "Two-Well Review",
-        "title": "Two-Well Review",
+        "name": "Facies Check",
+        "title": "Facies Check",
         "sections": [
-          {"id": "acoustics", "title": "Acoustics", "tracks": [{"id": "acoustics-track", "title": "Acoustics", "kind": "normal", "width_mm": 30, "bindings": []}]}
+          {"id": "gamma", "title": "Gamma", "tracks": [{"id": "gamma-track", "title": "Gamma", "kind": "normal", "width_mm": 30, "bindings": []}]},
+          {"id": "density", "title": "Density", "tracks": [{"id": "density-track", "title": "Density", "kind": "normal", "width_mm": 30, "bindings": []}]}
         ]
       },
       "sources": [
-        {"id": "north-sal", "name": "North Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "SAL", "measurement": "sonic amplitude log", "unit": "mV", "kind": "scalar", "addressable": true}]},
-        {"id": "south-sal", "name": "South Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "SAL", "measurement": "sonic amplitude log", "unit": "mV", "kind": "scalar", "addressable": true}]}
+        {"id": "facies-source", "name": "Facies Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "GR", "measurement": "gamma ray", "unit": "gAPI", "kind": "scalar", "addressable": true}, {"mnemonic": "DEN", "measurement": "bulk density", "unit": "g/cm3", "kind": "scalar", "addressable": true}]}
       ],
       "dialogue": [],
       "workflow": {"verified_results": [], "pending": []}
@@ -122,7 +122,7 @@
     "role": "section",
     "compiler_status": "COVERAGE_FAILURE",
     "request": "Add the physical SAL curve to the Acoustics track.",
-    "objective": "Plot physical SAL in the Acoustics section without choosing between eligible source datasets.",
+    "objective": "Add the requested physical SAL curve in Acoustics using the supplied inspected source records.",
     "scope": "acoustics",
     "document": {"name": "Source Review", "title": "Source Review", "sections": [{"id": "acoustics", "title": "Acoustics", "tracks": [{"id": "acoustics-track", "title": "Acoustics", "kind": "normal", "width_mm": 30, "bindings": []}]}]},
     "sources": [{"id": "north-sal", "name": "North Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "SAL", "measurement": "sonic amplitude log", "unit": "mV", "kind": "scalar", "addressable": true}]}, {"id": "south-sal", "name": "South Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "SAL", "measurement": "sonic amplitude log", "unit": "mV", "kind": "scalar", "addressable": true}]}],
@@ -138,7 +138,7 @@
     "role": "section",
     "compiler_status": "COVERAGE_FAILURE",
     "request": "Add the physical SAL curve to the Acoustics track.",
-    "objective": "Plot physical SAL in the Acoustics section without choosing between eligible source datasets.",
+    "objective": "Add the requested physical SAL curve in Acoustics using the supplied inspected source records.",
     "scope": "acoustics",
     "document": {"name": "Source Review", "title": "Source Review", "sections": [{"id": "acoustics", "title": "Acoustics", "tracks": [{"id": "acoustics-track", "title": "Acoustics", "kind": "normal", "width_mm": 30, "bindings": []}]}]},
     "sources": [{"id": "north-sal", "name": "North Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "SAL", "measurement": "sonic amplitude log", "unit": "mV", "kind": "scalar", "addressable": true}]}, {"id": "south-sal", "name": "South Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "SAL", "measurement": "sonic amplitude log", "unit": "mV", "kind": "scalar", "addressable": true}]}],
@@ -157,7 +157,7 @@
     "objective": "First add UPPER to Bounds; retain the dependent blue between-curves shading objective for UPPER and LOWER after verified co-location.",
     "scope": "bounds",
     "document": {"name": "Boundary Review", "title": "Boundary Review", "sections": [{"id": "bounds", "title": "Bounds", "tracks": [{"id": "bounds-track", "title": "Bounds", "kind": "normal", "width_mm": 30, "bindings": [{"kind": "curve", "binding_id": "lower-binding", "channel": "LOWER", "label": "LOWER", "scale": {"kind": "linear", "minimum": 0, "maximum": 1, "unit": "m"}}]}]}]},
-    "sources": [{"id": "boundary-source", "name": "Boundary Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "UPPER", "measurement": "upper boundary", "unit": "m", "kind": "scalar", "addressable": true}]}],
+    "sources": [{"id": "boundary-source", "name": "Boundary Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "UPPER", "measurement": "upper boundary", "unit": "m", "kind": "scalar", "addressable": true}, {"mnemonic": "LOWER", "measurement": "lower boundary", "unit": "m", "kind": "scalar", "addressable": true}]}],
     "dialogue": [],
     "workflow": {"pending": [], "verified_results": []}
   },
@@ -173,7 +173,7 @@
     "objective": "First add UPPER to Bounds; retain the dependent blue between-curves shading objective for UPPER and LOWER after verified co-location.",
     "scope": "bounds",
     "document": {"name": "Boundary Review", "title": "Boundary Review", "sections": [{"id": "bounds", "title": "Bounds", "tracks": [{"id": "bounds-track", "title": "Bounds", "kind": "normal", "width_mm": 30, "bindings": [{"kind": "curve", "binding_id": "lower-binding", "channel": "LOWER", "label": "LOWER", "scale": {"kind": "linear", "minimum": 0, "maximum": 1, "unit": "m"}}]}]}]},
-    "sources": [{"id": "boundary-source", "name": "Boundary Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "UPPER", "measurement": "upper boundary", "unit": "m", "kind": "scalar", "addressable": true}]}],
+    "sources": [{"id": "boundary-source", "name": "Boundary Survey", "inspection": "inspected", "complete": true, "channels": [{"mnemonic": "UPPER", "measurement": "upper boundary", "unit": "m", "kind": "scalar", "addressable": true}, {"mnemonic": "LOWER", "measurement": "lower boundary", "unit": "m", "kind": "scalar", "addressable": true}]}],
     "dialogue": [],
     "workflow": {"pending": [], "verified_results": []}
   },
