@@ -1,0 +1,89 @@
+{
+  "descriptor_type": "wellplot-live-authority-proposal-bundle",
+  "descriptor_status": "PROPOSED_NOT_AUTHORIZED",
+  "execution_eligible": false,
+  "authority_decisions": "NOT_GRANTED",
+  "implementation_checkpoint": "9898823e3d367e73061f7668e883e053f63f93b4",
+  "project_config_fingerprint_sha256": "14357a627f060572e73a822ab9efe9ed3a6cca6727b7247361a2a5adfa5bd498",
+  "harness": {
+    "path": "scripts/nlp_d5_live_semantic_qualification.py",
+    "sha256": "f77e08e44eb9516f043e5d716da51b178521e31af2d65b835e5665866aefcd88",
+    "launcher": "scripts/run_d5_live_campaign.sh",
+    "launcher_sha256": "008a85671ebe5c76c987baceee23e6ad76d28cd88a43b4c0f40e1ad8076defb7"
+  },
+  "runtime": {
+    "model": "qwen3.6-35b-a3b",
+    "identity_status": "PENDING_APPROVED_NON_GENERATIVE_LAN_READINESS",
+    "runtime_build": "NOT_REVERIFIED",
+    "chat_template_sha256": "NOT_REVERIFIED",
+    "runtime_defaults_sha256": "NOT_REVERIFIED"
+  },
+  "rubric_sha256": "b44e72d04a0498f59b587d7379fc230219b467d7a0d3599ee2860c459dc643eb",
+  "shared_controls": {
+    "temperature": 0,
+    "sampling_controls": "UNCHANGED_FROM_ACCEPTED_D5_CONFIGURATION",
+    "thinking_enabled": true,
+    "chat_template_kwargs": {"enable_thinking": true},
+    "maximum_output_tokens": 4096,
+    "logical_generations_max": 1,
+    "physical_attempts_max": 1,
+    "sdk_retries": 0,
+    "native_corrections": 0,
+    "measured_population_loading": false,
+    "worker_dispatch": false,
+    "lowering_or_intent_conversion": false,
+    "mutation_or_publication": false,
+    "authority_granted": false
+  },
+  "smokes": [
+    {
+      "authority_id": "HA-WELLPLOT-V2-REASONING-PLANNER-SMOKE-001-PROPOSED",
+      "campaign_id": "wellplot-v2-reasoning-planner-smoke-20261127-001-proposed",
+      "mode": "reasoning_planner_smoke",
+      "population": "reasoning-mode-development",
+      "case_id": "RM-PLANNER-SMOKE",
+      "role": "planner",
+      "fixture_file": "docs/research/WELLPLOT_V2_REASONING_MODE_SMOKES.json",
+      "fixture_file_sha256": "7a24d26142c24409e3c37c7a741edad4b0c881801933b043b54776dc9a69dde3",
+      "fixture_object_sha256": "caf954398686fedf4e19998000f6ac5ba0edd77ff08ee80aea4a2cbc58212b94",
+      "compiler_disposition": "NO_SUPPORTED_SEMANTICS",
+      "request_sha256": "ea1c4a98d9784f39c93130a36b0a3a871039224c6661e5d309ff26cbae1509c0",
+      "rendered_input_sha256": "0f2e3b140782d13821bc944cfeeebfb7b1621ab8775eefcdfbb3cb6cc2e935f2",
+      "prompt_sha256": "807797c9e776c47cd980e7423686c0bec5e4b8dd194a50b8b2d9c4e9218fadca",
+      "schema_sha256": "8fe2dffed215069f2ec28672c218db45b405efa059b3c5aacf2356b515d582c0",
+      "mock_sdk_request_body_sha256": "c3d9f5971d9255e148ade98ab81ef79794ec5348dbee08433430ceedf76ac5a7",
+      "exact_runtime_input_tokens": "PENDING_NON_GENERATIVE_TOKENIZATION",
+      "campaign_static_preflight": "PENDING_FINAL_CHECKPOINT_AND_WORKTREE_BINDING",
+      "canonical_invocation": "scripts/run_d5_live_campaign.sh planner-smoke reasoning-mode-development AUTH_JSON"
+    },
+    {
+      "authority_id": "HA-WELLPLOT-V2-REASONING-SECTION-SMOKE-001-PROPOSED",
+      "campaign_id": "wellplot-v2-reasoning-section-smoke-20261127-001-proposed",
+      "mode": "reasoning_section_smoke",
+      "population": "reasoning-mode-development",
+      "case_id": "RM-SECTION-SMOKE",
+      "role": "section_worker",
+      "fixture_file": "docs/research/WELLPLOT_V2_REASONING_MODE_SMOKES.json",
+      "fixture_file_sha256": "7a24d26142c24409e3c37c7a741edad4b0c881801933b043b54776dc9a69dde3",
+      "fixture_object_sha256": "619dec251e12166648e3fe1041a91a96e82159634228b163895ed22baf56fcb6",
+      "compiler_disposition": "NO_SUPPORTED_SEMANTICS",
+      "request_sha256": "bc41989941c26a6d0ea3aea32b95c6c35a1559087b9095f8a0ad3d7dcf92b9f3",
+      "rendered_input_sha256": "bb776a47caf9a4477b5bf4b63ac55b26ba74ac9b149ca434fb089e592d453368",
+      "prompt_sha256": "f2522ae3d1191eb6db265af04c230e93d7f71a03b3194027e334d69a724088e0",
+      "schema_sha256": "ac2928f97643f08becb002a5229a950ecbfa6adae62140bb40d39c5ae1e401a1",
+      "mock_sdk_request_body_sha256": "a9af08eee7db575275854bccf0a76e1939afb6d60c1837c9268c7eb69a8c346c",
+      "exact_runtime_input_tokens": "PENDING_NON_GENERATIVE_TOKENIZATION",
+      "campaign_static_preflight": "PENDING_FINAL_CHECKPOINT_AND_WORKTREE_BINDING",
+      "canonical_invocation": "scripts/run_d5_live_campaign.sh planner-smoke reasoning-mode-development AUTH_JSON"
+    }
+  ],
+  "required_before_execution": [
+    "Replace implementation and harness pending fields with the accepted executable checkpoint identities.",
+    "Verify exact frozen request identities from the committed fixture.",
+    "Perform approved non-generative LAN runtime readiness and tokenization for both smoke requests and all six paired inputs.",
+    "Verify chat-template and structured-schema behavior and record actual token budget semantics without generation.",
+    "Run committed-checkpoint static preflight and bind the exact worktree allowlist.",
+    "Obtain separate Human Authority for each one-call smoke and use fresh evidence namespaces."
+  ],
+  "prohibition": "This proposal bundle is not a D5 authorization and must not be passed to the campaign launcher."
+}
