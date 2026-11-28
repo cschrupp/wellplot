@@ -3,11 +3,19 @@
   "descriptor_status": "PROPOSED_NOT_AUTHORIZED",
   "execution_eligible": false,
   "authority_decisions": "NOT_GRANTED",
-  "implementation_checkpoint": "9898823e3d367e73061f7668e883e053f63f93b4",
+  "implementation_checkpoint": "f6e8331167bf9fa8e434c4aff719ae250dd9804d",
+  "worktree_allowlist": [
+    "docs/architecture/PLANNER_WORKER_RESPONSIBILITY_REALIGNMENT_DESIGN.md",
+    "examples/notebooks/user/agent_cbl_log_example_from_prompt.ipynb",
+    "examples/notebooks/user/agent_las_step_by_step.ipynb",
+    "examples/families/"
+  ],
+  "panel_sha256": "bbad629ff86201d924a04869acfe5dc87325eda3fe6bd2bbc634ce19fd5a8e1c",
+  "ordered_rendered_inputs_sha256": "685ffac5090c90ceaeb421f84c7a78cb8516003fc7a8a141f07ad4f01e2262d0",
   "project_config_fingerprint_sha256": "14357a627f060572e73a822ab9efe9ed3a6cca6727b7247361a2a5adfa5bd498",
   "harness": {
     "path": "scripts/nlp_d5_live_semantic_qualification.py",
-    "sha256": "f77e08e44eb9516f043e5d716da51b178521e31af2d65b835e5665866aefcd88",
+    "sha256": "c9b1af630f7571b6a4f2fdf246c4753efb6eace2fdc970920c03ee0fb295c564",
     "launcher": "scripts/run_d5_live_campaign.sh",
     "launcher_sha256": "008a85671ebe5c76c987baceee23e6ad76d28cd88a43b4c0f40e1ad8076defb7"
   },
@@ -18,7 +26,7 @@
     "chat_template_sha256": "NOT_REVERIFIED",
     "runtime_defaults_sha256": "NOT_REVERIFIED"
   },
-  "rubric_sha256": "b44e72d04a0498f59b587d7379fc230219b467d7a0d3599ee2860c459dc643eb",
+  "rubric_sha256": "a1ae9a052addd6ac09fb89046a42ea42a05ea540fbeccecbbfbd4605ecbd21a0",
   "shared_controls": {
     "temperature": 0,
     "sampling_controls": "UNCHANGED_FROM_ACCEPTED_D5_CONFIGURATION",
@@ -78,7 +86,7 @@
     }
   ],
   "required_before_execution": [
-    "Replace implementation and harness pending fields with the accepted executable checkpoint identities.",
+    "Convert each proposal into a separate Human-Authority-approved D5 descriptor bound to the exact executing HEAD and the recorded worktree allowlist.",
     "Verify exact frozen request identities from the committed fixture.",
     "Perform approved non-generative LAN runtime readiness and tokenization for both smoke requests and all six paired inputs.",
     "Verify chat-template and structured-schema behavior and record actual token budget semantics without generation.",

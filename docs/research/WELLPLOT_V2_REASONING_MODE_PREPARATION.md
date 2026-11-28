@@ -2,7 +2,9 @@
 
 **Status:** Provider-free implementation and mock qualification prepared;
 non-generative LAN qualification and operational smokes remain pending.
-**Implementation checkpoint:** `9898823e3d367e73061f7668e883e053f63f93b4`.
+**Implementation checkpoint:** `f6e8331167bf9fa8e434c4aff719ae250dd9804d`.
+**Superseded preparation checkpoint:**
+`9898823e3d367e73061f7668e883e053f63f93b4` (retained in Git history).
 **Active objective:** Prepare a finite six-pair, twelve-generation diagnostic
 of the existing planner and section-specialist observation contracts, changing
 only `chat_template_kwargs.enable_thinking`.
@@ -42,6 +44,10 @@ Evidence classification:
 
 Official references consulted:
 
+- [Qwen3.6-35B-A3B model card](https://huggingface.co/Qwen/Qwen3.6-35B-A3B)
+  is the model-specific reference for the selected Qwen family/model. Its
+  presence does not establish how the deployed llama.cpp build accounts for
+  reasoning tokens or combines thinking with either structured schema.
 - [Qwen3 official quickstart](https://github.com/QwenLM/Qwen3/blob/main/docs/source/getting_started/quickstart.md)
   documents `enable_thinking` and separates thinking and final text in its
   example. It is general Qwen documentation, not proof for this exact local
@@ -59,24 +65,38 @@ Panel file:
 
 | Identity | SHA-256 |
 | --- | --- |
-| Panel file | `b8293d3c2a7978c9fa566dc46c82ca98f52a9e07cb23983f3138e0f7eae59ac1` |
-| Ordered rendered input pairs | `46a427e1454140dcc624513ada6f40f3870f915e9ff38affec5b7cf13623d550` |
+| Panel file | `bbad629ff86201d924a04869acfe5dc87325eda3fe6bd2bbc634ce19fd5a8e1c` |
+| Ordered rendered input pairs | `685ffac5090c90ceaeb421f84c7a78cb8516003fc7a8a141f07ad4f01e2262d0` |
 | Planner prompt (accepted S03) | `807797c9e776c47cd980e7423686c0bec5e4b8dd194a50b8b2d9c4e9218fadca` |
 | Section manual (accepted specialist) | `f2522ae3d1191eb6db265af04c230e93d7f71a03b3194027e334d69a724088e0` |
 | Prompt bundle authority | `09f06538949bbb077472f2b5c05756923dcb65f0a3f2b5d917657857215a8330` |
 | Planner schema | `8fe2dffed215069f2ec28672c218db45b405efa059b3c5aacf2356b515d582c0` |
 | Section schema | `ac2928f97643f08becb002a5229a950ecbfa6adae62140bb40d39c5ae1e401a1` |
 | Schema bundle authority | `0790c3dc9ae06ed1a6964240e38593e8e63d6ed1acdf2906e5bb80b9368db6d6` |
+| Independent scientific rubric | `a1ae9a052addd6ac09fb89046a42ea42a05ea540fbeccecbbfbd4605ecbd21a0` |
+
+The panel fixtures were corrected before any measured response. The earlier
+P1 accidentally repeated the R03 source-ambiguity class, so it could not test
+the intended independent-outcome preservation failure. The replacement uses
+fresh Facies Survey content and separately requests physical GR in Gamma and
+physical DEN in Density, without requesting a relationship. S1's previous
+assigned objective explicitly stated the expected ambiguity response; the
+neutral objective now leaves that decision to the specialist while retaining
+both inspected, eligible SAL inventories. S2 previously described an existing
+LOWER binding while omitting LOWER from inspected source provenance; the
+corrected inventory consistently exposes both UPPER and LOWER. The prior
+preparation checkpoint remains in Git history; no measured observation is
+superseded or rewritten.
 
 The panel is six exact input pairs, each sent once in both conditions:
 
 | Pair | Role | Failure class under test | Order |
 | --- | --- | --- | --- |
-| P1 | Planner | Ambiguous source identity; clarify rather than choose SAL dataset | off, on |
+| P1 | Planner | Preserve independent GR-in-Gamma and DEN-in-Density outcomes; do not invent a relationship | off, on |
 | P2 | Planner | Preserve same-track GR/RHOB and blue between-curves relationship | on, off |
 | P3 | Planner | Preserve literal CALX, Northern Survey, linear 5–25 in, unchanged title | off, on |
-| S1 | Section | Ambiguous eligible SAL sources; no unsupported source selection | on, off |
-| S2 | Section | Select UPPER prerequisite and retain dependent blue between-curves shading; no premature fill | off, on |
+| S1 | Section | Neutral SAL assignment with two eligible inspected sources; assess safe source handling | on, off |
+| S2 | Section | Select UPPER prerequisite and retain dependent blue between-curves shading; both source channels are inspected | off, on |
 | S3 | Section | Preserve explicit East Survey FLOW, Hydraulics scope, PRES and presentation | on, off |
 
 Counterbalancing is frozen per pair. The serialized request, context, role
@@ -94,11 +114,13 @@ context and does not establish host execution outcomes.
 
 ## Canonical D4/D5 Adaptation
 
-The change uses the existing `reasoning-mode-development` population in
-`D5CampaignRunner`, `planner_only` observation, `SemanticPlanner.plan`,
-canonical provider construction, D4 `CountingBackend`, D5 logical/physical
-accounting, raw HTTP model-I/O custody, stage tracing, and terminal
-verification. Per-turn role attribution remains pinned to the frozen panel.
+The bounded corrective at
+`f6e8331167bf9fa8e434c4aff719ae250dd9804d` uses the existing
+`reasoning-mode-development` population in `D5CampaignRunner`, `planner_only`
+observation, `SemanticPlanner.plan`, canonical provider construction, D4
+`CountingBackend`, D5 logical/physical accounting, raw HTTP model-I/O custody,
+stage tracing, and terminal verification. Per-turn role attribution remains
+pinned to the frozen panel.
 The active role is selected through D4's existing observation role flag; no
 new provider, runner, semantic engine, scorer, compiler, or execution path is
 introduced.
@@ -128,7 +150,21 @@ Provider-free mock qualification proves:
 - custody and terminal digests verify; cross-role generation is rejected;
 - each smoke role makes one mock request, valid and invalid first responses
   terminate, and smoke custody verifies with no measured-population load or
-  downstream worker/mutation/publication calls.
+  downstream worker/mutation/publication calls;
+- the reasoning population's normal and interrupted campaign paths run through
+  `execute_live_campaign`, and both paths close every created HTTP client;
+- the two reasoning smoke modes bind logical and physical limits of one in the
+  existing D5 custody ledger and seal those limits in state and terminal
+  records; and
+- static preflight binds the independent rubric SHA-256, following the existing
+  response-agent precedent.
+
+The scoped `tests/test_nlp_d5_live_semantic_qualification.py` qualification
+passes 183 tests, including corrected-fixture parity, complete and interrupted
+campaign cleanup, request-body identity, and the smoke custody ceilings. The
+production manifest changes only the attested `planner.py` source digest for
+the exact frozen planner-case allowlist. This package adds no prompt, response
+schema, production routing, or lifecycle semantics.
 
 The mock demonstrates how WellPlot's current adapter handles a synthetic
 response with separate reasoning and final-content fields. It does **not**
@@ -144,16 +180,16 @@ the runtime's `/apply-template` and `/tokenize` operations.
 
 | Cell | SDK body SHA-256 |
 | --- | --- |
-| P1-OFF | `29c961910718481dc82b55baefd21e8983975a8b6c96eef08233ad207b6fd733` |
-| P1-ON | `c698d47e9779e816537944b50c6da739738160f67ebd2757cf6d031b60f66a92` |
+| P1-OFF | `fbaa832ab30982ae9c9dd05ac2094009d4fcaa066e9e5483a9ba76b7d033fd4b8` |
+| P1-ON | `c48d9ea1f3cd9df03aa413b49dfccc6d1f6ad66cd1ee85a8bf21d6b27a8dc471` |
 | P2-ON | `4b90838916610c27a59a3ccf69991d3c8af1ce2f46cca349ebbb9ed226f46b16` |
 | P2-OFF | `3b0f730778f7c894ae7c6bf739253a14a9fb652bbb3d0b33ac6eec3513500d70` |
 | P3-OFF | `8b9d4c35208930a8fc84390436ee859238220e045f806dcd4be0de40b3e77e7c` |
 | P3-ON | `06af06d8016c0b49b6cb2680a8d4d8da1281eaeac548d9457a8dd93be398a6d7` |
-| S1-ON | `b3c1bf24af7b8e9b2d63cb6fea7995572c263b1e8a3ed97a788808e0bc624f86` |
-| S1-OFF | `1f6ee45993d4ad31c6a0d3cc0236b69bc58eba1dc44d5aa69e2c1a35a70539b8` |
-| S2-OFF | `748696c3d9524c04b6a3b65bc68e43aa91f59305861144fbf0ed28d8bdf892e2` |
-| S2-ON | `2cc99193bd86a4ef295d5c69b675f8d27c9741c2a461a36bac73c2750afadb4b` |
+| S1-ON | `9a1fb32f7278ec43d9c9d96565bd0c9a573566cce565228ba03006faf02119fb` |
+| S1-OFF | `cd44e57faf863caba89b8a4cd978722097067ece06b41ddc046ca8c599d35f74` |
+| S2-OFF | `c1340ab7f6bcf72e55d5b741918adc70638de771fdfd528dfac0ee6156c97907` |
+| S2-ON | `cdbb07185344a7fa83a83835e2489127b5edc814c61cb758028156c8c25a1664` |
 | S3-ON | `cadbcb64e6d7e2665c3419ee3ca721c4acc14326382126012527cd0ba74029a4` |
 | S3-OFF | `715ba36d7bceeabf9f1440d72c7a32045e32201b821fbac6ac5f040b0794ba2d` |
 
@@ -181,12 +217,17 @@ thinking enabled. Each requires its own Human Authority and fresh namespace.
 
 ## Non-Generative LAN Readiness and Tokenization
 
-**Status: NOT PERFORMED.** This environment did not provide an approved
-escalation mechanism for the configured LAN endpoint. No `/v1/models`,
-`/props`, `/apply-template`, or `/tokenize` request was sent. No credentials
-were loaded or exposed. Do not infer runtime identity, template identity,
-thinking suffix, schema overhead, input token counts, structured-output
-compatibility, or reasoning-token budget semantics from local/mock evidence.
+**Status: NOT PERFORMED.** The tool authorization profile in this session
+does not permit requesting the LAN execution approval required by the
+repository gate. Therefore this is a readiness blocker, not evidence that the
+endpoint is unavailable. No `/v1/models`, `/props`, `/apply-template`, or
+`/tokenize` request was sent. No credentials were loaded or exposed. Do not
+infer runtime identity, template identity, thinking suffix, schema overhead,
+input token counts, structured-output compatibility, or reasoning-token
+budget semantics from local/mock evidence. The twelve measured cells and both
+enabled-mode smoke bodies still require exact approved-runtime tokenization
+and request-identity comparison before smoke authority can be prepared for
+execution.
 
 Before the smoke proposals can be converted into executable authorities, the
 existing approved non-generative procedure must verify current runtime
